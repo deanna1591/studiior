@@ -1,0 +1,176 @@
+# STUDIIOR V1 — DECISION LOG
+
+**Canonical.** Every entry here is settled. If code contradicts this file, the code is wrong. If you think an entry is wrong, change it here first with a reason, then change the code.
+
+**Source of truth above this file:** V1 Product Bible Ch. 8 (seven modules), Ch. 7 (exclusions), Ch. 9 (roles), Ch. 20 (scope test).
+
+---
+
+## 1 — Payment source resolution: soonest expiry first
+
+Booking resolves what pays for it in this order: unlimited membership covering the class type, then limited membership with remaining period allowance, then class pack credits soonest-expiry-first, then prompt for drop-in.
+
+Deliberately favours the member — their paid-for pack credits are preserved while a membership can cover the class. Some studios expect the reverse so packs get used before they expire. The resolved source is shown on the confirmation screen so it is never a surprise.
+
+Credits are consumed at booking time, not at attendance.
+
+**Where:** Business Rules §2.2. **Status:** settled.
+
+---
+
+## 2 — Instructor substitution inside the cancellation window
+
+Permitted, with friction: warns, requires a reason, writes to the audit log, notifies booked members immediately. Refusing outright just forces a cancelled class, which is worse for everyone.
+
+Members get a penalty-free cancellation **only** when the substitution is announced after the cancellation cutoff has already passed. Studio setting `sub_late_free_cancel`, default on. Three days' notice means normal policy. Ninety minutes' notice means the member isn't charged for a class they can no longer decide about.
+
+**Where:** Business Rules §3.3. **Status:** settled.
+
+---
+
+## 3 — No credit rollover between periods
+
+Recurring plan allowances reset at each billing period boundary. Unused allowance is lost.
+
+**Where:** Business Rules §6. **Status:** settled.
+
+---
+
+## 4 — Failed payment grace period
+
+Studio setting `payment_grace_days`, default 7, range 0–30. Zero means blocked immediately. Seven covers Stripe's retry cycle, so most cards recover before anyone notices.
+
+**Blocked means no new bookings. Existing bookings stand.** Cancelling classes someone already booked because their bank flagged a transaction is how you lose a member who did nothing wrong.
+
+Member emailed day 0, 3 and 6 with a Stripe update link. Owner sees it in the Morning Brief on day one.
+
+**Where:** Business Rules §7.3. **Status:** settled.
+
+---
+
+## 5 — Streaks are weekly, not daily
+
+A streak is consecutive weeks with at least one attended class, using the studio's week start.
+
+Daily streaks punish rest days, which is the opposite of the habit a Pilates or yoga studio wants to build, and they break constantly, which makes the number meaningless.
+
+**Where:** Business Rules §8. **Status:** settled.
+
+---
+
+## 6 — Challenge join deadlines are mandatory
+
+`join_deadline` is `not null` and must fall between `starts_on` and `ends_on`.
+
+Progress counts qualifying attendance from the challenge start date regardless of when the member joined. Someone who joins on day 10 having attended four classes starts at four.
+
+**Where:** Business Rules §9.2. **Status:** settled.
+
+---
+
+## 7 — Late cancellation releases the seat
+
+A late cancel is penalised per studio policy but still frees the spot and still triggers waitlist promotion. Penalising the member and holding the spot empty helps nobody.
+
+**Where:** Business Rules §3.1. **Status:** settled.
+
+---
+
+## 8 — Owner count, and the dormant locations table
+
+Minimum one Owner per studio, no maximum. The last active Owner cannot be removed or demoted. Enforced by trigger `guard_last_owner`, not application code.
+
+One location per studio in V1. `locations` ships in migration 001 with exactly one row per studio, no UI and no multi-location logic, with `rooms`, `class_series` and `class_occurrences` parented to `location_id` rather than `studio_id` directly. A foreign key, not a feature. Retrofitting it later means rewriting every scheduling query and every RLS policy against live studio data.
+
+Recruit single-location design partners deliberately — a two-location owner will spend the pilot asking for combined reporting and you'll learn nothing about whether the core product works.
+
+**Where:** Data Model §3, migration 001. **Status:** settled.
+
+---
+
+## 9 — Instructors submit availability; they do not schedule
+
+Instructors can submit and edit their own teaching availability. They cannot create, edit, move or delete classes. The timetable stays with Owner and Manager.
+
+**Availability does not retroactively invalidate assignments.** Once an instructor is assigned to an occurrence, later edits to their availability do not unassign them, do not flag the occurrence, and do not notify anyone. Availability is an input to future assignment only. Without this, an instructor can quietly edit themselves out of a class they already agreed to teach and the studio finds out at 6am.
+
+Assigning an instructor outside their stated availability is **permitted with a warning, never blocked**. Studios override availability constantly, and a hard block gets worked around by not using the feature.
+
+New instructor screen: My Availability. New admin panel inside the scheduling flow.
+
+**Where:** Data Model §5, Permissions §4 and §6. **Status:** settled.
+
+---
+
+## 10 — Instructor recognition is in V1; compensation is not
+
+In: classes taught, weekly teaching streaks, personal targets, badges, instructor challenges. Reuses the Module 6 engine with a different participant type.
+
+Out: anything that resolves to money owed — per-class rates, bonus thresholds, accrual, payout, payroll export. Remains Wave 3.
+
+**Boundary test.** If a feature's output is a number an instructor could reasonably expect to be paid, it's compensation and out of scope. Classes taught this month is recognition. Classes taught multiplied by anything is compensation.
+
+**Leaderboard caution.** Ranking instructors publicly by classes taught rewards whoever has the most open calendar, which in a small studio correlates with having the fewest other commitments rather than teaching quality. Ship personal metrics first; treat a public staff leaderboard as a studio setting, default off.
+
+New instructor screen: My Stats. Instructor rewards are descriptive text, fulfilled manually.
+
+**Where:** Business Rules §9.6 and §10, Permissions §11 and §13. **Status:** settled.
+
+---
+
+## 11 — Challenges are audience-typed at the schema level
+
+`challenge_audience` enum (`member`, `instructor`) on challenges, templates and achievement definitions. `challenge_participants` and `challenge_progress_events` carry both `member_id` and `instructor_id`, nullable, with a check constraint that exactly one is set, plus partial unique indexes on each.
+
+Same reasoning as the dormant `locations` table: one enum column and one indirection now, versus a data migration across participation, progress and reward tables while the feature is live.
+
+Member and instructor leaderboards never merge. Ordering runs per audience.
+
+Rewards must be audience-aware — an instructor cannot redeem a free class credit against a plan they do not hold.
+
+**Considered and rejected:** a polymorphic `participant_id` with no foreign key. Simpler to write, gives up referential integrity.
+
+**Where:** Data Model §8, migration 001. **Status:** settled. Blocked migration 001.
+
+---
+
+## Screen inventory
+
+| Surface | Count |
+|---|---|
+| Staff app | 49 |
+| Member PWA | 22 |
+| Account / onboarding | 9 |
+| **Total** | **80** |
+
+Instructor surface is five screens: My Schedule, Class Roster, Member Quick View, My Availability, My Stats. Was three before Decisions 9 and 10.
+
+---
+
+## Open — not decided
+
+1. **Instructor-initiated cancellation and substitution requests.** Currently Owner/Manager-initiated only. Adding this means a sixth instructor screen, a request state machine, and an approval queue on the admin side. Decision 2 governs what members are owed when a substitution lands late; this is about who initiates.
+2. **Reschedule inside the cancellation window.** Reschedule is cancel plus rebook and inherits the window. Open question is whether a same-week move to another occurrence is treated more leniently than a plain cancel. Affects credit consumption and seat release.
+3. **POS.** Verify against Chapter 8 whether in-person retail is actually in V1. Module 3 covers plans, packs, credits, promo codes and gift cards. Physical retail adds inventory, which is a different system.
+4. **Single tier vs plan gating.** Recommendation on record: V1 ships as one product at one price. Ten design partners with unannounced pricing don't need plan-gating logic, and building it now means guessing which features studios refuse to live without before any studio has used the product.
+5. **Stripe onboarding time-to-complete.** Connect Standard OAuth requires the studio to have or create a Stripe account during setup. Time it with a design partner against the one-hour target.
+6. **Member identity across studios.** Same email can be a member of two studios; separate accounts per subdomain, no policy joins them. Confirm this is acceptable.
+7. **Archived-member retention.** How long before GDPR hard delete, and who can trigger it.
+8. **Front-desk refunds.** Currently denied. Revisit if design partners find it too restrictive.
+9. **Instructor challenge credit on substitution.** Currently credits whoever actually taught the class, not the originally scheduled instructor. Fair reading, but it means an instructor who picks up subs climbs faster than one teaching a steady timetable.
+
+---
+
+## Excluded from V1 — Chapter 7
+
+Raised in brainstorming, confirmed out:
+
+| Item | Reason |
+|---|---|
+| Automate membership continuity promotions | Marketing Automation |
+| Share milestones to social | Community-adjacent |
+| Refer friends | Referral engine, not in the seven modules |
+| Instructor incentive/payroll tracking | Wave 3 (Decision 10) |
+| Multi-location | Ch. 7, though schema is ready (Decision 8) |
+| API access | Ch. 7 |
+| Community feed | Ch. 7 |
