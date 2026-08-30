@@ -134,6 +134,24 @@ Rewards must be audience-aware — an instructor cannot redeem a free class cred
 
 ---
 
+## 12 — `credits` is pack-only, `credits_per_period` is recurring-only
+
+`membership_plans.credits` is the size of a bundle bought once: a ten-class pack has `credits = 10`. It is null on every other plan type.
+
+`membership_plans.credits_per_period` is an allowance that resets at each billing boundary. It is null on every non-recurring type, and **null on a recurring plan means unlimited**. That is where the unlimited semantics live; they were previously annotated on `credits`, which implied a recurring plan could carry a bundle size.
+
+There is no lifetime-cap concept in V1. A recurring plan is either unlimited or capped per period. "Unlimited but only 200 classes ever" is not a thing a studio sells, and inventing a column for it costs a data migration to remove later.
+
+This is what `book_class()` has always done. Its §2.2 resolution reads `credits_per_period` and `memberships.credits_remaining`, and never reads `membership_plans.credits` at all — the pack grant reaches a booking through `credits_remaining`, not through the plan.
+
+The ambiguity mattered because two columns describing one concept is exactly how a plan ends up disagreeing with what the booking function reads. A recurring plan with `credits = 8` and `credits_per_period = null` looks capped in the admin screens and resolves as **unlimited** at booking time, and nobody finds out until a member takes their ninth class of the month for free. The schema now refuses to store that row.
+
+**Considered and rejected:** collapsing the two into one `credits` column with the meaning switched by `type`. Fewer columns, but every read site would have to know the type to know what the number means, and the null-means-unlimited case gets more confusing rather than less.
+
+**Where:** Data Model §7, Business Rules §2.2, migration 010. **Status:** settled.
+
+---
+
 ## Screen inventory
 
 | Surface | Count |

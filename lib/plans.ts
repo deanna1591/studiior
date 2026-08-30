@@ -13,8 +13,8 @@ export type BillingInterval = Database["public"]["Enums"]["billing_interval"];
  */
 export type FieldSet = {
   billing: boolean;           // billing_interval, billing_interval_count
-  credits: boolean;           // credits — a fixed bundle bought once
-  creditsPerPeriod: boolean;  // credits_per_period — an allowance that resets
+  credits: boolean;           // credits — pack only: a bundle bought once (Decision 12)
+  creditsPerPeriod: boolean;  // credits_per_period — recurring only; null = unlimited (Decision 12)
   validity: boolean;          // validity_days
   commitment: boolean;        // commitment_months, cancellation_notice_days
   freeze: boolean;            // freeze_allowed, max_freeze_days
@@ -36,7 +36,7 @@ export const PLAN_TYPE_LABEL: Record<PlanType, string> = {
 
 export const PLAN_TYPE_HINT: Record<PlanType, string> = {
   recurring:
-    "Bills on a schedule until cancelled. Leave the per-period allowance empty for unlimited.",
+    "Bills on a schedule until cancelled. Leave the per-period allowance empty for unlimited — that is what unlimited means here (Decision 12).",
   class_pack:
     "Bought once, a fixed number of classes, expiring after a set number of days.",
   drop_in: "One class, bought and used.",

@@ -266,6 +266,26 @@ select expect_write('a pack CANNOT carry commitment terms',
   $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, commitment_months)
     values ('77777777-0000-0000-0000-000000000001','Committed Pack','class_pack',50000,'CZK',10,6)$$, false);
 
+-- Decision 12, migration 010: credits is the size of a bundle bought once, so
+-- it belongs to a pack. A recurring plan carrying one would read as capped in
+-- the admin screens and resolve as unlimited in book_class().
+select expect_write('a recurring plan CANNOT carry credits',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, billing_interval, credits)
+    values ('77777777-0000-0000-0000-000000000001','Capped Sub','recurring',50000,'CZK','month',8)$$, false);
+
+select expect_write('a recurring plan with no per-period allowance is unlimited, and fine',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, billing_interval)
+    values ('77777777-0000-0000-0000-000000000001','Unlimited Sub','recurring',280000,'CZK','month')$$, true);
+
+select expect_num('that plan is unlimited: no allowance, no bundle',
+  (select count(*) from membership_plans
+    where studio_id = '77777777-0000-0000-0000-000000000001' and name = 'Unlimited Sub'
+      and credits is null and credits_per_period is null), 1);
+
+select expect_write('a template cannot describe a recurring plan with credits either',
+  $$insert into plan_templates (studio_id, name, type, credits)
+    values ('77777777-0000-0000-0000-000000000001','Bad Template','recurring',8)$$, false);
+
 select expect_write('a well-formed pack is fine',
   $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days)
     values ('77777777-0000-0000-0000-000000000001','Proper Pack','class_pack',50000,'CZK',10,180)$$, true);
@@ -279,7 +299,15 @@ select expect_num('no plan anywhere is mis-shaped for its type',
   (select count(*) from membership_plans
     where ((type = 'recurring') <> (billing_interval is not null))
        or (type = 'recurring' and validity_days is not null)
-       or (type <> 'recurring' and credits_per_period is not null)), 0);
+       or (type <> 'recurring' and credits_per_period is not null)
+       or (type = 'recurring' and credits is not null)), 0);
+
+-- The six shipped templates have to obey the decision they are teaching.
+select expect_num('no system template is mis-shaped either',
+  (select count(*) from plan_templates
+    where studio_id is null
+      and ((type = 'recurring' and credits is not null)
+        or (type <> 'recurring' and credits_per_period is not null))), 0);
 
 -- =============================================================================
 -- 6. One active plan per name per studio — migration 009

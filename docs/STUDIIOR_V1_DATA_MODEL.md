@@ -413,8 +413,8 @@ create table membership_plans (
   currency                char(3) not null,
   billing_interval        billing_interval,        -- recurring only
   billing_interval_count  int not null default 1,
-  credits                 int,                     -- null on 'recurring' = unlimited
-  credits_per_period      int,                     -- e.g. 8 classes per month
+  credits                 int,                     -- class_pack only: bundle size, e.g. 10
+  credits_per_period      int,                     -- recurring only: allowance per period; null = unlimited
   validity_days           int,                     -- pack expiry
   signup_fee_cents        int not null default 0,
   commitment_months       int not null default 0,
