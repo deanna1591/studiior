@@ -1461,3 +1461,33 @@ comment on view studio_public is
 -- =============================================================================
 -- END MIGRATION 001
 -- =============================================================================
+
+-- =============================================================================
+-- 16. GRANTS
+--
+-- RLS decides which rows. Grants decide whether the role may touch the table
+-- at all. Both are required: a table with perfect policies and no grant is
+-- closed to everyone, and a grant without RLS is open to everyone.
+--
+-- `authenticated` is every logged-in user regardless of role. Row-level
+-- scoping is the policies' job, above.
+-- `anon` gets nothing: there is no pre-login surface in V1.
+-- =============================================================================
+
+grant usage on schema public to authenticated, service_role;
+
+grant select, insert, update, delete on all tables in schema public
+  to authenticated, service_role;
+grant usage, select on all sequences in schema public
+  to authenticated, service_role;
+grant execute on all functions in schema public
+  to authenticated, service_role;
+
+-- Future tables inherit the same treatment, so a later migration can't
+-- accidentally ship a table nobody can read.
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated, service_role;
+alter default privileges in schema public
+  grant usage, select on sequences to authenticated, service_role;
+alter default privileges in schema public
+  grant execute on functions to authenticated, service_role;

@@ -11,11 +11,6 @@ set client_min_messages = notice;
 
 -- A non-superuser role, because superusers bypass RLS entirely and would
 -- make every one of these tests pass for the wrong reason.
-drop role if exists app_user;
-create role app_user nologin;
-grant usage on schema public to app_user;
-grant select, insert, update, delete on all tables in schema public to app_user;
-grant execute on all functions in schema public to app_user;
 
 -- --- Fixtures (as superuser, RLS bypassed) ----------------------------------
 
@@ -98,7 +93,7 @@ end $$;
 -- TESTS
 -- =============================================================================
 
-set role app_user;
+set role authenticated;
 
 -- 1. Cross-tenant reads --------------------------------------------------
 select login('00000000-0000-0000-0000-0000000000a1');   -- Owner A
@@ -148,7 +143,7 @@ select expect('desk sees NO ai insights',            (select count(*) from ai_in
 reset role;
 insert into instructor_availability (studio_id, instructor_id, day_of_week, starts_at_time, ends_at_time)
 values ('aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-0000000000e1',2,'07:00','12:00');
-set role app_user;
+set role authenticated;
 
 select login('00000000-0000-0000-0000-0000000000a2');
 select expect('instructor sees own availability',    (select count(*) from instructor_availability), 1);
@@ -198,7 +193,7 @@ begin
 end $$;
 
 -- 8. Restricted views ----------------------------------------------------
-set role app_user;
+set role authenticated;
 select login('00000000-0000-0000-0000-0000000000a2');
 do $$
 declare cols int;
