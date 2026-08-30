@@ -43,8 +43,11 @@ Three migrations, applying clean from `supabase db reset`:
 - **013** revokes execute on `rls_auto_enable()`, the Supabase-installed event trigger function behind `ensure_rls`. Guarded, because it exists only on hosted — which is why 011 missed it
 - **014** `revoke execute on all functions in schema public from anon`, then re-grants the three pre-login surfaces. Also moves `btree_gist` out of `public` — the only way its 188 index internals could leave the API-exposed schema, since `postgres` cannot revoke grants `supabase_admin` made
 - **015** `validate_iana_timezone()` on `studios` and `locations` — a zone not in `pg_timezone_names` cannot be stored by any writer. Plus ISO shape checks on currency and country, and `provision_studio()` fixed forward with `invalid_timezone` / `invalid_currency` / `invalid_country`
+- **016** *(partial — the importer is paused mid-build)* nullable `check_ins.occurrence_id` / `booking_id`, an `import_id` marker, and `recompute_member_stats()`
+- **017** demo data: `is_demo` on twelve tables, `generate_demo_data()` and `purge_demo_data()`, platform-admin only. Every id is derived from the studio id, so two runs produce identical data
+- **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in
 
-Six suites, **234 assertions**, all passing from a clean `db reset`:
+Seven suites, **299 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -60,6 +63,8 @@ Six suites, **234 assertions**, all passing from a clean `db reset`:
 The vertical slice is built: Next.js App Router + TypeScript + Tailwind, staff app on `localhost:3000` and the member PWA on `{slug}.localhost:3000`. Staff sign in, see the week, create a class; a member signs in on the studio subdomain and books it through `book_class()`; front desk checks them in. See `docs/SLICE.md` for how to run it and which login to use for which role.
 
 Every database call goes through a request-scoped client carrying the user's session, so RLS applies to all of it. There is no service-role client in the codebase and there should never be one — migration 004 exists because the pre-login slug lookup needed a policy, not a key.
+
+Rooms, class types and instructors have list/create/edit screens at `/rooms`, `/class-types`, `/instructors` — Owner and Manager, per Permissions §3 and §4, enforced by the existing `*_manager_write` policies. The dashboard checklist links to all three. An instructor is a teaching record with `staff_id` null: no login, no invite.
 
 Membership plan management is built: list, create from one of six system templates or blank, and edit, at `/plans`. Owner and Manager only — Permissions §9 — enforced by `plans_manager_write`, not by the nav.
 
@@ -100,6 +105,8 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **A studio's timezone is validated in the database, not the form.** It governs every day boundary and every materialised occurrence, and a typo does not fail — `Europe/Pragu` is simply not a zone, and the studio's classes are quietly wrong from then on. `validate_iana_timezone()` (migration 015) checks against `pg_timezone_names` on insert and update, so the wizard, `provision_studio()` and any future import all meet the same rule. The UI offers `Intl.supportedValuesOf('timeZone')` with live UTC offsets so the value can only come from a list; that is convenience, not the guarantee.
 
 **Time is `timestamptz` stored UTC.** Studio timezone governs display and all day boundaries. A 7am class stays 7am across DST — occurrences materialise by converting local time to UTC at generation, not by adding fixed intervals.
+
+**Demo data is flagged, never inferred.** `generate_demo_data()` sets `is_demo` on every row it writes and `purge_demo_data()` clears the lot in one call. Fake members will sit in the same table as real ones; working out later which was which from names and email domains is not a plan.
 
 **Nothing AI-generated sends itself.** The model drafts, the owner approves. Hard architectural rule.
 
@@ -152,11 +159,15 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/plan_mana
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
+```
+
 `db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 
-Never run any of the six suites against production. They create roles, insert fixtures, and the concurrency suite opens 50 connections.
+Never run any of the seven suites against production. They create roles, insert fixtures, and the concurrency suite opens 50 connections.
 
 ---
 

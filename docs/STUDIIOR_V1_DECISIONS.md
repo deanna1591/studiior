@@ -152,6 +152,109 @@ The ambiguity mattered because two columns describing one concept is exactly how
 
 ---
 
+## 14 — Member Health Score is a band with a reason, not a number
+
+## Why a band and not a number
+
+A score of 68 invites the owner to argue with the number, and gives them nothing to do. "Was coming twice a week, hasn't been in 16 days" is a fact they can act on before lunch. The owner already knows their members better than any model will; the product's job is to surface the fact they missed, not to rank people.
+
+A number also implies a precision the data cannot support. Thirty members and eighteen months of attendance is not enough to calibrate a hundred-point scale, and a false 68 is worse than an honest band.
+
+---
+
+## The five signals
+
+### 1. Rhythm deviation — primary
+
+Current visit frequency measured against **that member's own established baseline**, never against a studio average.
+
+- Baseline: median gap between visits over the member's history, minimum 6 visits to establish.
+- Fires when the current gap exceeds 2× baseline, floor of 10 days.
+- Reason names both halves: the old rhythm and the current gap.
+
+**This is the signal no competitor surfaces.** Every platform reports days-since-last-visit, which is a lagging indicator: by the time it is high, the member has already left mentally. Rhythm deviation catches someone who is *still attending* but has halved their frequency. They remain "active" in every other system in the market. This requires attendance history and the credit ledger in one place, which is what the schema gives.
+
+### 2. Booking-to-attendance drift
+
+A member who keeps booking but has started late-cancelling or no-showing is signalling before they stop booking. Intent persists; follow-through is going.
+
+- Fires when late cancels + no-shows reach 40% of bookings over the last 6 weeks, minimum 4 bookings.
+- Earlier than absence, and specific enough to act on.
+
+### 3. First thirty days
+
+A member's first month predicts lifetime value better than any later window, and it is the most rescuable period.
+
+- Fires when a member has been joined 14–35 days and has fewer than 3 attended visits.
+- Distinct from `new_member_stalled` in Business Rules §11, which is an insight; this is the band behind it.
+
+### 4. Payment state
+
+- Membership `past_due`, or a class pack expired within 30 days with no replacement purchased.
+- Factual rather than predictive, but it is a live reason a member cannot book.
+
+### 5. Membership expiry with declining usage
+
+The renewal decision is made before the renewal date.
+
+- Fires when a membership renews within 21 days **and** usage in the current period is below 60% of the member's own prior-period usage.
+- Either condition alone is not a signal. Together they are the moment someone decides not to renew.
+
+---
+
+## Deliberately excluded
+
+**Challenge and streak participation.** It correlates with engagement but is noisy: many loyal members ignore gamification entirely. Scoring them down for it produces false alarms in exactly the population the owner least wants to be nudged about. Revisit only if the data shows non-participants actually churn more.
+
+**Studio-average comparison anywhere.** A twice-weekly member and a fortnightly member are both healthy. Comparing either to a studio mean manufactures problems that do not exist.
+
+**Demographics, tenure alone, spend.** A member who has been there three years and comes weekly is healthy. A high spender who stopped coming is at risk. Neither fact adds anything the behavioural signals do not already carry.
+
+---
+
+## Band assignment
+
+| Band | Condition |
+|---|---|
+| `at_risk` | Signal 1 at ≥3× baseline, or signal 4, or two or more signals firing |
+| `drifting` | Any single signal firing |
+| `healthy` | No signal firing |
+
+A member with fewer than 6 visits and joined more than 35 days ago has **no band**, not a healthy one. Absence of evidence is not evidence of health, and a falsely reassuring band is worse than none. Show `insufficient_history`.
+
+---
+
+## Reasons are member-level, never categorical
+
+The reason string must name the member's actual behaviour.
+
+- Wrong: "Retention risk — low engagement."
+- Right: "Was coming twice a week through July, last visit 16 days ago."
+- Wrong: "Booking behaviour concern."
+- Right: "Booked 6 classes in the last month, attended 2."
+
+The owner knows their members. Give them the fact they missed, not a label they have to decode.
+
+---
+
+## Computation and storage
+
+Computed nightly per studio, and on check-in for the member checking in, so a returning member's band updates before they leave the building.
+
+Stored on `members` as a cache (band, reason, computed_at, signals fired). Derived from `check_ins`, `bookings`, `memberships` and `credit_ledger` — never edited in place, always recomputable. If cache and source disagree, source wins, per the derived-values table in the data model.
+
+The score feeds `ai_insights.type = 'retention_risk'` and the Morning Brief. Business Rules §11's insight threshold and this band are the same underlying calculation; §11 governs when an insight is *raised*, this decision governs what the band *is*.
+
+---
+
+## Status
+
+Settled. Blocks the Health Score implementation and the Morning Brief.
+
+**Where:** Data Model §5 (members cache), Business Rules §11, migration 018. **Status:** settled.
+
+---
+
 ## Screen inventory
 
 | Surface | Count |

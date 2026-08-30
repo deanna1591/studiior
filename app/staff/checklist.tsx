@@ -8,9 +8,9 @@ export type SetupState = Record<string, { done: boolean; dismissed: boolean }>;
 
 /** Order is the order a studio actually needs them in. */
 const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
-  { key: "rooms",          label: "Add your rooms",        hint: "Where classes happen, and how many people fit." },
-  { key: "class_types",    label: "Add your class types",  hint: "Reformer, mat, barre — with default length and capacity." },
-  { key: "instructors",    label: "Add your instructors",  hint: "Who teaches. They do not need logins yet." },
+  { key: "rooms",          label: "Add your rooms",        hint: "Where classes happen, and how many people fit.", href: "/rooms" },
+  { key: "class_types",    label: "Add your class types",  hint: "Reformer, mat, barre — with default length and capacity.", href: "/class-types" },
+  { key: "instructors",    label: "Add your instructors",  hint: "Who teaches. They do not need logins yet.", href: "/instructors" },
   { key: "plans",          label: "Set up what you sell",  hint: "Memberships, packs and drop-ins.", href: "/plans" },
   { key: "schedule",       label: "Put your week on",      hint: "Your first classes, so members have something to book.", href: "/classes/new" },
   { key: "staff",          label: "Invite your team",      hint: "Front desk and managers, so you are not the only login." },
@@ -26,14 +26,19 @@ function Row({ item, state }: { item: (typeof ITEMS)[number]; state: { done: boo
           <span className={state.done ? "text-emerald-700" : "text-stone-300"}>
             {state.done ? "✓" : "○"}
           </span>
-          {item.href && !state.done ? (
-            <Link href={item.href} className="font-medium underline underline-offset-4">
+          {item.href ? (
+            <Link
+              href={item.href}
+              className={
+                state.done
+                  ? "text-stone-500 underline underline-offset-4"
+                  : "font-medium underline underline-offset-4"
+              }
+            >
               {item.label}
             </Link>
           ) : (
-            <span className={state.done ? "text-stone-500 line-through" : "font-medium"}>
-              {item.label}
-            </span>
+            <span className={state.done ? "text-stone-500" : "font-medium"}>{item.label}</span>
           )}
         </div>
         {!state.done && <p className="mt-0.5 pl-6 text-xs text-stone-500">{item.hint}</p>}

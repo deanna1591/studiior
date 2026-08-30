@@ -374,7 +374,9 @@ All seven original items are now closed. Recorded here so nobody reopens them by
 | 6 | Challenge progress counts from challenge start; `join_deadline` mandatory | §9.2 |
 | 7 | Late cancellation releases the seat and promotes the waitlist | §3.1 |
 
-Decisions 8–12 (owner count, dormant locations, instructor availability, instructor recognition, challenge audience, plan credit columns) are recorded in the decision log and reflected in the data model.
+Decisions 8–14 (owner count, dormant locations, instructor availability, instructor recognition, challenge audience, plan credit columns, health score) are recorded in the decision log and reflected in the data model.
+
+**Decision 14 and §11's `retention_risk` threshold are the same calculation.** §11 governs when an insight is *raised*; Decision 14 governs what the band *is*. If they ever disagree, the decision log wins and §11 is the thing to correct.
 
 ---
 
