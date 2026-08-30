@@ -85,6 +85,27 @@ function readForm(fd: FormData, currency: string): ReadResult {
   };
 }
 
+/**
+ * Turn a database refusal into something an owner can act on.
+ *
+ * These constraints exist because the form is not the only writer (migration
+ * 009). When one fires here it usually means a genuine collision — two plans
+ * with one name — rather than a mis-shaped row, since readForm() already
+ * strips fields the type does not use.
+ */
+function explain(error: { code?: string; message: string }): string {
+  if (error.code === "23505" && /membership_plans_active_name/.test(error.message)) {
+    return "There is already an active plan with that name. Rename this one, or archive the existing plan first — archived plans keep their names.";
+  }
+  if (error.code === "23514") {
+    return `That combination of fields is not valid for this plan type (${error.message}).`;
+  }
+  if (/row-level security/i.test(error.message) || error.code === "42501") {
+    return "Your role cannot change plans. Owners and managers only.";
+  }
+  return error.message;
+}
+
 export async function createPlan(_prev: PlanFormState, fd: FormData): Promise<PlanFormState> {
   const ctx = await getStaffContext();
   if (!ctx) return { error: "Not signed in." };
@@ -101,11 +122,7 @@ export async function createPlan(_prev: PlanFormState, fd: FormData): Promise<Pl
     .select("id")
     .single();
 
-  if (error) {
-    return /row-level security/i.test(error.message) || error.code === "42501"
-      ? { error: "Your role cannot create plans. Owners and managers only." }
-      : { error: error.message };
-  }
+  if (error) return { error: explain(error) };
 
   revalidatePath("/plans");
   redirect(`/plans/${data.id}?saved=1`);
@@ -126,7 +143,7 @@ export async function updatePlan(_prev: PlanFormState, fd: FormData): Promise<Pl
     .eq("id", id)
     .select("id");
 
-  if (error) return { error: error.message };
+  if (error) return { error: explain(error) };
 
   // RLS blocks an UPDATE by making the row invisible, not by raising. Without
   // this check a refused edit returns no error and zero rows, and the screen
@@ -155,7 +172,7 @@ export async function setPlanStatus(_prev: PlanFormState, fd: FormData): Promise
     .eq("id", id)
     .select("id");
 
-  if (error) return { error: error.message };
+  if (error) return { error: explain(error) };
   if (!data || data.length === 0) {
     return { error: "Your role cannot archive plans. Owners and managers only." };
   }
@@ -181,7 +198,7 @@ export async function deletePlan(_prev: PlanFormState, fd: FormData): Promise<Pl
     // PT409 from guard_plan_delete(): the plan has members on it. The database
     // is the thing that knows, and it refuses on every path, not just this one.
     if (error.code === "PT409") return { error: error.message };
-    return { error: error.message };
+    return { error: explain(error) };
   }
   if (!data || data.length === 0) {
     return { error: "Your role cannot delete plans. Owners and managers only." };

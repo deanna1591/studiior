@@ -238,5 +238,92 @@ select expect_num('no membership anywhere drifted from its plan snapshot',
     where ms.studio_id = '77777777-0000-0000-0000-000000000001'
       and ms.price_cents <> 280000), 0);
 
+-- =============================================================================
+-- 5. Type-appropriate fields — migration 009
+--
+-- These used to be enforced only by the form and the server action that strips
+-- them, which meant an import or a psql session could write a pack that bills
+-- monthly. They are constraints now, so they hold for every writer.
+-- =============================================================================
+
+select expect_write('a pack CANNOT carry a billing interval',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, billing_interval, credits)
+    values ('77777777-0000-0000-0000-000000000001','Billing Pack','class_pack',50000,'CZK','month',10)$$, false);
+
+select expect_write('a recurring plan MUST carry a billing interval',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency)
+    values ('77777777-0000-0000-0000-000000000001','No Interval','recurring',50000,'CZK')$$, false);
+
+select expect_write('a recurring plan CANNOT carry validity_days',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, billing_interval, validity_days)
+    values ('77777777-0000-0000-0000-000000000001','Expiring Sub','recurring',50000,'CZK','month',90)$$, false);
+
+select expect_write('a pack CANNOT carry a per-period allowance',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, credits_per_period)
+    values ('77777777-0000-0000-0000-000000000001','Allowance Pack','class_pack',50000,'CZK',10,8)$$, false);
+
+select expect_write('a pack CANNOT carry commitment terms',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, commitment_months)
+    values ('77777777-0000-0000-0000-000000000001','Committed Pack','class_pack',50000,'CZK',10,6)$$, false);
+
+select expect_write('a well-formed pack is fine',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days)
+    values ('77777777-0000-0000-0000-000000000001','Proper Pack','class_pack',50000,'CZK',10,180)$$, true);
+
+select expect_write('a well-formed recurring plan is fine',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, billing_interval, credits_per_period)
+    values ('77777777-0000-0000-0000-000000000001','Proper Sub','recurring',150000,'CZK','month',8)$$, true);
+
+-- The form strips these too, so what the screen hides the database now refuses.
+select expect_num('no plan anywhere is mis-shaped for its type',
+  (select count(*) from membership_plans
+    where ((type = 'recurring') <> (billing_interval is not null))
+       or (type = 'recurring' and validity_days is not null)
+       or (type <> 'recurring' and credits_per_period is not null)), 0);
+
+-- =============================================================================
+-- 6. One active plan per name per studio — migration 009
+-- =============================================================================
+
+select expect_write('a second active plan cannot reuse a name',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days)
+    values ('77777777-0000-0000-0000-000000000001','Proper Pack','class_pack',99000,'CZK',5,90)$$, false);
+
+select expect_write('nor a different case of the same name',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days)
+    values ('77777777-0000-0000-0000-000000000001','proper pack','class_pack',99000,'CZK',5,90)$$, false);
+
+select expect_write('renaming an existing plan onto a taken name is refused too',
+  $$update membership_plans set name = 'Proper Pack'
+     where studio_id = '77777777-0000-0000-0000-000000000001' and name = 'Proper Sub'$$, false);
+
+-- Archived plans keep their names, and the name frees up for a new plan.
+select expect_write('archiving the plan frees the name',
+  $$update membership_plans set status = 'archived'
+     where studio_id = '77777777-0000-0000-0000-000000000001' and name = 'Proper Pack'$$, true);
+
+select expect_write('and a new active plan may now take it',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days)
+    values ('77777777-0000-0000-0000-000000000001','Proper Pack','class_pack',99000,'CZK',5,90)$$, true);
+
+select expect_num('both exist — the archived one kept its name',
+  (select count(*) from membership_plans
+    where studio_id = '77777777-0000-0000-0000-000000000001' and lower(name) = 'proper pack'), 2);
+
+select expect_num('exactly one of them is active',
+  (select count(*) from membership_plans
+    where studio_id = '77777777-0000-0000-0000-000000000001'
+      and lower(name) = 'proper pack' and status = 'active'), 1);
+
+-- Another studio is unaffected: the index is scoped per studio. Checked with
+-- RLS out of the way, because as this owner the write would be refused by
+-- plans_manager_write first and prove nothing about the index.
 reset role;
+select expect_write('a different studio may use the same plan name',
+  $$insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days)
+    values ('11111111-0000-0000-0000-000000000001','Proper Pack','class_pack',99000,'CZK',5,90)$$, true);
+select expect_num('the name now exists once in each studio',
+  (select count(distinct studio_id) from membership_plans
+    where lower(name) = 'proper pack' and status = 'active'), 2);
+
 select 'ALL PLAN MANAGEMENT TESTS PASSED' as result;

@@ -107,13 +107,15 @@ insert into members (id, studio_id, user_id, first_name, last_name, email, waive
 insert into members (id, studio_id, first_name, last_name, email, waiver_signed_at, status) values
   ('ffffffff-0000-0000-0000-0000000000da','ffffffff-0000-0000-0000-000000000001','In','Active','ia@t',now(),'inactive');
 
+-- billing_interval is required on a recurring plan and forbidden elsewhere
+-- (migration 009), so the pack below leaves it null on purpose.
 insert into membership_plans
-  (id, studio_id, name, type, price_cents, currency, credits, credits_per_period, restrictions)
+  (id, studio_id, name, type, price_cents, currency, billing_interval, credits, credits_per_period, restrictions)
 values
-  ('ffffffff-0000-0000-0000-00000000b101','ffffffff-0000-0000-0000-000000000001','Unlimited','recurring',280000,'CZK',null,null,'{}'),
-  ('ffffffff-0000-0000-0000-00000000b102','ffffffff-0000-0000-0000-000000000001','8 a month','recurring',180000,'CZK',null,8,'{}'),
-  ('ffffffff-0000-0000-0000-00000000b103','ffffffff-0000-0000-0000-000000000001','5-Class Pack','class_pack',500000,'CZK',5,null,'{}'),
-  ('ffffffff-0000-0000-0000-00000000b104','ffffffff-0000-0000-0000-000000000001','Reformer only','recurring',180000,'CZK',null,8,'{"class_type_ids":["ffffffff-0000-0000-0000-0000000000c1"]}');
+  ('ffffffff-0000-0000-0000-00000000b101','ffffffff-0000-0000-0000-000000000001','Unlimited','recurring',280000,'CZK','month',null,null,'{}'),
+  ('ffffffff-0000-0000-0000-00000000b102','ffffffff-0000-0000-0000-000000000001','8 a month','recurring',180000,'CZK','month',null,8,'{}'),
+  ('ffffffff-0000-0000-0000-00000000b103','ffffffff-0000-0000-0000-000000000001','5-Class Pack','class_pack',500000,'CZK',null,5,null,'{}'),
+  ('ffffffff-0000-0000-0000-00000000b104','ffffffff-0000-0000-0000-000000000001','Reformer only','recurring',180000,'CZK','month',null,8,'{"class_type_ids":["ffffffff-0000-0000-0000-0000000000c1"]}');
 
 insert into memberships
   (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on,

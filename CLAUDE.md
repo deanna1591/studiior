@@ -33,8 +33,9 @@ Three migrations, applying clean from `supabase db reset`:
 - **006** revokes `PUBLIC` execute on the auth and RLS helpers and changes the default for future functions, so §16's intent is actually true
 - **007** the §8 check-in window as a trigger, with `studio_settings.checkin_window_enforced` as the documented way off
 - **008** `plan_templates` (studio_id null = system) with six system templates, and a trigger refusing to delete a plan that has members on it
+- **009** CHECK constraints making the plan-type field rules real (a pack cannot bill monthly, a subscription cannot expire), and one active plan per name per studio
 
-Five suites, **158 assertions**, all passing from a clean `db reset`:
+Five suites, **175 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -42,7 +43,7 @@ Five suites, **158 assertions**, all passing from a clean `db reset`:
 | `test/book_class_test.sql` | 57 | authorisation, gate reason codes, payment resolution, overrides, comp |
 | `test/booking_concurrency_test.sql` | 20 | 50 simultaneous bookings against a 10-seat class |
 | `test/checkin_window_test.sql` | 11 | §8 check-in window bounds, the settings that move them, the escape hatch |
-| `test/plan_management_test.sql` | 34 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
+| `test/plan_management_test.sql` | 51 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
 
 `supabase/seed.sql` runs automatically on `db reset` and seeds Reform Collective as tenant one — **synthetic data only**, every address `@example.com`. One studio, one location, two rooms, four class types, three instructors, owner/manager/front-desk/instructor logins, four plans, a thirteen-class week materialised 26 weeks back and 4 weeks forward, and 30 members across six cohorts with attendance to match. The cohorts exist so the AI features have something real to read: five members drifting into `retention_risk`, four `new_member_stalled`, one `past_due` membership, four who never returned after one class. Attendance is generated from a deterministic hash rather than `random()`, so every reset produces an identical database and a misbehaving query can be reproduced.
 

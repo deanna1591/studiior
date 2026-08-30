@@ -61,9 +61,10 @@ insert into members (id, studio_id, user_id, first_name, last_name, email) value
   ('aaaaaaaa-0000-0000-0000-0000000000d2','aaaaaaaa-0000-0000-0000-000000000001',null,'Other','Member','other@test'),
   ('bbbbbbbb-0000-0000-0000-0000000000d1','bbbbbbbb-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b4','Rival','Member','rival@test');
 
-insert into membership_plans (id, studio_id, name, type, price_cents, currency) values
-  ('aaaaaaaa-0000-0000-0000-00000000ba01','aaaaaaaa-0000-0000-0000-000000000001','Unlimited','recurring',280000,'CZK'),
-  ('bbbbbbbb-0000-0000-0000-00000000ba01','bbbbbbbb-0000-0000-0000-000000000001','Unlimited','recurring',300000,'CZK');
+-- billing_interval is required on a recurring plan (migration 009).
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, billing_interval) values
+  ('aaaaaaaa-0000-0000-0000-00000000ba01','aaaaaaaa-0000-0000-0000-000000000001','Unlimited','recurring',280000,'CZK','month'),
+  ('bbbbbbbb-0000-0000-0000-00000000ba01','bbbbbbbb-0000-0000-0000-000000000001','Unlimited','recurring',300000,'CZK','month');
 
 insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on) values
   ('aaaaaaaa-0000-0000-0000-00000000cd01','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-0000000000d1','aaaaaaaa-0000-0000-0000-00000000ba01','active',280000,'CZK',current_date);
