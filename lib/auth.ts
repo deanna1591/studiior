@@ -10,6 +10,7 @@ export type StaffContext = {
   studioId: string;
   studioName: string;
   timeZone: string;
+  currency: string;
 };
 
 /**
@@ -28,7 +29,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
 
   const { data } = await supabase
     .from("studio_staff")
-    .select("id, role, studio_id, studios(name, timezone)")
+    .select("id, role, studio_id, studios(name, timezone, currency)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
@@ -43,6 +44,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     studioId: data.studio_id,
     studioName: data.studios.name,
     timeZone: data.studios.timezone,
+    currency: data.studios.currency,
   };
 }
 

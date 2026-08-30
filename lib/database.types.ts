@@ -2799,6 +2799,102 @@ export type Database = {
           },
         ]
       }
+      plan_templates: {
+        Row: {
+          billing_interval:
+            | Database["public"]["Enums"]["billing_interval"]
+            | null
+          billing_interval_count: number
+          booking_window_days: number | null
+          cancellation_notice_days: number
+          commitment_months: number
+          created_at: string
+          credits: number | null
+          credits_per_period: number | null
+          description: string | null
+          freeze_allowed: boolean
+          id: string
+          max_bookings_per_day: number | null
+          max_freeze_days: number | null
+          name: string
+          price_cents: number | null
+          restrictions: Json
+          signup_fee_cents: number
+          sort_order: number
+          studio_id: string | null
+          type: Database["public"]["Enums"]["plan_type"]
+          validity_days: number | null
+          visibility: string
+        }
+        Insert: {
+          billing_interval?:
+            | Database["public"]["Enums"]["billing_interval"]
+            | null
+          billing_interval_count?: number
+          booking_window_days?: number | null
+          cancellation_notice_days?: number
+          commitment_months?: number
+          created_at?: string
+          credits?: number | null
+          credits_per_period?: number | null
+          description?: string | null
+          freeze_allowed?: boolean
+          id?: string
+          max_bookings_per_day?: number | null
+          max_freeze_days?: number | null
+          name: string
+          price_cents?: number | null
+          restrictions?: Json
+          signup_fee_cents?: number
+          sort_order?: number
+          studio_id?: string | null
+          type: Database["public"]["Enums"]["plan_type"]
+          validity_days?: number | null
+          visibility?: string
+        }
+        Update: {
+          billing_interval?:
+            | Database["public"]["Enums"]["billing_interval"]
+            | null
+          billing_interval_count?: number
+          booking_window_days?: number | null
+          cancellation_notice_days?: number
+          commitment_months?: number
+          created_at?: string
+          credits?: number | null
+          credits_per_period?: number | null
+          description?: string | null
+          freeze_allowed?: boolean
+          id?: string
+          max_bookings_per_day?: number | null
+          max_freeze_days?: number | null
+          name?: string
+          price_cents?: number | null
+          restrictions?: Json
+          signup_fee_cents?: number
+          sort_order?: number
+          studio_id?: string | null
+          type?: Database["public"]["Enums"]["plan_type"]
+          validity_days?: number | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_templates_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_templates_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -3219,6 +3315,9 @@ export type Database = {
           booking_cutoff_minutes: number
           booking_window_days: number
           cancellation_cutoff_minutes: number
+          checkin_closes_minutes_after: number
+          checkin_opens_minutes_before: number
+          checkin_window_enforced: boolean
           created_at: string
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
@@ -3243,6 +3342,9 @@ export type Database = {
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
+          checkin_closes_minutes_after?: number
+          checkin_opens_minutes_before?: number
+          checkin_window_enforced?: boolean
           created_at?: string
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
@@ -3267,6 +3369,9 @@ export type Database = {
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
+          checkin_closes_minutes_after?: number
+          checkin_opens_minutes_before?: number
+          checkin_window_enforced?: boolean
           created_at?: string
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
@@ -3688,9 +3793,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
+      }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
+      login: { Args: { uid: string }; Returns: undefined }
       studio_by_slug: {
         Args: { p_slug: string }
         Returns: {

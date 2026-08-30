@@ -42,6 +42,7 @@ export default async function StaffWeek({
       subtitle={`Week view · signed in as ${ctx.email} (${ctx.role.replace("_", " ")})`}
       right={
         <>
+          {isManagerUp(ctx.role) && <NavLink href="/plans">Plans</NavLink>}
           {isManagerUp(ctx.role) && <NavLink href="/classes/new">Create a class</NavLink>}
           <form action={signOut}><button className="text-stone-600 underline underline-offset-4">Sign out</button></form>
         </>
