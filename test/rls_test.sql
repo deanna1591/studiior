@@ -13,6 +13,10 @@ set client_min_messages = notice;
 -- make every one of these tests pass for the wrong reason.
 
 -- --- Fixtures (as superuser, RLS bypassed) ----------------------------------
+--
+-- Slugs are deliberately fixture-flavoured. studios.slug is unique and
+-- supabase/seed.sql owns 'reform' for tenant one, which is present on every
+-- db reset before this file runs.
 
 insert into auth.users (id) values
   ('00000000-0000-0000-0000-0000000000a1'),   -- owner A
@@ -31,8 +35,8 @@ insert into profiles (id, email) values
   ('00000000-0000-0000-0000-0000000000b4','memberB@test');
 
 insert into studios (id, name, slug, timezone, currency, stripe_account_id) values
-  ('aaaaaaaa-0000-0000-0000-000000000001','Reform Collective','reform','Europe/Prague','CZK','acct_A'),
-  ('bbbbbbbb-0000-0000-0000-000000000001','Rival Studio','rival','Europe/Prague','CZK','acct_B');
+  ('aaaaaaaa-0000-0000-0000-000000000001','RLS Fixture A','rls-fixture-a','Europe/Prague','CZK','acct_A'),
+  ('bbbbbbbb-0000-0000-0000-000000000001','RLS Fixture B','rls-fixture-b','Europe/Prague','CZK','acct_B');
 
 insert into studio_settings (studio_id) values
   ('aaaaaaaa-0000-0000-0000-000000000001'),
