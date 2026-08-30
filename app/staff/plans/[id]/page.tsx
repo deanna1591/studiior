@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getStaffContext, isManagerUp } from "@/lib/auth";
+import { requireOnboardedStaff, isManagerUp } from "@/lib/auth";
 import { Shell, NavLink, Notice } from "@/components/ui";
 import { formatMoney, type PlanType } from "@/lib/plans";
 import PlanForm, { type PlanDraft } from "../plan-form";
@@ -14,8 +14,7 @@ export default async function EditPlan({
   params: { id: string };
   searchParams: { saved?: string };
 }) {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const ctx = await requireOnboardedStaff();
   if (!isManagerUp(ctx.role)) {
     return (
       <Shell title="Plan" subtitle={ctx.studioName} right={<NavLink href="/">Back to week</NavLink>}>

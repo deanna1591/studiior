@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getStaffContext } from "@/lib/auth";
+import { requireOnboardedStaff } from "@/lib/auth";
 import { Shell, NavLink } from "@/components/ui";
 import CreateClassForm from "./form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewClass() {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const ctx = await requireOnboardedStaff();
 
   const supabase = createClient();
   const [{ data: classTypes }, { data: instructors }, { data: rooms }] = await Promise.all([

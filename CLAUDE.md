@@ -10,14 +10,17 @@ Tenant one is Reform Collective, the founder's own studio. **Its data is product
 
 | File | What it governs |
 |---|---|
+| `docs/STUDIIOR_PRODUCT_BIBLE.md` | The source of truth. Vision, UX and per-chapter MVP scope. Above everything below. |
 | `docs/STUDIIOR_V1_DECISIONS.md` | Settled decisions. Canonical. Code that contradicts it is wrong. |
 | `docs/STUDIIOR_V1_DATA_MODEL.md` | Every table, column, index, RLS approach, concurrency rules |
 | `docs/STUDIIOR_V1_BUSINESS_RULES.md` | Booking, cancellation, waitlist, credits, memberships, challenges, AI |
 | `docs/STUDIIOR_V1_PERMISSIONS.md` | Five roles against every action. Becomes RLS policies directly. |
 
-The V1 Product Bible governs scope above all of these. If a feature isn't in Chapter 8's seven modules, it doesn't get built. Chapter 7 is the exclusion list.
+`docs/STUDIIOR_PRODUCT_BIBLE.md` governs scope above all of these. Read it before arguing about what is in V1.
 
-The seven modules: Scheduling & Booking · Member CRM · Memberships & Payments · Your Member App · AI Morning Brief · Challenges · Reports.
+**Its chapter numbers are not what this file used to claim.** There is no "Chapter 8's seven modules" and no "Chapter 7 exclusion list": Ch. 7 is the Booking Engine, Ch. 8 is Memberships & Billing, and Ch. 9 and Ch. 20 do not exist at all. Scope lives in a per-chapter **MVP Scope** section — Ch. 4 (dashboard), Ch. 5 (calendar), 6.23 (CRM), Ch. 7 (booking), 8.18 (billing), Ch. 10 (community), Ch. 12 (analytics) — each splitting Phase 1 / Phase 2 / Phase 3. Volumes 1–13 at the top are an outline of what the Bible will contain, not content; only chapters 1, 4, 5, 6, 7, 8, 10, 12, 16 and 19 are written.
+
+The seven modules — Scheduling & Booking · Member CRM · Memberships & Payments · Your Member App · AI Morning Brief · Challenges · Reports — are **this project's narrowing** of the Bible, not a quotation from it. They are a defensible six-month cut. Where they and the Bible disagree, say so out loud rather than picking silently. **Known disagreement:** Ch. 10 puts a community feed, reactions, announcements and friend connections in launch scope; this project excludes them (`docs/STUDIIOR_V1_DECISIONS.md`, "Excluded from V1"). Unresolved.
 
 ---
 
@@ -36,8 +39,9 @@ Three migrations, applying clean from `supabase db reset`:
 - **009** CHECK constraints making the plan-type field rules real (a pack cannot bill monthly, a subscription cannot expire), and one active plan per name per studio
 - **010** Decision 12: `credits` is class-pack only, `credits_per_period` is recurring-only and null there means unlimited. The fifth constraint 009 left open
 - **011** closes the anon RPC surface for real (006 revoked from `PUBLIC`, but hosted grants `anon` explicitly — see the rule below), makes trigger functions callable by nobody, and pins `search_path` on the five that predate the convention
+- **012** onboarding: `platform_admins`, `studio_invites` (hashed, single-use), `studios.status = 'provisioning'`, `setup_progress`, and `accept_studio_invite()` — account, owner row and status flip in one transaction
 
-Five suites, **180 assertions**, all passing from a clean `db reset`:
+Six suites, **234 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -46,6 +50,7 @@ Five suites, **180 assertions**, all passing from a clean `db reset`:
 | `test/booking_concurrency_test.sql` | 20 | 50 simultaneous bookings against a 10-seat class |
 | `test/checkin_window_test.sql` | 11 | §8 check-in window bounds, the settings that move them, the escape hatch |
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
+| `test/onboarding_test.sql` | 54 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist |
 
 `supabase/seed.sql` runs automatically on `db reset` and seeds Reform Collective as tenant one — **synthetic data only**, every address `@example.com`. One studio, one location, two rooms, four class types, three instructors, owner/manager/front-desk/instructor logins, four plans, a thirteen-class week materialised 26 weeks back and 4 weeks forward, and 30 members across six cohorts with attendance to match. The cohorts exist so the AI features have something real to read: five members drifting into `retention_risk`, four `new_member_stalled`, one `past_due` membership, four who never returned after one class. Attendance is generated from a deterministic hash rather than `random()`, so every reset produces an identical database and a misbehaving query can be reproduced.
 
@@ -54,6 +59,8 @@ The vertical slice is built: Next.js App Router + TypeScript + Tailwind, staff a
 Every database call goes through a request-scoped client carrying the user's session, so RLS applies to all of it. There is no service-role client in the codebase and there should never be one — migration 004 exists because the pre-login slug lookup needed a policy, not a key.
 
 Membership plan management is built: list, create from one of six system templates or blank, and edit, at `/plans`. Owner and Manager only — Permissions §9 — enforced by `plans_manager_write`, not by the nav.
+
+Onboarding is built and invite-only: the operator provisions a studio shell at `/admin` (gated by `platform_admins`, checked in SQL), the owner accepts a single-use hashed token at `/invite/[token]`, and a three-step wizard blocks every other screen until it finishes. The dashboard checklist derives its ticks from live data rather than stored flags, so it cannot go stale. Stripe is a stub.
 
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
@@ -134,11 +141,15 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/checkin_w
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/plan_management_test.sql
 ```
 
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
+```
+
 `db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 
-Never run any of the five suites against production. They create roles, insert fixtures, and the concurrency suite opens 50 connections.
+Never run any of the six suites against production. They create roles, insert fixtures, and the concurrency suite opens 50 connections.
 
 ---
 

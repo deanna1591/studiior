@@ -92,7 +92,13 @@ begin
 
   -- Everything at the documented defaults. A design partner moving one of
   -- these is a deliberate act, so the seed should not pre-empt it.
-  insert into studio_settings (studio_id) values (s);
+  --
+  -- onboarding_completed_at is set because Reform Collective has been running
+  -- for eighteen months in this data. Leaving it null would put a studio with
+  -- 30 members and 400 classes behind a setup wizard it never ran, and every
+  -- staff screen would bounce to /welcome.
+  insert into studio_settings (studio_id, onboarding_completed_at)
+  values (s, now() - interval '18 months');
 
   insert into locations (id, studio_id, name, address, timezone, is_primary)
   values (loc, s, 'Vinohrady',
@@ -329,6 +335,22 @@ begin
      set user_id = ('11111111-0000-0000-0003-' || lpad(m.idx::text, 12, '0'))::uuid
     from _seed_member m
    where m.id = mem.id and m.idx in (1, 9, 14, 22);
+
+  -- The platform operator, who provisions studios. Synthetic like everything
+  -- else here: on a hosted project you insert your own row into
+  -- platform_admins by hand, because there is deliberately no screen for it.
+  insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+                          email_confirmed_at, created_at)
+  values ('11111111-0000-0000-0004-000000000001',
+          '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          'platform@example.com', crypt('reform-dev-password', gen_salt('bf')), now(), now());
+
+  insert into profiles (id, email, full_name)
+  values ('11111111-0000-0000-0004-000000000001', 'platform@example.com', 'Platform Operator');
+
+  insert into platform_admins (user_id, email, note)
+  values ('11111111-0000-0000-0004-000000000001', 'platform@example.com',
+          'Local development operator. Provisions studios at /admin.');
 
   -- GoTrue scans these columns into non-nullable Go strings, so a hand-inserted
   -- auth.users row with NULLs in them fails every sign-in with "Database error

@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getStaffContext, isManagerUp } from "@/lib/auth";
+import { requireOnboardedStaff, isManagerUp } from "@/lib/auth";
 import { Shell, NavLink } from "@/components/ui";
 import { signOut } from "./actions";
+import SetupChecklist, { type SetupState } from "./checklist";
 import { addDays, fmtDayLabel, fmtTime, weekStart, zonedDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -13,14 +14,16 @@ export default async function StaffWeek({
 }: {
   searchParams: { week?: string };
 }) {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const ctx = await requireOnboardedStaff();
 
   const offset = Number(searchParams.week ?? 0) || 0;
   const from = weekStart(new Date(), ctx.timeZone, offset);
   const to = addDays(from, 7);
 
   const supabase = createClient();
+  const { data: setup } = await supabase.rpc("studio_setup_state", { p_studio_id: ctx.studioId });
+  const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+
   const { data: occurrences } = await supabase
     .from("class_occurrences")
     .select("id, name, starts_at, capacity, booked_count, status, instructors!instructor_id(display_name), rooms(name)")
@@ -42,12 +45,17 @@ export default async function StaffWeek({
       subtitle={`Week view · signed in as ${ctx.email} (${ctx.role.replace("_", " ")})`}
       right={
         <>
+          {isPlatformAdmin && <NavLink href="/admin">Admin</NavLink>}
           {isManagerUp(ctx.role) && <NavLink href="/plans">Plans</NavLink>}
           {isManagerUp(ctx.role) && <NavLink href="/classes/new">Create a class</NavLink>}
           <form action={signOut}><button className="text-stone-600 underline underline-offset-4">Sign out</button></form>
         </>
       }
     >
+      {isManagerUp(ctx.role) && setup && (
+        <SetupChecklist state={setup as unknown as SetupState} />
+      )}
+
       <div className="mb-4 flex items-center gap-4 text-sm">
         <NavLink href={`/?week=${offset - 1}`}>← Previous</NavLink>
         <span className="text-stone-500">

@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getStaffContext } from "@/lib/auth";
+import { requireOnboardedStaff } from "@/lib/auth";
 import { Shell, NavLink } from "@/components/ui";
 import { fmtDayLabel, fmtTime } from "@/lib/time";
 import CheckInButton from "./check-in-button";
@@ -8,8 +8,7 @@ import CheckInButton from "./check-in-button";
 export const dynamic = "force-dynamic";
 
 export default async function Roster({ params }: { params: { occurrenceId: string } }) {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const ctx = await requireOnboardedStaff();
 
   const supabase = createClient();
 

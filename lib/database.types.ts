@@ -2895,6 +2895,27 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          email: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -3310,6 +3331,57 @@ export type Database = {
           },
         ]
       }
+      studio_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          id: string
+          studio_id: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          studio_id: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          studio_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_invites_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_invites_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       studio_settings: {
         Row: {
           booking_cutoff_minutes: number
@@ -3326,9 +3398,11 @@ export type Database = {
           morning_brief_send_at: string
           no_show_consumes_credit: boolean
           no_show_fee_cents: number
+          onboarding_completed_at: string | null
           payment_grace_days: number
           reminder_hours_before: number
           require_waiver: boolean
+          setup_progress: Json
           studio_id: string
           sub_late_free_cancel: boolean
           updated_at: string
@@ -3353,9 +3427,11 @@ export type Database = {
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
+          onboarding_completed_at?: string | null
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
+          setup_progress?: Json
           studio_id: string
           sub_late_free_cancel?: boolean
           updated_at?: string
@@ -3380,9 +3456,11 @@ export type Database = {
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
+          onboarding_completed_at?: string | null
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
+          setup_progress?: Json
           studio_id?: string
           sub_late_free_cancel?: boolean
           updated_at?: string
@@ -3770,6 +3848,16 @@ export type Database = {
       }
     }
     Functions: {
+      accept_studio_invite: {
+        Args: { p_full_name: string; p_password: string; p_token: string }
+        Returns: Database["public"]["CompositeTypes"]["invite_acceptance"]
+        SetofOptions: {
+          from: "*"
+          to: "invite_acceptance"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_role_in: {
@@ -3793,18 +3881,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      dismiss_setup_item: {
+        Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
+        Returns: boolean
+      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
+      is_platform_admin: { Args: never; Returns: boolean }
       login: { Args: { uid: string }; Returns: undefined }
+      mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      provision_studio: {
+        Args: {
+          p_country: string
+          p_currency: string
+          p_name: string
+          p_owner_email: string
+          p_slug: string
+          p_timezone: string
+          p_valid_days?: number
+        }
+        Returns: Database["public"]["CompositeTypes"]["provision_result"]
+        SetofOptions: {
+          from: "*"
+          to: "provision_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       studio_by_slug: {
         Args: { p_slug: string }
         Returns: {
@@ -3817,6 +3929,17 @@ export type Database = {
           timezone: string
         }[]
       }
+      studio_invite_preview: {
+        Args: { p_token: string }
+        Returns: Database["public"]["CompositeTypes"]["invite_preview"]
+        SetofOptions: {
+          from: "*"
+          to: "invite_preview"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
     }
     Enums: {
       billing_interval: "week" | "month" | "quarter" | "year"
@@ -3882,6 +4005,25 @@ export type Database = {
         status: Database["public"]["Enums"]["booking_status"] | null
         payment_source: Database["public"]["Enums"]["payment_source"] | null
         waitlist_position: number | null
+        failure_reason: string | null
+      }
+      invite_acceptance: {
+        user_id: string | null
+        studio_id: string | null
+        studio_slug: string | null
+        email: string | null
+        failure_reason: string | null
+      }
+      invite_preview: {
+        studio_name: string | null
+        email: string | null
+        expires_at: string | null
+        state: string | null
+      }
+      provision_result: {
+        studio_id: string | null
+        invite_token: string | null
+        expires_at: string | null
         failure_reason: string | null
       }
     }

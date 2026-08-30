@@ -2,7 +2,7 @@
 
 **Canonical.** Every entry here is settled. If code contradicts this file, the code is wrong. If you think an entry is wrong, change it here first with a reason, then change the code.
 
-**Source of truth above this file:** V1 Product Bible Ch. 8 (seven modules), Ch. 7 (exclusions), Ch. 9 (roles), Ch. 20 (scope test).
+**Source of truth above this file:** `docs/STUDIIOR_PRODUCT_BIBLE.md`. Note its per-chapter **MVP Scope** sections — Ch. 4, Ch. 5, 6.23, Ch. 7, 8.18, Ch. 10, Ch. 12 — which is where scope actually lives. The earlier citation here ("Ch. 8 seven modules, Ch. 7 exclusions, Ch. 9 roles, Ch. 20 scope test") pointed at chapters that either say something else or do not exist; roles are in `STUDIIOR_V1_PERMISSIONS.md`.
 
 ---
 
@@ -191,4 +191,4 @@ Raised in brainstorming, confirmed out:
 | Instructor incentive/payroll tracking | Wave 3 (Decision 10) |
 | Multi-location | Ch. 7, though schema is ready (Decision 8) |
 | API access | Ch. 7 |
-| Community feed | Ch. 7 |
+| Community feed | **Conflicts with the Bible.** Ch. 10 puts a feed, reactions, announcements and friend connections in launch scope. Excluded here to fit six months. Needs an explicit call. |

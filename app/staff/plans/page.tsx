@@ -1,15 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getStaffContext, isManagerUp } from "@/lib/auth";
+import { requireOnboardedStaff, isManagerUp } from "@/lib/auth";
 import { Shell, NavLink } from "@/components/ui";
 import { PLAN_TYPE_LABEL, formatMoney, type PlanType } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlansList() {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const ctx = await requireOnboardedStaff();
 
   // Permissions §9: creating and editing plans is Owner and Manager. Front desk
   // may VIEW plans because they sell them, but this is the management screen,
