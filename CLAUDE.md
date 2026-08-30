@@ -23,11 +23,25 @@ The seven modules: Scheduling & Booking · Member CRM · Memberships & Payments 
 
 ## Current state
 
-- Migration 001 applied: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
-- `test/rls_test.sql` passing 36/36 against the local Supabase stack
-- No application code yet
+Three migrations, applying clean from `supabase db reset`:
 
-**Next:** the booking transaction, then a fifty-concurrent-bookings test, then one vertical slice (staff schedule → create class → member books → front desk checks in).
+- **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
+- **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
+- **003** `bookings.override_reason` / `overridden_rules` (§2.3 visibility), and `p_payment_source` so §2.4 comp bookings are reachable
+
+Three suites, **113 assertions**, all passing from a clean `db reset`:
+
+| Suite | Asserts | Covers |
+|---|---|---|
+| `test/rls_test.sql` | 36 | tenant isolation, role boundaries, restricted views |
+| `test/book_class_test.sql` | 57 | authorisation, gate reason codes, payment resolution, overrides, comp |
+| `test/booking_concurrency_test.sql` | 20 | 50 simultaneous bookings against a 10-seat class |
+
+`supabase/seed.sql` runs automatically on `db reset` and seeds Reform Collective as tenant one — **synthetic data only**, every address `@example.com`. One studio, one location, two rooms, four class types, three instructors, owner/manager/front-desk/instructor logins, four plans, a thirteen-class week materialised 26 weeks back and 4 weeks forward, and 30 members across six cohorts with attendance to match. The cohorts exist so the AI features have something real to read: five members drifting into `retention_risk`, four `new_member_stalled`, one `past_due` membership, four who never returned after one class. Attendance is generated from a deterministic hash rather than `random()`, so every reset produces an identical database and a misbehaving query can be reproduced.
+
+No application code yet.
+
+**Next:** one vertical slice — staff schedule → create class → member books → front desk checks in.
 
 ---
 
@@ -49,6 +63,10 @@ The seven modules: Scheduling & Booking · Member CRM · Memberships & Payments 
 
 **Credits derive from `credit_ledger`.** Never edited in place. `memberships.credits_remaining` is a cache written in the same transaction as the ledger row.
 
+**An applied migration is immutable.** Once a migration has run against a hosted Supabase project, it is history: fix forward with a new migration, never edit the file in place. A hosted database records which migrations it has applied and will not replay an edited one, so the file and the live schema silently diverge — and every environment that already ran the old version keeps it.
+
+Until something is actually hosted, editing in place is safe and `db reset` replays from scratch, so migration 002's authorisation predicate was corrected in the file rather than patched over. **That grace expires the first time a migration reaches a hosted project.** After that the rule is absolute, including for a comment.
+
 ---
 
 ## Stack
@@ -63,15 +81,26 @@ Staff app at `app.studiior.com`. Member PWA at `{studio}.studiior.app`, per-stud
 
 ```bash
 supabase start                 # local stack
-supabase db reset              # drop and replay all migrations
+supabase db reset              # drop, replay all migrations, run supabase/seed.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/rls_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install.
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/book_class_test.sql
+```
+
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/booking_concurrency_test.sql
+```
+
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 
-Never run the RLS suite against production — it creates roles and inserts fixtures.
+Never run any of the three suites against production. They create roles, insert fixtures, and the concurrency suite opens 50 connections.
 
 ---
 
