@@ -42,6 +42,7 @@ Three migrations, applying clean from `supabase db reset`:
 - **012** onboarding: `platform_admins`, `studio_invites` (hashed, single-use), `studios.status = 'provisioning'`, `setup_progress`, and `accept_studio_invite()` — account, owner row and status flip in one transaction
 - **013** revokes execute on `rls_auto_enable()`, the Supabase-installed event trigger function behind `ensure_rls`. Guarded, because it exists only on hosted — which is why 011 missed it
 - **014** `revoke execute on all functions in schema public from anon`, then re-grants the three pre-login surfaces. Also moves `btree_gist` out of `public` — the only way its 188 index internals could leave the API-exposed schema, since `postgres` cannot revoke grants `supabase_admin` made
+- **015** `validate_iana_timezone()` on `studios` and `locations` — a zone not in `pg_timezone_names` cannot be stored by any writer. Plus ISO shape checks on currency and country, and `provision_studio()` fixed forward with `invalid_timezone` / `invalid_currency` / `invalid_country`
 
 Six suites, **234 assertions**, all passing from a clean `db reset`:
 
@@ -95,6 +96,8 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **A price is snapshotted, never referenced.** `memberships.price_cents` is copied from the plan at purchase (§7.1). Editing a plan must never reprice anyone already on it, and any screen that edits a plan has to say so, because "changed the price" reads like "changed what everyone pays" unless you tell people otherwise.
 
 **A refused write does not raise — it changes nothing.** RLS blocks an INSERT with a WITH CHECK violation, which errors, but it blocks an UPDATE or DELETE by making the row invisible: PostgREST returns 200 and an empty array. Code that only checks `error` will report success having saved nothing. Check rows affected on every update and delete.
+
+**A studio's timezone is validated in the database, not the form.** It governs every day boundary and every materialised occurrence, and a typo does not fail — `Europe/Pragu` is simply not a zone, and the studio's classes are quietly wrong from then on. `validate_iana_timezone()` (migration 015) checks against `pg_timezone_names` on insert and update, so the wizard, `provision_studio()` and any future import all meet the same rule. The UI offers `Intl.supportedValuesOf('timeZone')` with live UTC offsets so the value can only come from a list; that is convenience, not the guarantee.
 
 **Time is `timestamptz` stored UTC.** Studio timezone governs display and all day boundaries. A 7am class stays 7am across DST — occurrences materialise by converting local time to UTC at generation, not by adding fixed intervals.
 

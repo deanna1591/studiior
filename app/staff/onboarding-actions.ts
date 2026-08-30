@@ -25,6 +25,9 @@ const PROVISION_REASONS: Record<string, string> = {
   invalid_slug: "The slug must be lowercase letters, numbers and hyphens, 3–40 characters.",
   invalid_email: "That does not look like an email address.",
   slug_taken: "That slug is already in use by another studio.",
+  invalid_timezone: "That is not a recognised IANA timezone. Pick one from the list.",
+  invalid_currency: "Choose a currency.",
+  invalid_country: "That is not a recognised country code.",
 };
 
 export async function provisionStudio(_prev: ActionState, fd: FormData): Promise<ActionState> {
@@ -122,9 +125,14 @@ export async function saveStudioIdentity(_prev: ActionState, fd: FormData): Prom
     .select("id");
 
   if (error) {
-    return error.code === "23505"
-      ? { error: "That slug is already taken by another studio." }
-      : { error: error.message };
+    if (error.code === "23505") return { error: "That slug is already taken by another studio." };
+    // PT422 from validate_iana_timezone() (migration 015). The form only offers
+    // real zones, so reaching this means something bypassed it.
+    if (error.code === "PT422") return { error: error.message };
+    if (error.code === "23514") {
+      return { error: "Country must be a two-letter code and currency a three-letter code." };
+    }
+    return { error: error.message };
   }
   // studios_owner_write is UPDATE for owners only; a refused update returns
   // zero rows rather than an error.

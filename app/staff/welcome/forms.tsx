@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import StudioLocaleFields from "@/components/studio-locale-fields";
 import { saveBookingBasics, saveStudioIdentity, type ActionState } from "../onboarding-actions";
 
 function Submit({ label }: { label: string }) {
@@ -32,20 +33,11 @@ export default function WizardForms({
             <span className="shrink-0 text-sm text-stone-500">.studiior.app</span>
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Timezone">
-            <input name="timezone" required defaultValue={studio.timezone} className={inputClass} />
-          </Field>
-          <Field label="Country">
-            <input name="country" maxLength={2} defaultValue={studio.country ?? ""} className={inputClass} />
-          </Field>
-        </div>
-        <Field label="Currency">
-          <input name="currency" required maxLength={3} defaultValue={studio.currency} className={inputClass} />
-          <p className="mt-1 text-xs text-stone-500">
-            Every price is stored in this currency. Changing it later does not convert anything.
-          </p>
-        </Field>
+        <StudioLocaleFields
+          timezone={studio.timezone}
+          country={studio.country ?? ""}
+          currency={studio.currency}
+        />
         <Submit label="Continue" />
       </form>
     );

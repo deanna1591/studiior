@@ -134,6 +134,24 @@ select expect_text('a malformed owner email is refused',
   (select failure_reason from provision_studio('Bad','bad-email-test','Europe/London','GBP','GB','nope')),
   'invalid_email');
 
+-- A timezone typo does not fail loudly on its own: Europe/Pragu is not a zone,
+-- and a studio stored with it has every class time quietly wrong from then on,
+-- because occurrences are materialised against it (migration 015).
+select expect_text('a timezone typo is refused',
+  (select failure_reason from provision_studio('Typo','tz-typo-test','Europe/Pragu','CZK','CZ','a@example.com')),
+  'invalid_timezone');
+select expect_text('IANA matching is case-sensitive, so lowercase is refused too',
+  (select failure_reason from provision_studio('Lower','tz-lower-test','europe/prague','CZK','CZ','a@example.com')),
+  'invalid_timezone');
+select expect_num('and neither wrote a studio',
+  (select count(*) from studios where slug in ('tz-typo-test','tz-lower-test')), 0);
+select expect_text('a non-ISO currency is refused',
+  (select failure_reason from provision_studio('Cur','cur-test','Europe/London','pounds','GB','a@example.com')),
+  'invalid_currency');
+select expect_text('a non-ISO country is refused',
+  (select failure_reason from provision_studio('Ctry','ctry-test','Europe/London','GBP','GBR','a@example.com')),
+  'invalid_country');
+
 -- =============================================================================
 -- 3. A provisioning studio has no member-facing surface
 -- =============================================================================
@@ -323,6 +341,35 @@ set role authenticated;
 select login('88888888-0000-0000-0000-0000000000a3');
 select expect_text('front desk cannot dismiss a checklist item',
   (select dismiss_setup_item((select id from studios where slug='bright-test'), 'plans')::text), 'false');
+
+-- =============================================================================
+-- 7b. The timezone guard holds for writers that never touch provision_studio
+--
+-- The wizard updates studios directly through RLS, and an import would not go
+-- near either path. The trigger is what makes the rule true for all of them.
+-- =============================================================================
+
+reset role;
+do $$
+begin
+  update studios set timezone = 'Europe/Pragu' where slug = 'bright-test';
+  raise exception 'FAIL  a direct update stored a bogus timezone';
+exception
+  when sqlstate 'PT422' then
+    raise notice 'PASS  a direct update with a bogus timezone is refused';
+end $$;
+
+select expect_text('and the studio kept its real zone',
+  (select timezone from studios where slug='bright-test'), 'Europe/London');
+
+do $$
+begin
+  update studios set timezone = 'America/New_York' where slug = 'bright-test';
+  raise notice 'PASS  a real zone is still accepted';
+exception when others then
+  raise exception 'FAIL  a valid timezone was refused: %', sqlerrm;
+end $$;
+update studios set timezone = 'Europe/London' where slug='bright-test';
 
 -- =============================================================================
 -- 8. The state that caused the sign-in loop

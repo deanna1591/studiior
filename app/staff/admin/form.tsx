@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import StudioLocaleFields from "@/components/studio-locale-fields";
 import { provisionStudio, type ActionState } from "../onboarding-actions";
 
 function Submit() {
@@ -24,17 +25,7 @@ export default function ProvisionForm() {
           Their member app will live at <code>{"{slug}"}.studiior.app</code>. The owner can change it in the wizard.
         </p>
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Timezone">
-          <input name="timezone" required defaultValue="Europe/Prague" className={inputClass} />
-        </Field>
-        <Field label="Country">
-          <input name="country" required defaultValue="CZ" maxLength={2} className={inputClass} />
-        </Field>
-      </div>
-      <Field label="Currency">
-        <input name="currency" required defaultValue="CZK" maxLength={3} className={inputClass} />
-      </Field>
+      <StudioLocaleFields />
       <Field label="Owner email">
         <input name="owner_email" type="email" required className={inputClass}
                placeholder="owner@brightpilates.com" />
