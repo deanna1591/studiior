@@ -25,6 +25,44 @@ export type StaffContext = {
  * form by typing the URL — the insert is refused by occ_manager_write, and that
  * refusal is the real permission.
  */
+/**
+ * The three ways a request can arrive at a staff screen.
+ *
+ * Collapsing the last two into `null` is what caused the sign-in loop: a
+ * platform admin has no studio_staff row anywhere — by design, they operate the
+ * platform rather than a studio — so "not staff of any studio" was read as "not
+ * signed in", bounced to /login, signed in again, and round it went. They are
+ * different states and they need different answers.
+ */
+export type StaffAccess =
+  | { kind: "anonymous" }
+  | { kind: "no_studio"; userId: string; email: string; isPlatformAdmin: boolean }
+  | { kind: "staff"; ctx: StaffContext };
+
+export async function getStaffAccess(): Promise<StaffAccess> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { kind: "anonymous" };
+
+  const ctx = await getStaffContext();
+  if (ctx) return { kind: "staff", ctx };
+
+  const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+  return {
+    kind: "no_studio",
+    userId: user.id,
+    email: user.email ?? "",
+    isPlatformAdmin: isPlatformAdmin === true,
+  };
+}
+
+/**
+ * Staff context for one studio, or null when the caller is not active staff of
+ * any studio — which includes both "signed out" and "signed in, but a platform
+ * admin". Pages must use getStaffAccess() to tell those apart; this stays for
+ * server actions, where "not staff of a studio" is the precondition that
+ * matters and both cases are equally a refusal.
+ */
 export async function getStaffContext(): Promise<StaffContext | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -62,16 +100,13 @@ export async function getStaffContext(): Promise<StaffContext | null> {
 }
 
 /**
- * Staff context for a screen that the setup wizard should block.
+ * The wizard gate, for a caller already known to be staff.
  *
- * The wizard is linear and must finish before the rest of the app is usable,
- * so every screen behind it funnels through here rather than each remembering
- * to check. Returns null only when signed out; otherwise it either returns a
- * context or redirects.
+ * Deliberately takes a context rather than fetching one, so it cannot repeat
+ * the mistake above: deciding what to do about a non-staff caller is the
+ * page's job, through getStaffAccess() and <StaffAccessGate>.
  */
-export async function requireOnboardedStaff(): Promise<StaffContext> {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+export function requireOnboarded(ctx: StaffContext): StaffContext {
   if (!ctx.onboardingComplete) redirect("/welcome");
   return ctx;
 }

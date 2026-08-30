@@ -40,6 +40,8 @@ Three migrations, applying clean from `supabase db reset`:
 - **010** Decision 12: `credits` is class-pack only, `credits_per_period` is recurring-only and null there means unlimited. The fifth constraint 009 left open
 - **011** closes the anon RPC surface for real (006 revoked from `PUBLIC`, but hosted grants `anon` explicitly — see the rule below), makes trigger functions callable by nobody, and pins `search_path` on the five that predate the convention
 - **012** onboarding: `platform_admins`, `studio_invites` (hashed, single-use), `studios.status = 'provisioning'`, `setup_progress`, and `accept_studio_invite()` — account, owner row and status flip in one transaction
+- **013** revokes execute on `rls_auto_enable()`, the Supabase-installed event trigger function behind `ensure_rls`. Guarded, because it exists only on hosted — which is why 011 missed it
+- **014** `revoke execute on all functions in schema public from anon`, then re-grants the three pre-login surfaces. Also moves `btree_gist` out of `public` — the only way its 188 index internals could leave the API-exposed schema, since `postgres` cannot revoke grants `supabase_admin` made
 
 Six suites, **234 assertions**, all passing from a clean `db reset`:
 
@@ -82,7 +84,9 @@ The lesson is not about one grant. **`supabase db reset` cannot verify grants** 
 supabase db query --linked "select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute');"
 ```
 
-`studio_by_slug(text)` is the only name that belongs in that output.
+The only names of ours that belong in that output are `studio_by_slug(text)`, `studio_invite_preview(text)` and `accept_studio_invite(text,text,text)` — the three pre-login surfaces. As of migration 014 that query returns exactly those three on hosted, with no filtering needed.
+
+Note what migration 013 found: the query has to enumerate what is *actually there* on hosted, not what this repo creates. `rls_auto_enable()` is installed by the platform, exists on no local stack, and sat anon-callable through migration 011 because 011 only checked its own list.
 
 **Booking runs in one transaction with a row lock.** `select ... from class_occurrences where id = $1 for update` before reading `booked_count`. Application-level check-then-insert will overbook under load and is not acceptable.
 
@@ -154,5 +158,13 @@ Never run any of the six suites against production. They create roles, insert fi
 ---
 
 ## Known issues
+
+`btree_gist` now lives in `extensions`, not `public`. It is installed but unused — no GiST index, no exclusion constraint. If you later add one (room double-booking is the obvious candidate), its operators resolve through the database search_path, which includes `extensions`.
+
+**Seed data hides whole categories of state.** `supabase/seed.sql` gives every user a `studio_staff` row, so no seeded account has ever exercised "signed in, staff of nothing" — and a platform admin is exactly that by design. `getStaffContext()` returned null for them, callers read null as "not signed in", and sign-in looped on `app.studiior.com` while every local test passed. The suites did not catch it either, for the same reason: their fixtures also give everyone a staff row.
+
+Before trusting a green run, ask what state the seed cannot produce. Empty studios, users with no membership anywhere, a studio with no owner, a plan nobody bought, a member with no bookings. If a code path keys off "no rows", the seed almost certainly has rows.
+
+
 
 `btree_gist` internals throw grant warnings on every `db reset`. Cosmetic. Fix by scoping grants to own functions rather than `all functions in schema public`.

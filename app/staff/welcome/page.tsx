@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getStaffContext } from "@/lib/auth";
+import { getStaffAccess } from "@/lib/auth";
+import StaffAccessGate from "@/components/staff-access-gate";
 import WizardForms from "./forms";
 
 export const dynamic = "force-dynamic";
@@ -9,14 +10,15 @@ export const dynamic = "force-dynamic";
  * Steps 2 and 3. Step 1 was accepting the invite, which created the account.
  *
  * Linear and blocking: every other staff screen goes through
- * requireOnboardedStaff(), which sends people back here until
+ * requireOnboarded(), which sends people back here until
  * onboarding_completed_at is set at the end of step 3. The Product Bible ends
  * the wizard at the dashboard, not at a fully configured studio — the rest is
  * the dashboard checklist.
  */
 export default async function Welcome({ searchParams }: { searchParams: { step?: string } }) {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const access = await getStaffAccess();
+  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
+  const ctx = access.ctx;
   if (ctx.onboardingComplete) redirect("/");
 
   const supabase = createClient();

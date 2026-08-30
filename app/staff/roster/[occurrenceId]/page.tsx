@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireOnboardedStaff } from "@/lib/auth";
+import { getStaffAccess, requireOnboarded } from "@/lib/auth";
+import StaffAccessGate from "@/components/staff-access-gate";
 import { Shell, NavLink } from "@/components/ui";
 import { fmtDayLabel, fmtTime } from "@/lib/time";
 import CheckInButton from "./check-in-button";
@@ -8,7 +9,9 @@ import CheckInButton from "./check-in-button";
 export const dynamic = "force-dynamic";
 
 export default async function Roster({ params }: { params: { occurrenceId: string } }) {
-  const ctx = await requireOnboardedStaff();
+  const access = await getStaffAccess();
+  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
+  const ctx = requireOnboarded(access.ctx);
 
   const supabase = createClient();
 

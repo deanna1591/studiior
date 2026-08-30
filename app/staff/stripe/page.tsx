@@ -1,14 +1,15 @@
 import { Shell, NavLink } from "@/components/ui";
-import { getStaffContext, isManagerUp } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { getStaffAccess, isManagerUp } from "@/lib/auth";
+import StaffAccessGate from "@/components/staff-access-gate";
 import StripeStub from "./stub";
 
 export const dynamic = "force-dynamic";
 
 /** Stub. No OAuth, no keys, no webhooks — a description and a way past it. */
 export default async function StripePage() {
-  const ctx = await getStaffContext();
-  if (!ctx) redirect("/login");
+  const access = await getStaffAccess();
+  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
+  const ctx = access.ctx;
 
   return (
     <Shell title="Connect Stripe" subtitle="Coming soon"

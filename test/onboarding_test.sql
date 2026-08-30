@@ -324,5 +324,44 @@ select login('88888888-0000-0000-0000-0000000000a3');
 select expect_text('front desk cannot dismiss a checklist item',
   (select dismiss_setup_item((select id from studios where slug='bright-test'), 'plans')::text), 'false');
 
+-- =============================================================================
+-- 8. The state that caused the sign-in loop
+--
+-- A platform admin is staff of no studio — that is the whole point of the role.
+-- getStaffContext() returned null for them, callers read null as "not signed
+-- in", and app.studiior.com bounced them to /login forever.
+--
+-- SQL can only pin the data condition; which screen each case lands on is
+-- verified in the browser. But the condition is the part that a seed with a
+-- studio_staff row for every user will never produce.
+-- =============================================================================
+
+reset role;
+select expect_num('a platform admin is staff of no studio, anywhere',
+  (select count(*) from studio_staff
+    where user_id = '88888888-0000-0000-0000-0000000000a1'), 0);
+select expect_text('and is still a platform admin',
+  (select exists (select 1 from platform_admins
+                   where user_id = '88888888-0000-0000-0000-0000000000a1')::text), 'true');
+
+-- The third case: signed in, no staff row, not an admin either. Nothing in the
+-- seed looks like this, which is exactly why the loop reached production.
+insert into auth.users (id) values ('88888888-0000-0000-0000-0000000000a9');
+insert into profiles (id, email) values ('88888888-0000-0000-0000-0000000000a9','stranded@example.com');
+select expect_num('a stranded user has no staff row',
+  (select count(*) from studio_staff where user_id = '88888888-0000-0000-0000-0000000000a9'), 0);
+select expect_text('and is not a platform admin',
+  (select exists (select 1 from platform_admins
+                   where user_id = '88888888-0000-0000-0000-0000000000a9')::text), 'false');
+
+-- These three are distinguishable in SQL, so they are distinguishable in the
+-- app: anonymous, no-studio-but-admin, no-studio-and-not-admin.
+select expect_num('the three cases are distinct users',
+  (select count(distinct u) from (values
+     ('88888888-0000-0000-0000-0000000000a1'),   -- admin, no studio
+     ('88888888-0000-0000-0000-0000000000a2'),   -- staff of a studio
+     ('88888888-0000-0000-0000-0000000000a9')    -- neither
+   ) v(u)), 3);
+
 reset role;
 select 'ALL ONBOARDING TESTS PASSED' as result;

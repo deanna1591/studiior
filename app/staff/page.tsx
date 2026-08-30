@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireOnboardedStaff, isManagerUp } from "@/lib/auth";
+import { getStaffAccess, requireOnboarded, isManagerUp } from "@/lib/auth";
+import StaffAccessGate from "@/components/staff-access-gate";
 import { Shell, NavLink } from "@/components/ui";
 import { signOut } from "./actions";
 import SetupChecklist, { type SetupState } from "./checklist";
@@ -14,7 +15,9 @@ export default async function StaffWeek({
 }: {
   searchParams: { week?: string };
 }) {
-  const ctx = await requireOnboardedStaff();
+  const access = await getStaffAccess();
+  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
+  const ctx = requireOnboarded(access.ctx);
 
   const offset = Number(searchParams.week ?? 0) || 0;
   const from = weekStart(new Date(), ctx.timeZone, offset);
