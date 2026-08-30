@@ -261,6 +261,7 @@ export type Database = {
           credit_entry_id: string | null
           fee_charged_cents: number
           id: string
+          is_demo: boolean
           is_late_cancel: boolean
           member_id: string
           membership_id: string | null
@@ -282,6 +283,7 @@ export type Database = {
           credit_entry_id?: string | null
           fee_charged_cents?: number
           id?: string
+          is_demo?: boolean
           is_late_cancel?: boolean
           member_id: string
           membership_id?: string | null
@@ -303,6 +305,7 @@ export type Database = {
           credit_entry_id?: string | null
           fee_charged_cents?: number
           id?: string
+          is_demo?: boolean
           is_late_cancel?: boolean
           member_id?: string
           membership_id?: string | null
@@ -709,36 +712,42 @@ export type Database = {
       }
       check_ins: {
         Row: {
-          booking_id: string
+          booking_id: string | null
           checked_in_at: string
           checked_in_by: string | null
           created_at: string
           id: string
+          import_id: string | null
+          is_demo: boolean
           member_id: string
           method: Database["public"]["Enums"]["checkin_method"]
-          occurrence_id: string
+          occurrence_id: string | null
           studio_id: string
         }
         Insert: {
-          booking_id: string
+          booking_id?: string | null
           checked_in_at?: string
           checked_in_by?: string | null
           created_at?: string
           id?: string
+          import_id?: string | null
+          is_demo?: boolean
           member_id: string
           method: Database["public"]["Enums"]["checkin_method"]
-          occurrence_id: string
+          occurrence_id?: string | null
           studio_id: string
         }
         Update: {
-          booking_id?: string
+          booking_id?: string | null
           checked_in_at?: string
           checked_in_by?: string | null
           created_at?: string
           id?: string
+          import_id?: string | null
+          is_demo?: boolean
           member_id?: string
           method?: Database["public"]["Enums"]["checkin_method"]
-          occurrence_id?: string
+          occurrence_id?: string | null
           studio_id?: string
         }
         Relationships: [
@@ -754,6 +763,13 @@ export type Database = {
             columns: ["checked_in_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "imports"
             referencedColumns: ["id"]
           },
           {
@@ -806,6 +822,7 @@ export type Database = {
           id: string
           instructor_id: string | null
           instructor_notes: string | null
+          is_demo: boolean
           is_exception: boolean
           location_id: string
           name: string
@@ -830,6 +847,7 @@ export type Database = {
           id?: string
           instructor_id?: string | null
           instructor_notes?: string | null
+          is_demo?: boolean
           is_exception?: boolean
           location_id: string
           name: string
@@ -854,6 +872,7 @@ export type Database = {
           id?: string
           instructor_id?: string | null
           instructor_notes?: string | null
+          is_demo?: boolean
           is_exception?: boolean
           location_id?: string
           name?: string
@@ -938,6 +957,7 @@ export type Database = {
           ends_on: string | null
           id: string
           instructor_id: string | null
+          is_demo: boolean
           location_id: string
           name: string
           room_id: string | null
@@ -960,6 +980,7 @@ export type Database = {
           ends_on?: string | null
           id?: string
           instructor_id?: string | null
+          is_demo?: boolean
           location_id: string
           name: string
           room_id?: string | null
@@ -982,6 +1003,7 @@ export type Database = {
           ends_on?: string | null
           id?: string
           instructor_id?: string | null
+          is_demo?: boolean
           location_id?: string
           name?: string
           room_id?: string | null
@@ -1053,6 +1075,7 @@ export type Database = {
           difficulty: string | null
           duration_minutes: number
           id: string
+          is_demo: boolean
           name: string
           status: string
           studio_id: string
@@ -1066,6 +1089,7 @@ export type Database = {
           difficulty?: string | null
           duration_minutes: number
           id?: string
+          is_demo?: boolean
           name: string
           status?: string
           studio_id: string
@@ -1079,6 +1103,7 @@ export type Database = {
           difficulty?: string | null
           duration_minutes?: number
           id?: string
+          is_demo?: boolean
           name?: string
           status?: string
           studio_id?: string
@@ -1110,6 +1135,7 @@ export type Database = {
           delta: number
           expires_at: string | null
           id: string
+          is_demo: boolean
           member_id: string
           membership_id: string | null
           reason: Database["public"]["Enums"]["credit_reason"]
@@ -1123,6 +1149,7 @@ export type Database = {
           delta: number
           expires_at?: string | null
           id?: string
+          is_demo?: boolean
           member_id: string
           membership_id?: string | null
           reason: Database["public"]["Enums"]["credit_reason"]
@@ -1136,6 +1163,7 @@ export type Database = {
           delta?: number
           expires_at?: string | null
           id?: string
+          is_demo?: boolean
           member_id?: string
           membership_id?: string | null
           reason?: Database["public"]["Enums"]["credit_reason"]
@@ -1594,6 +1622,7 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
+          is_demo: boolean
           staff_id: string | null
           status: string
           studio_id: string
@@ -1607,6 +1636,7 @@ export type Database = {
           created_at?: string
           display_name: string
           id?: string
+          is_demo?: boolean
           staff_id?: string | null
           status?: string
           studio_id: string
@@ -1620,6 +1650,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           id?: string
+          is_demo?: boolean
           staff_id?: string | null
           status?: string
           studio_id?: string
@@ -2059,7 +2090,12 @@ export type Database = {
           emergency_contact: Json | null
           first_name: string
           first_visit_at: string | null
+          health_band: string | null
+          health_computed_at: string | null
+          health_reason: string | null
+          health_signals: Json
           id: string
+          is_demo: boolean
           joined_on: string
           last_name: string
           last_visit_at: string | null
@@ -2084,7 +2120,12 @@ export type Database = {
           emergency_contact?: Json | null
           first_name: string
           first_visit_at?: string | null
+          health_band?: string | null
+          health_computed_at?: string | null
+          health_reason?: string | null
+          health_signals?: Json
           id?: string
+          is_demo?: boolean
           joined_on?: string
           last_name: string
           last_visit_at?: string | null
@@ -2109,7 +2150,12 @@ export type Database = {
           emergency_contact?: Json | null
           first_name?: string
           first_visit_at?: string | null
+          health_band?: string | null
+          health_computed_at?: string | null
+          health_reason?: string | null
+          health_signals?: Json
           id?: string
+          is_demo?: boolean
           joined_on?: string
           last_name?: string
           last_visit_at?: string | null
@@ -2231,6 +2277,7 @@ export type Database = {
           description: string | null
           freeze_allowed: boolean
           id: string
+          is_demo: boolean
           max_bookings_per_day: number | null
           max_freeze_days: number | null
           name: string
@@ -2262,6 +2309,7 @@ export type Database = {
           description?: string | null
           freeze_allowed?: boolean
           id?: string
+          is_demo?: boolean
           max_bookings_per_day?: number | null
           max_freeze_days?: number | null
           name: string
@@ -2293,6 +2341,7 @@ export type Database = {
           description?: string | null
           freeze_allowed?: boolean
           id?: string
+          is_demo?: boolean
           max_bookings_per_day?: number | null
           max_freeze_days?: number | null
           name?: string
@@ -2343,6 +2392,7 @@ export type Database = {
           freeze_end: string | null
           freeze_start: string | null
           id: string
+          is_demo: boolean
           member_id: string
           plan_id: string
           price_cents: number
@@ -2370,6 +2420,7 @@ export type Database = {
           freeze_end?: string | null
           freeze_start?: string | null
           id?: string
+          is_demo?: boolean
           member_id: string
           plan_id: string
           price_cents: number
@@ -2397,6 +2448,7 @@ export type Database = {
           freeze_end?: string | null
           freeze_start?: string | null
           id?: string
+          is_demo?: boolean
           member_id?: string
           plan_id?: string
           price_cents?: number
@@ -2678,6 +2730,7 @@ export type Database = {
           failure_message: string | null
           gift_card_id: string | null
           id: string
+          is_demo: boolean
           member_id: string | null
           membership_id: string | null
           next_retry_at: string | null
@@ -2703,6 +2756,7 @@ export type Database = {
           failure_message?: string | null
           gift_card_id?: string | null
           id?: string
+          is_demo?: boolean
           member_id?: string | null
           membership_id?: string | null
           next_retry_at?: string | null
@@ -2728,6 +2782,7 @@ export type Database = {
           failure_message?: string | null
           gift_card_id?: string | null
           id?: string
+          is_demo?: boolean
           member_id?: string | null
           membership_id?: string | null
           next_retry_at?: string | null
@@ -3231,6 +3286,7 @@ export type Database = {
           color: string | null
           created_at: string
           id: string
+          is_demo: boolean
           location_id: string
           name: string
           status: string
@@ -3242,6 +3298,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           id?: string
+          is_demo?: boolean
           location_id: string
           name: string
           status?: string
@@ -3253,6 +3310,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           id?: string
+          is_demo?: boolean
           location_id?: string
           name?: string
           status?: string
@@ -3885,6 +3943,22 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
@@ -3893,12 +3967,29 @@ export type Database = {
         Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
+      }
+      generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
+      import_commit: { Args: { p_import_id: string }; Returns: Json }
+      import_dry_run: { Args: { p_import_id: string }; Returns: Json }
+      import_member_status: {
+        Args: { p: string }
+        Returns: Database["public"]["Enums"]["member_status"]
+      }
+      import_membership_status: {
+        Args: { p: string }
+        Returns: Database["public"]["Enums"]["membership_status"]
+      }
+      import_rollback: { Args: { p_import_id: string }; Returns: Json }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      member_health: { Args: { p_member_id: string }; Returns: Json }
       provision_studio: {
         Args: {
           p_country: string
@@ -3917,6 +4008,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      purge_demo_data: { Args: { p_studio_id: string }; Returns: Json }
+      recompute_member_stats: {
+        Args: { p_member_ids?: string[]; p_studio_id: string }
+        Returns: number
+      }
+      refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
+      refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
       studio_by_slug: {
         Args: { p_slug: string }
         Returns: {

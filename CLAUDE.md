@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Three migrations, applying clean from `supabase db reset`:
+Twenty migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -43,11 +43,13 @@ Three migrations, applying clean from `supabase db reset`:
 - **013** revokes execute on `rls_auto_enable()`, the Supabase-installed event trigger function behind `ensure_rls`. Guarded, because it exists only on hosted — which is why 011 missed it
 - **014** `revoke execute on all functions in schema public from anon`, then re-grants the three pre-login surfaces. Also moves `btree_gist` out of `public` — the only way its 188 index internals could leave the API-exposed schema, since `postgres` cannot revoke grants `supabase_admin` made
 - **015** `validate_iana_timezone()` on `studios` and `locations` — a zone not in `pg_timezone_names` cannot be stored by any writer. Plus ISO shape checks on currency and country, and `provision_studio()` fixed forward with `invalid_timezone` / `invalid_currency` / `invalid_country`
-- **016** *(partial — the importer is paused mid-build)* nullable `check_ins.occurrence_id` / `booking_id`, an `import_id` marker, and `recompute_member_stats()`
+- **016** the importer's schema half: nullable `check_ins.occurrence_id` / `booking_id` so an imported visit can exist without a class, an `import_id` marker, `check_ins_booked_or_imported` (a check-in is either an import or has both a booking and an occurrence), and `recompute_member_stats()`
 - **017** demo data: `is_demo` on twelve tables, `generate_demo_data()` and `purge_demo_data()`, platform-admin only. Every id is derived from the studio id, so two runs produce identical data
-- **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in
+- **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
+- **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
+- **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Seven suites, **299 assertions**, all passing from a clean `db reset`:
+Eight suites, **369 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -56,7 +58,9 @@ Seven suites, **299 assertions**, all passing from a clean `db reset`:
 | `test/booking_concurrency_test.sql` | 20 | 50 simultaneous bookings against a 10-seat class |
 | `test/checkin_window_test.sql` | 11 | §8 check-in window bounds, the settings that move them, the escape hatch |
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
-| `test/onboarding_test.sql` | 54 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist |
+| `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
+| `test/health_score_test.sql` | 60 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
 
 `supabase/seed.sql` runs automatically on `db reset` and seeds Reform Collective as tenant one — **synthetic data only**, every address `@example.com`. One studio, one location, two rooms, four class types, three instructors, owner/manager/front-desk/instructor logins, four plans, a thirteen-class week materialised 26 weeks back and 4 weeks forward, and 30 members across six cohorts with attendance to match. The cohorts exist so the AI features have something real to read: five members drifting into `retention_risk`, four `new_member_stalled`, one `past_due` membership, four who never returned after one class. Attendance is generated from a deterministic hash rather than `random()`, so every reset produces an identical database and a misbehaving query can be reproduced.
 
@@ -67,6 +71,8 @@ Every database call goes through a request-scoped client carrying the user's ses
 Rooms, class types and instructors have list/create/edit screens at `/rooms`, `/class-types`, `/instructors` — Owner and Manager, per Permissions §3 and §4, enforced by the existing `*_manager_write` policies. The dashboard checklist links to all three. An instructor is a teaching record with `staff_id` null: no login, no invite.
 
 Membership plan management is built: list, create from one of six system templates or blank, and edit, at `/plans`. Owner and Manager only — Permissions §9 — enforced by `plans_manager_write`, not by the nav.
+
+The member importer is built, at `/imports`: upload a CSV, match its columns, see exactly what would happen, commit, and undo. Three types in dependency order — members, then memberships, then attendance — each matching on email. The split is that string work happens in TypeScript (`lib/csv.ts`: quoted commas, a date order inferred per column rather than per row, names in one field or two) and judgement happens in SQL, where the studio's existing members and plans are. Owner and Manager, per Permissions §5. Attendance import writes `check_ins` with no occurrence and fires no notification, challenge progress or achievement — importing history must not tell thirty people they have earned a streak.
 
 Onboarding is built and invite-only: the operator provisions a studio shell at `/admin` (gated by `platform_admins`, checked in SQL), the owner accepts a single-use hashed token at `/invite/[token]`, and a three-step wizard blocks every other screen until it finishes. The dashboard checklist derives its ticks from live data rather than stored flags, so it cannot go stale. Stripe is a stub.
 
@@ -99,6 +105,10 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **Money is integer cents plus an ISO currency code.** Never floats.
 
 **A price is snapshotted, never referenced.** `memberships.price_cents` is copied from the plan at purchase (§7.1). Editing a plan must never reprice anyone already on it, and any screen that edits a plan has to say so, because "changed the price" reads like "changed what everyone pays" unless you tell people otherwise.
+
+**A boolean authorisation helper must never return null.** `auth_role_in()` returns null for a caller who is staff of no studio, so `role in ('owner','manager')` is null, not false. RLS treats that as deny and is safe. plpgsql does not: `if not is_manager_up(x) then raise ... end if` skips its own raise, and the function carries on — and these functions are `SECURITY DEFINER`, so nothing is standing behind the guard. Every such guard in the codebase reads that way, and every one of them was open to any signed-in user who knew an id. Migration 020 fixes it in the helpers rather than at the call sites, because the call sites are the natural way to write it and the next one will be written the same way. When adding a helper, `coalesce(..., false)`.
+
+**A guard that never fires looks exactly like a guard that passes.** The §5 tests for the importer used a front desk *of the same studio* — a real role, so the guard worked and the assertions passed. The caller who got through was the one with no staff row in that studio at all, which nothing exercised. When testing a permission, include a caller the check has never seen, not only a caller with the wrong role.
 
 **A refused write does not raise — it changes nothing.** RLS blocks an INSERT with a WITH CHECK violation, which errors, but it blocks an UPDATE or DELETE by making the row invisible: PostgREST returns 200 and an empty array. Code that only checks `error` will report success having saved nothing. Check rows affected on every update and delete.
 
@@ -163,6 +173,18 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/importer_test.sql
+```
+
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
+```
+
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
+```
+
 `db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
@@ -178,6 +200,10 @@ Never run any of the seven suites against production. They create roles, insert 
 **Seed data hides whole categories of state.** `supabase/seed.sql` gives every user a `studio_staff` row, so no seeded account has ever exercised "signed in, staff of nothing" — and a platform admin is exactly that by design. `getStaffContext()` returned null for them, callers read null as "not signed in", and sign-in looped on `app.studiior.com` while every local test passed. The suites did not catch it either, for the same reason: their fixtures also give everyone a staff row.
 
 Before trusting a green run, ask what state the seed cannot produce. Empty studios, users with no membership anywhere, a studio with no owner, a plan nobody bought, a member with no bookings. If a code path keys off "no rows", the seed almost certainly has rows.
+
+The same blind spot produced migration 020: every fixture in every suite gives every caller a staff row *in the studio under test*, so `is_manager_up()` was never asked about a studio the caller is nothing to, and nothing ever saw it return null.
+
+**`generate_demo_data()` runs once per transaction and once per studio.** Its temp tables are `on commit drop`, so two calls in one transaction collide on `_d_room`. It also used to select the check-ins it writes by `is_demo` alone, with no studio — which meant the second studio on any database re-selected the first one's bookings and died on `check_ins_booking_id_key`. Fixed, but the shape of the mistake is worth remembering: `is_demo` is a marker, never a tenant boundary. The tenant boundary is `studio_id`, every time.
 
 
 

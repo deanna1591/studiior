@@ -27,7 +27,7 @@ alter table members
 alter table members
   add constraint members_health_band_known
   check (health_band is null or health_band in
-         ('healthy','drifting','at_risk','insufficient_history'));
+         ('new','healthy','drifting','at_risk','insufficient_history'));
 
 create index on members (studio_id, health_band) where health_band is not null;
 
@@ -76,6 +76,25 @@ begin
 
   select count(*), max(checked_in_at) into visits, last_visit
     from check_ins where member_id = p_member_id;
+
+  -- --- The first fortnight (Decision 14 amendment) -------------------------
+  -- Not a warning and not a verdict: the signals have not had time to mean
+  -- anything. Returned before them, because "the signals do not apply yet" is
+  -- the whole content of this band. Without it days 0-13 fell through to
+  -- `healthy` — signal 3 starts at day 14 and insufficient_history needs 35 —
+  -- and a member who has never been in was described as though nothing was
+  -- wrong, which is the opposite of true for the most rescuable member a studio
+  -- has.
+  if today - m.joined_on < 14 then
+    return jsonb_build_object(
+      'band', 'new',
+      'reason', case when visits = 0
+                     then format('Joined %s days ago, no visits yet.', today - m.joined_on)
+                     else format('Joined %s days ago, %s visit%s.',
+                                 today - m.joined_on, visits,
+                                 case when visits = 1 then '' else 's' end) end,
+      'signals', '[]'::jsonb);
+  end if;
 
   -- --- Signal 1: rhythm deviation, against the member's own baseline -------
   -- Minimum 6 visits to establish a baseline; below that there is no rhythm to

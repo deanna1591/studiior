@@ -53,6 +53,7 @@ export default async function StaffWeek({
           {isManagerUp(ctx.role) && <NavLink href="/class-types">Class types</NavLink>}
           {isManagerUp(ctx.role) && <NavLink href="/instructors">Instructors</NavLink>}
           {isManagerUp(ctx.role) && <NavLink href="/plans">Plans</NavLink>}
+          {isManagerUp(ctx.role) && <NavLink href="/imports">Import</NavLink>}
           {isManagerUp(ctx.role) && <NavLink href="/classes/new">Create a class</NavLink>}
           <form action={signOut}><button className="text-stone-600 underline underline-offset-4">Sign out</button></form>
         </>

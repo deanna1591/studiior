@@ -40,12 +40,22 @@ alter table check_ins
 
 create index on check_ins (import_id) where import_id is not null;
 
--- A check-in is either something that happened here — with a booking behind it
--- — or history somebody imported. Never neither: that would be a visit with no
--- provenance at all.
+-- A check-in is either something that happened here — a booking AND the class
+-- it was for — or history somebody imported, where the class is genuinely
+-- unknown. Never a half-formed third thing.
+--
+-- The first version of this read `booking_id is not null or import_id is not
+-- null`, which sounds like the same rule and is not: it says nothing about
+-- occurrence_id, so a normal desk check-in could carry a booking and a NULL
+-- occurrence and pass. Making occurrence_id nullable for the importer had
+-- quietly relaxed it for every other path too. Verified by inserting exactly
+-- that row and watching it be accepted.
 alter table check_ins
   add constraint check_ins_booked_or_imported
-  check (booking_id is not null or import_id is not null);
+  check (
+    import_id is not null
+    or (booking_id is not null and occurrence_id is not null)
+  );
 
 comment on column check_ins.import_id is
   'Set when this visit came from a CSV rather than the door. Imported rows '
@@ -135,7 +145,13 @@ declare
   v_tz text;
   n    int;
 begin
-  if not is_manager_up(p_studio_id) then
+  -- A platform admin is staff of no studio by design, and generate_demo_data
+  -- runs as one — so this has to name them, the way refresh_studio_health
+  -- already does. Until migration 020 it did not have to: is_manager_up()
+  -- returned null for them, "if not null" is not true, and the guard was
+  -- skipped. The demo generator was passing through a hole rather than through
+  -- a check, and looked like it worked.
+  if not is_manager_up(p_studio_id) and not is_platform_admin() then
     return 0;
   end if;
 

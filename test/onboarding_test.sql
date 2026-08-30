@@ -410,5 +410,22 @@ select expect_num('the three cases are distinct users',
      ('88888888-0000-0000-0000-0000000000a9')    -- neither
    ) v(u)), 3);
 
+-- The setup-state writers are SECURITY DEFINER, so their own guard is the only
+-- thing between a stranded user and another studio's settings. Before
+-- migration 020 that guard was "if not is_manager_up(...)", and is_manager_up
+-- returned NULL rather than false for someone with no staff row at all — so
+-- the branch was skipped and the write went through. See migration 020.
+select login('88888888-0000-0000-0000-0000000000a9');
+select expect_text('a stranded user is not a manager of a studio they are nothing to',
+  is_manager_up('88888888-0000-0000-0000-000000000009')::text, 'false');
+select expect_text('dismiss_setup_item refuses them',
+  dismiss_setup_item('88888888-0000-0000-0000-000000000009','plans',true)::text, 'false');
+select expect_text('mark_stripe_stub_done refuses them',
+  mark_stripe_stub_done('88888888-0000-0000-0000-000000000009')::text, 'false');
 reset role;
+
+select expect_text('and the other studio''s setup progress is untouched',
+  coalesce((select setup_progress::text from studio_settings
+             where studio_id='88888888-0000-0000-0000-000000000009'), '{}'), '{}');
+
 select 'ALL ONBOARDING TESTS PASSED' as result;

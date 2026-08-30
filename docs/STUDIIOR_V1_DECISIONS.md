@@ -219,8 +219,21 @@ The renewal decision is made before the renewal date.
 | `at_risk` | Signal 1 at ≥3× baseline, or signal 4, or two or more signals firing |
 | `drifting` | Any single signal firing |
 | `healthy` | No signal firing |
+| `new` | Joined under 14 days — the signals do not apply yet (amendment below) |
 
 A member with fewer than 6 visits and joined more than 35 days ago has **no band**, not a healthy one. Absence of evidence is not evidence of health, and a falsely reassuring band is worse than none. Show `insufficient_history`.
+
+### Amendment — the `new` band
+
+A member joined fewer than 14 days ago is `new`, whatever their visit count. The reason states where they are: "Joined 5 days ago, no visits yet" or "Joined 5 days ago, 2 visits".
+
+This closes a hole in the bands above. Signal 3 starts at day 14 and `insufficient_history` needs more than 35 days, so days 0–13 fell through to `healthy` — and "healthy, no visits" is the most rescuable member a studio has, described as though nothing is wrong. The first fortnight is not a period where the signals return a clean result; it is a period where they do not apply, and the band should say so rather than defaulting to reassurance.
+
+`new` is **not a warning**. It is a distinct state meaning the signals have not had enough time to mean anything. An owner scanning the list should read it as "too early to tell, here is where they are", and the reason gives them the one fact worth acting on — whether the member has actually been in yet.
+
+At day 14, signal 3 takes over exactly as specified: joined 14–35 days with fewer than 3 attended visits fires `first_month_stalled`.
+
+Because `new` means the signals do not apply, it is decided **before** them, and a member in their first fortnight is `new` even if another signal would otherwise fire.
 
 ---
 

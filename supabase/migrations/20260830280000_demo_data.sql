@@ -232,8 +232,8 @@ begin
     (md5(p_studio_id::text||':m:23')::uuid, 23,'stalled','Ulan','Imagined',       today-24,'active',0.4, today-24, today-19,'dropin',1,0,0),
     (md5(p_studio_id::text||':m:24')::uuid, 24,'stalled','Hangin','Pretend',      today-31,'active',0.3, today-31, today-27,'pack',1,0,0),
     -- 10. renewal approaching, usage falling away — signal 5
-    (md5(p_studio_id::text||':m:25')::uuid, 25,'expiring','Araw','Hypothetical',  today-260,'active',2.4, today-182, today-2,'eight',0.30, extract(day from today)::int, 0.06),
-    (md5(p_studio_id::text||':m:26')::uuid, 26,'expiring','Buwan','Notional',     today-300,'active',2.6, today-182, today-2,'eight',0.25, extract(day from today)::int, 0.06);
+    (md5(p_studio_id::text||':m:25')::uuid, 25,'expiring','Araw','Hypothetical',  today-260,'active',2.4, today-182, today-2,'eight',0.30, greatest(extract(day from today)::int - 1, 1), 0.06),
+    (md5(p_studio_id::text||':m:26')::uuid, 26,'expiring','Buwan','Notional',     today-300,'active',2.6, today-182, today-2,'eight',0.25, greatest(extract(day from today)::int - 1, 1), 0.06);
 
   insert into members
     (id, studio_id, first_name, last_name, email, phone, status, joined_on,
@@ -300,7 +300,7 @@ begin
     from memberships ms
     join _d_member m on m.id = ms.member_id
     cross join generate_series(0, 2) k
-   where ms.is_demo and m.plan in ('unlimited','eight')
+   where ms.studio_id = p_studio_id and ms.is_demo and m.plan in ('unlimited','eight')
      and (date_trunc('month', today) - make_interval(months => k))::date >= m.joined_on;
 
   -- --- attendance ----------------------------------------------------------
@@ -415,6 +415,19 @@ begin
     left join memberships ms on ms.member_id = a.member_id and ms.is_demo;
   get diagnostics n_bk = row_count;
 
+  -- Cohorts meant to read as healthy must not trip signal 2 by hash luck. A
+  -- low-frequency pack member might have only four bookings in six weeks, and
+  -- two unlucky draws is 50% — over the 40% bar, on a sample far too small to
+  -- mean anything. Done before check-ins are written, so every attended booking
+  -- still gets its visit and the data stays coherent.
+  update bookings b
+     set status = 'attended', cancelled_at = null, is_late_cancel = false
+    from _d_member m
+   where m.id = b.member_id and b.is_demo
+     and m.cohort in ('regular','eight','pack','expiring')
+     and b.booked_at >= now() - interval '6 weeks'
+     and b.status in ('no_show','late_cancelled');
+
   -- Placed inside the §8 window, so the check-in trigger accepts them without
   -- the studio-wide escape hatch being touched.
   insert into check_ins
@@ -424,8 +437,48 @@ begin
          (array['qr','staff','kiosk','self'])[1 + (abs(hashtextextended(b.id::text, 9)) % 4)]::checkin_method,
          true
     from bookings b join class_occurrences o on o.id = b.occurrence_id
-   where b.is_demo and b.status = 'attended';
+   -- Scoped to this studio, not just to is_demo. Every other statement in this
+   -- function reaches its rows through _d_member, whose ids are derived from
+   -- p_studio_id and so cannot belong to anyone else; this one goes straight at
+   -- bookings, and without the studio it re-selects the demo bookings of every
+   -- studio generated before it and dies on check_ins_booking_id_key. Which
+   -- means demo data worked exactly once per database — fine on a laptop with
+   -- one studio, and broken for the second design partner to ask for it.
+   where b.studio_id = p_studio_id and b.is_demo and b.status = 'attended';
   get diagnostics n_ci = row_count;
+
+  -- The expiring cohort is defined by a ratio — this period under 60% of last —
+  -- so the ratio is set, not sampled. Left to the hash it lands wherever the
+  -- month boundary and capacity pruning leave it, and the cohort stops
+  -- demonstrating the signal it exists for. Deleting the booking takes its
+  -- check-in with it, which is what "attended fewer classes" actually looks
+  -- like; trimming only the check-in would leave an attended booking with no
+  -- visit behind it.
+  delete from bookings b
+   where b.id in (
+     select cur.booking_id
+       from (
+         select ci.booking_id, ci.member_id,
+                row_number() over (partition by ci.member_id
+                                   order by ci.checked_in_at desc) as rn
+           from check_ins ci
+           join _d_member m on m.id = ci.member_id
+          where m.cohort = 'expiring'
+            and (ci.checked_in_at at time zone tz)::date
+                >= date_trunc('month', today)::date
+       ) cur
+       join (
+         select ci.member_id, count(*) as n
+           from check_ins ci
+           join _d_member m on m.id = ci.member_id
+          where m.cohort = 'expiring'
+            and (ci.checked_in_at at time zone tz)::date
+                between (date_trunc('month', today) - interval '1 month')::date
+                    and (date_trunc('month', today)::date - 1)
+          group by ci.member_id
+       ) prior on prior.member_id = cur.member_id
+      where cur.rn > floor(prior.n * 0.4)
+        and cur.booking_id is not null);
 
   update class_occurrences o
      set booked_count   = coalesce(c.seats, 0),

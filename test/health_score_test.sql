@@ -63,6 +63,16 @@ select expect_num('and refreshing health covers all of them',
   refresh_studio_health(current_setting('h.sid')::uuid)::bigint, 26);
 reset role;
 
+-- The generator writes check_ins and then recomputes the visit cache. Asserted
+-- on its own rather than left to the band assertions, because when the
+-- recompute silently did nothing the failure surfaced eleven assertions later
+-- as "a member with under 6 visits gets no band", which is not what went wrong.
+select expect_num('no demo member has visits on record but a zero visit count',
+  (select count(*) from members m
+    where m.studio_id = current_setting('h.sid')::uuid
+      and m.lifetime_visits = 0
+      and exists (select 1 from check_ins c where c.member_id = m.id)), 0);
+
 -- =============================================================================
 -- 1. Every cohort lands in the band it exists to demonstrate
 -- =============================================================================
@@ -80,6 +90,7 @@ insert into _want values
   ('Bagwis','drifting','booking drift'), ('Luntian','drifting','booking drift'),
   ('Ulan','drifting','first month'),     ('Hangin','drifting','first month'),
   ('Araw','drifting','expiry + declining use'), ('Buwan','drifting','expiry + declining use'),
+  ('Alon','new','first fortnight'), ('Haraya','new','first fortnight'),
   ('Perlas','insufficient_history','one visit'), ('Kidlat','insufficient_history','one visit'),
   ('Sampaguita','insufficient_history','one visit');
 
@@ -99,7 +110,7 @@ begin
   if bad > 0 then
     raise exception 'FAIL  % cohort member(s) in the wrong band', bad;
   end if;
-  raise notice 'PASS  all 24 cohort members land in their intended band';
+  raise notice 'PASS  all 26 cohort members land in their intended band';
 end $$;
 
 select expect_num('the four lapsing members are all at_risk',
@@ -187,6 +198,57 @@ select expect_num('an expiry reason states the countdown and both periods',
       and health_signals ? 'expiry_declining_use'
       and health_reason ~ 'Renews in [0-9]+ days'
       and health_reason ~ '[0-9]+ class(es)? this period against [0-9]+ last'), 2);
+
+-- =============================================================================
+-- 3b. The first fortnight is `new` — Decision 14 amendment
+--
+-- Days 0-13 used to fall through to `healthy`: signal 3 starts at day 14 and
+-- insufficient_history needs 35. A member who has never been in was described
+-- as though nothing was wrong.
+-- =============================================================================
+
+select expect_num('nobody under 14 days is called healthy',
+  (select count(*) from members
+    where studio_id = current_setting('h.sid')::uuid
+      and (current_date - joined_on) < 13 and health_band = 'healthy'), 0);
+
+select expect_num('and their reason says how long and how many visits',
+  (select count(*) from members
+    where studio_id = current_setting('h.sid')::uuid and health_band = 'new'
+      and health_reason ~ '^Joined [0-9]+ days ago, (no visits yet|[0-9]+ visits?)\.$'), 2);
+
+select expect_num('`new` is not a warning — it fires no signals',
+  (select count(*) from members
+    where studio_id = current_setting('h.sid')::uuid and health_band = 'new'
+      and jsonb_array_length(health_signals) <> 0), 0);
+
+-- A member who joined this week and has never been in: the case the amendment
+-- exists for, built rather than hoped for.
+insert into members (id, studio_id, first_name, last_name, email, joined_on, waiver_signed_at, is_demo)
+values ('66666666-0000-0000-0000-0000000000fa', current_setting('h.sid')::uuid,
+        'Never','Arrived','never.arrived@example.com', current_date - 5, now(), true);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','66666666-0000-0000-0000-0000000000a1',false);
+select expect_text('five days in with no visits is new, not healthy',
+  ((member_health('66666666-0000-0000-0000-0000000000fa')) ->> 'band'), 'new');
+select expect_num('and the reason says so plainly',
+  (select count(*) from (select (member_health('66666666-0000-0000-0000-0000000000fa')) ->> 'reason' as r) x
+    where x.r ~ 'Joined [0-9]+ days ago, no visits yet'), 1);
+reset role;
+
+-- At day 14 the amendment hands over to signal 3, as specified.
+update members set joined_on = current_date - 20
+ where id = '66666666-0000-0000-0000-0000000000fa';
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','66666666-0000-0000-0000-0000000000a1',false);
+select expect_text('at 20 days the same member is signal 3, not new',
+  ((member_health('66666666-0000-0000-0000-0000000000fa')) ->> 'band'), 'drifting');
+select expect_text('and it is the first-month signal that fired',
+  (((member_health('66666666-0000-0000-0000-0000000000fa')) -> 'signals') ->> 0),
+  'first_month_stalled');
+reset role;
 
 -- =============================================================================
 -- 4. insufficient_history is a distinct state, not a healthy one
@@ -392,10 +454,18 @@ select expect_num('every generated member is flagged',
   (select count(*) from members
     where studio_id = current_setting('h.sid')::uuid and not is_demo), 0);
 
+-- Counted rather than hardcoded: this suite adds its own demo members as
+-- fixtures, so a literal here breaks every time the fixtures change and says
+-- nothing about whether the purge worked.
+select set_config('h.demo_before',
+  (select count(*)::text from members
+    where studio_id = current_setting('h.sid')::uuid and is_demo), false);
+
 set role authenticated;
 select set_config('request.jwt.claim.sub','66666666-0000-0000-0000-0000000000a1',false);
-select expect_num('purging clears the members in one call',
-  ((purge_demo_data(current_setting('h.sid')::uuid)) ->> 'members')::bigint, 29);
+select expect_num('purging clears every demo member in one call',
+  ((purge_demo_data(current_setting('h.sid')::uuid)) ->> 'members')::bigint,
+  current_setting('h.demo_before')::bigint);
 reset role;
 
 select expect_num('no demo members remain',
