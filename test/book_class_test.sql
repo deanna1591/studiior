@@ -141,10 +141,24 @@ set role authenticated;
 
 -- The attack, exactly: authenticated role, no sub claim, so auth.uid() is null.
 select login('');
+select expect_text('sanity: this caller really does have a null auth.uid()',
+  (select case when auth.uid() is null then 'null' else 'not null' end), 'null');
+select expect_text('sanity: and is really running as authenticated',
+  current_setting('role', true), 'authenticated');
 select expect_text('authenticated with null auth.uid() is refused',
   (book_class('ffffffff-0000-0000-0000-0000000000e1',
               'ffffffff-0000-0000-0000-0000000000d3','member')).failure_reason,
   'not_authorised');
+
+-- Same attack with the claim never set at all rather than set to empty. Both
+-- yield a null auth.uid() but leave the GUC in different states, and the old
+-- predicate trusted both.
+select set_config('request.jwt.claim.sub', null, false);
+select expect_text('authenticated with NO jwt claim at all is refused',
+  (book_class('ffffffff-0000-0000-0000-0000000000e1',
+              'ffffffff-0000-0000-0000-0000000000d3','member')).failure_reason,
+  'not_authorised');
+select login('');
 
 select expect_text('null auth.uid() cannot override either',
   (book_class('ffffffff-0000-0000-0000-0000000000e9',
@@ -186,6 +200,19 @@ select expect_text('member cannot override their own booking window',
   (book_class('ffffffff-0000-0000-0000-0000000000e9',
               'ffffffff-0000-0000-0000-0000000000d1','member','I really want in')).failure_reason,
   'outside_booking_window');
+
+-- The other half of the predicate: rejecting null auth.uid() must not lock out
+-- the legitimate backend caller. service_role has no JWT subject either, and
+-- has to keep working for jobs, imports and webhooks.
+reset role;
+set role service_role;
+select login('');
+select expect_text('service_role with null auth.uid() is still trusted',
+  (book_class('ffffffff-0000-0000-0000-0000000000e6',
+              'ffffffff-0000-0000-0000-0000000000d3','import')).status::text,
+  'booked');
+reset role;
+set role authenticated;
 
 -- Front desk may act for any member in their studio.
 select login('ffffffff-0000-0000-0000-00000000a001');

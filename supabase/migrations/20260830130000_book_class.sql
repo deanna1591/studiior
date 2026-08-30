@@ -54,6 +54,7 @@ declare
   v_tz           text;
 
   v_actor        uuid := auth.uid();
+  v_caller_role  text;
   v_trusted      boolean;
   v_is_desk      boolean;
   v_is_self      boolean;
@@ -99,13 +100,38 @@ begin
   select * into v_set from studio_settings where studio_id = v_occ.studio_id;
   select timezone into v_tz from studios where id = v_occ.studio_id;
 
-  -- No auth.uid() means a trusted server context: `anon` holds no execute
-  -- grant on this schema (migration 001 §16), so the only callers reaching
-  -- here without a JWT subject are service_role and direct DB connections
-  -- (jobs, imports, tests).
-  v_trusted := v_actor is null;
+  -- --- Trust is a property of the ROLE, never of a missing auth.uid() -------
+  --
+  -- A null auth.uid() proves nothing. It is tempting to argue that `anon`
+  -- holds no execute grant (migration 001 §16), so an unauthenticated caller
+  -- can never reach here, so a null subject must mean service_role. The
+  -- conclusion does not follow: an `authenticated` caller presenting a
+  -- malformed JWT with no `sub` claim has the execute grant AND a null
+  -- auth.uid(), and would be handed booking rights over every member in the
+  -- studio with every gate bypassed.
+  --
+  -- current_user is useless here — inside a security definer function it is
+  -- always the function owner, not the caller. The caller's effective role is
+  -- the `role` GUC, which is what PostgREST sets per request and what SET ROLE
+  -- sets in a direct session; it is NOT changed by security definer entry.
+  -- 'none' means no SET ROLE happened at all, i.e. a direct login session.
+  --
+  -- rolbypassrls is the honest test of "already privileged above RLS":
+  -- service_role, postgres and supabase_admin have it, and gain nothing from
+  -- this function that they could not do by writing the tables directly.
+  -- authenticated, anon and authenticator do not have it.
+  v_caller_role := coalesce(nullif(current_setting('role', true), 'none'),
+                            session_user);
+  v_trusted := exists (
+    select 1 from pg_roles
+     where rolname = v_caller_role
+       and (rolsuper or rolbypassrls)
+  );
+
   v_is_desk := coalesce(is_desk_up(v_occ.studio_id), false);
-  v_is_self := v_member.user_id is not null and v_member.user_id = v_actor;
+  v_is_self := v_actor is not null
+               and v_member.user_id is not null
+               and v_member.user_id = v_actor;
 
   if not (v_trusted or v_is_desk or v_is_self) then
     return (null, null, null, null, 'not_authorised')::book_class_result;
