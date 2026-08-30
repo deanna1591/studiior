@@ -26,14 +26,18 @@ export default function MemberLogin() {
         </Field>
         <Submit />
       </form>
-      <p className="mt-8 text-xs leading-relaxed text-stone-500">
-        Seed members: alena.fabricated@example.com (unlimited) ·
-        ivana.sampleton@example.com (8 a month) ·
-        nikola.simulated@example.com (class pack) ·
-        adela.nonexistent@example.com (no waiver — the gate refuses her)
-        <br />
-        Password: <code className="font-mono">reform-dev-password</code>
-      </p>
+      {/* Local development only — see the note on the staff login page for why
+          this is inline rather than a wrapper component. */}
+      {process.env.NODE_ENV === "development" && (
+        <p className="mt-8 text-xs leading-relaxed text-stone-500">
+          Seed members: alena.fabricated@example.com (unlimited) ·
+          ivana.sampleton@example.com (8 a month) ·
+          nikola.simulated@example.com (class pack) ·
+          adela.nonexistent@example.com (no waiver — the gate refuses her)
+          <br />
+          Password: <code className="font-mono">reform-dev-password</code>
+        </p>
+      )}
     </div>
   );
 }

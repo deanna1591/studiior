@@ -81,6 +81,12 @@ to a studio before anything renders. An unknown slug 404s:
 All passwords are `reform-dev-password`. Synthetic accounts on a local
 database; they mean nothing anywhere else.
 
+These logins are also printed on the sign-in pages themselves, but only when
+`NODE_ENV === 'development'`. The condition is inline around the JSX so the
+strings are eliminated from the production bundle rather than merely hidden —
+if you refactor those blocks into a shared component, the credentials go back
+into the JavaScript that anyone can read.
+
 ### Staff — http://localhost:3000
 
 | Email | Role | What it can do in the slice |

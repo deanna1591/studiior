@@ -35,6 +35,7 @@ Three migrations, applying clean from `supabase db reset`:
 - **008** `plan_templates` (studio_id null = system) with six system templates, and a trigger refusing to delete a plan that has members on it
 - **009** CHECK constraints making the plan-type field rules real (a pack cannot bill monthly, a subscription cannot expire), and one active plan per name per studio
 - **010** Decision 12: `credits` is class-pack only, `credits_per_period` is recurring-only and null there means unlimited. The fifth constraint 009 left open
+- **011** closes the anon RPC surface for real (006 revoked from `PUBLIC`, but hosted grants `anon` explicitly — see the rule below), makes trigger functions callable by nobody, and pins `search_path` on the five that predate the convention
 
 Five suites, **180 assertions**, all passing from a clean `db reset`:
 
@@ -64,7 +65,17 @@ Membership plan management is built: list, create from one of six system templat
 
 **Every table gets RLS and a grant.** RLS decides which rows; grants decide whether the role may touch the table at all. Both, or the table is either closed to everyone or open to everyone. See migration 001 §16 — but read migration 005 with it: §16 claims there is no pre-login surface, and since migration 004 there is exactly one, `studio_by_slug()`.
 
-**Functions are closed by default, because PostgreSQL's default is the opposite.** A new function is executable by `PUBLIC` — meaning `anon` — the moment it is created. Withholding a grant does nothing; you have to revoke. Migration 006 revokes it on the helpers and flips the schema default, so a new function is now reachable only by the roles you name. Say who may execute, every time.
+**Functions are closed by default, because PostgreSQL's default is the opposite.** A new function is executable the moment it is created. Withholding a grant does nothing; you have to revoke. Say who may execute, every time.
+
+**Revoking from `PUBLIC` is not the same as revoking from `anon`, and only hosted can tell you.** The hosted platform ships default privileges naming `anon` explicitly, so every function created by `postgres` in `public` is born with an `anon=X` grant. The local stack does not do this. Migration 006 revoked from `PUBLIC`, passed every local check, and left eight functions anon-callable in production for five migrations; 011 revoked from `anon` and flipped the hosted default so the next one is not born open.
+
+The lesson is not about one grant. **`supabase db reset` cannot verify grants** — local and hosted have different default ACLs, so the tests agree with the wrong answer. After any migration that creates a function or touches privileges, run the advisor query against the hosted project, not just locally:
+
+```bash
+supabase db query --linked "select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute');"
+```
+
+`studio_by_slug(text)` is the only name that belongs in that output.
 
 **Booking runs in one transaction with a row lock.** `select ... from class_occurrences where id = $1 for update` before reading `booked_count`. Application-level check-then-insert will overbook under load and is not acceptable.
 
