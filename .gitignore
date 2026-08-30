@@ -4,3 +4,11 @@ node_modules/
 supabase/.branches
 supabase/.temp
 .DS_Store
+
+# Next.js
+/node_modules
+/.next
+/out
+next-env.d.ts
+.env*.local
+tsconfig.tsbuildinfo

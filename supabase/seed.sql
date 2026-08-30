@@ -302,6 +302,54 @@ begin
               else (m.joined_on + time '10:00') at time zone tz end
     from _seed_member m;
 
+  -- Member logins for the vertical slice. Only a handful: enough to sign in as
+  -- each interesting shape without pretending all 30 use the app. Same local
+  -- dev password as the staff accounts.
+  --   alena.fabricated  unlimited membership, books with nothing consumed
+  --   ivana.sampleton   8-a-month, books against the period allowance
+  --   nikola.simulated  class pack, books against a credit
+  --   adela.nonexistent no signed waiver, so the §2.1.4 gate refuses her
+  insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+                          email_confirmed_at, created_at)
+  select ('11111111-0000-0000-0003-' || lpad(m.idx::text, 12, '0'))::uuid,
+         '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+         mem.email, crypt('reform-dev-password', gen_salt('bf')), now(), now()
+    from _seed_member m
+    join members mem on mem.id = m.id
+   where m.idx in (1, 9, 14, 22);
+
+  insert into profiles (id, email, full_name)
+  select ('11111111-0000-0000-0003-' || lpad(m.idx::text, 12, '0'))::uuid,
+         mem.email, mem.first_name || ' ' || mem.last_name
+    from _seed_member m
+    join members mem on mem.id = m.id
+   where m.idx in (1, 9, 14, 22);
+
+  update members mem
+     set user_id = ('11111111-0000-0000-0003-' || lpad(m.idx::text, 12, '0'))::uuid
+    from _seed_member m
+   where m.id = mem.id and m.idx in (1, 9, 14, 22);
+
+  -- GoTrue scans these columns into non-nullable Go strings, so a hand-inserted
+  -- auth.users row with NULLs in them fails every sign-in with "Database error
+  -- querying schema" — an error that points at the schema rather than at the
+  -- row that caused it. Normalising them to '' is what the real signup path
+  -- does; skipping it makes every seeded login useless.
+  update auth.users
+     set confirmation_token         = coalesce(confirmation_token, ''),
+         recovery_token             = coalesce(recovery_token, ''),
+         email_change               = coalesce(email_change, ''),
+         email_change_token_new     = coalesce(email_change_token_new, ''),
+         email_change_token_current = coalesce(email_change_token_current, ''),
+         phone_change               = coalesce(phone_change, ''),
+         phone_change_token         = coalesce(phone_change_token, ''),
+         reauthentication_token     = coalesce(reauthentication_token, ''),
+         -- GoTrue scans these into time.Time, not *time.Time, so NULL is fatal
+         -- for the same reason.
+         created_at                 = coalesce(created_at, now()),
+         updated_at                 = coalesce(updated_at, created_at, now())
+   where id::text like '11111111-%';
+
   -- ===========================================================================
   -- 8. Memberships and the payments behind them
   -- ===========================================================================
@@ -583,6 +631,21 @@ begin
          (c.booked_at + interval '180 days'), c.booked_at - interval '1 hour'
     from _seed_consume c
    where c.plan = 'pack' and c.rn_all % 10 = 1;
+
+  -- A pack member who is still training has credits in hand: they buy the next
+  -- pack when the last one runs out, not at the moment they next book. Without
+  -- this, every active pack member sits at exactly zero — grants and
+  -- consumption cancel out — and nothing downstream that depends on a member
+  -- having credit is exercisable.
+  insert into _seed_ledger (member_id, membership_id, delta, reason, expires_at, created_at)
+  select c.member_id, c.membership_id, 10, 'purchase',
+         max(c.booked_at) + interval '180 days',
+         max(c.booked_at) + interval '1 day'
+    from _seed_consume c
+    join _seed_member m on m.id = c.member_id
+   where c.plan = 'pack'
+     and m.active_to >= today - 45          -- still coming
+   group by c.member_id, c.membership_id;
 
   -- One allowance grant per billing period the member has lived through.
   insert into _seed_ledger (member_id, membership_id, delta, reason, created_at)

@@ -1,0 +1,3965 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  public: {
+    Tables: {
+      achievement_definitions: {
+        Row: {
+          audience: Database["public"]["Enums"]["challenge_audience"]
+          code: string
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          status: string
+          studio_id: string | null
+          threshold: number | null
+          trigger_type: string
+        }
+        Insert: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          code: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          status?: string
+          studio_id?: string | null
+          threshold?: number | null
+          trigger_type: string
+        }
+        Update: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          code?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          status?: string
+          studio_id?: string | null
+          threshold?: number | null
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "achievement_definitions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "achievement_definitions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_insights: {
+        Row: {
+          action_payload: Json
+          action_type: string
+          actioned_at: string | null
+          actioned_by: string | null
+          created_at: string
+          dismissed_at: string | null
+          estimated_impact_cents: number | null
+          for_date: string
+          id: string
+          input_snapshot: Json | null
+          model: string | null
+          observation: string
+          prompt_version: string | null
+          recommended_action: string
+          severity: string
+          status: Database["public"]["Enums"]["insight_status"]
+          studio_id: string
+          subject_id: string | null
+          subject_type: string | null
+          title: string
+          type: string
+          updated_at: string
+          why_it_matters: string
+        }
+        Insert: {
+          action_payload?: Json
+          action_type: string
+          actioned_at?: string | null
+          actioned_by?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          estimated_impact_cents?: number | null
+          for_date: string
+          id?: string
+          input_snapshot?: Json | null
+          model?: string | null
+          observation: string
+          prompt_version?: string | null
+          recommended_action: string
+          severity?: string
+          status?: Database["public"]["Enums"]["insight_status"]
+          studio_id: string
+          subject_id?: string | null
+          subject_type?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          why_it_matters: string
+        }
+        Update: {
+          action_payload?: Json
+          action_type?: string
+          actioned_at?: string | null
+          actioned_by?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          estimated_impact_cents?: number | null
+          for_date?: string
+          id?: string
+          input_snapshot?: Json | null
+          model?: string | null
+          observation?: string
+          prompt_version?: string | null
+          recommended_action?: string
+          severity?: string
+          status?: Database["public"]["Enums"]["insight_status"]
+          studio_id?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          why_it_matters?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_actioned_by_fkey"
+            columns: ["actioned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insights_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insights_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_table: string
+          id: string
+          ip: unknown
+          studio_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_table: string
+          id?: string
+          ip?: unknown
+          studio_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_table?: string
+          id?: string
+          ip?: unknown
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          booked_at: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          created_at: string
+          credit_entry_id: string | null
+          fee_charged_cents: number
+          id: string
+          is_late_cancel: boolean
+          member_id: string
+          membership_id: string | null
+          occurrence_id: string
+          overridden_rules: string[] | null
+          override_reason: string | null
+          payment_source: Database["public"]["Enums"]["payment_source"] | null
+          source: Database["public"]["Enums"]["booking_source"]
+          status: Database["public"]["Enums"]["booking_status"]
+          studio_id: string
+          updated_at: string
+          waitlist_position: number | null
+        }
+        Insert: {
+          booked_at?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          credit_entry_id?: string | null
+          fee_charged_cents?: number
+          id?: string
+          is_late_cancel?: boolean
+          member_id: string
+          membership_id?: string | null
+          occurrence_id: string
+          overridden_rules?: string[] | null
+          override_reason?: string | null
+          payment_source?: Database["public"]["Enums"]["payment_source"] | null
+          source?: Database["public"]["Enums"]["booking_source"]
+          status?: Database["public"]["Enums"]["booking_status"]
+          studio_id: string
+          updated_at?: string
+          waitlist_position?: number | null
+        }
+        Update: {
+          booked_at?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string
+          credit_entry_id?: string | null
+          fee_charged_cents?: number
+          id?: string
+          is_late_cancel?: boolean
+          member_id?: string
+          membership_id?: string | null
+          occurrence_id?: string
+          overridden_rules?: string[] | null
+          override_reason?: string | null
+          payment_source?: Database["public"]["Enums"]["payment_source"] | null
+          source?: Database["public"]["Enums"]["booking_source"]
+          status?: Database["public"]["Enums"]["booking_status"]
+          studio_id?: string
+          updated_at?: string
+          waitlist_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_participants: {
+        Row: {
+          audience: Database["public"]["Enums"]["challenge_audience"]
+          challenge_id: string
+          completed_at: string | null
+          created_at: string
+          goal_value: number
+          id: string
+          instructor_id: string | null
+          joined_at: string
+          last_progress_at: string | null
+          member_id: string | null
+          progress: number
+          rank: number | null
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          audience: Database["public"]["Enums"]["challenge_audience"]
+          challenge_id: string
+          completed_at?: string | null
+          created_at?: string
+          goal_value: number
+          id?: string
+          instructor_id?: string | null
+          joined_at?: string
+          last_progress_at?: string | null
+          member_id?: string | null
+          progress?: number
+          rank?: number | null
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          challenge_id?: string
+          completed_at?: string | null
+          created_at?: string
+          goal_value?: number
+          id?: string
+          instructor_id?: string | null
+          joined_at?: string
+          last_progress_at?: string | null
+          member_id?: string | null
+          progress?: number
+          rank?: number | null
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_participants_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_participants_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_participants_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_participants_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_participants_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_participants_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_progress_events: {
+        Row: {
+          booking_id: string | null
+          challenge_id: string
+          created_at: string
+          delta: number
+          id: string
+          instructor_id: string | null
+          member_id: string | null
+          occurred_at: string
+          occurrence_id: string | null
+          studio_id: string
+        }
+        Insert: {
+          booking_id?: string | null
+          challenge_id: string
+          created_at?: string
+          delta: number
+          id?: string
+          instructor_id?: string | null
+          member_id?: string | null
+          occurred_at: string
+          occurrence_id?: string | null
+          studio_id: string
+        }
+        Update: {
+          booking_id?: string | null
+          challenge_id?: string
+          created_at?: string
+          delta?: number
+          id?: string
+          instructor_id?: string | null
+          member_id?: string | null
+          occurred_at?: string
+          occurrence_id?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_progress_events_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_progress_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_templates: {
+        Row: {
+          audience: Database["public"]["Enums"]["challenge_audience"]
+          created_at: string
+          description: string | null
+          duration_days: number
+          goal_value: number
+          id: string
+          reward_description: string | null
+          studio_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["challenge_type"]
+        }
+        Insert: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          created_at?: string
+          description?: string | null
+          duration_days: number
+          goal_value: number
+          id?: string
+          reward_description?: string | null
+          studio_id?: string | null
+          title: string
+          type: Database["public"]["Enums"]["challenge_type"]
+        }
+        Update: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          goal_value?: number
+          id?: string
+          reward_description?: string | null
+          studio_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["challenge_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_templates_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_templates_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          audience: Database["public"]["Enums"]["challenge_audience"]
+          auto_enrol: boolean
+          class_type_ids: Json
+          cover_image_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          ends_on: string
+          goal_value: number
+          id: string
+          join_deadline: string
+          reward_description: string | null
+          starts_on: string
+          status: Database["public"]["Enums"]["challenge_status"]
+          studio_id: string
+          template_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["challenge_type"]
+          updated_at: string
+        }
+        Insert: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          auto_enrol?: boolean
+          class_type_ids?: Json
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_on: string
+          goal_value: number
+          id?: string
+          join_deadline: string
+          reward_description?: string | null
+          starts_on: string
+          status?: Database["public"]["Enums"]["challenge_status"]
+          studio_id: string
+          template_id?: string | null
+          title: string
+          type: Database["public"]["Enums"]["challenge_type"]
+          updated_at?: string
+        }
+        Update: {
+          audience?: Database["public"]["Enums"]["challenge_audience"]
+          auto_enrol?: boolean
+          class_type_ids?: Json
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_on?: string
+          goal_value?: number
+          id?: string
+          join_deadline?: string
+          reward_description?: string | null
+          starts_on?: string
+          status?: Database["public"]["Enums"]["challenge_status"]
+          studio_id?: string
+          template_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["challenge_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenges_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "challenge_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      check_ins: {
+        Row: {
+          booking_id: string
+          checked_in_at: string
+          checked_in_by: string | null
+          created_at: string
+          id: string
+          member_id: string
+          method: Database["public"]["Enums"]["checkin_method"]
+          occurrence_id: string
+          studio_id: string
+        }
+        Insert: {
+          booking_id: string
+          checked_in_at?: string
+          checked_in_by?: string | null
+          created_at?: string
+          id?: string
+          member_id: string
+          method: Database["public"]["Enums"]["checkin_method"]
+          occurrence_id: string
+          studio_id: string
+        }
+        Update: {
+          booking_id?: string
+          checked_in_at?: string
+          checked_in_by?: string | null
+          created_at?: string
+          id?: string
+          member_id?: string
+          method?: Database["public"]["Enums"]["checkin_method"]
+          occurrence_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_ins_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_checked_in_by_fkey"
+            columns: ["checked_in_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_occurrences: {
+        Row: {
+          booked_count: number
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          capacity: number
+          class_type_id: string | null
+          created_at: string
+          description: string | null
+          ends_at: string
+          id: string
+          instructor_id: string | null
+          instructor_notes: string | null
+          is_exception: boolean
+          location_id: string
+          name: string
+          room_id: string | null
+          series_id: string | null
+          starts_at: string
+          status: Database["public"]["Enums"]["occurrence_status"]
+          studio_id: string
+          substitute_for: string | null
+          updated_at: string
+          waitlist_count: number
+        }
+        Insert: {
+          booked_count?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          capacity: number
+          class_type_id?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at: string
+          id?: string
+          instructor_id?: string | null
+          instructor_notes?: string | null
+          is_exception?: boolean
+          location_id: string
+          name: string
+          room_id?: string | null
+          series_id?: string | null
+          starts_at: string
+          status?: Database["public"]["Enums"]["occurrence_status"]
+          studio_id: string
+          substitute_for?: string | null
+          updated_at?: string
+          waitlist_count?: number
+        }
+        Update: {
+          booked_count?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          capacity?: number
+          class_type_id?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string
+          id?: string
+          instructor_id?: string | null
+          instructor_notes?: string | null
+          is_exception?: boolean
+          location_id?: string
+          name?: string
+          room_id?: string | null
+          series_id?: string | null
+          starts_at?: string
+          status?: Database["public"]["Enums"]["occurrence_status"]
+          studio_id?: string
+          substitute_for?: string | null
+          updated_at?: string
+          waitlist_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_occurrences_class_type_id_fkey"
+            columns: ["class_type_id"]
+            isOneToOne: false
+            referencedRelation: "class_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "class_series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_substitute_for_fkey"
+            columns: ["substitute_for"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_series: {
+        Row: {
+          booking_window_days: number | null
+          capacity: number
+          class_type_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          difficulty: string | null
+          duration_minutes: number
+          ends_on: string | null
+          id: string
+          instructor_id: string | null
+          location_id: string
+          name: string
+          room_id: string | null
+          rrule: string
+          starts_on: string
+          status: Database["public"]["Enums"]["series_status"]
+          studio_id: string
+          time_of_day: string
+          updated_at: string
+        }
+        Insert: {
+          booking_window_days?: number | null
+          capacity: number
+          class_type_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          duration_minutes: number
+          ends_on?: string | null
+          id?: string
+          instructor_id?: string | null
+          location_id: string
+          name: string
+          room_id?: string | null
+          rrule: string
+          starts_on: string
+          status?: Database["public"]["Enums"]["series_status"]
+          studio_id: string
+          time_of_day: string
+          updated_at?: string
+        }
+        Update: {
+          booking_window_days?: number | null
+          capacity?: number
+          class_type_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          duration_minutes?: number
+          ends_on?: string | null
+          id?: string
+          instructor_id?: string | null
+          location_id?: string
+          name?: string
+          room_id?: string | null
+          rrule?: string
+          starts_on?: string
+          status?: Database["public"]["Enums"]["series_status"]
+          studio_id?: string
+          time_of_day?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_series_class_type_id_fkey"
+            columns: ["class_type_id"]
+            isOneToOne: false
+            referencedRelation: "class_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_types: {
+        Row: {
+          color: string | null
+          created_at: string
+          default_capacity: number
+          description: string | null
+          difficulty: string | null
+          duration_minutes: number
+          id: string
+          name: string
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          default_capacity: number
+          description?: string | null
+          difficulty?: string | null
+          duration_minutes: number
+          id?: string
+          name: string
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          default_capacity?: number
+          description?: string | null
+          difficulty?: string | null
+          duration_minutes?: number
+          id?: string
+          name?: string
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_types_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_types_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_ledger: {
+        Row: {
+          actor_user_id: string | null
+          balance_after: number
+          booking_id: string | null
+          created_at: string
+          delta: number
+          expires_at: string | null
+          id: string
+          member_id: string
+          membership_id: string | null
+          reason: Database["public"]["Enums"]["credit_reason"]
+          studio_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          balance_after: number
+          booking_id?: string | null
+          created_at?: string
+          delta: number
+          expires_at?: string | null
+          id?: string
+          member_id: string
+          membership_id?: string | null
+          reason: Database["public"]["Enums"]["credit_reason"]
+          studio_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          balance_after?: number
+          booking_id?: string | null
+          created_at?: string
+          delta?: number
+          expires_at?: string | null
+          id?: string
+          member_id?: string
+          membership_id?: string | null
+          reason?: Database["public"]["Enums"]["credit_reason"]
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gift_card_transactions: {
+        Row: {
+          balance_after: number
+          created_at: string
+          delta_cents: number
+          gift_card_id: string
+          id: string
+          payment_id: string | null
+          studio_id: string
+        }
+        Insert: {
+          balance_after: number
+          created_at?: string
+          delta_cents: number
+          gift_card_id: string
+          id?: string
+          payment_id?: string | null
+          studio_id: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          delta_cents?: number
+          gift_card_id?: string
+          id?: string
+          payment_id?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gift_card_transactions_gift_card_id_fkey"
+            columns: ["gift_card_id"]
+            isOneToOne: false
+            referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_card_transactions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_card_transactions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_card_transactions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gift_cards: {
+        Row: {
+          balance_cents: number
+          code_hash: string
+          code_last4: string
+          created_at: string
+          expires_on: string | null
+          id: string
+          initial_amount_cents: number
+          message: string | null
+          purchaser_member_id: string | null
+          recipient_email: string | null
+          recipient_name: string | null
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance_cents: number
+          code_hash: string
+          code_last4: string
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          initial_amount_cents: number
+          message?: string | null
+          purchaser_member_id?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance_cents?: number
+          code_hash?: string
+          code_last4?: string
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          initial_amount_cents?: number
+          message?: string | null
+          purchaser_member_id?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gift_cards_purchaser_member_id_fkey"
+            columns: ["purchaser_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_purchaser_member_id_fkey"
+            columns: ["purchaser_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_rows: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          entity_table: string | null
+          error: string | null
+          id: string
+          import_id: string
+          normalized: Json | null
+          raw: Json
+          row_number: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          entity_table?: string | null
+          error?: string | null
+          id?: string
+          import_id: string
+          normalized?: Json | null
+          raw: Json
+          row_number: number
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          entity_table?: string | null
+          error?: string | null
+          id?: string
+          import_id?: string
+          normalized?: Json | null
+          raw?: Json
+          row_number?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_rows_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      imports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_count: number
+          filename: string
+          id: string
+          mapping: Json
+          report: Json
+          row_count: number
+          status: Database["public"]["Enums"]["import_status"]
+          studio_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_count?: number
+          filename: string
+          id?: string
+          mapping?: Json
+          report?: Json
+          row_count?: number
+          status?: Database["public"]["Enums"]["import_status"]
+          studio_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_count?: number
+          filename?: string
+          id?: string
+          mapping?: Json
+          report?: Json
+          row_count?: number
+          status?: Database["public"]["Enums"]["import_status"]
+          studio_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "imports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "imports_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "imports_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_achievements: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          definition_id: string
+          earned_at: string
+          id: string
+          instructor_id: string
+          studio_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          definition_id: string
+          earned_at?: string
+          id?: string
+          instructor_id: string
+          studio_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          definition_id?: string
+          earned_at?: string
+          id?: string
+          instructor_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_achievements_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "achievement_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_achievements_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_achievements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_achievements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_availability: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          day_of_week: number | null
+          effective_from: string | null
+          effective_to: string | null
+          ends_at_time: string | null
+          exception_date: string | null
+          id: string
+          instructor_id: string
+          is_available: boolean
+          note: string | null
+          starts_at_time: string | null
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number | null
+          effective_from?: string | null
+          effective_to?: string | null
+          ends_at_time?: string | null
+          exception_date?: string | null
+          id?: string
+          instructor_id: string
+          is_available?: boolean
+          note?: string | null
+          starts_at_time?: string | null
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number | null
+          effective_from?: string | null
+          effective_to?: string | null
+          ends_at_time?: string | null
+          exception_date?: string | null
+          id?: string
+          instructor_id?: string
+          is_available?: boolean
+          note?: string | null
+          starts_at_time?: string | null
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_availability_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_availability_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_availability_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_availability_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructors: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          certifications: Json
+          color: string | null
+          created_at: string
+          display_name: string
+          id: string
+          staff_id: string | null
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          certifications?: Json
+          color?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          staff_id?: string | null
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          certifications?: Json
+          color?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          staff_id?: string | null
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructors_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "studio_staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructors_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructors_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_runs: {
+        Row: {
+          attempts: number
+          error: string | null
+          finished_at: string | null
+          id: string
+          job_key: string
+          run_for: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_key: string
+          run_for: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_key?: string
+          run_for?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      locations: {
+        Row: {
+          address: Json | null
+          created_at: string
+          id: string
+          is_primary: boolean
+          name: string
+          status: string
+          studio_id: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: Json | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          name: string
+          status?: string
+          studio_id: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: Json | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          name?: string
+          status?: string
+          studio_id?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_achievements: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          definition_id: string
+          earned_at: string
+          id: string
+          member_id: string
+          studio_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          definition_id: string
+          earned_at?: string
+          id?: string
+          member_id: string
+          studio_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          definition_id?: string
+          earned_at?: string
+          id?: string
+          member_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_achievements_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "achievement_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_achievements_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_achievements_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_achievements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_achievements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_goals: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_value: number
+          id: string
+          member_id: string
+          status: string
+          studio_id: string
+          target_date: string | null
+          target_type: string
+          target_value: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number
+          id?: string
+          member_id: string
+          status?: string
+          studio_id: string
+          target_date?: string | null
+          target_type: string
+          target_value?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number
+          id?: string
+          member_id?: string
+          status?: string
+          studio_id?: string
+          target_date?: string | null
+          target_type?: string
+          target_value?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_goals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_goals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_goals_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_goals_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_notes: {
+        Row: {
+          active: boolean
+          author_user_id: string | null
+          body: string
+          category: Database["public"]["Enums"]["note_category"]
+          created_at: string
+          id: string
+          managers_only: boolean
+          member_id: string
+          pinned: boolean
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          author_user_id?: string | null
+          body: string
+          category?: Database["public"]["Enums"]["note_category"]
+          created_at?: string
+          id?: string
+          managers_only?: boolean
+          member_id: string
+          pinned?: boolean
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          author_user_id?: string | null
+          body?: string
+          category?: Database["public"]["Enums"]["note_category"]
+          created_at?: string
+          id?: string
+          managers_only?: boolean
+          member_id?: string
+          pinned?: boolean
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_notes_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_notes_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_notes_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_notes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_notes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_tag_assignments: {
+        Row: {
+          created_at: string
+          member_id: string
+          studio_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          member_id: string
+          studio_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          member_id?: string
+          studio_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_tag_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tag_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tag_assignments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tag_assignments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tag_assignments_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "member_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          studio_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          studio_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_tags_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tags_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      members: {
+        Row: {
+          address: Json | null
+          archived_at: string | null
+          avatar_url: string | null
+          created_at: string
+          current_streak: number
+          date_of_birth: string | null
+          email: string
+          emergency_contact: Json | null
+          first_name: string
+          first_visit_at: string | null
+          id: string
+          joined_on: string
+          last_name: string
+          last_visit_at: string | null
+          lifetime_visits: number
+          marketing_opt_in: boolean
+          phone: string | null
+          source: string | null
+          status: Database["public"]["Enums"]["member_status"]
+          studio_id: string
+          updated_at: string
+          user_id: string | null
+          waiver_signed_at: string | null
+        }
+        Insert: {
+          address?: Json | null
+          archived_at?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          current_streak?: number
+          date_of_birth?: string | null
+          email: string
+          emergency_contact?: Json | null
+          first_name: string
+          first_visit_at?: string | null
+          id?: string
+          joined_on?: string
+          last_name: string
+          last_visit_at?: string | null
+          lifetime_visits?: number
+          marketing_opt_in?: boolean
+          phone?: string | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["member_status"]
+          studio_id: string
+          updated_at?: string
+          user_id?: string | null
+          waiver_signed_at?: string | null
+        }
+        Update: {
+          address?: Json | null
+          archived_at?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          current_streak?: number
+          date_of_birth?: string | null
+          email?: string
+          emergency_contact?: Json | null
+          first_name?: string
+          first_visit_at?: string | null
+          id?: string
+          joined_on?: string
+          last_name?: string
+          last_visit_at?: string | null
+          lifetime_visits?: number
+          marketing_opt_in?: boolean
+          phone?: string | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["member_status"]
+          studio_id?: string
+          updated_at?: string
+          user_id?: string | null
+          waiver_signed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "members_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          effective_at: string
+          from_status: Database["public"]["Enums"]["membership_status"] | null
+          id: string
+          membership_id: string
+          metadata: Json
+          studio_id: string
+          to_status: Database["public"]["Enums"]["membership_status"] | null
+          type: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          effective_at?: string
+          from_status?: Database["public"]["Enums"]["membership_status"] | null
+          id?: string
+          membership_id: string
+          metadata?: Json
+          studio_id: string
+          to_status?: Database["public"]["Enums"]["membership_status"] | null
+          type: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          effective_at?: string
+          from_status?: Database["public"]["Enums"]["membership_status"] | null
+          id?: string
+          membership_id?: string
+          metadata?: Json
+          studio_id?: string
+          to_status?: Database["public"]["Enums"]["membership_status"] | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_events_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_plans: {
+        Row: {
+          billing_interval:
+            | Database["public"]["Enums"]["billing_interval"]
+            | null
+          billing_interval_count: number
+          booking_window_days: number | null
+          cancellation_notice_days: number
+          commitment_months: number
+          created_at: string
+          credits: number | null
+          credits_per_period: number | null
+          currency: string
+          description: string | null
+          freeze_allowed: boolean
+          id: string
+          max_bookings_per_day: number | null
+          max_freeze_days: number | null
+          name: string
+          price_cents: number
+          restrictions: Json
+          signup_fee_cents: number
+          sort_order: number
+          status: string
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          studio_id: string
+          type: Database["public"]["Enums"]["plan_type"]
+          updated_at: string
+          validity_days: number | null
+          visibility: string
+        }
+        Insert: {
+          billing_interval?:
+            | Database["public"]["Enums"]["billing_interval"]
+            | null
+          billing_interval_count?: number
+          booking_window_days?: number | null
+          cancellation_notice_days?: number
+          commitment_months?: number
+          created_at?: string
+          credits?: number | null
+          credits_per_period?: number | null
+          currency: string
+          description?: string | null
+          freeze_allowed?: boolean
+          id?: string
+          max_bookings_per_day?: number | null
+          max_freeze_days?: number | null
+          name: string
+          price_cents: number
+          restrictions?: Json
+          signup_fee_cents?: number
+          sort_order?: number
+          status?: string
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          studio_id: string
+          type: Database["public"]["Enums"]["plan_type"]
+          updated_at?: string
+          validity_days?: number | null
+          visibility?: string
+        }
+        Update: {
+          billing_interval?:
+            | Database["public"]["Enums"]["billing_interval"]
+            | null
+          billing_interval_count?: number
+          booking_window_days?: number | null
+          cancellation_notice_days?: number
+          commitment_months?: number
+          created_at?: string
+          credits?: number | null
+          credits_per_period?: number | null
+          currency?: string
+          description?: string | null
+          freeze_allowed?: boolean
+          id?: string
+          max_bookings_per_day?: number | null
+          max_freeze_days?: number | null
+          name?: string
+          price_cents?: number
+          restrictions?: Json
+          signup_fee_cents?: number
+          sort_order?: number
+          status?: string
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          studio_id?: string
+          type?: Database["public"]["Enums"]["plan_type"]
+          updated_at?: string
+          validity_days?: number | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_plans_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_plans_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memberships: {
+        Row: {
+          auto_renew: boolean
+          cancel_at: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          created_at: string
+          credits_remaining: number | null
+          credits_reset_at: string | null
+          currency: string
+          current_period_end: string | null
+          current_period_start: string | null
+          expires_on: string | null
+          freeze_days_used: number
+          freeze_end: string | null
+          freeze_start: string | null
+          id: string
+          member_id: string
+          plan_id: string
+          price_cents: number
+          renews_on: string | null
+          starts_on: string
+          status: Database["public"]["Enums"]["membership_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          cancel_at?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          credits_remaining?: number | null
+          credits_reset_at?: string | null
+          currency: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          expires_on?: string | null
+          freeze_days_used?: number
+          freeze_end?: string | null
+          freeze_start?: string | null
+          id?: string
+          member_id: string
+          plan_id: string
+          price_cents: number
+          renews_on?: string | null
+          starts_on: string
+          status: Database["public"]["Enums"]["membership_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_renew?: boolean
+          cancel_at?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          credits_remaining?: number | null
+          credits_reset_at?: string | null
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          expires_on?: string | null
+          freeze_days_used?: number
+          freeze_end?: string | null
+          freeze_start?: string | null
+          id?: string
+          member_id?: string
+          plan_id?: string
+          price_cents?: number
+          renews_on?: string | null
+          starts_on?: string
+          status?: Database["public"]["Enums"]["membership_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      morning_briefs: {
+        Row: {
+          brief_date: string
+          created_at: string
+          generated_at: string
+          id: string
+          insight_ids: string[]
+          metrics: Json
+          opened_at: string | null
+          studio_id: string
+          summary: string
+        }
+        Insert: {
+          brief_date: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          insight_ids?: string[]
+          metrics?: Json
+          opened_at?: string | null
+          studio_id: string
+          summary: string
+        }
+        Update: {
+          brief_date?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          insight_ids?: string[]
+          metrics?: Json
+          opened_at?: string | null
+          studio_id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "morning_briefs_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "morning_briefs_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          booking_email: boolean
+          booking_push: boolean
+          challenge_push: boolean
+          created_at: string
+          marketing_email: boolean
+          member_id: string
+          milestone_push: boolean
+          reminder_email: boolean
+          reminder_push: boolean
+          studio_id: string
+          updated_at: string
+          waitlist_email: boolean
+          waitlist_push: boolean
+        }
+        Insert: {
+          booking_email?: boolean
+          booking_push?: boolean
+          challenge_push?: boolean
+          created_at?: string
+          marketing_email?: boolean
+          member_id: string
+          milestone_push?: boolean
+          reminder_email?: boolean
+          reminder_push?: boolean
+          studio_id: string
+          updated_at?: string
+          waitlist_email?: boolean
+          waitlist_push?: boolean
+        }
+        Update: {
+          booking_email?: boolean
+          booking_push?: boolean
+          challenge_push?: boolean
+          created_at?: string
+          marketing_email?: boolean
+          member_id?: string
+          milestone_push?: boolean
+          reminder_email?: boolean
+          reminder_push?: boolean
+          studio_id?: string
+          updated_at?: string
+          waitlist_email?: boolean
+          waitlist_push?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_preferences_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_preferences_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_preferences_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          channel: Database["public"]["Enums"]["notif_channel"]
+          created_at: string
+          dedupe_key: string
+          error: string | null
+          failed_at: string | null
+          id: string
+          member_id: string | null
+          payload: Json
+          recipient_type: string
+          scheduled_for: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notif_status"]
+          studio_id: string
+          template_key: string
+          user_id: string | null
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["notif_channel"]
+          created_at?: string
+          dedupe_key: string
+          error?: string | null
+          failed_at?: string | null
+          id?: string
+          member_id?: string | null
+          payload?: Json
+          recipient_type: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notif_status"]
+          studio_id: string
+          template_key: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["notif_channel"]
+          created_at?: string
+          dedupe_key?: string
+          error?: string | null
+          failed_at?: string | null
+          id?: string
+          member_id?: string | null
+          payload?: Json
+          recipient_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notif_status"]
+          studio_id?: string
+          template_key?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount_cents: number
+          attempt_count: number
+          booking_id: string | null
+          card_brand: string | null
+          card_last4: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          failure_code: string | null
+          failure_message: string | null
+          gift_card_id: string | null
+          id: string
+          member_id: string | null
+          membership_id: string | null
+          next_retry_at: string | null
+          paid_at: string | null
+          promo_code_id: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id: string | null
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          attempt_count?: number
+          booking_id?: string | null
+          card_brand?: string | null
+          card_last4?: string | null
+          created_at?: string
+          currency: string
+          description?: string | null
+          failure_code?: string | null
+          failure_message?: string | null
+          gift_card_id?: string | null
+          id?: string
+          member_id?: string | null
+          membership_id?: string | null
+          next_retry_at?: string | null
+          paid_at?: string | null
+          promo_code_id?: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          attempt_count?: number
+          booking_id?: string | null
+          card_brand?: string | null
+          card_last4?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          failure_code?: string | null
+          failure_message?: string | null
+          gift_card_id?: string | null
+          id?: string
+          member_id?: string | null
+          membership_id?: string | null
+          next_retry_at?: string | null
+          paid_at?: string | null
+          promo_code_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          stripe_charge_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_gift_card_fk"
+            columns: ["gift_card_id"]
+            isOneToOne: false
+            referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_promo_fk"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          applies_to_plans: Json
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          ends_at: string | null
+          id: string
+          max_redemptions: number | null
+          per_member_limit: number
+          redemption_count: number
+          starts_at: string | null
+          status: string
+          stripe_coupon_id: string | null
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          applies_to_plans?: Json
+          code: string
+          created_at?: string
+          discount_type: string
+          discount_value: number
+          ends_at?: string | null
+          id?: string
+          max_redemptions?: number | null
+          per_member_limit?: number
+          redemption_count?: number
+          starts_at?: string | null
+          status?: string
+          stripe_coupon_id?: string | null
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          applies_to_plans?: Json
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          ends_at?: string | null
+          id?: string
+          max_redemptions?: number | null
+          per_member_limit?: number
+          redemption_count?: number
+          starts_at?: string | null
+          status?: string
+          stripe_coupon_id?: string | null
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_codes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_codes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promo_redemptions: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          payment_id: string | null
+          promo_code_id: string
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          payment_id?: string | null
+          promo_code_id: string
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          payment_id?: string | null
+          promo_code_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_redemptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_redemptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_redemptions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_redemptions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_redemptions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_redemptions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_used_at: string | null
+          member_id: string | null
+          p256dh: string
+          revoked_at: string | null
+          studio_id: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_used_at?: string | null
+          member_id?: string | null
+          p256dh: string
+          revoked_at?: string | null
+          studio_id: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_used_at?: string | null
+          member_id?: string | null
+          p256dh?: string
+          revoked_at?: string | null
+          studio_id?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refunds: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          created_by: string | null
+          id: string
+          payment_id: string
+          reason: string
+          stripe_refund_id: string | null
+          studio_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payment_id: string
+          reason: string
+          stripe_refund_id?: string | null
+          studio_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payment_id?: string
+          reason?: string
+          stripe_refund_id?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms: {
+        Row: {
+          capacity: number
+          color: string | null
+          created_at: string
+          id: string
+          location_id: string
+          name: string
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          capacity: number
+          color?: string | null
+          created_at?: string
+          id?: string
+          location_id: string
+          name: string
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          color?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string
+          name?: string
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stripe_events: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          stripe_account_id: string | null
+          studio_id: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id: string
+          payload: Json
+          processed_at?: string | null
+          stripe_account_id?: string | null
+          studio_id?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          stripe_account_id?: string | null
+          studio_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stripe_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stripe_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_settings: {
+        Row: {
+          booking_cutoff_minutes: number
+          booking_window_days: number
+          cancellation_cutoff_minutes: number
+          created_at: string
+          late_cancel_consumes_credit: boolean
+          late_cancel_fee_cents: number
+          max_bookings_per_day: number | null
+          max_future_bookings: number | null
+          morning_brief_send_at: string
+          no_show_consumes_credit: boolean
+          no_show_fee_cents: number
+          payment_grace_days: number
+          reminder_hours_before: number
+          require_waiver: boolean
+          studio_id: string
+          sub_late_free_cancel: boolean
+          updated_at: string
+          waitlist_cutoff_minutes: number
+          waitlist_enabled: boolean
+          waitlist_offer_window_minutes: number
+          waiver_text: string | null
+          week_starts_on: number
+        }
+        Insert: {
+          booking_cutoff_minutes?: number
+          booking_window_days?: number
+          cancellation_cutoff_minutes?: number
+          created_at?: string
+          late_cancel_consumes_credit?: boolean
+          late_cancel_fee_cents?: number
+          max_bookings_per_day?: number | null
+          max_future_bookings?: number | null
+          morning_brief_send_at?: string
+          no_show_consumes_credit?: boolean
+          no_show_fee_cents?: number
+          payment_grace_days?: number
+          reminder_hours_before?: number
+          require_waiver?: boolean
+          studio_id: string
+          sub_late_free_cancel?: boolean
+          updated_at?: string
+          waitlist_cutoff_minutes?: number
+          waitlist_enabled?: boolean
+          waitlist_offer_window_minutes?: number
+          waiver_text?: string | null
+          week_starts_on?: number
+        }
+        Update: {
+          booking_cutoff_minutes?: number
+          booking_window_days?: number
+          cancellation_cutoff_minutes?: number
+          created_at?: string
+          late_cancel_consumes_credit?: boolean
+          late_cancel_fee_cents?: number
+          max_bookings_per_day?: number | null
+          max_future_bookings?: number | null
+          morning_brief_send_at?: string
+          no_show_consumes_credit?: boolean
+          no_show_fee_cents?: number
+          payment_grace_days?: number
+          reminder_hours_before?: number
+          require_waiver?: boolean
+          studio_id?: string
+          sub_late_free_cancel?: boolean
+          updated_at?: string
+          waitlist_cutoff_minutes?: number
+          waitlist_enabled?: boolean
+          waitlist_offer_window_minutes?: number
+          waiver_text?: string | null
+          week_starts_on?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_settings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: true
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_settings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: true
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_staff: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_at: string | null
+          joined_at: string | null
+          role: Database["public"]["Enums"]["staff_role"]
+          status: string
+          studio_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_at?: string | null
+          joined_at?: string | null
+          role: Database["public"]["Enums"]["staff_role"]
+          status?: string
+          studio_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_at?: string | null
+          joined_at?: string | null
+          role?: Database["public"]["Enums"]["staff_role"]
+          status?: string
+          studio_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_staff_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_staff_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_staff_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studios: {
+        Row: {
+          archived_at: string | null
+          brand_color: string | null
+          country: string | null
+          created_at: string
+          currency: string
+          custom_domain: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          slug: string
+          status: string
+          stripe_account_id: string | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          brand_color?: string | null
+          country?: string | null
+          created_at?: string
+          currency: string
+          custom_domain?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          slug: string
+          status?: string
+          stripe_account_id?: string | null
+          timezone: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          brand_color?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string
+          custom_domain?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          status?: string
+          stripe_account_id?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      timeline_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          member_id: string
+          metadata: Json
+          occurred_at: string
+          ref_id: string | null
+          ref_table: string | null
+          studio_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          member_id: string
+          metadata?: Json
+          occurred_at: string
+          ref_id?: string | null
+          ref_table?: string | null
+          studio_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          member_id?: string
+          metadata?: Json
+          occurred_at?: string
+          ref_id?: string | null
+          ref_table?: string | null
+          studio_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waitlist_offers: {
+        Row: {
+          booking_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          occurrence_id: string
+          offered_at: string
+          outcome: string | null
+          responded_at: string | null
+          studio_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          occurrence_id: string
+          offered_at?: string
+          outcome?: string | null
+          responded_at?: string | null
+          studio_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          occurrence_id?: string
+          offered_at?: string
+          outcome?: string | null
+          responded_at?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_offers_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitlist_offers_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitlist_offers_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitlist_offers_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      member_quick_view: {
+        Row: {
+          avatar_url: string | null
+          current_streak: number | null
+          date_of_birth: string | null
+          first_name: string | null
+          first_visit_at: string | null
+          id: string | null
+          joined_on: string | null
+          last_name: string | null
+          last_visit_at: string | null
+          lifetime_visits: number | null
+          status: Database["public"]["Enums"]["member_status"] | null
+          studio_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          current_streak?: number | null
+          date_of_birth?: string | null
+          first_name?: string | null
+          first_visit_at?: string | null
+          id?: string | null
+          joined_on?: string | null
+          last_name?: string | null
+          last_visit_at?: string | null
+          lifetime_visits?: number | null
+          status?: Database["public"]["Enums"]["member_status"] | null
+          studio_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          current_streak?: number | null
+          date_of_birth?: string | null
+          first_name?: string | null
+          first_visit_at?: string | null
+          id?: string | null
+          joined_on?: string | null
+          last_name?: string | null
+          last_visit_at?: string | null
+          lifetime_visits?: number | null
+          status?: Database["public"]["Enums"]["member_status"] | null
+          studio_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "members_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studio_public: {
+        Row: {
+          brand_color: string | null
+          country: string | null
+          currency: string | null
+          custom_domain: string | null
+          id: string | null
+          logo_url: string | null
+          name: string | null
+          slug: string | null
+          status: string | null
+          timezone: string | null
+        }
+        Insert: {
+          brand_color?: string | null
+          country?: string | null
+          currency?: string | null
+          custom_domain?: string | null
+          id?: string | null
+          logo_url?: string | null
+          name?: string | null
+          slug?: string | null
+          status?: string | null
+          timezone?: string | null
+        }
+        Update: {
+          brand_color?: string | null
+          country?: string | null
+          currency?: string | null
+          custom_domain?: string | null
+          id?: string | null
+          logo_url?: string | null
+          name?: string | null
+          slug?: string | null
+          status?: string | null
+          timezone?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      auth_instructor_id: { Args: { target: string }; Returns: string }
+      auth_member_studios: { Args: never; Returns: string[] }
+      auth_role_in: {
+        Args: { target: string }
+        Returns: Database["public"]["Enums"]["staff_role"]
+      }
+      auth_staff_studios: { Args: never; Returns: string[] }
+      book_class: {
+        Args: {
+          p_member_id: string
+          p_occurrence_id: string
+          p_override_reason?: string
+          p_payment_source?: Database["public"]["Enums"]["payment_source"]
+          p_source: Database["public"]["Enums"]["booking_source"]
+        }
+        Returns: Database["public"]["CompositeTypes"]["book_class_result"]
+        SetofOptions: {
+          from: "*"
+          to: "book_class_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      is_desk_up: { Args: { target: string }; Returns: boolean }
+      is_manager_up: { Args: { target: string }; Returns: boolean }
+      is_owner: { Args: { target: string }; Returns: boolean }
+      studio_by_slug: {
+        Args: { p_slug: string }
+        Returns: {
+          brand_color: string
+          currency: string
+          id: string
+          logo_url: string
+          name: string
+          slug: string
+          timezone: string
+        }[]
+      }
+    }
+    Enums: {
+      billing_interval: "week" | "month" | "quarter" | "year"
+      booking_source: "member" | "staff" | "front_desk" | "import"
+      booking_status:
+        | "booked"
+        | "waitlisted"
+        | "cancelled"
+        | "late_cancelled"
+        | "attended"
+        | "no_show"
+      challenge_audience: "member" | "instructor"
+      challenge_status: "draft" | "scheduled" | "active" | "ended" | "archived"
+      challenge_type: "class_count" | "streak" | "class_type_count"
+      checkin_method: "qr" | "staff" | "kiosk" | "self"
+      credit_reason:
+        | "purchase"
+        | "booking"
+        | "cancellation_refund"
+        | "expiry"
+        | "freeze_adjustment"
+        | "manual"
+      import_status:
+        | "uploaded"
+        | "validating"
+        | "dry_run_complete"
+        | "importing"
+        | "complete"
+        | "failed"
+        | "rolled_back"
+      insight_status: "new" | "actioned" | "dismissed" | "expired"
+      member_status: "lead" | "active" | "inactive" | "archived"
+      membership_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "frozen"
+        | "cancelled"
+        | "expired"
+      note_category: "general" | "injury" | "medical" | "preference" | "admin"
+      notif_channel: "email" | "push" | "in_app"
+      notif_status: "scheduled" | "sent" | "delivered" | "failed" | "cancelled"
+      occurrence_status: "scheduled" | "cancelled" | "completed"
+      payment_source:
+        | "membership"
+        | "class_pack"
+        | "drop_in"
+        | "comp"
+        | "gift_card"
+      payment_status:
+        | "pending"
+        | "succeeded"
+        | "failed"
+        | "refunded"
+        | "partially_refunded"
+      plan_type: "recurring" | "class_pack" | "drop_in" | "trial"
+      series_status: "active" | "ended" | "cancelled"
+      staff_role: "owner" | "manager" | "instructor" | "front_desk"
+    }
+    CompositeTypes: {
+      book_class_result: {
+        booking_id: string | null
+        status: Database["public"]["Enums"]["booking_status"] | null
+        payment_source: Database["public"]["Enums"]["payment_source"] | null
+        waitlist_position: number | null
+        failure_reason: string | null
+      }
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      billing_interval: ["week", "month", "quarter", "year"],
+      booking_source: ["member", "staff", "front_desk", "import"],
+      booking_status: [
+        "booked",
+        "waitlisted",
+        "cancelled",
+        "late_cancelled",
+        "attended",
+        "no_show",
+      ],
+      challenge_audience: ["member", "instructor"],
+      challenge_status: ["draft", "scheduled", "active", "ended", "archived"],
+      challenge_type: ["class_count", "streak", "class_type_count"],
+      checkin_method: ["qr", "staff", "kiosk", "self"],
+      credit_reason: [
+        "purchase",
+        "booking",
+        "cancellation_refund",
+        "expiry",
+        "freeze_adjustment",
+        "manual",
+      ],
+      import_status: [
+        "uploaded",
+        "validating",
+        "dry_run_complete",
+        "importing",
+        "complete",
+        "failed",
+        "rolled_back",
+      ],
+      insight_status: ["new", "actioned", "dismissed", "expired"],
+      member_status: ["lead", "active", "inactive", "archived"],
+      membership_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "frozen",
+        "cancelled",
+        "expired",
+      ],
+      note_category: ["general", "injury", "medical", "preference", "admin"],
+      notif_channel: ["email", "push", "in_app"],
+      notif_status: ["scheduled", "sent", "delivered", "failed", "cancelled"],
+      occurrence_status: ["scheduled", "cancelled", "completed"],
+      payment_source: [
+        "membership",
+        "class_pack",
+        "drop_in",
+        "comp",
+        "gift_card",
+      ],
+      payment_status: [
+        "pending",
+        "succeeded",
+        "failed",
+        "refunded",
+        "partially_refunded",
+      ],
+      plan_type: ["recurring", "class_pack", "drop_in", "trial"],
+      series_status: ["active", "ended", "cancelled"],
+      staff_role: ["owner", "manager", "instructor", "front_desk"],
+    },
+  },
+} as const
+
