@@ -1,24 +1,26 @@
-import { getStaffAccess, requireOnboarded, isManagerUp } from "@/lib/auth";
-import StaffAccessGate from "@/components/staff-access-gate";
-import { Shell, NavLink } from "@/components/ui";
+import { isManagerUp } from "@/lib/auth";
+import { staffScreen } from "@/lib/screen";
+import { AppShell, Denied, NavLink } from "@/components/ui";
 import InstructorForm from "../form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewInstructor() {
-  const access = await getStaffAccess();
-  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
-  const ctx = requireOnboarded(access.ctx);
+  const screen = await staffScreen("/instructors");
+  if (screen.gate) return screen.gate;
+  const { ctx, supabase, shell } = screen;
   if (!isManagerUp(ctx.role)) {
-    return <Shell title="Add an instructor" subtitle={ctx.studioName} right={<NavLink href="/instructors">Back</NavLink>}>
-      <p className="text-sm text-stone-600">Owners and managers only.</p></Shell>;
+    return (
+      <AppShell {...shell} title="Instructors">
+        <Denied what="Managing instructors" role={ctx.role} />
+      </AppShell>
+    );
   }
   return (
-    <Shell title="Add an instructor" subtitle={ctx.studioName}
-           right={<NavLink href="/instructors">Back to instructors</NavLink>}>
+    <AppShell {...shell} title="Add an instructor" actions={<NavLink href="/instructors">Back to instructors</NavLink>}>
       <InstructorForm mode="create" draft={{
         display_name: "", bio: null, avatar_url: null, color: null,
         certifications: [], status: "active", hasLogin: false }} />
-    </Shell>
+    </AppShell>
   );
 }

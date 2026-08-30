@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { getStaffAccess, requireOnboarded, isManagerUp } from "@/lib/auth";
-import StaffAccessGate from "@/components/staff-access-gate";
-import { Shell, NavLink } from "@/components/ui";
+import { isManagerUp } from "@/lib/auth";
+import { staffScreen } from "@/lib/screen";
+import { AppShell, Denied, NavLink } from "@/components/ui";
 import { PLAN_TYPE_LABEL, type PlanType } from "@/lib/plans";
 import PlanForm, { type PlanDraft } from "../plan-form";
 
@@ -24,20 +23,17 @@ export default async function NewPlan({
 }: {
   searchParams: { template?: string };
 }) {
-  const access = await getStaffAccess();
-  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
-  const ctx = requireOnboarded(access.ctx);
+  const screen = await staffScreen("/plans");
+  if (screen.gate) return screen.gate;
+  const { ctx, supabase, shell } = screen;
   if (!isManagerUp(ctx.role)) {
     return (
-      <Shell title="New plan" subtitle={ctx.studioName} right={<NavLink href="/plans">Back</NavLink>}>
-        <p className="text-sm text-stone-600">
-          Creating plans is owners and managers only. Your role is {ctx.role.replace("_", " ")}.
-        </p>
-      </Shell>
+      <AppShell {...shell} title="Plans">
+        <Denied what="Creating plans" role={ctx.role} />
+      </AppShell>
     );
   }
 
-  const supabase = createClient();
   const [{ data: templates }, { data: classTypes }] = await Promise.all([
     supabase
       .from("plan_templates")
@@ -51,39 +47,35 @@ export default async function NewPlan({
 
   if (blank) {
     return (
-      <Shell title="New plan" subtitle={`Blank · ${ctx.studioName}`}
-             right={<NavLink href="/plans/new">Start from a template instead</NavLink>}>
+      <AppShell {...shell} title="New plan"
+                actions={<NavLink href="/plans/new">Start from a template instead</NavLink>}>
         <PlanForm draft={BLANK} classTypes={classTypes ?? []} currency={ctx.currency}
                   activeMemberships={0} mode="create" />
-      </Shell>
+      </AppShell>
     );
   }
 
   // No template picked yet: offer the six, plus starting blank.
   if (!chosen) {
     return (
-      <Shell
-        title="New plan"
-        subtitle="Start from a template, or from nothing"
-        right={<NavLink href="/plans">Back to plans</NavLink>}
-      >
-        <p className="mb-4 max-w-2xl text-sm text-stone-600">
+      <AppShell {...shell} title="New plan" actions={<NavLink href="/plans">Back to plans</NavLink>}>
+        <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">
           Every field arrives filled in except the price, which is yours to set —
           a number that reads right in one currency reads badly in another.
           Nothing here is locked: change anything after you pick.
         </p>
-        <ul className="divide-y divide-stone-200 rounded border border-stone-200 bg-white">
+        <ul className="divide-y divide-line rounded border border-line bg-white">
           {(templates ?? []).map((t) => (
             <li key={t.id}>
               <Link href={`/plans/new?template=${t.id}`}
-                    className="block px-3 py-3 hover:bg-stone-50">
+                    className="block px-3 py-3 hover:bg-paper">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-sm font-medium">{t.name}</span>
-                  <span className="shrink-0 text-xs text-stone-500">
+                  <span className="shrink-0 text-xs text-ink-3">
                     {PLAN_TYPE_LABEL[t.type as PlanType]}
                   </span>
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-stone-500">{t.description}</p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-3">{t.description}</p>
               </Link>
             </li>
           ))}
@@ -93,7 +85,7 @@ export default async function NewPlan({
             Start from a blank plan instead →
           </Link>
         </p>
-      </Shell>
+      </AppShell>
     );
   }
 
@@ -119,13 +111,13 @@ export default async function NewPlan({
   };
 
   return (
-    <Shell
-      title="New plan"
-      subtitle={`From the "${chosen.name}" template · ${ctx.studioName}`}
-      right={<NavLink href="/plans/new">Pick a different template</NavLink>}
-    >
+    <AppShell {...shell} title="New plan"
+              actions={<NavLink href="/plans/new">Pick a different template</NavLink>}>
+      <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
+        From the &ldquo;{chosen.name}&rdquo; template. Change anything you like.
+      </p>
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={ctx.currency}
                 activeMemberships={0} mode="create" />
-    </Shell>
+    </AppShell>
   );
 }

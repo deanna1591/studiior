@@ -30,7 +30,7 @@ export default function WizardForms({
         <Field label="Member app address">
           <div className="flex items-center gap-1">
             <input name="slug" required defaultValue={studio.slug} className={inputClass} />
-            <span className="shrink-0 text-sm text-stone-500">.studiior.app</span>
+            <span className="shrink-0 text-sm text-ink-3">.studiior.app</span>
           </div>
         </Field>
         <StudioLocaleFields
@@ -53,7 +53,7 @@ export default function WizardForms({
       <Field label="Cancellation cutoff (minutes before class)">
         <input name="cancellation_cutoff_minutes" type="number" min={0} required
                defaultValue={settings.cancellation_cutoff_minutes} className={inputClass} />
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-3">
           720 is twelve hours. Cancelling after this is a late cancellation and
           consumes the credit.
         </p>

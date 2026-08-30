@@ -113,11 +113,11 @@ export default function StudioLocaleFields({
             <option key={z.value} value={z.value}>{z.label}</option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-3">
           {mounted ? (
             <>
               {filtered.length} of {zones.length} zones.{" "}
-              <span className="font-medium text-stone-700">
+              <span className="font-medium text-ink">
                 {tz} is UTC{utcOffset(tz)} right now.
               </span>{" "}
             </>
@@ -158,7 +158,7 @@ export default function StudioLocaleFields({
           </select>
         </Field>
       </div>
-      <p className="-mt-2 text-xs text-stone-500">
+      <p className="-mt-2 text-xs text-ink-3">
         Choosing a country suggests its currency; change it if the studio prices
         in something else. Every price is stored in this currency and changing it
         later converts nothing.

@@ -38,7 +38,7 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
                  defaultValue={draft.default_capacity || ""} className={inputClass} placeholder="8" />
         </Field>
       </div>
-      <p className="-mt-2 text-xs text-stone-500">
+      <p className="-mt-2 text-xs text-ink-3">
         Both are starting points: a class created from this type inherits them and
         can override either.
       </p>
@@ -54,7 +54,7 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
         </Field>
         <Field label="Colour">
           <input name="color" type="color" defaultValue={draft.color ?? "#2F4F4F"}
-                 className="h-9 w-20 rounded border border-stone-300" />
+                 className="h-9 w-20 rounded border border-line-2" />
         </Field>
       </div>
       {mode === "edit" && (
@@ -67,7 +67,7 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
       )}
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Add class type" : "Save changes"} />
-        <Link href="/class-types" className="text-sm text-stone-600 underline underline-offset-4">Cancel</Link>
+        <Link href="/class-types" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>
       </div>
     </form>
   );

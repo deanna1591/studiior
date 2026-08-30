@@ -68,7 +68,7 @@ export default function CreateClassForm({
         />
       </Field>
 
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-ink-3">
         The date and time are studio-local. They are converted to UTC at the instant
         they refer to, so the class keeps its wall-clock time across a DST change.
       </p>

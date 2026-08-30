@@ -15,17 +15,17 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 
 const TONE: Record<string, string> = {
-  uploaded: "bg-amber-50 text-amber-800 border-amber-200",
-  dry_run_complete: "bg-sky-50 text-sky-800 border-sky-200",
-  complete: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  failed: "bg-rose-50 text-rose-800 border-rose-200",
-  rolled_back: "bg-stone-100 text-stone-600 border-stone-300",
+  uploaded: "bg-amber-tint text-ink border-amber",
+  dry_run_complete: "bg-paper text-ink-2 border-line-2",
+  complete: "bg-lime-tint text-lime-text border-lime-text",
+  failed: "bg-coral-tint text-ink border-coral",
+  rolled_back: "bg-line text-ink-2 border-line-2",
 };
 
 export function StatusPill({ status }: { status: string }) {
   return (
     <span className={`shrink-0 rounded border px-2 py-0.5 text-xs ${
-      TONE[status] ?? "bg-stone-100 text-stone-600 border-stone-300"}`}>
+      TONE[status] ?? "bg-line text-ink-2 border-line-2"}`}>
       {STATUS_LABEL[status] ?? status}
     </span>
   );

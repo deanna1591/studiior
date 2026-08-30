@@ -1,113 +1,161 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { getStaffAccess, requireOnboarded, isManagerUp } from "@/lib/auth";
-import StaffAccessGate from "@/components/staff-access-gate";
-import { Shell, NavLink } from "@/components/ui";
-import { signOut } from "./actions";
-import SetupChecklist, { type SetupState } from "./checklist";
-import { addDays, fmtDayLabel, fmtTime, weekStart, zonedDateKey } from "@/lib/time";
+import { isManagerUp } from "@/lib/auth";
+import { staffScreen } from "@/lib/screen";
+import { AppShell, Empty, Pill, PillRow, Rows, Segmented, SectionLabel } from "@/components/ui";
+import { ScheduleRow, type Occ } from "@/components/schedule-rows";
+import {
+  addDays, dayStart, fmtDayLong, relativeDayName, weekStart, zonedDateKey,
+} from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-export default async function StaffWeek({
+export default async function Schedule({
   searchParams,
 }: {
-  searchParams: { week?: string };
+  searchParams: { view?: string; d?: string; room?: string; instructor?: string };
 }) {
-  const access = await getStaffAccess();
-  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
-  const ctx = requireOnboarded(access.ctx);
+  const screen = await staffScreen("/");
+  if (screen.gate) return screen.gate;
+  const { ctx, supabase, shell } = screen;
 
-  const offset = Number(searchParams.week ?? 0) || 0;
-  const from = weekStart(new Date(), ctx.timeZone, offset);
-  const to = addDays(from, 7);
+  // Day is the default. A week is roughly ninety rows, which is a scroll, not
+  // a glance — the week is there when you want to plan, and the day is what
+  // you have open at the desk.
+  const view = searchParams.view === "week" ? "week" : "day";
+  const offset = Number(searchParams.d ?? 0) || 0;
 
-  const supabase = createClient();
-  const { data: setup } = await supabase.rpc("studio_setup_state", { p_studio_id: ctx.studioId });
-  const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+  const from = view === "week"
+    ? weekStart(new Date(), ctx.timeZone, offset)
+    : dayStart(new Date(), ctx.timeZone, offset);
+  const to = addDays(from, view === "week" ? 7 : 1);
 
-  const { data: occurrences } = await supabase
-    .from("class_occurrences")
-    .select("id, name, starts_at, capacity, booked_count, status, instructors!instructor_id(display_name), rooms(name)")
-    .gte("starts_at", from.toISOString())
-    .lt("starts_at", to.toISOString())
-    .order("starts_at");
+  const [{ data: occurrences }, { data: rooms }] =
+    await Promise.all([
+      supabase
+        .from("class_occurrences")
+        .select("id, name, starts_at, capacity, booked_count, waitlist_count, status, room_id, instructor_id, instructors!instructor_id(display_name), rooms(name)")
+        .gte("starts_at", from.toISOString())
+        .lt("starts_at", to.toISOString())
+        .order("starts_at"),
+      supabase.from("rooms").select("id, name").eq("status", "active").order("name"),
+    ]);
 
-  const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
-  const byDay = new Map<string, NonNullable<typeof occurrences>>();
-  for (const o of occurrences ?? []) {
+  const roomFilter = searchParams.room ?? "";
+  const shown = (occurrences ?? []).filter((o) => !roomFilter || o.room_id === roomFilter);
+
+  const qs = (over: Record<string, string | number | undefined>) => {
+    const p = new URLSearchParams();
+    const merged = { view, d: offset, room: roomFilter || undefined, ...over };
+    for (const [k, v] of Object.entries(merged)) {
+      if (v !== undefined && v !== "" && !(k === "d" && v === 0) && !(k === "view" && v === "day")) {
+        p.set(k, String(v));
+      }
+    }
+    const s = p.toString();
+    return s ? `/?${s}` : "/";
+  };
+
+  // Grouped by day either way, so the week is the same rows under headings
+  // rather than a different component.
+  const byDay = new Map<string, Occ[]>();
+  for (const o of shown) {
     const key = zonedDateKey(o.starts_at, ctx.timeZone);
     if (!byDay.has(key)) byDay.set(key, []);
-    byDay.get(key)!.push(o);
+    byDay.get(key)!.push(o as Occ);
   }
+  const days = Array.from({ length: view === "week" ? 7 : 1 }, (_, i) => addDays(from, i));
+  const now = Date.now();
+
+  const heading = (() => {
+    const iso = from.toISOString();
+    if (view === "week") return "Schedule";
+    return relativeDayName(iso, ctx.timeZone) ?? fmtDayLong(iso, ctx.timeZone);
+  })();
 
   return (
-    <Shell
-      title={ctx.studioName}
-      subtitle={`Week view · signed in as ${ctx.email} (${ctx.role.replace("_", " ")})`}
-      right={
-        <>
-          {isPlatformAdmin && <NavLink href="/admin">Admin</NavLink>}
-          {isManagerUp(ctx.role) && <NavLink href="/rooms">Rooms</NavLink>}
-          {isManagerUp(ctx.role) && <NavLink href="/class-types">Class types</NavLink>}
-          {isManagerUp(ctx.role) && <NavLink href="/instructors">Instructors</NavLink>}
-          {isManagerUp(ctx.role) && <NavLink href="/plans">Plans</NavLink>}
-          {isManagerUp(ctx.role) && <NavLink href="/imports">Import</NavLink>}
-          {isManagerUp(ctx.role) && <NavLink href="/classes/new">Create a class</NavLink>}
-          <form action={signOut}><button className="text-stone-600 underline underline-offset-4">Sign out</button></form>
-        </>
+    <AppShell
+      {...shell}
+      title={heading}
+      actions={
+        isManagerUp(ctx.role) ? (
+          <Link
+            href="/classes/new"
+            className="inline-flex items-center rounded bg-ink px-3.5 py-2 text-[13px] font-medium leading-[18px] text-paper hover:bg-ink-2"
+          >
+            Add a class
+          </Link>
+        ) : null
+      }
+      filters={
+        <PillRow
+          right={
+            <div className="flex items-center gap-2">
+              <Link href={qs({ d: offset - 1 })} aria-label="Previous"
+                    className="num flex h-7 w-7 items-center justify-center rounded-full border border-line-2 bg-surface text-ink-2 hover:text-ink">‹</Link>
+              <Link href={qs({ d: 0 })}
+                    className="text-[12px] text-ink-3 underline underline-offset-4 hover:text-ink">
+                {view === "week" ? "This week" : "Today"}
+              </Link>
+              <Link href={qs({ d: offset + 1 })} aria-label="Next"
+                    className="num flex h-7 w-7 items-center justify-center rounded-full border border-line-2 bg-surface text-ink-2 hover:text-ink">›</Link>
+              <Segmented
+                options={[
+                  { href: qs({ view: "day", d: 0 }), label: "Day", active: view === "day" },
+                  { href: qs({ view: "week", d: 0 }), label: "Week", active: view === "week" },
+                ]}
+              />
+            </div>
+          }
+        >
+          <Pill href={qs({ room: undefined })} active={!roomFilter}>All rooms</Pill>
+          {(rooms ?? []).map((r) => (
+            <Pill key={r.id} href={qs({ room: r.id })} active={roomFilter === r.id}>
+              {r.name}
+            </Pill>
+          ))}
+        </PillRow>
       }
     >
-      {isManagerUp(ctx.role) && setup && (
-        <SetupChecklist state={setup as unknown as SetupState} />
+      {shown.length === 0 ? (
+        <Empty>
+          {roomFilter
+            ? <>Nothing in that room {view === "week" ? "this week" : "on this day"}. <Link href={qs({ room: undefined })} className="text-lime-text underline underline-offset-4">Show every room</Link>.</>
+            : isManagerUp(ctx.role)
+              ? <>No classes {view === "week" ? "this week" : "today"}. <Link href="/classes/new" className="text-lime-text underline underline-offset-4">Add one</Link> and members can book it.</>
+              : <>No classes {view === "week" ? "this week" : "today"}.</>}
+        </Empty>
+      ) : view === "day" ? (
+        <Rows>
+          {shown.map((o) => (
+            <ScheduleRow key={o.id} o={o as Occ} timeZone={ctx.timeZone} now={now} />
+          ))}
+        </Rows>
+      ) : (
+        <div className="space-y-6">
+          {days.map((d) => {
+            const key = zonedDateKey(d.toISOString(), ctx.timeZone);
+            const list = byDay.get(key) ?? [];
+            return (
+              <section key={key}>
+                <SectionLabel>
+                  {relativeDayName(d.toISOString(), ctx.timeZone) ?? fmtDayLong(d.toISOString(), ctx.timeZone)}
+                </SectionLabel>
+                {list.length === 0 ? (
+                  <p className="border-y border-line bg-surface px-3 py-2.5 text-[13px] text-ink-3">
+                    Nothing on.
+                  </p>
+                ) : (
+                  <Rows>
+                    {list.map((o) => (
+                      <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} now={now} />
+                    ))}
+                  </Rows>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
-
-      <div className="mb-4 flex items-center gap-4 text-sm">
-        <NavLink href={`/?week=${offset - 1}`}>← Previous</NavLink>
-        <span className="text-stone-500">
-          {offset === 0 ? "This week" : offset > 0 ? `+${offset} weeks` : `${offset} weeks`}
-        </span>
-        <NavLink href={`/?week=${offset + 1}`}>Next →</NavLink>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {days.map((d) => {
-          const key = zonedDateKey(d.toISOString(), ctx.timeZone);
-          const list = byDay.get(key) ?? [];
-          return (
-            <div key={key} className="rounded border border-stone-200 bg-white p-3">
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
-                {fmtDayLabel(d.toISOString(), ctx.timeZone)}
-              </h2>
-              {list.length === 0 && <p className="text-sm text-stone-400">—</p>}
-              <ul className="space-y-2">
-                {list.map((o) => (
-                  <li key={o.id}>
-                    <Link
-                      href={`/roster/${o.id}`}
-                      className="block rounded border border-stone-200 px-2 py-1.5 hover:border-stone-400"
-                    >
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="font-medium">{fmtTime(o.starts_at, ctx.timeZone)}</span>
-                        <span className={o.booked_count >= o.capacity ? "text-xs text-amber-700" : "text-xs text-stone-500"}>
-                          {o.booked_count}/{o.capacity}
-                        </span>
-                      </div>
-                      <div className="text-sm">{o.name}</div>
-                      <div className="text-xs text-stone-500">
-                        {o.instructors?.display_name ?? "Unassigned"}
-                        {o.rooms?.name ? ` · ${o.rooms.name}` : ""}
-                        {o.status !== "scheduled" ? ` · ${o.status}` : ""}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-    </Shell>
+    </AppShell>
   );
 }

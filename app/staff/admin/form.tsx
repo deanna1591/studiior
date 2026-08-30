@@ -21,7 +21,7 @@ export default function ProvisionForm() {
       </Field>
       <Field label="Slug">
         <input name="slug" required className={inputClass} placeholder="bright-pilates" />
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-3">
           Their member app will live at <code>{"{slug}"}.studiior.app</code>. The owner can change it in the wizard.
         </p>
       </Field>
@@ -29,7 +29,7 @@ export default function ProvisionForm() {
       <Field label="Owner email">
         <input name="owner_email" type="email" required className={inputClass}
                placeholder="owner@brightpilates.com" />
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-3">
           The invite link is generated here; sending it is still a manual step.
         </p>
       </Field>

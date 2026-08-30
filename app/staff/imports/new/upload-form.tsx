@@ -46,13 +46,13 @@ export default function UploadForm() {
         <legend className="mb-2 text-sm font-medium">What is in this file?</legend>
         {TYPES.map((t, i) => (
           <label key={t.value}
-                 className="flex cursor-pointer gap-3 rounded border border-stone-200 bg-white p-3 hover:bg-stone-50">
+                 className="flex cursor-pointer gap-3 rounded border border-line bg-white p-3 hover:bg-paper">
             <input type="radio" name="type" value={t.value} defaultChecked={i === 0}
                    className="mt-1 shrink-0" required />
             <span className="min-w-0">
               <span className="block text-sm font-medium">{t.label}</span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">{t.blurb}</span>
-              <span className="mt-1 block text-xs text-stone-400">Columns it looks for: {t.columns}</span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-ink-2">{t.blurb}</span>
+              <span className="mt-1 block text-xs text-ink-3">Columns it looks for: {t.columns}</span>
             </span>
           </label>
         ))}
@@ -60,8 +60,8 @@ export default function UploadForm() {
 
       <Field label="CSV file">
         <input name="file" type="file" accept=".csv,text/csv" required
-               className="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-stone-800 file:px-3 file:py-1.5 file:text-sm file:text-white" />
-        <p className="mt-1 text-xs text-stone-500">
+               className="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-sm file:text-white" />
+        <p className="mt-1 text-xs text-ink-3">
           Export from whatever you use now — the first row must be the column
           names. Nothing in your studio changes from uploading; the next screen
           shows you what would happen before anything is written.
@@ -70,7 +70,7 @@ export default function UploadForm() {
 
       <div className="flex items-center gap-4">
         <Submit />
-        <Link href="/imports" className="text-sm text-stone-600 underline underline-offset-4">Cancel</Link>
+        <Link href="/imports" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>
       </div>
     </form>
   );

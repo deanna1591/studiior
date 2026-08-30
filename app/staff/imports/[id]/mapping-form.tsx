@@ -35,23 +35,23 @@ export default function MappingForm({
       {state && <Notice kind="error">{state.error}</Notice>}
       <input type="hidden" name="id" value={id} />
 
-      <div className="overflow-x-auto rounded border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded border border-line bg-white">
         <table className="w-full text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+          <thead className="border-b border-line bg-paper text-left text-xs uppercase tracking-wide text-ink-3">
             <tr>
               <th className="px-3 py-2 font-medium">Studiior field</th>
               <th className="px-3 py-2 font-medium">Column in your file</th>
               <th className="px-3 py-2 font-medium">First row reads</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100">
+          <tbody className="divide-y divide-line">
             {fields.map((f) => {
               const chosen = mapping[f.key] ?? "";
               return (
                 <tr key={f.key}>
                   <td className="whitespace-nowrap px-3 py-2">
                     {f.label}
-                    {f.required && <span className="ml-1 text-rose-600" title="Required">*</span>}
+                    {f.required && <span className="ml-1 text-ink" title="Required">*</span>}
                   </td>
                   <td className="px-3 py-2">
                     <select name={`map_${f.key}`} defaultValue={chosen} className={inputClass}>
@@ -59,8 +59,8 @@ export default function MappingForm({
                       {headers.map((h) => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </td>
-                  <td className="max-w-[16rem] truncate px-3 py-2 text-stone-500">
-                    {chosen ? (sample[chosen] || <span className="italic text-stone-400">empty</span>) : "—"}
+                  <td className="max-w-[16rem] truncate px-3 py-2 text-ink-3">
+                    {chosen ? (sample[chosen] || <span className="italic text-ink-3">empty</span>) : "—"}
                   </td>
                 </tr>
               );
@@ -69,7 +69,7 @@ export default function MappingForm({
         </table>
       </div>
 
-      <p className="text-xs text-stone-500">
+      <p className="text-xs text-ink-3">
         Dates are read one column at a time, not one row at a time: 03/04/2024 is
         ambiguous alone, so the whole column decides, and a column that is
         genuinely mixed is left for you to fix rather than guessed at.

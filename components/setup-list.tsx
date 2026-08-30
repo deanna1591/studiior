@@ -1,30 +1,47 @@
 import Link from "next/link";
-import { Shell, NavLink } from "@/components/ui";
+import { AppShell, Empty, Rows } from "@/components/ui";
+
+type ShellProps = React.ComponentProps<typeof AppShell>;
 
 /** The three setup lists differ only in their rows, so the frame is shared. */
 export function SetupShell({
-  title, subtitle, newHref, newLabel, empty, children, count,
+  shell, title, blurb, newHref, newLabel, empty, count, children,
 }: {
-  title: string; subtitle: string; newHref: string; newLabel: string;
-  empty: string; count: number; children: React.ReactNode;
+  shell: Omit<ShellProps, "title" | "children">;
+  title: string;
+  blurb?: string;
+  newHref: string;
+  newLabel: string;
+  empty: string;
+  count: number;
+  children: React.ReactNode;
 }) {
   return (
-    <Shell
+    <AppShell
+      {...shell}
       title={title}
-      subtitle={subtitle}
-      right={<><NavLink href={newHref}>{newLabel}</NavLink><NavLink href="/">Back to week</NavLink></>}
+      actions={
+        <Link
+          href={newHref}
+          className="inline-flex items-center rounded bg-ink px-3.5 py-2 text-[13px] font-medium leading-[18px] text-paper hover:bg-ink-2"
+        >
+          {newLabel}
+        </Link>
+      }
     >
+      {blurb && <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">{blurb}</p>}
       {count === 0 ? (
-        <p className="text-sm text-stone-600">
+        <Empty>
           {empty}{" "}
-          <Link href={newHref} className="underline underline-offset-4">{newLabel}</Link>.
-        </p>
+          <Link href={newHref} className="text-lime-text underline underline-offset-4">
+            {newLabel.toLowerCase()}
+          </Link>
+          .
+        </Empty>
       ) : (
-        <ul className="divide-y divide-stone-200 rounded border border-stone-200 bg-white">
-          {children}
-        </ul>
+        <Rows>{children}</Rows>
       )}
-    </Shell>
+    </AppShell>
   );
 }
 
@@ -34,17 +51,17 @@ export function SetupRow({
   href: string; name: string; meta: string; right?: string; archived?: boolean;
 }) {
   return (
-    <li>
-      <Link href={href}
-            className={`flex items-center justify-between gap-4 px-3 py-3 hover:bg-stone-50 ${archived ? "opacity-60" : ""}`}>
-        <div className="min-w-0">
-          <div className="text-sm font-medium">
-            {name}{archived && <span className="ml-2 text-xs font-normal text-stone-500">archived</span>}
-          </div>
-          <div className="text-xs text-stone-500">{meta}</div>
+    <Link href={href} className="flex items-center justify-between gap-4 px-3 py-2.5 hover:bg-paper">
+      <div className="min-w-0">
+        <div className={`truncate text-[14px] leading-5 ${archived ? "text-ink-3" : "text-ink"}`}>
+          {name}
+          {archived && (
+            <span className="ml-2 text-[12px] leading-4 text-ink-3">Archived</span>
+          )}
         </div>
-        {right && <div className="shrink-0 text-sm text-stone-600">{right}</div>}
-      </Link>
-    </li>
+        <div className="text-[12px] leading-4 text-ink-3">{meta}</div>
+      </div>
+      {right && <div className="num shrink-0 text-[13px] text-ink-2">{right}</div>}
+    </Link>
   );
 }

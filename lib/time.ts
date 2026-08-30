@@ -69,3 +69,40 @@ export function weekStart(ref: Date, timeZone: string, weekOffset = 0): Date {
 export function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * 86_400_000);
 }
+
+/** Midnight in the studio's timezone, `dayOffset` days from today. */
+export function dayStart(ref: Date, timeZone: string, dayOffset = 0): Date {
+  const key = zonedDateKey(ref.toISOString(), timeZone);
+  const midnight = zonedToUtc(key, "00:00", timeZone);
+  return addDays(midnight, dayOffset);
+}
+
+/** "Tuesday 25 August" — the heading a person would say out loud. */
+export function fmtDayLong(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone, weekday: "long", day: "numeric", month: "long",
+  }).format(new Date(iso));
+}
+
+/** "Today", "Tomorrow", "Yesterday", or null when it is none of those. */
+export function relativeDayName(iso: string, timeZone: string, now = new Date()): string | null {
+  const key = zonedDateKey(iso, timeZone);
+  const t = zonedDateKey(now.toISOString(), timeZone);
+  const y = zonedDateKey(addDays(now, -1).toISOString(), timeZone);
+  const m = zonedDateKey(addDays(now, 1).toISOString(), timeZone);
+  if (key === t) return "Today";
+  if (key === m) return "Tomorrow";
+  if (key === y) return "Yesterday";
+  return null;
+}
+
+/**
+ * "24 Aug" split so only the numeral is monospaced. Mono is for numbers; a
+ * month name set in it picks up tabular spacing and reads as a part number.
+ */
+export function dayMonthParts(iso: string, timeZone: string): { day: string; month: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "short" })
+    .formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return { day: get("day"), month: get("month") };
+}

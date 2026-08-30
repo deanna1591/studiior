@@ -7,7 +7,7 @@ import { markStripeStubDone, type ActionState } from "../onboarding-actions";
 function Btn() {
   const { pending } = useFormStatus();
   return (
-    <button className="rounded border border-stone-300 px-3 py-1.5 text-sm hover:border-stone-500 disabled:opacity-50"
+    <button className="rounded border border-line-2 px-3 py-1.5 text-sm hover:border-ink-3 disabled:opacity-50"
             disabled={pending}>
       {pending ? "…" : "Tick this off for now"}
     </button>
@@ -20,7 +20,7 @@ export default function StripeStub() {
     <form action={action} className="pt-2">
       {state && <Notice kind="error">{state.error}</Notice>}
       <Btn />
-      <p className="mt-2 text-xs text-stone-500">
+      <p className="mt-2 text-xs text-ink-3">
         Marks the checklist item done so it stops nagging. It connects nothing.
       </p>
     </form>

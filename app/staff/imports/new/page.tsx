@@ -13,7 +13,7 @@ export default async function NewImport() {
   if (!isManagerUp(ctx.role)) {
     return (
       <Shell title="New import" subtitle={ctx.studioName} right={<NavLink href="/">Back to week</NavLink>}>
-        <p className="text-sm text-stone-600">Importing is owners and managers.</p>
+        <p className="text-sm text-ink-2">Importing is owners and managers.</p>
       </Shell>
     );
   }

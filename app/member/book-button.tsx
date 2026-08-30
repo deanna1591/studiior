@@ -7,7 +7,7 @@ function Submit({ full }: { full: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
-      className="rounded bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-50"
+      className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-2 disabled:opacity-50"
       disabled={pending}
     >
       {pending ? "…" : full ? "Join waitlist" : "Book"}
@@ -22,7 +22,7 @@ export default function BookButton({ occurrenceId, full }: { occurrenceId: strin
     <form action={action} className="flex items-center gap-3">
       <input type="hidden" name="occurrence_id" value={occurrenceId} />
       {result && (
-        <span className={`text-xs ${result.ok ? "text-emerald-700" : "text-red-700"}`}>
+        <span className={`text-xs ${result.ok ? "text-lime-text" : "text-ink"}`}>
           {result.message}
         </span>
       )}

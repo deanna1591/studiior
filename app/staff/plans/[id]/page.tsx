@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getStaffAccess, requireOnboarded, isManagerUp } from "@/lib/auth";
-import StaffAccessGate from "@/components/staff-access-gate";
-import { Shell, NavLink, Notice } from "@/components/ui";
+import { isManagerUp } from "@/lib/auth";
+import { staffScreen } from "@/lib/screen";
+import { AppShell, Denied, NavLink, Notice } from "@/components/ui";
 import { formatMoney, type PlanType } from "@/lib/plans";
 import PlanForm, { type PlanDraft } from "../plan-form";
 import PlanLifecycle from "./lifecycle";
@@ -15,20 +14,17 @@ export default async function EditPlan({
   params: { id: string };
   searchParams: { saved?: string };
 }) {
-  const access = await getStaffAccess();
-  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
-  const ctx = requireOnboarded(access.ctx);
+  const screen = await staffScreen("/plans");
+  if (screen.gate) return screen.gate;
+  const { ctx, supabase, shell } = screen;
   if (!isManagerUp(ctx.role)) {
     return (
-      <Shell title="Plan" subtitle={ctx.studioName} right={<NavLink href="/">Back to week</NavLink>}>
-        <p className="text-sm text-stone-600">
-          Editing plans is owners and managers only. Your role is {ctx.role.replace("_", " ")}.
-        </p>
-      </Shell>
+      <AppShell {...shell} title="Plans">
+        <Denied what="Editing plans" role={ctx.role} />
+      </AppShell>
     );
   }
 
-  const supabase = createClient();
   const { data: plan } = await supabase
     .from("membership_plans")
     .select("*")
@@ -71,15 +67,18 @@ export default async function EditPlan({
   };
 
   return (
-    <Shell
-      title={plan.name}
-      subtitle={`${formatMoney(plan.price_cents, plan.currency)} · ${plan.status}${plan.status === "archived" ? " — not sellable" : ""}`}
-      right={<NavLink href="/plans">Back to plans</NavLink>}
-    >
+    <AppShell {...shell} title={plan.name}
+              actions={<NavLink href="/plans">Back to plans</NavLink>}>
+      <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
+        <span className="num text-ink">{formatMoney(plan.price_cents, plan.currency)}</span>
+        {plan.status === "archived"
+          ? " · archived, so nobody new can buy it"
+          : " · on sale"}
+      </p>
       {searchParams.saved && <Notice kind="ok">Saved.</Notice>}
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
                 activeMemberships={active} mode="edit" />
       <PlanLifecycle id={plan.id} status={plan.status} activeMemberships={active} />
-    </Shell>
+    </AppShell>
   );
 }

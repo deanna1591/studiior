@@ -11,8 +11,8 @@ function Btn({ label, danger }: { label: string; danger?: boolean }) {
       disabled={pending}
       className={`rounded border px-3 py-1.5 text-sm disabled:opacity-50 ${
         danger
-          ? "border-red-300 text-red-800 hover:border-red-500"
-          : "border-stone-300 hover:border-stone-500"
+          ? "border-coral text-ink hover:border-coral"
+          : "border-line-2 hover:border-ink-3"
       }`}
     >
       {pending ? "…" : label}
@@ -29,15 +29,15 @@ export default function PlanLifecycle({
   const [deleteState, deleteAction] = useFormState<PlanFormState, FormData>(deletePlan, null);
 
   return (
-    <section className="mt-10 max-w-2xl rounded border border-stone-200 bg-white p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+    <section className="mt-10 max-w-2xl rounded border border-line bg-white p-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3">
         Retiring this plan
       </h2>
 
       {archiveState && <div className="mt-3"><Notice kind="error">{archiveState.error}</Notice></div>}
       {deleteState && <div className="mt-3"><Notice kind="error">{deleteState.error}</Notice></div>}
 
-      <p className="mt-2 text-sm leading-relaxed text-stone-600">
+      <p className="mt-2 text-sm leading-relaxed text-ink-2">
         Archiving stops the plan being sold. Everyone already on it keeps it, at the
         price they bought at, and keeps booking normally.
       </p>
@@ -55,14 +55,14 @@ export default function PlanLifecycle({
             <Btn label="Delete permanently" danger />
           </form>
         ) : (
-          <span className="text-sm text-stone-500">
+          <span className="text-sm text-ink-3">
             Cannot be deleted — {activeMemberships} member
             {activeMemberships === 1 ? " is" : "s are"} on it. Archive instead.
           </span>
         )}
       </div>
 
-      <p className="mt-3 text-xs text-stone-500">
+      <p className="mt-3 text-xs text-ink-3">
         Deleting is only offered for a plan nobody ever bought. The database refuses
         the rest regardless of what this screen shows.
       </p>

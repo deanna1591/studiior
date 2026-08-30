@@ -27,14 +27,14 @@ export default function RoomForm({ draft, mode }: { draft: RoomDraft; mode: "cre
       <Field label="Capacity">
         <input name="capacity" type="number" min={1} required defaultValue={draft.capacity || ""}
                className={inputClass} placeholder="8" />
-        <p className="mt-1 text-xs text-stone-500">
-          How many people fit. A class in this room defaults to it, and capacity
-          cannot later be cut below what is already booked (§5).
+        <p className="mt-1 text-xs text-ink-3">
+          How many people fit. A class put in this room starts at this number,
+          and you cannot cut it below the number already booked.
         </p>
       </Field>
       <Field label="Colour">
         <input name="color" type="color" defaultValue={draft.color ?? "#8FBC8F"}
-               className="h-9 w-20 rounded border border-stone-300" />
+               className="h-9 w-20 rounded border border-line-2" />
       </Field>
       {mode === "edit" && (
         <Field label="Status">
@@ -46,7 +46,7 @@ export default function RoomForm({ draft, mode }: { draft: RoomDraft; mode: "cre
       )}
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Add room" : "Save changes"} />
-        <Link href="/rooms" className="text-sm text-stone-600 underline underline-offset-4">Cancel</Link>
+        <Link href="/rooms" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>
       </div>
     </form>
   );

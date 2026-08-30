@@ -21,7 +21,7 @@ export default function StaffAccessGate({ access }: { access: StaffAccess }) {
 
   return (
     <Shell title="No studio access" subtitle={access.email}>
-      <div className="max-w-lg space-y-3 text-sm leading-relaxed text-stone-700">
+      <div className="max-w-lg space-y-3 text-sm leading-relaxed text-ink">
         <p>
           You are signed in, but this account is not staff at any studio, so
           there is nothing here for it to show.
@@ -31,7 +31,7 @@ export default function StaffAccessGate({ access }: { access: StaffAccess }) {
           one you signed in with, or your access was removed. Whoever owns the
           studio can add you again from their staff settings.
         </p>
-        <p className="text-stone-500">
+        <p className="text-ink-3">
           Signed in as <span className="font-medium">{access.email}</span>.{" "}
           <a href="/login" className="underline underline-offset-4">
             Sign in as someone else

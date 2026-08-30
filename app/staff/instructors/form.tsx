@@ -24,7 +24,7 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
       <Field label="Display name">
         <input name="display_name" required defaultValue={draft.display_name}
                className={inputClass} placeholder="Ada Example" />
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-3">
           What members see on the schedule.
         </p>
       </Field>
@@ -35,7 +35,7 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
       <Field label="Photo URL">
         <input name="avatar_url" type="url" defaultValue={draft.avatar_url ?? ""}
                className={inputClass} placeholder="https://…" />
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-3">
           A link for now — uploading files is not built yet.
         </p>
       </Field>
@@ -43,11 +43,11 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
         <textarea name="certifications" rows={3} className={inputClass}
                   defaultValue={draft.certifications.join("\n")}
                   placeholder={"BASI Comprehensive\nPre/postnatal"} />
-        <p className="mt-1 text-xs text-stone-500">One per line, or comma separated.</p>
+        <p className="mt-1 text-xs text-ink-3">One per line, or comma separated.</p>
       </Field>
       <Field label="Colour">
         <input name="color" type="color" defaultValue={draft.color ?? "#CD853F"}
-               className="h-9 w-20 rounded border border-stone-300" />
+               className="h-9 w-20 rounded border border-line-2" />
       </Field>
       {mode === "edit" && (
         <Field label="Status">
@@ -57,14 +57,14 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
           </select>
         </Field>
       )}
-      <p className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-600">
+      <p className="rounded border border-line bg-paper px-3 py-2 text-xs leading-relaxed text-ink-2">
         {draft.hasLogin
           ? "This instructor has a staff login and can sign in to see their own schedule."
           : "This is a teaching record, not an account — no login, no invite, nothing to sign in with. Give them one later from staff settings if they need the instructor portal."}
       </p>
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Add instructor" : "Save changes"} />
-        <Link href="/instructors" className="text-sm text-stone-600 underline underline-offset-4">Cancel</Link>
+        <Link href="/instructors" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>
       </div>
     </form>
   );

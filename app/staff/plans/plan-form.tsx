@@ -33,12 +33,17 @@ export type PlanDraft = {
   restrictions: { class_type_ids?: string[] } | null;
 };
 
+/**
+ * A form section is a heading and a rule, not a box. Four bordered white
+ * panels stacked down a page is the card-per-thing kit the brief rules out,
+ * and the grouping reads perfectly well from a line.
+ */
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded border border-stone-200 bg-white p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">{title}</h2>
-      {note && <p className="mt-1 text-xs text-stone-500">{note}</p>}
-      <div className="mt-3 space-y-4">{children}</div>
+    <section>
+      <h2 className="border-b border-line pb-1.5 text-[14px] font-medium leading-5 text-ink">{title}</h2>
+      {note && <p className="mt-1.5 text-[12px] leading-4 text-ink-3">{note}</p>}
+      <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
 }
@@ -74,17 +79,17 @@ export default function PlanForm({
       <input type="hidden" name="status" value={draft.status} />
 
       {mode === "edit" && (
-        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+        <div className="rounded border border-amber bg-amber-tint px-3 py-2.5 text-sm text-ink">
           <p className="font-medium">
             {activeMemberships === 0
               ? "No members are on this plan."
               : `${activeMemberships} member${activeMemberships === 1 ? " is" : "s are"} on this plan.`}
           </p>
           <p className="mt-1 text-[13px] leading-relaxed">
-            Editing does <strong>not</strong> reprice them. Each membership snapshots
-            its price when it is bought (§7.1), so a change here only affects
-            people who buy from now on. The same goes for credits, validity and
-            commitment terms: existing members keep what they signed up to.
+            Editing does <strong>not</strong> reprice them. A membership keeps
+            the price it was bought at, so a change here only affects people who
+            buy from now on. The same goes for credits, validity and commitment
+            terms: existing members keep what they signed up to.
             {" "}What <em>does</em> apply immediately to everyone on this plan are the
             booking overrides — window and daily limit — because those are read
             live at booking time.
@@ -108,7 +113,7 @@ export default function PlanForm({
               <option key={t} value={t}>{PLAN_TYPE_LABEL[t]}</option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-stone-500">{PLAN_TYPE_HINT[type]}</p>
+          <p className="mt-1 text-xs text-ink-3">{PLAN_TYPE_HINT[type]}</p>
         </Field>
         <Field label="Visibility">
           <select name="visibility" defaultValue={draft.visibility} className={inputClass}>
@@ -148,7 +153,7 @@ export default function PlanForm({
             </Field>
           </div>
         ) : (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-ink-3">
             A {PLAN_TYPE_LABEL[type].toLowerCase()} is bought once, so there is no billing schedule.
           </p>
         )}
@@ -160,9 +165,9 @@ export default function PlanForm({
             <input name="credits_per_period" type="number" min={0}
                    defaultValue={num(draft.credits_per_period)} className={inputClass}
                    placeholder="Leave empty for unlimited" />
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-ink-3">
               Empty means unlimited. An allowance resets each billing period and does
-              not roll over (Decision 3).
+              not roll over.
             </p>
           </Field>
         )}
@@ -176,18 +181,18 @@ export default function PlanForm({
           <Field label="Valid for (days)">
             <input name="validity_days" type="number" min={1} defaultValue={num(draft.validity_days)}
                    className={inputClass} placeholder="180" />
-            <p className="mt-1 text-xs text-stone-500">
-              Counted from purchase. A credit cannot be spent past its expiry (§6).
+            <p className="mt-1 text-xs text-ink-3">
+              Counted from the day they buy. Credits cannot be used after they expire.
             </p>
           </Field>
         )}
         <fieldset>
-          <legend className="mb-1 block text-sm font-medium text-stone-700">
+          <legend className="mb-1 block text-sm font-medium text-ink">
             Class types this plan covers
           </legend>
-          <p className="mb-2 text-xs text-stone-500">
-            None selected means every class type. Otherwise booking a class outside
-            the list is refused with <code>class_type_not_in_plan</code> (§2.1.9).
+          <p className="mb-2 text-xs text-ink-3">
+            Select none and this plan covers everything. Select some and members
+            on it can only book those, and are turned away from the rest.
           </p>
           <div className="space-y-1.5">
             {classTypes.map((ct) => (
@@ -198,7 +203,7 @@ export default function PlanForm({
               </label>
             ))}
             {classTypes.length === 0 && (
-              <p className="text-sm text-stone-400">No class types yet.</p>
+              <p className="text-sm text-ink-3">No class types yet.</p>
             )}
           </div>
         </fieldset>
@@ -247,7 +252,7 @@ export default function PlanForm({
                    placeholder="Studio default" />
           </Field>
         </div>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-ink-3">
           Both override the studio setting for members on this plan, and unlike price
           they take effect immediately for everyone.
         </p>
@@ -255,7 +260,7 @@ export default function PlanForm({
 
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Create plan" : "Save changes"} />
-        <Link href="/plans" className="text-sm text-stone-600 underline underline-offset-4">
+        <Link href="/plans" className="text-sm text-ink-2 underline underline-offset-4">
           Cancel
         </Link>
       </div>

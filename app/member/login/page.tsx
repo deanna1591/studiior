@@ -15,7 +15,7 @@ export default function MemberLogin() {
   return (
     <div className="mx-auto max-w-sm px-5 py-16">
       <h1 className="text-xl font-semibold tracking-tight">Book a class</h1>
-      <p className="mb-6 mt-1 text-sm text-stone-500">Sign in with your member email.</p>
+      <p className="mb-6 mt-1 text-sm text-ink-3">Sign in with your member email.</p>
       {error && <Notice kind="error">{error}</Notice>}
       <form action={action} className="space-y-4">
         <Field label="Email">
@@ -29,7 +29,7 @@ export default function MemberLogin() {
       {/* Local development only — see the note on the staff login page for why
           this is inline rather than a wrapper component. */}
       {process.env.NODE_ENV === "development" && (
-        <p className="mt-8 text-xs leading-relaxed text-stone-500">
+        <p className="mt-8 text-xs leading-relaxed text-ink-3">
           Seed members: alena.fabricated@example.com (unlimited) ·
           ivana.sampleton@example.com (8 a month) ·
           nikola.simulated@example.com (class pack) ·

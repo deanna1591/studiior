@@ -45,19 +45,19 @@ export default async function MemberSchedule() {
       subtitle={`Hello ${ctx.name} — book a class`}
       right={
         <form action={signOut}>
-          <button className="text-stone-600 underline underline-offset-4">Sign out</button>
+          <button className="text-ink-2 underline underline-offset-4">Sign out</button>
         </form>
       }
     >
-      {byDay.size === 0 && <p className="text-sm text-stone-500">No classes scheduled.</p>}
+      {byDay.size === 0 && <p className="text-sm text-ink-3">No classes scheduled.</p>}
 
       <div className="space-y-6">
         {[...byDay.entries()].map(([day, list]) => (
           <section key={day}>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
               {fmtDayLabel(list[0].starts_at, ctx.timeZone)}
             </h2>
-            <ul className="divide-y divide-stone-200 rounded border border-stone-200 bg-white">
+            <ul className="divide-y divide-line rounded border border-line bg-white">
               {list.map((o) => {
                 const booking = byOccurrence.get(o.id);
                 const spots = o.capacity - o.booked_count;
@@ -67,13 +67,13 @@ export default async function MemberSchedule() {
                       <div className="text-sm font-medium">
                         {fmtTime(o.starts_at, ctx.timeZone)} · {o.name}
                       </div>
-                      <div className="text-xs text-stone-500">
+                      <div className="text-xs text-ink-3">
                         {o.instructors?.display_name ?? "Unassigned"} ·{" "}
                         {spots > 0 ? `${spots} spot${spots === 1 ? "" : "s"} left` : "Full — waitlist"}
                       </div>
                     </div>
                     {booking ? (
-                      <span className="text-sm font-medium text-emerald-700">
+                      <span className="text-sm font-medium text-lime-text">
                         {booking.status === "waitlisted"
                           ? `Waitlist #${booking.waitlist_position}`
                           : "Booked ✓"}

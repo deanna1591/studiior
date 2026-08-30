@@ -32,7 +32,7 @@ export default async function InvitePage({ params }: { params: { token: string }
         <h1 className="text-xl font-semibold tracking-tight">
           {state === "used" ? "Already accepted" : state === "expired" ? "Invite expired" : "Invite not found"}
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-stone-600">{message}</p>
+        <p className="mt-3 text-sm leading-relaxed text-ink-2">{message}</p>
         {state === "used" && (
           <p className="mt-4 text-sm">
             <a href="/login" className="underline underline-offset-4">Go to sign in</a>
@@ -44,11 +44,11 @@ export default async function InvitePage({ params }: { params: { token: string }
 
   return (
     <div className="mx-auto max-w-md px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Step 1 of 3</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">Step 1 of 3</p>
       <h1 className="mt-1 text-xl font-semibold tracking-tight">
         Set up {preview!.studio_name}
       </h1>
-      <p className="mb-6 mt-1 text-sm text-stone-600">
+      <p className="mb-6 mt-1 text-sm text-ink-2">
         You have been invited as the owner. Choose a password and we will create
         your account.
       </p>

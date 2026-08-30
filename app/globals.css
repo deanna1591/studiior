@@ -2,5 +2,107 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-body { @apply bg-stone-50 text-stone-900 antialiased; }
+/* ---------------------------------------------------------------------------
+   Tokens
+   Every value here was checked against WCAG before it got a role. The ratios
+   in the comments are against --paper unless stated; they are the reason a
+   colour is allowed where it is, so do not repoint a token without redoing
+   the sum.
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  --paper:   #FAFAF7;
+  --surface: #FFFFFF;
+
+  --ink:   #14170E;   /* 17.33 */
+  --ink-2: #57534E;   /*  7.30 — secondary */
+  --ink-3: #78716C;   /*  4.59 — muted, and the floor. stone-400 is 2.41 and
+                              cannot carry text, which is why a past class is
+                              greyed to here and no further. */
+  --line:   #E7E5E4;
+  --line-2: #D6D3D1;
+
+  /* Lime never carries text: #BEF738 on white is 1.27. */
+  --lime:        #BEF738;   /* fill only */
+  --lime-tint:   #F3FAE0;   /* active pill, healthy wash */
+  --lime-text:   #3F5A08;   /* 7.84 — links, active nav */
+  --lime-text-2: #4C6B0B;   /* 6.15 — hover, pressed */
+
+  --amber:      #E8C93A;    /* fill only; ink on it is 11.09 */
+  --amber-tint: #F7F2D9;
+
+  /* Coral is two tokens because one cannot do both jobs. #D9401A on white is
+     4.47 — it misses body text by 0.03, so it borders and fills and sets large
+     numerals, and never sets a sentence. #FF6B45 is too light for white text
+     (2.82) but ink on it is 6.42, which is what the at-risk chip needs. */
+  --coral:      #D9401A;
+  --coral-fill: #FF6B45;
+  --coral-tint: #FBE6DE;
+
+  --rail-w: 240px;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-karla), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* --- display type ---------------------------------------------------------
+   Archivo at wdth 112. Weight is set inside font-variation-settings because
+   declaring the axis by hand stops font-weight reaching the variable font in
+   some engines; setting both keeps them in agreement. */
+.display, .section-label {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+}
+.display {
+  font-variation-settings: 'wdth' 112, 'wght' 620;
+  font-size: 28px; line-height: 32px; letter-spacing: 0.02em;
+}
+.display-sm {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 112, 'wght' 620;
+  font-size: 18px; line-height: 22px; letter-spacing: 0.02em;
+}
+.section-label {
+  font-variation-settings: 'wdth' 112, 'wght' 600;
+  font-size: 13px; line-height: 16px; letter-spacing: 0.06em;
+  /* No colour here. This class is defined after @tailwind utilities, so a
+     colour on it beats any text-* utility applied alongside it — which is how
+     the health chips ended up rendering their label in --ink-2 on coral at
+     2.70 rather than --ink at 6.42. Callers set their own colour. */
+}
+
+/* --- numerals -------------------------------------------------------------
+   Times, counts, capacities, money, dates, credits. Not phone numbers and not
+   email addresses: mono makes a phone number look like a measurement. */
+.num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* --- a cancelled row ------------------------------------------------------
+   Hatching rather than a badge, so the status is the row and not a chip
+   sitting on it. */
+.hatched {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(20, 23, 14, 0.055) 0 1px,
+    transparent 1px 5px
+  );
+}
+
+::selection { background: var(--lime); color: var(--ink); }
+
+*:focus-visible {
+  outline: 2px solid var(--lime-text);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

@@ -21,8 +21,8 @@ export default function AcceptForm({ token, email }: { token: string; email: str
       {state && <Notice kind="error">{state.error}</Notice>}
       <input type="hidden" name="token" value={token} />
       <Field label="Email">
-        <input value={email} readOnly disabled className={`${inputClass} bg-stone-100 text-stone-500`} />
-        <p className="mt-1 text-xs text-stone-500">
+        <input value={email} readOnly disabled className={`${inputClass} bg-line text-ink-3`} />
+        <p className="mt-1 text-xs text-ink-3">
           The invite was sent here, so this is the address your account uses.
         </p>
       </Field>
@@ -32,7 +32,7 @@ export default function AcceptForm({ token, email }: { token: string; email: str
       <Field label="Password">
         <input name="password" type="password" required minLength={8}
                autoComplete="new-password" className={inputClass} />
-        <p className="mt-1 text-xs text-stone-500">At least 8 characters.</p>
+        <p className="mt-1 text-xs text-ink-3">At least 8 characters.</p>
       </Field>
       <Submit />
     </form>

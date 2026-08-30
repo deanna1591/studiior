@@ -76,6 +76,8 @@ The member importer is built, at `/imports`: upload a CSV, match its columns, se
 
 Onboarding is built and invite-only: the operator provisions a studio shell at `/admin` (gated by `platform_admins`, checked in SQL), the owner accepts a single-use hashed token at `/invite/[token]`, and a three-step wizard blocks every other screen until it finishes. The dashboard checklist derives its ticks from live data rather than stored flags, so it cannot go stale. Stripe is a stub.
 
+The staff app is redesigned: a persistent left rail (studio and location top, nav, current user bottom; a drawer below `md`, because front desk works on an iPad and a bottom bar costs roster rows), the schedule as rows defaulting to **day**, pill filters with a day/week toggle, and one banner slot ordered money → blocked members → setup → nudges, suppressed only when it would point at the screen you are on. Archivo at `wdth 112` for display, Karla for body, IBM Plex Mono with `tabular-nums` for every number that is a measurement — not phone numbers, which look like part codes in mono. No glass anywhere: over a light surface it reads as a rendering artefact, and spending the effect elsewhere would dilute the health band.
+
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
 ---
@@ -117,6 +119,12 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **Time is `timestamptz` stored UTC.** Studio timezone governs display and all day boundaries. A 7am class stays 7am across DST — occurrences materialise by converting local time to UTC at generation, not by adding fixed intervals.
 
 **Demo data is flagged, never inferred.** `generate_demo_data()` sets `is_demo` on every row it writes and `purge_demo_data()` clears the lot in one call. Fake members will sit in the same table as real ones; working out later which was which from names and email domains is not a plan.
+
+**The palette is three tokens deep and every colour earned its role by measurement.** `app/globals.css` holds the lot; nothing in `app/` or `components/` may name a raw Tailwind colour. Two results decide most of the design and are not negotiable without redoing the sums: `#D9401A` is **4.47** on white, so coral borders, fills and sets large numerals but never a sentence — warnings are ink on `--coral-tint` with a coral rule; and `stone-400` is **2.41**, so `--ink-3` (4.59) is the floor for greying anything, including a class that has already happened.
+
+**The health band is the only loud thing, and its loudness is rationed.** Saturation sits on the label chip; the reason gets a wash. Full-bleed fills were built first and thrown away twice — most members are healthy, so the screen came out a wall of lime, and sorted by severity it came out a wall of coral. Healthy has no reason to carry (Decision 14 gives one to every band *except* healthy), so it renders as a chip and nothing more.
+
+**A colour set in `globals.css` beats a Tailwind text utility.** Those classes are declared after `@tailwind utilities` and match on equal specificity, so source order decides. `.section-label` carried a `color` and silently repainted every health chip's label to `--ink-2`, dropping the at-risk chip from 6.42 to **2.70**. Utility classes there are not overrides; measure the rendered DOM rather than reading the markup.
 
 **Nothing AI-generated sends itself.** The model drafts, the owner approves. Hard architectural rule.
 

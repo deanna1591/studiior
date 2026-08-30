@@ -25,7 +25,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
   if (!isManagerUp(ctx.role)) {
     return (
       <Shell title="Import" subtitle={ctx.studioName} right={<NavLink href="/">Back to week</NavLink>}>
-        <p className="text-sm text-stone-600">Importing is owners and managers.</p>
+        <p className="text-sm text-ink-2">Importing is owners and managers.</p>
       </Shell>
     );
   }
@@ -79,7 +79,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
       {/* ---- step 1: mapping. Editable until it has actually been imported. ---- */}
       {!done && !rolledBack && (
         <section className="mb-8">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-500">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">
             Match your columns
           </h2>
           <MappingForm
@@ -96,7 +96,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
       {/* ---- step 2: the review. What would happen, before anything happens. ---- */}
       {reviewed && (
         <section className="mb-8">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-500">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">
             What this would do
           </h2>
           <div className="mb-4 flex flex-wrap gap-3 text-sm">
@@ -106,7 +106,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
           </div>
 
           {(counts.error ?? 0) > 0 && (
-            <p className="mb-4 max-w-2xl text-sm text-stone-600">
+            <p className="mb-4 max-w-2xl text-sm text-ink-2">
               Rows with a problem are left out — the rest still import. Fix them
               in your file and upload it again, or import what is ready now and
               deal with the rest afterwards.
@@ -114,17 +114,17 @@ export default async function ImportDetail({ params }: { params: { id: string } 
           )}
 
           {problems.length > 0 && (
-            <div className="mb-4 max-h-96 overflow-auto rounded border border-stone-200 bg-white">
+            <div className="mb-4 max-h-96 overflow-auto rounded border border-line bg-white">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 border-b border-stone-200 bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+                <thead className="sticky top-0 border-b border-line bg-paper text-left text-xs uppercase tracking-wide text-ink-3">
                   <tr>
                     <th className="px-3 py-2 font-medium">Row</th>
                     <th className="px-3 py-2 font-medium">Reason</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody className="divide-y divide-line">
                   {problems.map((r) => (
-                    <tr key={r.id} className={r.status === "error" ? "" : "text-stone-500"}>
+                    <tr key={r.id} className={r.status === "error" ? "" : "text-ink-3"}>
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums">{r.row_number}</td>
                       <td className="px-3 py-2">{r.error}</td>
                     </tr>
@@ -137,7 +137,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
           {(counts.ok ?? 0) > 0 ? (
             <CommitButton id={imp.id} okCount={counts.ok ?? 0} />
           ) : (
-            <p className="text-sm text-stone-600">
+            <p className="text-sm text-ink-2">
               Nothing here would be imported. Change the mapping above, or fix
               the file and start again.
             </p>
@@ -148,7 +148,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
       {/* ---- step 3: done, and undoable. ---- */}
       {done && (
         <section className="space-y-4">
-          <p className="text-sm text-stone-700">
+          <p className="text-sm text-ink">
             {counts.committed ?? 0} {NOUN[imp.type] ?? "rows"} imported
             {(counts.skip ?? 0) > 0 && `, ${counts.skip} skipped as already here`}
             {(counts.error ?? 0) > 0 && `, ${counts.error} left out`}.
@@ -163,7 +163,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
       )}
 
       {rolledBack && (
-        <p className="max-w-2xl text-sm text-stone-600">
+        <p className="max-w-2xl text-sm text-ink-2">
           This import was undone. Everything it created has been removed; the
           file and the row-by-row record are kept so you can see what happened.
           Upload the file again to redo it.
@@ -175,9 +175,9 @@ export default async function ImportDetail({ params }: { params: { id: string } 
 
 function Tally({ n, label, tone }: { n: number; label: string; tone: "ok" | "skip" | "error" }) {
   const cls = {
-    ok: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    skip: "border-stone-200 bg-stone-50 text-stone-600",
-    error: "border-rose-200 bg-rose-50 text-rose-900",
+    ok: "border-lime-text bg-lime-tint text-ink",
+    skip: "border-line bg-paper text-ink-2",
+    error: "border-coral bg-coral-tint text-ink",
   }[tone];
   return (
     <span className={`rounded border px-3 py-1.5 ${cls}`}>

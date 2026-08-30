@@ -35,13 +35,13 @@ export default async function Welcome({ searchParams }: { searchParams: { step?:
 
   return (
     <div className="mx-auto max-w-lg px-5 py-14">
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">
         Step {step} of 3
       </p>
       <h1 className="mt-1 text-xl font-semibold tracking-tight">
         {step === 2 ? "Confirm your studio" : "Booking basics"}
       </h1>
-      <p className="mb-6 mt-1 text-sm leading-relaxed text-stone-600">
+      <p className="mb-6 mt-1 text-sm leading-relaxed text-ink-2">
         {step === 2
           ? "We pre-filled this from your invite. Change anything that is wrong — the slug decides your member app address."
           : "Three settings to get you booking. Everything else has a sensible default and can wait."}

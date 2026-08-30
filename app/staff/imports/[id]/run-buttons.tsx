@@ -11,7 +11,7 @@ function Submit({ label, busy, danger }: { label: string; busy: string; danger?:
     <button
       disabled={pending}
       className={danger
-        ? "rounded border border-rose-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+        ? "rounded border border-coral bg-white px-3 py-1.5 text-sm text-ink hover:bg-coral-tint disabled:opacity-50"
         : buttonClass}
     >
       {pending ? busy : label}
@@ -46,7 +46,7 @@ export function RollbackButton({ id, created, noun }: { id: string; created: num
       <div className="space-y-2">
         {state && <Notice kind="error">{state.error}</Notice>}
         <button onClick={() => setArmed(true)}
-                className="text-sm text-stone-600 underline underline-offset-4 hover:text-rose-700">
+                className="text-sm text-ink-2 underline underline-offset-4 hover:text-ink">
           Undo this import
         </button>
       </div>
@@ -54,10 +54,10 @@ export function RollbackButton({ id, created, noun }: { id: string; created: num
   }
 
   return (
-    <form action={action} className="max-w-lg space-y-3 rounded border border-rose-200 bg-rose-50 p-3">
+    <form action={action} className="max-w-lg space-y-3 rounded border border-coral bg-coral-tint p-3">
       {state && <Notice kind="error">{state.error}</Notice>}
       <input type="hidden" name="id" value={id} />
-      <p className="text-sm text-rose-900">
+      <p className="text-sm text-ink">
         This removes the {created} {noun} this import created, and nothing else —
         anything you have added or edited since stays. If something else was
         imported on top of these, that one has to be undone first.
@@ -65,7 +65,7 @@ export function RollbackButton({ id, created, noun }: { id: string; created: num
       <div className="flex items-center gap-4">
         <Submit label="Undo the import" busy="Undoing…" danger />
         <button type="button" onClick={() => setArmed(false)}
-                className="text-sm text-stone-600 underline underline-offset-4">
+                className="text-sm text-ink-2 underline underline-offset-4">
           Keep it
         </button>
       </div>

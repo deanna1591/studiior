@@ -14,8 +14,8 @@ export default async function StripePage() {
   return (
     <Shell title="Connect Stripe" subtitle="Coming soon"
            right={<NavLink href="/">Back to dashboard</NavLink>}>
-      <div className="max-w-xl space-y-4 text-sm leading-relaxed text-stone-700">
-        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+      <div className="max-w-xl space-y-4 text-sm leading-relaxed text-ink">
+        <p className="rounded border border-amber bg-amber-tint px-3 py-2 text-ink">
           Not built yet. Nothing on this page charges anyone or talks to Stripe.
         </p>
         <p>
@@ -30,7 +30,7 @@ export default async function StripePage() {
           <li>Bill recurring plans automatically at each period</li>
           <li>Refund from the payment record, without leaving Studiior</li>
         </ul>
-        <p className="text-stone-600">
+        <p className="text-ink-2">
           Until then you can run the studio exactly as you do now and record
           payments however you already do. Nothing else is blocked by this.
         </p>

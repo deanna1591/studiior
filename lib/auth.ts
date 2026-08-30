@@ -10,6 +10,7 @@ export type StaffContext = {
   role: StaffRole;
   studioId: string;
   studioName: string;
+  locationName: string | null;
   timeZone: string;
   currency: string;
   onboardingComplete: boolean;
@@ -78,12 +79,22 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   if (!data || !data.studios) return null;
 
   // studio_settings is keyed by studio_id and has no foreign key from
-  // studio_staff, so it cannot be embedded in the query above.
-  const { data: settings } = await supabase
-    .from("studio_settings")
-    .select("onboarding_completed_at")
-    .eq("studio_id", data.studio_id)
-    .maybeSingle();
+  // studio_staff, so it cannot be embedded in the query above. The primary
+  // location comes along for the ride: the rail names the place people are
+  // standing in, and a timezone is not that.
+  const [{ data: settings }, { data: loc }] = await Promise.all([
+    supabase
+      .from("studio_settings")
+      .select("onboarding_completed_at")
+      .eq("studio_id", data.studio_id)
+      .maybeSingle(),
+    supabase
+      .from("locations")
+      .select("name")
+      .eq("studio_id", data.studio_id)
+      .eq("is_primary", true)
+      .maybeSingle(),
+  ]);
 
   return {
     userId: user.id,
@@ -92,6 +103,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     role: data.role as StaffRole,
     studioId: data.studio_id,
     studioName: data.studios.name,
+    locationName: loc?.name ?? null,
     timeZone: data.studios.timezone,
     currency: data.studios.currency,
     studioStatus: data.studios.status,

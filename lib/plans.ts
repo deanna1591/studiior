@@ -36,12 +36,12 @@ export const PLAN_TYPE_LABEL: Record<PlanType, string> = {
 
 export const PLAN_TYPE_HINT: Record<PlanType, string> = {
   recurring:
-    "Bills on a schedule until cancelled. Leave the per-period allowance empty for unlimited — that is what unlimited means here (Decision 12).",
+    "Bills on a schedule until cancelled. Leave the per-period allowance empty for unlimited — that is what unlimited means here.",
   class_pack:
     "Bought once, a fixed number of classes, expiring after a set number of days.",
   drop_in: "One class, bought and used.",
   trial:
-    "A plan type, not a flag — it converts or expires (§7.1). Usually a few classes over a short window.",
+    "A plan in its own right, not a flag on someone — it converts to a paid plan or it expires. Usually a few classes over a short window.",
 };
 
 export const VISIBILITY_LABEL: Record<string, string> = {
