@@ -5,6 +5,7 @@ import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { HealthChip, bandOf } from "@/components/health-band";
 import { fmtDayLong, fmtTime, relativeDayName } from "@/lib/time";
 import CheckInButton from "./check-in-button";
+import CodeCheckIn from "./code-check-in";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,10 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
         {inCount > 0 && <>, <span className="num text-ink">{inCount}</span> checked in</>}
         {occ.status === "cancelled" && " · this class is cancelled"}
       </p>
+
+      {/* The desk end of the member's rotating code. Without it the QR on
+          their phone is a picture nothing can read. */}
+      <CodeCheckIn occurrenceId={occ.id} />
 
       <SectionLabel>Roster</SectionLabel>
       {booked.length === 0 ? (

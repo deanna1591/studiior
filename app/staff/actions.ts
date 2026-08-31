@@ -113,3 +113,71 @@ export async function checkIn(_prev: string | null, formData: FormData) {
   revalidatePath(`/roster/${occurrenceId}`);
   return null;
 }
+
+
+export type CodeState = { ok: boolean; message: string } | null;
+
+/**
+ * Check a member in from the rotating code on their phone.
+ *
+ * Permissions §8 note 13. resolve_checkin_code() accepts the current or the
+ * previous 30-second bucket, so a code that rotates while the desk is typing
+ * still works — and it is desk-up only, so a member cannot resolve anybody's
+ * code including their own.
+ */
+export async function checkInByCode(_prev: CodeState, fd: FormData): Promise<CodeState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const code = String(fd.get("code") ?? "").trim();
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  if (!code) return { ok: false, message: "Type the code from their phone." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resolve_checkin_code", { p_code: code });
+  if (error) return { ok: false, message: error.message };
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    return {
+      ok: false,
+      message: "That code did not match anyone. Codes change every 30 seconds — ask them to read out the current one.",
+    };
+  }
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, status")
+    .eq("occurrence_id", occurrenceId)
+    .eq("member_id", row.member_id)
+    .in("status", ["booked", "attended"])
+    .maybeSingle();
+
+  if (!booking) {
+    return {
+      ok: false,
+      message: `${row.first_name} ${row.last_name} is not booked into this class. Book them in first, or check the class.`,
+    };
+  }
+
+  const { error: ciError } = await supabase.from("check_ins").insert({
+    studio_id: ctx.studioId,
+    booking_id: booking.id,
+    member_id: row.member_id,
+    occurrence_id: occurrenceId,
+    method: "qr",
+    checked_in_by: ctx.userId,
+  });
+  if (ciError) {
+    if (ciError.code === "23505") {
+      return { ok: true, message: `${row.first_name} is already checked in.` };
+    }
+    // PT422 is the §8 window trigger. The rule lives in SQL; this shows it.
+    if (ciError.code === "PT422") return { ok: false, message: ciError.message };
+    return { ok: false, message: ciError.message };
+  }
+
+  await supabase.from("bookings").update({ status: "attended" }).eq("id", booking.id);
+  revalidatePath(`/roster/${occurrenceId}`);
+  return { ok: true, message: `${row.first_name} ${row.last_name} checked in.` };
+}

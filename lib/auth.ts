@@ -127,9 +127,13 @@ export type MemberContext = {
   userId: string;
   memberId: string;
   name: string;
+  firstName: string;
   studioId: string;
   studioName: string;
   timeZone: string;
+  /** Caches on members, recomputed on check-in and nightly (Business Rules §8). */
+  streak: number;
+  lifetimeVisits: number;
 };
 
 /** Who is making this request, on the member PWA. */
@@ -140,7 +144,7 @@ export async function getMemberContext(): Promise<MemberContext | null> {
 
   const { data } = await supabase
     .from("members")
-    .select("id, first_name, last_name, studio_id, studios(name, timezone)")
+    .select("id, first_name, last_name, current_streak, lifetime_visits, studio_id, studios(name, timezone)")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -150,6 +154,9 @@ export async function getMemberContext(): Promise<MemberContext | null> {
     userId: user.id,
     memberId: data.id,
     name: `${data.first_name} ${data.last_name}`,
+    firstName: data.first_name,
+    streak: data.current_streak ?? 0,
+    lifetimeVisits: data.lifetime_visits ?? 0,
     studioId: data.studio_id,
     studioName: data.studios.name,
     timeZone: data.studios.timezone,

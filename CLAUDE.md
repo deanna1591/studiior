@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Twenty-four migrations, applying clean from `supabase db reset`:
+Twenty-five migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,12 +48,13 @@ Twenty-four migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **025** the member app's missing half: `occ_member_own_read` (a member may read a class at any status if they have a booking or check-in for it), `rooms_member_read`, `studio_member_settings()`, the rotating check-in code, `cancel_booking()` per §3.1, and `respond_to_offer()`. Written after asking a real member session what it returns, not after designing screens
 - **024** the clock behind the brief: `is_service_context()`, `run_due_morning_briefs()`, and a pg_cron job every 15 minutes. `studios_due_for_brief()` had existed since 023 with nothing calling it, so no brief ever generated on its own
 - **023** the Morning Brief: `insight_config` (every §11 threshold as a row a studio can move), `generate_morning_brief()`, `brief_summary()`, `studios_due_for_brief()` and `set_insight_status()`. Writes `ai_insights` and `morning_briefs`, which had existed since 001 with nothing writing them. No model is called and `model` / `prompt_version` stay null — a row naming a model it never saw would be worse than an empty column
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Twelve suites, **479 assertions**, all passing from a clean `db reset`:
+Thirteen suites, **511 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -64,6 +65,7 @@ Twelve suites, **479 assertions**, all passing from a clean `db reset`:
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
 | `test/health_score_test.sql` | 59 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/member_app_test.sql` | 32 | history joins to real classes while someone else's past class stays hidden, the code rotates and only the desk resolves it, cancelling returns or consumes the credit and always frees the seat |
 | `test/brief_schedule_test.sql` | 32 | a studio past its send time is picked up and one that is not is skipped, a second run the same day is a no-op, a half-finished run retries, and an authenticated caller with no JWT is still refused |
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
 | `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
@@ -97,6 +99,10 @@ The band carries an action: **Message**, beside the hero on the member screen an
 `managers_only` notes are enforced where they have to be. `notes_read` is `is_manager_up(studio_id) or not managers_only`, so a front desk session never receives the row; the screen does no filtering of its own and has no way to leak one.
 
 **Payments on the member screen are the one place the UI shows less than RLS allows, and that is a standing disagreement, not a decision.** Permissions §9 note 18 gives front desk payment history explicitly — "individual transactions to answer a member's question" — and `payments_desk_read` implements it, so front desk can still read those rows through the API. This screen withholds the section and filters `payment` out of the journey for anyone below manager, on instruction. It is a display choice and nothing more; if it should be a boundary, §9 and the policy have to change together.
+
+The member PWA is built at `{slug}.studiior.app` — five screens on a bottom tab bar: home, book, check in, history, plan. Phone-first rather than a smaller staff app: body is 15px not 14, nothing interactive is under 44px, the primary action is 56px and there is one of it. Home leads with the next class, and inside the §8 check-in window that card stops describing the class and becomes the way in. Booking and cancelling go through `book_class()` and `cancel_booking()`; a class you are in reads as a different row rather than wearing a tick.
+
+It is branded as the studio, including the browser tab, the bookmark and the name iOS uses on a home screen — `app/member/layout.tsx` titles it from `studio_by_slug()`. The word "Studiior" appears nowhere a member can see. `brand_color` is deliberately unused: an arbitrary hex with unverified contrast driving text or fills would silently break every ratio the palette was measured for, so identity is carried by the logo and the name.
 
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
@@ -151,6 +157,12 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **The row-size band has no wash; the hero does, and its chip goes white there.** The chip's fill is the band's tint, so a wash behind it leaves a pill dissolving into a bar — and a column of pale bars is the slab problem again in a weaker shade. On the hero the ground is worth keeping, so the chip takes `--surface` and lifts off it (1.20 against the wash, with a 1.48 border).
 
 **A colour set in `globals.css` beats a Tailwind text utility.** Those classes are declared after `@tailwind utilities` and match on equal specificity, so source order decides. `.section-label` carried a `color` and silently repainted every health chip's label to `--ink-2`, dropping the at-risk chip from 6.42 to **2.70**. Utility classes there are not overrides; measure the rendered DOM rather than reading the markup.
+
+**Ask the database what a member session returns before designing the screen that shows it.** Signed in as a real member: 76 check-ins visible, **0 with a class name**, 0 past occurrences, 0 rooms, 0 settings rows. `occ_member_read` is `status = 'scheduled'`, which is right for a schedule and wrong for a history — a class leaves the member's view the moment it runs. The History screen would have rendered seventy-six rows reading "Visit" and looked finished. The fix is narrow on purpose: readable if you have a booking or a check-in for it, not "all statuses", which would hand every member the studio's entire past schedule.
+
+**A member-facing subset of a settings table is a function, not a policy.** RLS is row-level, so a read policy on `studio_settings` to expose the check-in window would also expose every fee, the morning brief time and the onboarding state. `studio_member_settings()` returns the six fields the app needs, the same shape as `studio_by_slug()`.
+
+**The check-in code is an HMAC, not a row.** Member id plus a 30-second bucket, keyed by a per-studio secret the member cannot read, so it cannot be forged and a screenshot is worthless thirty seconds later. `resolve_checkin_code()` accepts the current bucket or the one before it, because a scan takes a moment and a code that dies mid-rotation is a member holding up a phone the desk has just rejected.
 
 **A background job needs a positive identity, never an absent one.** pg_cron runs with no JWT, so `auth.uid()` is null, `is_platform_admin()` is false and `is_manager_up()` is false — all correctly. The temptation is to let a null through, and that is precisely the hole migration 002 had and 020 finished closing: it would hand the job's powers to any caller PostgREST failed to identify. `is_service_context()` instead asks whether the effective role is one Postgres itself marks `rolsuper` or `rolbypassrls` — `postgres`, `service_role`, `supabase_admin` yes; `authenticated` and `anon` never, with or without a token. It reads `current_setting('role')` rather than `current_user`, because inside a SECURITY DEFINER function `current_user` is the owner and would answer "trusted" for everybody. `brief_schedule_test.sql` asserts an authenticated session with a null `auth.uid()` is still refused, so rewriting the guard as `auth.uid() is null` fails the suite.
 
@@ -242,6 +254,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/brief_sch
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/member_app_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -249,7 +265,7 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 

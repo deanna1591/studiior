@@ -84,7 +84,7 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
     return { ok: false, message: REASONS[result.failure_reason] ?? result.failure_reason };
   }
 
-  revalidatePath("/");
+  revalidateMember();
 
   if (result.status === "waitlisted") {
     return { ok: true, message: `You are #${result.waitlist_position} on the waitlist. No credit taken.` };
@@ -97,4 +97,88 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
     : "drop-in, payable at the studio";
 
   return { ok: true, message: `Booked — ${paid}.` };
+}
+
+
+/** Every member screen shows some slice of the same booking state. */
+function revalidateMember() {
+  for (const p of ["/", "/book", "/history", "/membership"]) revalidatePath(p);
+}
+
+export type ActionResult = { ok: boolean; message: string } | null;
+
+/**
+ * Cancel, per Business Rules §3.1.
+ *
+ * The rule — before the cutoff the credit comes back, after it the credit is
+ * used, and either way the seat is released — lives in cancel_booking(). This
+ * turns its answer into a sentence, and says plainly when a credit did not
+ * come back rather than leaving the member to notice a number that did not
+ * move.
+ */
+export async function cancelBooking(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("cancel_booking", {
+    p_booking_id: String(formData.get("booking_id") ?? ""),
+  });
+
+  if (error) {
+    if (error.code === "PT409") return { ok: false, message: "That booking has already been cancelled." };
+    if (error.code === "PT403") return { ok: false, message: "That is not your booking." };
+    return { ok: false, message: error.message };
+  }
+
+  const r = data as unknown as {
+    status: string; credit_returned: boolean; reason: string | null; offer_made: boolean;
+  } | null;
+  if (!r) return { ok: false, message: "No response from the cancel function." };
+
+  revalidateMember();
+
+  const late = r.status === "late_cancelled";
+  const head = late ? "Cancelled, inside the notice period." : "Cancelled.";
+  const credit = r.credit_returned
+    ? " Your credit is back on your account."
+    : r.reason ? ` ${r.reason}`
+    : "";
+  return { ok: true, message: head + credit };
+}
+
+/**
+ * Accept or decline a waitlist offer.
+ *
+ * Accepting re-runs the whole eligibility gate through book_class(), because
+ * a membership can lapse between joining a waitlist and a seat opening — §4.2
+ * says so, and this does not shortcut it.
+ */
+export async function respondToOffer(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const accept = String(formData.get("accept") ?? "") === "1";
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("respond_to_offer", {
+    p_offer_id: String(formData.get("offer_id") ?? ""),
+    p_accept: accept,
+  });
+
+  if (error) {
+    if (error.code === "PT409") return { ok: false, message: "That offer has already been answered." };
+    return { ok: false, message: error.message };
+  }
+
+  const r = (data ?? {}) as { ok?: boolean; accepted?: boolean; reason?: string };
+  revalidateMember();
+
+  if (r.ok === false) {
+    return r.reason === "expired"
+      ? { ok: false, message: "That offer ran out before you got to it. You are off the list for this one." }
+      : { ok: false, message: REASONS[r.reason ?? ""] ?? "That seat could not be taken." };
+  }
+  return r.accepted
+    ? { ok: true, message: "You are in. See you there." }
+    : { ok: true, message: "No problem — the seat goes to the next person." };
 }

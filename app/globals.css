@@ -114,6 +114,34 @@ body {
   );
 }
 
+/* --- the member app --------------------------------------------------------
+   Same tokens, a bigger hand. A member holds this at 6am, one-handed, on a
+   phone; the staff app assumes a desk and a mouse. Body goes 14 -> 15 and
+   nothing interactive is under 44px, which is the floor below which a thumb
+   starts missing (WCAG 2.5.5). Primary actions are 56px and live in the lower
+   half of the screen, where a thumb actually reaches.
+   --------------------------------------------------------------------------- */
+.m-body   { font-size: 15px; line-height: 22px; }
+.m-sub    { font-size: 14px; line-height: 20px; }
+.m-micro  { font-size: 12px; line-height: 16px; }
+.m-display {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 112, 'wght' 620;
+  font-size: 26px; line-height: 30px; letter-spacing: 0.02em;
+}
+.m-tap    { min-height: 44px; }
+.m-action { min-height: 56px; }
+
+/* The tab bar sits on the home-indicator edge; the inset keeps it off it. */
+.m-tabbar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* A filter strip you swipe. The scrollbar is chrome a phone does not show and
+   a desktop preview does, which makes the row look broken in review. */
+.m-hscroll { scrollbar-width: none; -ms-overflow-style: none; }
+.m-hscroll::-webkit-scrollbar { display: none; }
+.m-scroll { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+
 /* --- health chip ----------------------------------------------------------
    A pill that sits on the surface rather than being stamped into it: tinted
    fill, a hairline a step darker, a dot carrying the colour, and a 2px shadow

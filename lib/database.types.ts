@@ -3618,6 +3618,7 @@ export type Database = {
           cancellation_cutoff_minutes: number
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
+          checkin_secret: string
           checkin_window_enforced: boolean
           created_at: string
           late_cancel_consumes_credit: boolean
@@ -3647,6 +3648,7 @@ export type Database = {
           cancellation_cutoff_minutes?: number
           checkin_closes_minutes_after?: number
           checkin_opens_minutes_before?: number
+          checkin_secret?: string
           checkin_window_enforced?: boolean
           created_at?: string
           late_cancel_consumes_credit?: boolean
@@ -3676,6 +3678,7 @@ export type Database = {
           cancellation_cutoff_minutes?: number
           checkin_closes_minutes_after?: number
           checkin_opens_minutes_before?: number
+          checkin_secret?: string
           checkin_window_enforced?: boolean
           created_at?: string
           late_cancel_consumes_credit?: boolean
@@ -4114,6 +4117,20 @@ export type Database = {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
       }
+      cancel_booking: {
+        Args: { p_booking_id: string }
+        Returns: Database["public"]["CompositeTypes"]["cancel_result"]
+        SetofOptions: {
+          from: "*"
+          to: "cancel_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      checkin_code_for: {
+        Args: { p_bucket: number; p_member_id: string }
+        Returns: string
+      }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
@@ -4142,7 +4159,16 @@ export type Database = {
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_service_context: { Args: never; Returns: boolean }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      member_checkin_code: {
+        Args: never
+        Returns: {
+          code: string
+          member_name: string
+          seconds_left: number
+        }[]
+      }
       member_health: { Args: { p_member_id: string }; Returns: Json }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
@@ -4180,6 +4206,20 @@ export type Database = {
       }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
+      resolve_checkin_code: {
+        Args: { p_code: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          member_id: string
+        }[]
+      }
+      respond_to_offer: {
+        Args: { p_accept: boolean; p_offer_id: string }
+        Returns: Json
+      }
+      run_due_morning_briefs: { Args: never; Returns: Json }
       say_count: { Args: { n: number }; Returns: string }
       send_message: {
         Args: { p_message_id: string }
@@ -4264,6 +4304,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      studio_member_settings: {
+        Args: { p_studio_id: string }
+        Returns: {
+          booking_cutoff_minutes: number
+          cancellation_cutoff_minutes: number
+          checkin_closes_minutes_after: number
+          checkin_opens_minutes_before: number
+          waitlist_enabled: boolean
+          week_starts_on: number
+        }[]
+      }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
       studios_due_for_brief: {
         Args: { p_now?: string }
@@ -4339,6 +4390,12 @@ export type Database = {
         payment_source: Database["public"]["Enums"]["payment_source"] | null
         waitlist_position: number | null
         failure_reason: string | null
+      }
+      cancel_result: {
+        status: Database["public"]["Enums"]["booking_status"] | null
+        credit_returned: boolean | null
+        reason: string | null
+        offer_made: boolean | null
       }
       invite_acceptance: {
         user_id: string | null
