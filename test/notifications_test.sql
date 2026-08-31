@@ -171,9 +171,71 @@ select expect_num('no placeholder survives into the text',
     where text_body ~ '\{[a-z_]+\}'), 0);
 select expect_like('the html is branded with the studio accent',
   (select html_body from render_notification(current_setting('n.id')::uuid)), '%#2B6CB0%');
-select expect_num('and Studiior appears nowhere in it',
+-- The member app is served from {slug}.studiior.app, so the settings link in
+-- the footer necessarily carries our domain — a member sees it in the URL bar
+-- of the app itself already. The rule is about the words we write, so the link
+-- is stripped before asking, rather than the rule being quietly dropped.
+select expect_num('and Studiior appears nowhere in the copy',
   (select count(*) from render_notification(current_setting('n.id')::uuid)
-    where html_body ilike '%studiior%' or text_body ilike '%studiior%'), 0);
+    where replace(html_body, 'notify-test.studiior.app', '') ilike '%studiior%'
+       or replace(text_body, 'notify-test.studiior.app', '') ilike '%studiior%'), 0);
+
+-- =============================================================================
+-- 3b. What a delivered email actually looked like (migration 034)
+-- =============================================================================
+
+-- The room was its own sentence in its own paragraph: "In Studio A." stranded
+-- under the booking. It is a fragment now, inside the sentence.
+select expect_like('the room is folded into the sentence',
+  (select text_body from render_notification(current_setting('n.id')::uuid)),
+  '%, in Studio A.%');
+select expect_num('and never stands alone as its own line',
+  (select count(*) from render_notification(current_setting('n.id')::uuid)
+    where text_body ~ '(^|\n)In Studio A\.'), 0);
+
+-- Reply-to. The studio has no contact address yet, and an absent header is the
+-- right answer — pointing replies at our own notifications@ mailbox would look
+-- like somewhere to write.
+select expect_text('no contact address means no reply-to at all',
+  (select coalesce(reply_to,'null') from render_notification(current_setting('n.id')::uuid)), 'null');
+
+update studios set contact_email = 'hello@notify.example.com', contact_phone = '020 7946 0102'
+ where id = '13131313-0000-0000-0000-000000000001';
+
+select expect_text('reply-to is the studio''s own address',
+  (select reply_to from render_notification(current_setting('n.id')::uuid)),
+  'hello@notify.example.com');
+select expect_like('and the footer carries the contact details',
+  (select text_body from render_notification(current_setting('n.id')::uuid)),
+  '%hello@notify.example.com · 020 7946 0102%');
+
+-- The footer used to be the studio name, already in the header, under a rule.
+select expect_like('the footer offers a way to change what we send',
+  (select text_body from render_notification(current_setting('n.id')::uuid)),
+  '%https://notify-test.studiior.app/settings%');
+
+-- An always-send template must not offer a switch that does not exist.
+select set_config('n.cancel',
+  (select queue_notification('13131313-0000-0000-0000-000000000001',
+     '13131313-0000-0000-0000-00000000dd01', 'class_cancelled',
+     jsonb_build_object('class_name','Reformer Flow','when','Thursday'),
+     'test:cancelled:1313')::text), false);
+select expect_like('an always-send email says so rather than pretending',
+  (select text_body from render_notification(current_setting('n.cancel')::uuid)),
+  '%always send this one%');
+-- Taken back off the queue: it was queued to be rendered, not to be sent, and
+-- section 5 counts what the worker failed. Leaving it here made that count 2.
+delete from notifications where id = current_setting('n.cancel')::uuid;
+
+-- The accent rule took Studiior's lime when a studio had not chosen a colour,
+-- in mail sent over that studio's own name.
+update studios set accent_color = null where id = '13131313-0000-0000-0000-000000000001';
+select expect_num('an accentless studio does not get Studiior lime in its email',
+  (select count(*) from render_notification(current_setting('n.id')::uuid)
+    where html_body like '%#BEF738%'), 0);
+select expect_like('it falls back to neutral grey',
+  (select html_body from render_notification(current_setting('n.id')::uuid)), '%#78716C%');
+update studios set accent_color = '#2B6CB0' where id = '13131313-0000-0000-0000-000000000001';
 
 -- =============================================================================
 -- 4. A failed send keeps the row and the reason
@@ -267,6 +329,65 @@ select expect_num('running the worker again does not queue it twice',
 -- 7. The worker is backend-only
 -- =============================================================================
 
+-- 7a. Privilege first: migration 033. A signed-in member cannot reach these
+-- functions at all — not the worker, not the transport, and above all not the
+-- key. Until 033 every one of them was executable by `authenticated`, because
+-- migration 030 revoked from PUBLIC and the hosted default privileges name
+-- `authenticated` explicitly. Counting rather than spot-checking, so a function
+-- added later without a revoke fails here instead of shipping open.
+select expect_num('no notification internal is executable by authenticated',
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = any (array['notification_setting','notification_api_key',
+        'notification_wanted','queue_notification','queue_booking_notifications',
+        'queue_waitlist_offer','queue_occurrence_cancelled','queue_substitution',
+        'queue_payment_failed','queue_milestone','queue_credit_expiries',
+        'queue_all_credit_expiries','render_notification','send_via_resend',
+        'deliver_notification','send_due_notifications',
+        'reconcile_notification_sends','tg_queue_booking_notifications',
+        'tg_queue_waitlist_offer','tg_cancel_booking_notifications'])
+      and has_function_privilege('authenticated', p.oid, 'execute')), 0);
+select expect_num('...nor by anon, including the three trigger functions',
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = any (array['notification_api_key','send_via_resend',
+        'render_notification','deliver_notification','queue_notification',
+        'tg_queue_booking_notifications','tg_queue_waitlist_offer',
+        'tg_cancel_booking_notifications'])
+      and has_function_privilege('anon', p.oid, 'execute')), 0);
+
+-- The concrete attack, run for real: this returned the key before 033.
+set role authenticated;
+select set_config('request.jwt.claim.sub','13131313-0000-0000-0000-0000000000a1',false);
+do $$
+begin
+  perform notification_api_key();
+  raise exception 'FAIL  a signed-in member read the Resend API key';
+exception when insufficient_privilege then
+  raise notice 'PASS  a signed-in member cannot read the Resend API key';
+end $$;
+do $$
+begin
+  perform send_via_resend('anyone@example.com','Reform',null,'hi','hi','<p>hi</p>');
+  raise exception 'FAIL  a signed-in member sent mail from the studio domain';
+exception when insufficient_privilege then
+  raise notice 'PASS  a signed-in member cannot send mail from the studio domain';
+end $$;
+do $$
+begin
+  perform send_due_notifications();
+  raise exception 'FAIL  an authenticated caller ran the notification worker';
+exception when insufficient_privilege then
+  raise notice 'PASS  an authenticated caller is denied execute on the worker';
+end $$;
+reset role;
+
+-- 7b. And the guard behind the privilege still refuses on its own, which is
+-- what actually protects us if a grant is ever restored by a future migration
+-- or by a hosted default. Granted deliberately here so the guard is tested
+-- rather than merely shadowed by 7a, then taken back.
+grant execute on function send_due_notifications()       to authenticated;
+grant execute on function reconcile_notification_sends() to authenticated;
 set role authenticated;
 select set_config('request.jwt.claim.sub','13131313-0000-0000-0000-0000000000a1',false);
 do $$
@@ -274,18 +395,20 @@ begin
   perform send_due_notifications();
   raise exception 'FAIL  an owner ran the notification worker';
 exception when sqlstate 'PT403' then
-  raise notice 'PASS  an owner cannot run the notification worker';
+  raise notice 'PASS  with execute granted, the worker still refuses a non-service caller';
 end $$;
 do $$
 begin
   perform reconcile_notification_sends();
   raise exception 'FAIL  an owner ran the reconciler';
 exception when sqlstate 'PT403' then
-  raise notice 'PASS  an owner cannot run the reconciler';
+  raise notice 'PASS  with execute granted, the reconciler still refuses a non-service caller';
 end $$;
 select expect_text('and an authenticated session is not a service context',
   is_service_context()::text, 'false');
 reset role;
+revoke execute on function send_due_notifications()       from authenticated;
+revoke execute on function reconcile_notification_sends() from authenticated;
 
 select expect_num('both cron jobs are scheduled every minute',
   (select count(*) from cron.job

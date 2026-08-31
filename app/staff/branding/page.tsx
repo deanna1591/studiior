@@ -26,7 +26,7 @@ export default async function Branding() {
 
   const { data: studio } = await supabase
     .from("studios")
-    .select("theme_preset, accent_color, logo_url")
+    .select("theme_preset, accent_color, logo_url, contact_email, contact_phone")
     .eq("id", ctx.studioId)
     .maybeSingle();
 
@@ -41,6 +41,8 @@ export default async function Branding() {
         preset={(studio?.theme_preset ?? "warm") as PresetKey}
         accent={studio?.accent_color ?? null}
         logoUrl={studio?.logo_url ?? null}
+        contactEmail={studio?.contact_email ?? ""}
+        contactPhone={studio?.contact_phone ?? ""}
       />
     </AppShell>
   );

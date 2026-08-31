@@ -278,3 +278,47 @@ export async function signUp(_prev: ClaimState, fd: FormData): Promise<ClaimStat
   }
   redirect("/signup?sent=1");
 }
+
+/**
+ * Email preferences.
+ *
+ * Five switches, one per opt-outable template. The three §12 events that always
+ * send — a cancelled class, a substituted instructor, a failed payment — are not
+ * here, because there is no switch for them and rendering one that silently did
+ * nothing would be a lie told in a form control.
+ *
+ * Upsert rather than update: a member who has never opened this screen has no
+ * row at all, and notification_wanted() reads a missing row as "everything on".
+ * The first save is therefore an insert, and every later one an update.
+ */
+export async function updateEmailPreferences(
+  _prev: string | null, formData: FormData,
+): Promise<string | null> {
+  const ctx = await getMemberContext();
+  if (!ctx) return "Not signed in.";
+
+  const supabase = createClient();
+  const row = {
+    member_id: ctx.memberId,
+    studio_id: ctx.studioId,
+    updated_at: new Date().toISOString(),
+    booking_email: formData.get("booking_email") === "on",
+    reminder_email: formData.get("reminder_email") === "on",
+    waitlist_email: formData.get("waitlist_email") === "on",
+    credit_expiry_email: formData.get("credit_expiry_email") === "on",
+    milestone_email: formData.get("milestone_email") === "on",
+  };
+
+  // RLS refuses an UPDATE by making the row invisible, which PostgREST returns
+  // as 200 and an empty array. Selecting back is how we know it saved.
+  const { data, error } = await supabase
+    .from("notification_preferences")
+    .upsert(row, { onConflict: "member_id" })
+    .select("member_id");
+
+  if (error) return error.message;
+  if (!data || data.length === 0) return "That did not save. Please try again.";
+
+  revalidatePath("/settings");
+  return "ok";
+}

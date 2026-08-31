@@ -128,7 +128,12 @@ export default async function Membership() {
         </p>
       )}
 
-      <form action={signOut} className="mt-8">
+      <Link href="/settings"
+            className="m-tap mt-8 flex w-full items-center justify-center rounded-lg border border-line-2 bg-surface text-[14px] text-ink-2">
+        Email settings
+      </Link>
+
+      <form action={signOut} className="mt-3">
         <button className="m-tap w-full rounded-lg border border-line-2 bg-surface text-[14px] text-ink-2">
           Sign out
         </button>

@@ -14,8 +14,11 @@ function Submit({ label }: { label: string }) {
 
 export default function BrandingForm({
   preset: initialPreset, accent: initialAccent, logoUrl,
+  contactEmail, contactPhone,
 }: {
   preset: PresetKey; accent: string | null; logoUrl: string | null;
+  contactEmail: string;
+  contactPhone: string;
 }) {
   // Local state so the preview moves as they choose, before anything is saved.
   const [preset, setPreset] = useState<PresetKey>(initialPreset);
@@ -76,6 +79,27 @@ export default function BrandingForm({
               not have to pick two, and you cannot pick one that fails.
             </span>
           </label>
+
+          <fieldset className="space-y-3 border-t border-line pt-5">
+            <legend className="sr-only">Contact details</legend>
+            <span className="block text-[13px] font-medium leading-[18px] text-ink">
+              How members reach you
+            </span>
+            <span className="block text-[12px] leading-4 text-ink-3">
+              This goes in the footer of every email, and a member who hits reply
+              writes here. Leave it blank and replies go nowhere.
+            </span>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] leading-[18px] text-ink-2">Email</span>
+              <input name="contact_email" type="email" defaultValue={contactEmail}
+                     className={inputClass} placeholder="hello@yourstudio.com" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] leading-[18px] text-ink-2">Phone</span>
+              <input name="contact_phone" defaultValue={contactPhone}
+                     className={inputClass} placeholder="020 7946 0102" />
+            </label>
+          </fieldset>
 
           <Submit label="Save" />
         </form>

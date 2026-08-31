@@ -28,10 +28,23 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
     return { ok: false, message: "An accent has to be a six-digit hex, like #BEF738." };
   }
 
+  // Contact details. Not branding, strictly — but this is the only Owner-only
+  // screen that governs what members see, and these two go out in the footer of
+  // every email and set its reply-to. A member who replies to a booking
+  // confirmation reaches this address or nobody.
+  const rawEmail = String(fd.get("contact_email") ?? "").trim();
+  const contactEmail = rawEmail === "" ? null : rawEmail;
+  if (contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
+    return { ok: false, message: "That does not look like an email address." };
+  }
+  const rawPhone = String(fd.get("contact_phone") ?? "").trim();
+  const contactPhone = rawPhone === "" ? null : rawPhone;
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from("studios")
-    .update({ theme_preset: preset, accent_color: accent })
+    .update({ theme_preset: preset, accent_color: accent,
+              contact_email: contactEmail, contact_phone: contactPhone })
     .eq("id", ctx.studioId)
     .select("id");
 

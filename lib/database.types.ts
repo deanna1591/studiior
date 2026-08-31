@@ -2802,14 +2802,34 @@ export type Database = {
           },
         ]
       }
+      notification_config: {
+        Row: {
+          key: string
+          note: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          note?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          note?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           booking_email: boolean
           booking_push: boolean
           challenge_push: boolean
           created_at: string
+          credit_expiry_email: boolean
           marketing_email: boolean
           member_id: string
+          milestone_email: boolean
           milestone_push: boolean
           reminder_email: boolean
           reminder_push: boolean
@@ -2823,8 +2843,10 @@ export type Database = {
           booking_push?: boolean
           challenge_push?: boolean
           created_at?: string
+          credit_expiry_email?: boolean
           marketing_email?: boolean
           member_id: string
+          milestone_email?: boolean
           milestone_push?: boolean
           reminder_email?: boolean
           reminder_push?: boolean
@@ -2838,8 +2860,10 @@ export type Database = {
           booking_push?: boolean
           challenge_push?: boolean
           created_at?: string
+          credit_expiry_email?: boolean
           marketing_email?: boolean
           member_id?: string
+          milestone_email?: boolean
           milestone_push?: boolean
           reminder_email?: boolean
           reminder_push?: boolean
@@ -2879,16 +2903,44 @@ export type Database = {
           },
         ]
       }
+      notification_templates: {
+        Row: {
+          html_body: string
+          key: string
+          note: string | null
+          subject: string
+          text_body: string
+        }
+        Insert: {
+          html_body: string
+          key: string
+          note?: string | null
+          subject: string
+          text_body: string
+        }
+        Update: {
+          html_body?: string
+          key?: string
+          note?: string | null
+          subject?: string
+          text_body?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
+          attempts: number
           channel: Database["public"]["Enums"]["notif_channel"]
+          claimed_at: string | null
           created_at: string
           dedupe_key: string
           error: string | null
           failed_at: string | null
           id: string
           member_id: string | null
+          net_request_id: number | null
           payload: Json
+          provider_message_id: string | null
           recipient_type: string
           scheduled_for: string
           sent_at: string | null
@@ -2898,14 +2950,18 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          attempts?: number
           channel: Database["public"]["Enums"]["notif_channel"]
+          claimed_at?: string | null
           created_at?: string
           dedupe_key: string
           error?: string | null
           failed_at?: string | null
           id?: string
           member_id?: string | null
+          net_request_id?: number | null
           payload?: Json
+          provider_message_id?: string | null
           recipient_type: string
           scheduled_for: string
           sent_at?: string | null
@@ -2915,14 +2971,18 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          attempts?: number
           channel?: Database["public"]["Enums"]["notif_channel"]
+          claimed_at?: string | null
           created_at?: string
           dedupe_key?: string
           error?: string | null
           failed_at?: string | null
           id?: string
           member_id?: string | null
+          net_request_id?: number | null
           payload?: Json
+          provider_message_id?: string | null
           recipient_type?: string
           scheduled_for?: string
           sent_at?: string | null
@@ -3867,6 +3927,8 @@ export type Database = {
           accent_color: string | null
           archived_at: string | null
           brand_color: string | null
+          contact_email: string | null
+          contact_phone: string | null
           country: string | null
           created_at: string
           currency: string
@@ -3886,6 +3948,8 @@ export type Database = {
           accent_color?: string | null
           archived_at?: string | null
           brand_color?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           country?: string | null
           created_at?: string
           currency: string
@@ -3905,6 +3969,8 @@ export type Database = {
           accent_color?: string | null
           archived_at?: string | null
           brand_color?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           country?: string | null
           created_at?: string
           currency?: string
@@ -4254,6 +4320,10 @@ export type Database = {
           token: string
         }[]
       }
+      deliver_notification: {
+        Args: { p_notification_id: string }
+        Returns: number
+      }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
@@ -4306,6 +4376,12 @@ export type Database = {
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
+      notification_api_key: { Args: never; Returns: string }
+      notification_setting: { Args: { p_key: string }; Returns: string }
+      notification_wanted: {
+        Args: { p_member_id: string; p_template: string }
+        Returns: boolean
+      }
       provision_studio: {
         Args: {
           p_country: string
@@ -4325,6 +4401,40 @@ export type Database = {
         }
       }
       purge_demo_data: { Args: { p_studio_id: string }; Returns: Json }
+      queue_all_credit_expiries: { Args: never; Returns: Json }
+      queue_booking_notifications: {
+        Args: { p_booking_id: string }
+        Returns: number
+      }
+      queue_credit_expiries: { Args: { p_studio_id: string }; Returns: number }
+      queue_milestone: {
+        Args: { p_body: string; p_member_id: string; p_name: string }
+        Returns: number
+      }
+      queue_notification: {
+        Args: {
+          p_dedupe_key: string
+          p_member_id: string
+          p_payload: Json
+          p_scheduled_for?: string
+          p_studio_id: string
+          p_template_key: string
+        }
+        Returns: string
+      }
+      queue_occurrence_cancelled: {
+        Args: { p_occurrence_id: string }
+        Returns: number
+      }
+      queue_payment_failed: {
+        Args: { p_membership_id: string }
+        Returns: number
+      }
+      queue_substitution: {
+        Args: { p_new: string; p_occurrence_id: string; p_old: string }
+        Returns: number
+      }
+      queue_waitlist_offer: { Args: { p_offer_id: string }; Returns: number }
       rebuild_member_timeline: {
         Args: { p_member_id: string }
         Returns: number
@@ -4337,8 +4447,20 @@ export type Database = {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number
       }
+      reconcile_notification_sends: { Args: never; Returns: Json }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
+      render_notification: {
+        Args: { p_notification_id: string }
+        Returns: {
+          from_name: string
+          html_body: string
+          reply_to: string
+          subject: string
+          text_body: string
+          to_email: string
+        }[]
+      }
       resolve_checkin_code: {
         Args: { p_code: string }
         Returns: {
@@ -4354,6 +4476,7 @@ export type Database = {
       }
       run_due_morning_briefs: { Args: never; Returns: Json }
       say_count: { Args: { n: number }; Returns: string }
+      send_due_notifications: { Args: never; Returns: Json }
       send_message: {
         Args: { p_message_id: string }
         Returns: {
@@ -4377,6 +4500,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      send_via_resend: {
+        Args: {
+          p_from_name: string
+          p_html: string
+          p_reply_to: string
+          p_subject: string
+          p_text: string
+          p_to: string
+        }
+        Returns: number
       }
       set_insight_status: {
         Args: {
@@ -4500,7 +4634,13 @@ export type Database = {
       message_status: "draft" | "queued" | "sent" | "failed"
       note_category: "general" | "injury" | "medical" | "preference" | "admin"
       notif_channel: "email" | "push" | "in_app"
-      notif_status: "scheduled" | "sent" | "delivered" | "failed" | "cancelled"
+      notif_status:
+        | "scheduled"
+        | "sending"
+        | "sent"
+        | "delivered"
+        | "failed"
+        | "cancelled"
       occurrence_status: "scheduled" | "cancelled" | "completed"
       payment_source:
         | "membership"
@@ -4730,7 +4870,14 @@ export const Constants = {
       message_status: ["draft", "queued", "sent", "failed"],
       note_category: ["general", "injury", "medical", "preference", "admin"],
       notif_channel: ["email", "push", "in_app"],
-      notif_status: ["scheduled", "sent", "delivered", "failed", "cancelled"],
+      notif_status: [
+        "scheduled",
+        "sending",
+        "sent",
+        "delivered",
+        "failed",
+        "cancelled",
+      ],
       occurrence_status: ["scheduled", "cancelled", "completed"],
       payment_source: [
         "membership",
