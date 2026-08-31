@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { PRESETS, PRESET_KEYS, type PresetKey } from "@/lib/theme";
 import { Notice, buttonClass, inputClass } from "@/components/ui";
-import { saveBranding, uploadLogo, type BrandingState } from "./actions";
+import { saveBranding, uploadLogo, uploadLoginImage, type BrandingState } from "./actions";
 import Preview from "./preview";
 
 function Submit({ label }: { label: string }) {
@@ -13,10 +13,11 @@ function Submit({ label }: { label: string }) {
 }
 
 export default function BrandingForm({
-  preset: initialPreset, accent: initialAccent, logoUrl,
+  preset: initialPreset, accent: initialAccent, logoUrl, loginImageUrl,
   contactEmail, contactPhone,
 }: {
   preset: PresetKey; accent: string | null; logoUrl: string | null;
+  loginImageUrl: string | null;
   contactEmail: string;
   contactPhone: string;
 }) {
@@ -26,6 +27,7 @@ export default function BrandingForm({
 
   const [state, action] = useFormState<BrandingState, FormData>(saveBranding, null);
   const [logoState, logoAction] = useFormState<BrandingState, FormData>(uploadLogo, null);
+  const [imgState, imgAction] = useFormState<BrandingState, FormData>(uploadLoginImage, null);
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row">
@@ -116,6 +118,28 @@ export default function BrandingForm({
                  className="block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-paper" />
           <p className="text-[12px] leading-4 text-ink-3">
             Square works best — it sits at 28px in the app header. Under 2 MB.
+          </p>
+          <Submit label="Upload" />
+        </form>
+
+        <form action={imgAction} className="space-y-3 border-t border-line pt-6">
+          {imgState && <Notice kind={imgState.ok ? "ok" : "error"}>{imgState.message}</Notice>}
+          <span className="block text-[13px] font-medium leading-[18px] text-ink">Login photo</span>
+          {loginImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={loginImageUrl} alt="Current login photo"
+                 className="h-28 w-full rounded border border-line object-cover" />
+          ) : (
+            <p className="text-[12px] leading-4 text-ink-3">
+              No photo yet, so members see your accent as a full-screen colour instead.
+            </p>
+          )}
+          <input name="login_image" type="file" accept="image/png,image/jpeg,image/webp"
+                 className="block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-paper" />
+          <p className="text-[12px] leading-4 text-ink-3">
+            The whole sign-in screen, so a wide shot of the studio works better
+            than a portrait. Members see it before they sign in. Under 2 MB —
+            around 1600px wide is usually well inside that.
           </p>
           <Submit label="Upload" />
         </form>

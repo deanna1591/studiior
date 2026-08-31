@@ -10,14 +10,16 @@ export const dynamic = "force-dynamic";
 /**
  * The way in.
  *
- * A form on white is a webpage. This is the first thing a member sees of a
- * studio they already know, and it should look like the studio — so the whole
- * screen is theirs: their photograph, their logo, their accent on the button.
+ * The photograph is the screen — full bleed, edge to edge, top to bottom — and
+ * the panel is a sheet anchored to the bottom edge. The first version floated a
+ * white card in the middle of the field, which framed the studio's photograph
+ * and turned it into decoration behind a form. A studio's picture of its own
+ * room should be the thing you are looking at.
  *
- * Everything here is resolved before anyone is signed in, through
- * studio_by_slug() on a cookie-less anon client — the same pre-login lookup
- * migration 004 exists for, and the only function anon may execute. It has
- * carried login_image_url since migration 029 and nothing has ever read it.
+ * Everything here resolves before anyone is signed in, through studio_by_slug()
+ * on a cookie-less anon client — the pre-login lookup migration 004 exists for,
+ * and the only function anon may execute. It has carried login_image_url since
+ * migration 029; until now nothing wrote it and nothing read it.
  *
  * The word Studiior does not appear.
  */
@@ -44,62 +46,71 @@ export default async function MemberLogin() {
 
   return (
     <div style={vars} className="relative min-h-dvh overflow-hidden bg-paper">
-      {/* The field behind everything: the studio's photograph, or its accent as
-          a gradient. Never a stock image and never our lime — a studio that has
-          not uploaded a picture gets its own colour, not somebody else's. */}
+      {/* The field. Fixed and full bleed: it is the screen, not a backdrop. */}
       {image ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="" aria-hidden
-               className="absolute inset-0 h-full w-full object-cover" />
-          {/* The scrim does the contrast work. Weighted to the bottom, where
-              the panel sits, so the top of the photograph stays a photograph. */}
-          <div aria-hidden className="absolute inset-0"
-               style={{ background: "linear-gradient(to bottom, rgb(0 0 0 / 0.28) 0%, rgb(0 0 0 / 0.46) 46%, rgb(0 0 0 / 0.78) 100%)" }} />
-        </>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt="" aria-hidden
+             className="absolute inset-0 h-full w-full object-cover" />
       ) : (
-        // From the accent to the accent darkened a fifth — NOT from fill to
-        // the ramp's text colour. That gradient ran light-to-dark, so nothing
-        // could sit on both ends: near-black failed at the bottom and white
-        // failed at the top. Both stops are now within one measured step of
-        // `solid`, which is the colour `onSolid` was measured against.
         <div aria-hidden className="absolute inset-0"
              style={{ background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)` }} />
       )}
 
-      <div className="relative mx-auto flex min-h-dvh max-w-lg flex-col px-5 pb-8 pt-16">
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          {studio?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={studio.logo_url} alt={name}
-                 className="h-24 w-24 rounded-2xl object-cover shadow-lg" />
-          ) : (
-            // Inverted against the field behind it. Accent-on-accent made the
-            // square vanish into the gradient: the same colour cannot be both
-            // the background and the thing in front of it.
-            <span
-              style={{ background: "var(--surface)", color: ramp.text }}
-              className="flex h-24 w-24 items-center justify-center rounded-2xl text-[40px] font-semibold shadow-lg"
-            >
-              {name.slice(0, 1)}
-            </span>
-          )}
+      {/* The scrim, over a photograph only. Transparent at the top so the
+          picture is still a picture, and dark by the time it reaches the sheet,
+          so the panel area is a known quantity whatever the photograph does
+          there. The gradient needs none of this: it is a colour we derived and
+          measured, and darkening it would only move it off the studio's own. */}
+      {image && (
+        <div aria-hidden className="absolute inset-0"
+             style={{
+               background:
+                 "linear-gradient(to bottom, rgb(0 0 0 / 0.06) 0%, rgb(0 0 0 / 0.30) 34%, "
+                 + "rgb(0 0 0 / 0.58) 62%, rgb(0 0 0 / 0.82) 100%)",
+             }} />
+      )}
 
-          <h1 className="m-title mt-5" style={{ color: image ? "#FFFFFF" : ramp.onSolid }}>
+      <div className="relative flex min-h-dvh flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center px-6 pb-8 pt-16 text-center">
+          {/* The logo sits on a near-white chip rather than straight on the
+              photograph. Most studio logos are a raster with a white
+              background, and dropping one onto a picture leaves a white
+              rectangle floating there; assuming transparency is assuming a
+              PNG somebody may never have made. object-contain, not cover — a
+              logo that has been cropped to fill a square is a different logo. */}
+          <span className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white p-3 shadow-[0_8px_28px_rgb(0_0_0_/_0.28)]">
+            {studio?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={studio.logo_url} alt={name}
+                   className="h-full w-full object-contain" />
+            ) : (
+              <span className="text-[40px] font-semibold leading-none"
+                    style={{ color: ramp.text }}>
+                {name.slice(0, 1)}
+              </span>
+            )}
+          </span>
+
+          <h1 className={`m-title mt-5 ${image ? "m-on-photo" : ""}`}
+              style={{ color: image ? "#FFFFFF" : ramp.onSolid }}>
             {name}
           </h1>
-          {/* Functional, not marketing. There is no tagline column on studios,
-              and inventing a sentence in a studio's voice is worse than saying
-              plainly what the app is for. */}
-          <p className="m-body mt-2" style={{ color: image ? "rgb(255 255 255 / 0.85)" : ramp.onSolid, opacity: image ? 1 : 0.82 }}>
+          {/* No opacity on the gradient branch. Fading onSolid to 82% composites
+              it toward the accent underneath, which took terracotta-on-Warm to
+              3.61 — a sentence set below the floor by a decorative flourish,
+              which is the same mistake as tinting coral until it nearly passes.
+              Over a photograph the scrim guarantees a dark ground, so a slight
+              fade there costs nothing measurable. */}
+          <p className={`m-body mt-2 ${image ? "m-on-photo" : ""}`}
+             style={{ color: image ? "rgb(255 255 255 / 0.88)" : ramp.onSolid }}>
             Book your classes, check in, and see your plan.
           </p>
         </div>
 
-        {/* Glass ONLY here, and only when there is a photograph under it to
-            refract. Over the accent gradient this is a solid panel: blur over a
-            flat field is fog with a compositor layer attached. */}
-        <div className={`${image ? "m-glass" : "m-panel"} p-5`}>
+        {/* Glass ONLY over a photograph — the one place with something behind it
+            to refract. Over the accent gradient this is a solid sheet: blur over
+            a flat field is fog with a compositor layer attached. */}
+        <div className={`${image ? "m-glass" : "m-panel"} px-5 pb-8 pt-6`}>
           <LoginForm onImage={!!image} />
 
           <Link
@@ -110,17 +121,15 @@ export default async function MemberLogin() {
           >
             Create an account
           </Link>
-        </div>
 
-        {process.env.NODE_ENV === "development" && (
-          // Both branches sit on the accent field or a photograph, never on a
-          // surface, so --ink-3 was the wrong greying here in one of them.
-          <p className="m-micro mt-4 text-center"
-             style={{ color: image ? "rgb(255 255 255 / 0.7)" : ramp.onSolid, opacity: 0.7 }}>
-            Seed: alena.fabricated@example.com · nikola.simulated@example.com ·
-            adela.nonexistent@example.com — password reform-dev-password
-          </p>
-        )}
+          {process.env.NODE_ENV === "development" && (
+            <p className="m-micro mt-4 text-center"
+               style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>
+              Seed: alena.fabricated@example.com · nikola.simulated@example.com —
+              password reform-dev-password
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

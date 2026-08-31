@@ -97,3 +97,63 @@ export async function uploadLogo(_prev: BrandingState, fd: FormData): Promise<Br
   revalidatePath("/branding");
   return { ok: true, message: "Logo updated." };
 }
+
+/**
+ * The login screen's photograph.
+ *
+ * login_image_url has been on studios since migration 029 and nothing has ever
+ * written to it, so every studio fell through to the accent gradient and the
+ * frosted panel built for a photograph never rendered anywhere.
+ *
+ * Same path as the logo, and the same storage policy does the enforcing: the
+ * studio id is the first path segment and "owners write their own studio's
+ * branding" checks it, so a session cannot write into another studio's folder
+ * whatever this function does.
+ *
+ * The 2 MB ceiling is the bucket's own (migration 029 sets file_size_limit),
+ * not a number invented here — which is why it is worth saying out loud in the
+ * copy rather than letting a wide studio photograph fail with a raw storage
+ * error the owner cannot act on.
+ */
+export async function uploadLoginImage(_prev: BrandingState, fd: FormData): Promise<BrandingState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const file = fd.get("login_image") as File | null;
+  if (!file || file.size === 0) return { ok: false, message: "Choose a photo first." };
+  if (file.size > 2_000_000) {
+    return {
+      ok: false,
+      message: "That photo is over 2 MB, which is the most this can store. "
+             + "Exporting it at about 1600px wide usually gets well under.",
+    };
+  }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    // SVG is allowed in the bucket for the logo and is not a photograph.
+    return { ok: false, message: "JPEG, PNG or WebP." };
+  }
+
+  const supabase = createClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const path = `${ctx.studioId}/login-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from("studio-branding")
+    .upload(path, file, { cacheControl: "3600", upsert: false });
+  if (error) {
+    return /row-level security|Unauthorized/i.test(error.message)
+      ? { ok: false, message: "Only the studio owner can change the login photo." }
+      : { ok: false, message: error.message };
+  }
+
+  const { data: pub } = supabase.storage.from("studio-branding").getPublicUrl(path);
+  const { data: rows, error: upErr } = await supabase
+    .from("studios").update({ login_image_url: pub.publicUrl }).eq("id", ctx.studioId).select("id");
+  if (upErr) return { ok: false, message: upErr.message };
+  if (!rows || rows.length === 0) {
+    return { ok: false, message: "The photo uploaded but the studio record could not be updated." };
+  }
+
+  revalidatePath("/branding");
+  return { ok: true, message: "Login photo updated. Members see it before they sign in." };
+}
