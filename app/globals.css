@@ -31,6 +31,13 @@
 
   --amber:      #E8C93A;    /* fill only; ink on it is 11.09 */
   --amber-tint: #F7F2D9;
+  /* Derived, and the only colour in the file that is. A health chip's dot has
+     to clear 3:1 against its own fill to be a dot at all (WCAG 1.4.11), and
+     amber manages 1.54 on its own tint — it is too near white to mark
+     anything. Lime has the same problem and the brand already answers it with
+     --lime-text; there is no dark amber to reach for, so this is amber carried
+     40% toward ink. 3.41 on --amber-tint. */
+  --amber-deep: #938228;
 
   /* Coral is two tokens because one cannot do both jobs. #D9401A on white is
      4.47 — it misses body text by 0.03, so it borders and fills and sets large
@@ -39,6 +46,14 @@
   --coral:      #D9401A;
   --coral-fill: #FF6B45;
   --coral-tint: #FBE6DE;
+
+  /* Health chip edges: the dot colour carried 30% into the fill, which lands
+     every band on a hairline of 1.38–1.61 against its own fill — present, and
+     not a line drawn round the outside. */
+  --edge-lime:    #BDCA9F;
+  --edge-amber:   #D9D0A4;
+  --edge-coral:   #F1B4A3;
+  --edge-neutral: #C6C2C0;
 
   --rail-w: 240px;
 }
@@ -97,6 +112,38 @@ body {
     rgba(20, 23, 14, 0.055) 0 1px,
     transparent 1px 5px
   );
+}
+
+/* --- health chip ----------------------------------------------------------
+   A pill that sits on the surface rather than being stamped into it: tinted
+   fill, a hairline a step darker, a dot carrying the colour, and a 2px shadow
+   at 5%. No backdrop-filter anywhere — over a flat white row there is nothing
+   behind the chip to refract, so it would render as a grey smudge and cost a
+   compositor layer for the privilege. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 3px 9px 3px 7px;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  /* Set here rather than by a utility, and worth knowing why: this file is
+     loaded after @tailwind utilities, so a colour declared in it beats any
+     text-* class put on the same element. That is deliberate — every chip
+     wants ink on its fill, and every fill was measured for it — but it means
+     a text-* utility on a .chip will not do what its author expects. This is
+     the trap that dropped the old chip label to 2.70 through .section-label. */
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(20, 23, 14, 0.05);
+}
+.chip-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  flex: none;
 }
 
 ::selection { background: var(--lime); color: var(--ink); }
