@@ -1,19 +1,19 @@
-import { Shell, NavLink } from "@/components/ui";
-import { getStaffAccess, isManagerUp } from "@/lib/auth";
-import StaffAccessGate from "@/components/staff-access-gate";
+import { AppShell, NavLink } from "@/components/ui";
+import { isManagerUp } from "@/lib/auth";
+import { staffScreen } from "@/lib/screen";
 import StripeStub from "./stub";
 
 export const dynamic = "force-dynamic";
 
 /** Stub. No OAuth, no keys, no webhooks — a description and a way past it. */
 export default async function StripePage() {
-  const access = await getStaffAccess();
-  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
-  const ctx = access.ctx;
+  const screen = await staffScreen("/stripe");
+  if (screen.gate) return screen.gate;
+  const { ctx, shell } = screen;
 
   return (
-    <Shell title="Connect Stripe" subtitle="Coming soon"
-           right={<NavLink href="/">Back to dashboard</NavLink>}>
+    <AppShell {...shell} title="Connect Stripe"
+              actions={<NavLink href="/">Back to schedule</NavLink>}>
       <div className="max-w-xl space-y-4 text-sm leading-relaxed text-ink">
         <p className="rounded border border-amber bg-amber-tint px-3 py-2 text-ink">
           Not built yet. Nothing on this page charges anyone or talks to Stripe.
@@ -36,6 +36,6 @@ export default async function StripePage() {
         </p>
         {isManagerUp(ctx.role) && <StripeStub />}
       </div>
-    </Shell>
+    </AppShell>
   );
 }

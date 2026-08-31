@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getStaffAccess, requireOnboarded, isManagerUp } from "@/lib/auth";
-import StaffAccessGate from "@/components/staff-access-gate";
-import { Shell, NavLink } from "@/components/ui";
+import { isManagerUp } from "@/lib/auth";
+import { staffScreen } from "@/lib/screen";
+import { AppShell, Denied, NavLink } from "@/components/ui";
 import { FIELDS } from "@/lib/csv";
 import { TYPE_LABEL, StatusPill } from "../labels";
 import MappingForm from "./mapping-form";
@@ -18,19 +17,14 @@ const NOUN: Record<string, string> = {
 };
 
 export default async function ImportDetail({ params }: { params: { id: string } }) {
-  const access = await getStaffAccess();
-  if (access.kind !== "staff") return <StaffAccessGate access={access} />;
-  const ctx = requireOnboarded(access.ctx);
+  const screen = await staffScreen("/imports");
+  if (screen.gate) return screen.gate;
+  const { ctx, supabase, shell } = screen;
 
   if (!isManagerUp(ctx.role)) {
-    return (
-      <Shell title="Import" subtitle={ctx.studioName} right={<NavLink href="/">Back to week</NavLink>}>
-        <p className="text-sm text-ink-2">Importing is owners and managers.</p>
-      </Shell>
-    );
+    return <AppShell {...shell} title="Import"><Denied what="Importing" role={ctx.role} /></AppShell>;
   }
 
-  const supabase = createClient();
   const { data: imp } = await supabase
     .from("imports")
     .select("id, type, filename, status, row_count, error_count, report, mapping, created_at")
@@ -64,22 +58,23 @@ export default async function ImportDetail({ params }: { params: { id: string } 
   const problems = (rows ?? []).filter((r) => r.status === "error" || r.status === "skip");
 
   return (
-    <Shell
+    <AppShell
+      {...shell}
       title={imp.filename}
-      subtitle={`${TYPE_LABEL[imp.type] ?? imp.type} · ${imp.row_count} row${imp.row_count === 1 ? "" : "s"}`}
-      right={
-        <>
-          <NavLink href="/imports">All imports</NavLink>
-          <NavLink href="/">Back to week</NavLink>
-        </>
-      }
+      actions={<NavLink href="/imports">All imports</NavLink>}
     >
-      <div className="mb-6"><StatusPill status={imp.status} /></div>
+      <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] leading-[20px] text-ink-2">
+        <StatusPill status={imp.status} />
+        <span>
+          {TYPE_LABEL[imp.type] ?? imp.type} · <span className="num">{imp.row_count}</span> row
+          {imp.row_count === 1 ? "" : "s"}
+        </span>
+      </p>
 
       {/* ---- step 1: mapping. Editable until it has actually been imported. ---- */}
       {!done && !rolledBack && (
         <section className="mb-8">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">
+          <h2 className="section-label mb-2 text-ink-2">
             Match your columns
           </h2>
           <MappingForm
@@ -96,7 +91,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
       {/* ---- step 2: the review. What would happen, before anything happens. ---- */}
       {reviewed && (
         <section className="mb-8">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">
+          <h2 className="section-label mb-2 text-ink-2">
             What this would do
           </h2>
           <div className="mb-4 flex flex-wrap gap-3 text-sm">
@@ -169,7 +164,7 @@ export default async function ImportDetail({ params }: { params: { id: string } 
           Upload the file again to redo it.
         </p>
       )}
-    </Shell>
+    </AppShell>
   );
 }
 

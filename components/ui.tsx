@@ -41,7 +41,51 @@ export function AppShell({
   );
 }
 
-/** Page head for screens that sit inside the shell without their own rail. */
+/**
+ * The frame for the platform operator.
+ *
+ * A platform admin is staff of no studio by design, so they cannot have the
+ * studio rail — and must not go anywhere near staffScreen(), whose gate
+ * redirects a non-staff caller to /admin and would loop this page into itself.
+ * They get the same furniture with the platform in the rail's identity slot.
+ */
+export function AdminShell({
+  email, title, actions, signOut, children,
+}: {
+  email: string;
+  title: string;
+  actions?: React.ReactNode;
+  signOut?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <Rail
+        studioName="Studiior"
+        location="Platform"
+        items={[{ href: "/admin", label: "Studios" }]}
+        user={{ email, role: "platform admin" }}
+        signOut={signOut}
+      />
+      <div className="md:pl-[--rail-w]">
+        <main className="max-w-[1120px] px-5 py-6 md:px-8 md:py-8">
+          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+            <h1 className="display text-ink">{title}</h1>
+            {actions && <div className="flex flex-wrap items-center gap-4">{actions}</div>}
+          </div>
+          {children}
+        </main>
+      </div>
+    </>
+  );
+}
+
+/**
+ * The centred frame, for the two places a rail cannot go: the member PWA,
+ * which is a different app on a different subdomain, and the no-studio gate,
+ * whose whole point is that the caller belongs to no studio and so has nothing
+ * to put in a rail. Not a leftover — every staff screen is on AppShell.
+ */
 export function Shell({
   title, subtitle, right, children,
 }: {
@@ -162,8 +206,16 @@ export function Segmented({ options }: {
   );
 }
 
-/** Empty states say what to do next. */
-export function Empty({ children }: { children: React.ReactNode }) {
+/**
+ * Empty states say what to do next.
+ *
+ * `quiet` is for a sidebar, where three dashed boxes stacked down the column
+ * shout louder than the content they are standing in for. Same words, one line.
+ */
+export function Empty({ children, quiet }: { children: React.ReactNode; quiet?: boolean }) {
+  if (quiet) {
+    return <p className="text-[12px] leading-[17px] text-ink-3">{children}</p>;
+  }
   return (
     <div className="border border-dashed border-line-2 px-4 py-8 text-center text-[13px] leading-[18px] text-ink-2">
       {children}

@@ -23,7 +23,7 @@ export default function Rail({
   location: string | null;
   items: RailItem[];
   user: RailUser;
-  signOut: React.ReactNode;
+  signOut?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -62,7 +62,7 @@ export default function Rail({
         <div className="mt-0.5 text-[11px] leading-[14px] capitalize text-ink-3">
           {user.role.replace("_", " ")}
         </div>
-        <div className="mt-2">{signOut}</div>
+        {signOut && <div className="mt-2">{signOut}</div>}
       </div>
     </div>
   );

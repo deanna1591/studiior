@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
-import { Shell, NavLink } from "@/components/ui";
+import { AdminShell, Empty, NavLink } from "@/components/ui";
 import ProvisionForm from "./form";
+import { signOut } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +23,22 @@ export default async function AdminPage({
   if (!isAdmin) {
     const ctx = await getStaffContext();
     return (
-      <Shell title="Not available" subtitle={user.email ?? ""}
-             right={<NavLink href={ctx ? "/" : "/login"}>Back</NavLink>}>
-        <p className="text-sm text-ink-2">
+      <AdminShell
+        email={user.email ?? ""}
+        title="Not available"
+      signOut={
+        <form action={signOut}>
+          <button className="text-[12px] leading-4 text-ink-3 underline underline-offset-4 hover:text-ink">
+            Sign out
+          </button>
+        </form>
+      }
+        actions={<NavLink href={ctx ? "/" : "/login"}>Back</NavLink>}
+      >
+        <Empty>
           This page provisions new studios and is limited to platform operators.
-        </p>
-      </Shell>
+        </Empty>
+      </AdminShell>
     );
   }
 
@@ -47,10 +58,16 @@ export default async function AdminPage({
     : undefined;
 
   return (
-    <Shell
+    <AdminShell
+      email={user.email ?? ""}
       title="Provision a studio"
-      subtitle={`Platform operator · ${user.email}`}
-      right={<NavLink href="/">Back to app</NavLink>}
+      signOut={
+        <form action={signOut}>
+          <button className="text-[12px] leading-4 text-ink-3 underline underline-offset-4 hover:text-ink">
+            Sign out
+          </button>
+        </form>
+      }
     >
       {searchParams.token && justCreated && (
         <div className="mb-6 rounded border border-lime-text bg-lime-tint p-4">
@@ -73,11 +90,11 @@ export default async function AdminPage({
       <h2 className="mb-2 mt-10 text-sm font-semibold uppercase tracking-wide text-ink-3">
         Studios
       </h2>
-      <ul className="divide-y divide-line rounded border border-line bg-white">
+      <div className="divide-y divide-line border-y border-line bg-surface">
         {(studios ?? []).map((s) => {
           const inv = inviteFor.get(s.id);
           return (
-            <li key={s.id} className="flex items-center justify-between gap-4 px-3 py-2.5">
+            <div key={s.id} className="flex items-center justify-between gap-4 px-3 py-2.5">
               <div>
                 <div className="text-sm font-medium">{s.name}</div>
                 <div className="text-xs text-ink-3">
@@ -98,13 +115,13 @@ export default async function AdminPage({
                   </div>
                 )}
               </div>
-            </li>
+            </div>
           );
         })}
         {(studios ?? []).length === 0 && (
-          <li className="px-3 py-3 text-sm text-ink-3">No studios yet.</li>
+          <p className="px-3 py-3 text-[13px] leading-[18px] text-ink-3">No studios yet — the first one you create appears here.</p>
         )}
-      </ul>
-    </Shell>
+      </div>
+    </AdminShell>
   );
 }

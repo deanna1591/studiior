@@ -789,3 +789,95 @@ begin
   raise notice 'seed: Reform Collective — % occurrences, % historical bookings, % check-ins, % upcoming bookings',
     n_occ, n_bk, n_ci, n_future;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- CRM: notes, goals, tags, and the derived journey timeline
+--
+-- These three tables have been in the schema since migration 001 and nothing
+-- has ever put a row in any of them, so every CRM section of the member screen
+-- rendered its empty state in every environment and nobody could tell an empty
+-- state from a broken query. CLAUDE.md's warning is usually "the seed has rows
+-- where your code expects none"; this is the same blind spot the other way up.
+--
+-- Notes deliberately include a managers_only one. Its policy — is_manager_up()
+-- or not managers_only — is the only thing standing between front desk and a
+-- member's medical history, and a policy no fixture exercises is a policy
+-- nobody has tested.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  s   uuid := '11111111-0000-0000-0000-000000000001';
+  own uuid := '11111111-0000-0000-0000-000000000061';
+  m   record;
+  i   int := 0;
+  n_tl int;
+begin
+  insert into member_tags (studio_id, name, color) values
+    (s, 'Prenatal',    '#BEF738'),
+    (s, 'Founding member', '#E8C93A'),
+    (s, 'Referral',    '#FF6B45')
+  on conflict do nothing;
+
+  for m in
+    select id, first_name, health_band, joined_on, lifetime_visits
+      from members where studio_id = s order by created_at limit 12
+  loop
+    i := i + 1;
+
+    -- One in three carries a tag, so the list is not uniformly tagged.
+    if i % 3 = 0 then
+      insert into member_tag_assignments (member_id, tag_id, studio_id)
+      select m.id, t.id, s from member_tags t
+       where t.studio_id = s and t.name = 'Founding member'
+      on conflict do nothing;
+    end if;
+
+    -- An injury note on a few. Visible to everyone: front desk needs to know
+    -- before they put someone on a reformer.
+    if i % 4 = 1 then
+      insert into member_notes (studio_id, member_id, author_user_id, category, body, pinned, managers_only)
+      values (s, m.id, own, 'injury',
+              'Lower back — no deep twists, and keep the springs light on the reformer. Flared up again in July.',
+              true, false);
+    end if;
+
+    -- A managers-only note on a couple. Front desk must not see these at all,
+    -- and that is the policy's job, not the screen's.
+    if i % 5 = 2 then
+      insert into member_notes (studio_id, member_id, author_user_id, category, body, pinned, managers_only)
+      values (s, m.id, own, 'admin',
+              'Asked about freezing over the summer. Has form on cancelling in August — worth a call before they ask.',
+              false, true);
+    end if;
+
+    if i % 3 = 1 then
+      insert into member_notes (studio_id, member_id, author_user_id, category, body, pinned, managers_only)
+      values (s, m.id, own, 'preference',
+              'Prefers the 07:00 slot and the back-left reformer. Will take 09:30 at a push.',
+              false, false);
+    end if;
+
+    -- Goals: one in progress, one already met, so both states render.
+    if i % 3 = 0 then
+      insert into member_goals (studio_id, member_id, title, target_type, target_value, current_value, target_date, status)
+      values (s, m.id, 'Come twice a week', 'class_count', 8,
+              least(8, greatest(1, (m.lifetime_visits % 9))),
+              current_date + 30, 'active');
+    end if;
+    if i % 6 = 4 then
+      insert into member_goals (studio_id, member_id, title, target_type, target_value, current_value, target_date, status, completed_at)
+      values (s, m.id, 'Hold a plank for two minutes', 'custom', 120, 120,
+              current_date - 20, 'completed', now() - interval '20 days');
+    end if;
+  end loop;
+
+  -- The timeline is derived, so it is built last and can be rebuilt whenever.
+  perform set_config('request.jwt.claim.sub', own::text, true);
+  n_tl := rebuild_studio_timeline(s);
+
+  raise notice 'seed: CRM — % notes, % goals, % tag assignments, % timeline events',
+    (select count(*) from member_notes  where studio_id = s),
+    (select count(*) from member_goals  where studio_id = s),
+    (select count(*) from member_tag_assignments where studio_id = s),
+    n_tl;
+end $$;

@@ -137,7 +137,11 @@ export default async function Members({
             const band = bandOf(m.health_band);
             const loud = isLoud(band) && !!m.health_reason;
             return (
-              <div key={m.id} className={loud ? "px-3 py-3" : "px-3 py-2.5"}>
+              <Link
+                key={m.id}
+                href={`/members/${m.id}`}
+                className={`block hover:bg-paper ${loud ? "px-3 py-3" : "px-3 py-2.5"}`}
+              >
                 <div className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 ${loud ? "mb-1.5" : ""}`}>
                   <span className="flex min-w-0 items-center gap-2.5">
                     <span className="truncate text-[14px] font-medium leading-5 text-ink">
@@ -155,7 +159,7 @@ export default async function Members({
                   </span>
                 </div>
                 {loud && <HealthBand band={band} reason={m.health_reason} />}
-              </div>
+              </Link>
             );
           })}
         </Rows>

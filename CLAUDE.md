@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Twenty migrations, applying clean from `supabase db reset`:
+Twenty-one migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -47,9 +47,10 @@ Twenty migrations, applying clean from `supabase db reset`:
 - **017** demo data: `is_demo` on twelve tables, `generate_demo_data()` and `purge_demo_data()`, platform-admin only. Every id is derived from the studio id, so two runs produce identical data
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
+- **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Eight suites, **369 assertions**, all passing from a clean `db reset`:
+Nine suites, **389 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -60,9 +61,10 @@ Eight suites, **369 assertions**, all passing from a clean `db reset`:
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
 | `test/health_score_test.sql` | 60 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
 | `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
 
-`supabase/seed.sql` runs automatically on `db reset` and seeds Reform Collective as tenant one — **synthetic data only**, every address `@example.com`. One studio, one location, two rooms, four class types, three instructors, owner/manager/front-desk/instructor logins, four plans, a thirteen-class week materialised 26 weeks back and 4 weeks forward, and 30 members across six cohorts with attendance to match. The cohorts exist so the AI features have something real to read: five members drifting into `retention_risk`, four `new_member_stalled`, one `past_due` membership, four who never returned after one class. Attendance is generated from a deterministic hash rather than `random()`, so every reset produces an identical database and a misbehaving query can be reproduced.
+`supabase/seed.sql` runs automatically on `db reset` and seeds Reform Collective as tenant one — **synthetic data only**, every address `@example.com`. One studio, one location, two rooms, four class types, three instructors, owner/manager/front-desk/instructor logins, four plans, a thirteen-class week materialised 26 weeks back and 4 weeks forward, and 30 members across six cohorts with attendance to match. The cohorts exist so the AI features have something real to read: five members drifting into `retention_risk`, four `new_member_stalled`, one `past_due` membership, four who never returned after one class. Attendance is generated from a deterministic hash rather than `random()`, so every reset produces an identical database and a misbehaving query can be reproduced. It also seeds the CRM tables — notes (including a `managers_only` one, so that policy has a fixture), goals, tags — and rebuilds the timeline at the end. Those three tables had existed since migration 001 with nothing ever writing to them, which meant every CRM section rendered its empty state in every environment and an empty state was indistinguishable from a broken query.
 
 The vertical slice is built: Next.js App Router + TypeScript + Tailwind, staff app on `localhost:3000` and the member PWA on `{slug}.localhost:3000`. Staff sign in, see the week, create a class; a member signs in on the studio subdomain and books it through `book_class()`; front desk checks them in. See `docs/SLICE.md` for how to run it and which login to use for which role.
 
@@ -77,6 +79,12 @@ The member importer is built, at `/imports`: upload a CSV, match its columns, se
 Onboarding is built and invite-only: the operator provisions a studio shell at `/admin` (gated by `platform_admins`, checked in SQL), the owner accepts a single-use hashed token at `/invite/[token]`, and a three-step wizard blocks every other screen until it finishes. The dashboard checklist derives its ticks from live data rather than stored flags, so it cannot go stale. Stripe is a stub.
 
 The staff app is redesigned: a persistent left rail (studio and location top, nav, current user bottom; a drawer below `md`, because front desk works on an iPad and a bottom bar costs roster rows), the schedule as rows defaulting to **day**, pill filters with a day/week toggle, and one banner slot ordered money → blocked members → setup → nudges, suppressed only when it would point at the screen you are on. Archivo at `wdth 112` for display, Karla for body, IBM Plex Mono with `tabular-nums` for every number that is a measurement — not phone numbers, which look like part codes in mono. No glass anywhere: over a light surface it reads as a rendering artefact, and spending the effect elsewhere would dilute the health band.
+
+The member screen is built at `/members/[id]`, and it is where the health band lands: full width at the top with its reason as a sentence, and everything under it — attendance shape, journey, membership, credits, notes, goals, payments — is the evidence for that sentence. Names link to it from the member list and from a class roster.
+
+`managers_only` notes are enforced where they have to be. `notes_read` is `is_manager_up(studio_id) or not managers_only`, so a front desk session never receives the row; the screen does no filtering of its own and has no way to leak one.
+
+**Payments on the member screen are the one place the UI shows less than RLS allows, and that is a standing disagreement, not a decision.** Permissions §9 note 18 gives front desk payment history explicitly — "individual transactions to answer a member's question" — and `payments_desk_read` implements it, so front desk can still read those rows through the API. This screen withholds the section and filters `payment` out of the journey for anyone below manager, on instruction. It is a display choice and nothing more; if it should be a boundary, §9 and the policy have to change together.
 
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
@@ -183,6 +191,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_sc
 
 ```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/importer_test.sql
+```
+
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/timeline_test.sql
 ```
 
 ```bash

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
@@ -70,9 +71,12 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
             return (
               <div key={b.id} className="flex items-center justify-between gap-4 px-3 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="truncate text-[14px] leading-5 text-ink">
+                  <Link
+                    href={`/members/${b.member_id}`}
+                    className="truncate text-[14px] leading-5 text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink"
+                  >
                     {b.members?.first_name} {b.members?.last_name}
-                  </span>
+                  </Link>
                   {flag && <HealthChip band={band} />}
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
                     {b.payment_source?.replace("_", " ") ?? "—"}

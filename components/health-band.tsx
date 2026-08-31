@@ -76,24 +76,60 @@ export function HealthChip({ band }: { band: Band }) {
 /**
  * Label plus reason. The signature element.
  *
- * One size only. A larger variant for a member detail screen was written here
- * before that screen existed, and an unrendered branch is a branch nobody has
- * looked at — it comes back when there is something to put it on.
+ * `hero` is the member screen: full width, at the top, before anything else on
+ * the page. Everywhere else the row size keeps it to one line of a list.
  */
-export function HealthBand({ band, reason }: { band: Band; reason: string | null | undefined }) {
+export function HealthBand({
+  band, reason, size = "row",
+}: {
+  band: Band;
+  reason: string | null | undefined;
+  size?: "row" | "hero";
+}) {
   const b = BANDS[band];
-  if (!reason) return <HealthChip band={band} />;
+  const hero = size === "hero";
+  if (!reason) return hero ? <HeroEmpty band={band} /> : <HealthChip band={band} />;
   return (
     <div className="flex items-stretch overflow-hidden rounded-sm">
       <div className="w-[3px] shrink-0" style={{ background: b.rule }} aria-hidden />
-      <div className={`flex min-w-0 flex-1 items-baseline gap-2.5 px-2.5 py-1.5 ${b.wash}`}>
+      <div className={`flex min-w-0 flex-1 ${b.wash} ${
+        hero ? "flex-col gap-2 px-4 py-3.5" : "items-baseline gap-2.5 px-2.5 py-1.5"}`}>
         <span
-          className={`section-label shrink-0 rounded-sm px-1.5 py-0.5 ${b.fill} ${b.text}`}
-          style={{ fontSize: 11, letterSpacing: "0.07em" }}
+          className={`section-label shrink-0 self-start rounded-sm px-1.5 py-0.5 ${b.fill} ${b.text}`}
+          style={{ fontSize: hero ? 12 : 11, letterSpacing: "0.07em" }}
         >
           {b.label}
         </span>
-        <p className="min-w-0 text-[13px] leading-[18px] text-ink">{reason}</p>
+        <p className={`min-w-0 text-ink ${hero ? "text-[15px] leading-[22px]" : "text-[13px] leading-[18px]"}`}>
+          {reason}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The hero band for a healthy member, who by Decision 14 has no reason —
+ * "no signal fired" is not a sentence about a person. Saying so plainly beats
+ * both an empty panel and an invented reassurance.
+ */
+function HeroEmpty({ band }: { band: Band }) {
+  const b = BANDS[band];
+  return (
+    <div className="flex items-stretch overflow-hidden rounded-sm">
+      <div className="w-[3px] shrink-0" style={{ background: b.rule }} aria-hidden />
+      <div className={`flex flex-1 flex-col gap-2 px-4 py-3.5 ${b.wash}`}>
+        <span
+          className={`section-label self-start rounded-sm px-1.5 py-0.5 ${b.fill} ${b.text}`}
+          style={{ fontSize: 12, letterSpacing: "0.07em" }}
+        >
+          {b.label}
+        </span>
+        <p className="text-[15px] leading-[22px] text-ink">
+          {band === "healthy"
+            ? "Nothing to flag. They are coming at their own steady rhythm."
+            : "Not enough history yet to say anything useful about this member."}
+        </p>
       </div>
     </div>
   );
