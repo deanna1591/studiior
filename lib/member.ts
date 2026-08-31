@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberContext } from "@/lib/auth";
+import type { PresetKey } from "@/lib/theme";
 
 /**
  * Everything a member screen needs before it draws: who they are, what their
@@ -16,7 +17,7 @@ export async function memberScreen() {
 
   const supabase = createClient();
   const [{ data: studio }, { data: settings }] = await Promise.all([
-    supabase.from("studios").select("name, logo_url").eq("id", ctx.studioId).maybeSingle(),
+    supabase.from("studios").select("name, logo_url, theme_preset, accent_color").eq("id", ctx.studioId).maybeSingle(),
     supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
   ]);
 
@@ -27,6 +28,8 @@ export async function memberScreen() {
     supabase,
     studioName: studio?.name ?? "",
     logoUrl: studio?.logo_url ?? null,
+    preset: (studio?.theme_preset ?? "warm") as PresetKey,
+    accent: studio?.accent_color ?? null,
     settings: {
       checkinOpensBefore: s?.checkin_opens_minutes_before ?? 60,
       checkinClosesAfter: s?.checkin_closes_minutes_after ?? 30,

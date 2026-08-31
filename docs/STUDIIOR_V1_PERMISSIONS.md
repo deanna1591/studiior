@@ -264,7 +264,13 @@ Some fields must be denied inside tables a role can otherwise read. Implemented 
 - Role is resolved via `auth_role_in(studio_id)` from the data model, evaluated per request. Never trusted from the client, never cached in a JWT claim that outlives a role change.
 - Conditional permissions (⚠️ rows) are policy predicates, not application `if` statements — instructor roster scoping, member own-record scoping and Manager staff limits all live in SQL.
 - Overrides write to `audit_logs` with actor and reason, per Business Rules §13.
-- Members authenticate on their studio's subdomain. A person who is a member of two studios has two accounts, and no policy anywhere joins them.
+- Members authenticate on their studio's subdomain. **A person who is a member of two studios has ONE account and two member records** — corrected, see below.
+
+> **Correction (migration 027).** This line previously read "has two accounts, and no policy anywhere joins them". Neither half was true of the schema. `auth.users` carries `users_email_partial_key`, a global unique index on email, so one email is one account across the whole project and two accounts would require the person to use two different email addresses — not something a studio can ask a walk-in for. And `auth_member_studios()` is `select studio_id from members where user_id = auth.uid()`: it returns a *set*, and is precisely a policy that joins them.
+>
+> What is true, and what the code now enforces: **one login, many memberships, each scoped by subdomain.** A member row is per studio; the app resolves which one from the host, never by assuming there is only one. Studio A's members, classes and payments stay invisible from studio B because every policy is scoped by `studio_id` — what a person can reach across studios is their own two records, which is not a leak.
+>
+> The old wording was not merely inaccurate: `getMemberContext()` selected the member row with `.maybeSingle()`, so the second membership made the query error and the member PWA showed "no studio access" to anyone who joined a second studio.
 
 ---
 

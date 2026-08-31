@@ -37,7 +37,7 @@ export default async function Members({
   const [{ data: members }] = await Promise.all([
     supabase
       .from("members")
-      .select("id, first_name, last_name, email, status, lifetime_visits, last_visit_at, health_band, health_reason")
+      .select("id, first_name, last_name, email, status, lifetime_visits, last_visit_at, health_band, health_reason, user_id")
       .neq("status", "archived")
       .order("last_visit_at", { ascending: false, nullsFirst: false })
       .limit(500),
@@ -60,6 +60,9 @@ export default async function Members({
     const ids = new Set((rows ?? []).map((r) => r.member_id));
     shown = all.filter((m) => ids.has(m.id));
     membershipFilterLabel = "Past due";
+  } else if (filter === "no_app") {
+    shown = all.filter((m) => !m.user_id);
+    membershipFilterLabel = "No app yet";
   } else if (spec?.bands) {
     shown = all.filter((m) => spec.bands!.includes(bandOf(m.health_band)));
   }
@@ -100,7 +103,13 @@ export default async function Members({
               </Pill>
             );
           })}
-          {membershipFilterLabel && (
+          <Pill href={href("no_app")} active={filter === "no_app"}>
+            No app
+            {all.filter((m) => !m.user_id).length > 0 && (
+              <span className="num ml-1.5 opacity-60">{all.filter((m) => !m.user_id).length}</span>
+            )}
+          </Pill>
+          {membershipFilterLabel && filter !== "no_app" && (
             <Pill href={href(filter)} active>{membershipFilterLabel}</Pill>
           )}
         </PillRow>
@@ -156,6 +165,14 @@ export default async function Members({
                       {m.first_name} {m.last_name}
                     </Link>
                     {!loud && <HealthChip band={band} />}
+                    {/* Quiet, and only on the ones without. A tick on every
+                        row that has an account is a column of ticks; the
+                        useful signal is the absence. */}
+                    {!m.user_id && (
+                      <span className="shrink-0 rounded-sm bg-line px-1.5 py-0.5 text-[10px] uppercase leading-4 tracking-[0.06em] text-ink-2">
+                        No app
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-3 text-[12px] leading-4 text-ink-3">
                     <span>

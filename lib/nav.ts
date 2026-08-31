@@ -28,6 +28,9 @@ export function railItems(
       { href: "/imports", label: "Import" },
     );
   }
+  // Studio identity is the owner's, per Decision 8's precedent for
+  // studio-level settings sitting above Manager.
+  if (ctx.role === "owner") items.push({ href: "/branding", label: "Member app" });
   if (isPlatformAdmin) items.push({ href: "/admin", label: "Admin" });
   return items;
 }

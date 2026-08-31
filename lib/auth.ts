@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentSlug } from "@/lib/tenant";
 
 export type StaffRole = "owner" | "manager" | "instructor" | "front_desk";
 
@@ -131,21 +132,38 @@ export type MemberContext = {
   studioId: string;
   studioName: string;
   timeZone: string;
+  status: string;
   /** Caches on members, recomputed on check-in and nightly (Business Rules §8). */
   streak: number;
   lifetimeVisits: number;
 };
 
 /** Who is making this request, on the member PWA. */
+/**
+ * Who is making this request, on the member PWA, and at WHICH studio.
+ *
+ * The studio comes from the subdomain, and it has to: one login can hold
+ * memberships at several studios, because auth.users has a global unique index
+ * on email — one address is one account, project-wide, whatever Permissions
+ * line 267 used to say. This previously selected on user_id alone with
+ * .maybeSingle(), so the moment somebody joined a second studio PostgREST
+ * errored on the two rows, this returned null, and the member app told them
+ * they had no studio access. Scoping by studio fixes it properly; taking the
+ * first row would have hidden it and shown people the wrong studio's data.
+ */
 export async function getMemberContext(): Promise<MemberContext | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const slug = currentSlug();
+  if (!slug) return null;
+
   const { data } = await supabase
     .from("members")
-    .select("id, first_name, last_name, current_streak, lifetime_visits, studio_id, studios(name, timezone)")
+    .select("id, first_name, last_name, current_streak, lifetime_visits, status, studio_id, studios!inner(name, slug, timezone)")
     .eq("user_id", user.id)
+    .eq("studios.slug", slug)
     .maybeSingle();
 
   if (!data || !data.studios) return null;
@@ -155,6 +173,7 @@ export async function getMemberContext(): Promise<MemberContext | null> {
     memberId: data.id,
     name: `${data.first_name} ${data.last_name}`,
     firstName: data.first_name,
+    status: data.status,
     streak: data.current_streak ?? 0,
     lifetimeVisits: data.lifetime_visits ?? 0,
     studioId: data.studio_id,

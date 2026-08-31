@@ -1,4 +1,5 @@
 import TabBar from "./tab-bar";
+import { themeVars, type PresetKey } from "@/lib/theme";
 
 /**
  * The member frame. Branded as the studio: its name and, when it has one, its
@@ -12,15 +13,21 @@ import TabBar from "./tab-bar";
  */
 export default function MemberShell({
   studioName, logoUrl, title, children, bare = false,
+  preset = "warm", accent,
 }: {
   studioName: string;
   logoUrl: string | null;
   title?: string;
   children: React.ReactNode;
   bare?: boolean;
+  preset?: PresetKey;
+  accent?: string | null;
 }) {
+  // Scoped to this subtree, not :root — the staff app shares the same stylesheet
+  // and must keep Studiior's lime. A studio brands what its members see.
+  const vars = themeVars(preset, accent ?? "#BEF738") as React.CSSProperties;
   return (
-    <div className="min-h-dvh bg-paper">
+    <div className="min-h-dvh bg-paper" style={vars}>
       {!bare && (
         <header className="sticky top-0 z-20 border-b border-line bg-surface px-4 py-3">
           <div className="mx-auto flex max-w-lg items-center gap-2.5">

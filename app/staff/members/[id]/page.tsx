@@ -5,6 +5,7 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { HealthBand, bandOf } from "@/components/health-band";
 import { MessageLink } from "@/components/message-link";
+import InviteToApp from "@/components/invite-to-app";
 import { formatMoney } from "@/lib/plans";
 import { dayMonthParts, fmtTime } from "@/lib/time";
 import { TimelineList } from "./timeline";
@@ -42,7 +43,7 @@ export default async function MemberDetail({
 
   const { data: m } = await supabase
     .from("members")
-    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason")
+    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id")
     .eq("id", params.id)
     .maybeSingle();
   if (!m) notFound();
@@ -126,6 +127,19 @@ export default async function MemberDetail({
         {m.status !== "active" && <> · {m.status}</>}
         {!m.waiver_signed_at && <> · <span className="text-ink">no waiver signed</span></>}
       </p>
+      {/* Whether they can actually use the app they are being messaged about. */}
+      <div className="mb-4 mt-2">
+        {m.user_id ? (
+          <p className="text-[12px] leading-4 text-ink-3">
+            Has an account and can use the member app.
+          </p>
+        ) : isDeskUp(ctx.role) ? (
+          <InviteToApp memberId={m.id} />
+        ) : (
+          <p className="text-[12px] leading-4 text-ink-3">No account yet.</p>
+        )}
+      </div>
+
       {(tags ?? []).length > 0 && (
         <p className="mb-4 flex flex-wrap gap-1.5">
           {(tags ?? []).map((t) => (

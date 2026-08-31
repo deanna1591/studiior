@@ -308,3 +308,20 @@ Raised in brainstorming, confirmed out:
 | Multi-location | Ch. 7, though schema is ready (Decision 8) |
 | API access | Ch. 7 |
 | Community feed | **Conflicts with the Bible.** Ch. 10 puts a feed, reactions, announcements and friend connections in launch scope. Excluded here to fit six months. Needs an explicit call. |
+
+
+---
+
+## 15 — A `lead` may book, but only as a drop-in
+
+Business Rules §2.1 rule 5 is "member status is `active`". A `lead` — someone who has signed up on the studio's subdomain and has never bought anything — fails it and cannot book at all.
+
+That is the wrong answer for the best new member a studio gets: a walk-in who finds the studio on their phone on Tuesday evening and wants tomorrow's 7am. Making them wait for a staff member to flip a flag loses the booking, and it loses it at the exact moment their intent is highest.
+
+**Rule 5 now passes for `status in ('active', 'lead')`.** `inactive` and `archived` continue to fail, unchanged.
+
+Because rule 5 is evaluated *before* §2.2 resolves who pays, a second guard runs after resolution: **if the member is a `lead` and the resolved payment source is anything other than `drop_in`, the booking is refused** with `member_not_active`. A lead has by definition bought nothing, so in practice they always resolve to drop-in; the guard exists for the case where staff attach a membership to somebody without activating them, and it means "lead" can never quietly become a way to consume credits that were never sold.
+
+Attending as a drop-in does not itself promote a lead to `active`. Status is a thing staff set when they sell something, and a booking that is never paid for at the desk should not leave a `lead` looking like a member.
+
+**Where:** Business Rules §2.1 rule 5, §2.2; migration 027. **Status:** settled.

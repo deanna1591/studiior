@@ -23,7 +23,7 @@ export default async function Book({
 }: {
   searchParams: { d?: string; type?: string; instructor?: string };
 }) {
-  const { ctx, supabase, studioName, logoUrl, settings } = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings } = await memberScreen();
 
   const offset = Number(searchParams.d ?? 0) || 0;
   const from = dayStart(new Date(), ctx.timeZone, offset);
@@ -78,7 +78,7 @@ export default async function Book({
   );
 
   return (
-    <MemberShell studioName={studioName} logoUrl={logoUrl}>
+    <MemberShell studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       {/* Day navigation with targets you can hit walking. */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <Link href={qs({ d: offset - 1 })} aria-label="Previous day"

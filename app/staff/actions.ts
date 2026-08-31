@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { zonedToUtc } from "@/lib/time";
+import { memberOrigin } from "@/lib/tenant";
 
 export async function signIn(_prev: string | null, formData: FormData) {
   const supabase = createClient();
@@ -180,4 +181,45 @@ export async function checkInByCode(_prev: CodeState, fd: FormData): Promise<Cod
   await supabase.from("bookings").update({ status: "attended" }).eq("id", booking.id);
   revalidatePath(`/roster/${occurrenceId}`);
   return { ok: true, message: `${row.first_name} ${row.last_name} checked in.` };
+}
+
+export type InviteState = { ok: boolean; message: string; link?: string } | null;
+
+/**
+ * Mint an app invite for one member.
+ *
+ * The raw token comes back exactly once and is not stored — only its hash is
+ * (migration 027). Nothing sends it: the link is handed to whoever asked for
+ * it, the same as the studio invite in migration 012, because there is still
+ * no transport and inventing one here would be the third place that pretends.
+ */
+export async function inviteMemberToApp(_prev: InviteState, fd: FormData): Promise<InviteState> {
+  const memberId = String(fd.get("member_id") ?? "");
+  const supabase = createClient();
+
+  const { data, error } = await supabase.rpc("create_member_invite", {
+    p_member_id: memberId,
+    p_days: 14,
+  });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "Owners, managers and front desk can invite members." };
+    if (error.code === "PT409") return { ok: false, message: error.message };
+    return { ok: false, message: error.message };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, message: "No invite was created." };
+
+  revalidatePath(`/members/${memberId}`);
+  revalidatePath("/members");
+
+  const ctx = await getStaffContext();
+  const { data: studio } = await supabase
+    .from("studios").select("slug").eq("id", ctx?.studioId ?? "").maybeSingle();
+
+  return {
+    ok: true,
+    message: `Send this link to ${row.email}. It works once and expires in 14 days.`,
+    link: studio?.slug ? `${memberOrigin(studio.slug)}/claim/${row.token}` : undefined,
+  };
 }

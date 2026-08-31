@@ -40,3 +40,16 @@ export function resolveHost(host: string): { app: AppKind; slug?: string } {
 export function currentSlug(): string | null {
   return headers().get(SLUG_HEADER);
 }
+
+/**
+ * Where a member's app lives, for building links from the staff side.
+ *
+ * Not "the staff host with app. stripped": the two apps are on different
+ * domains in production — app.studiior.com and {slug}.studiior.app — so
+ * deriving one from the other is only ever right by accident.
+ */
+export function memberOrigin(slug: string): string {
+  const base = process.env.NEXT_PUBLIC_MEMBER_DOMAIN ?? "localhost:3000";
+  const scheme = base.includes("localhost") || base.includes("lvh.me") ? "http" : "https";
+  return `${scheme}://${slug}.${base}`;
+}

@@ -182,3 +182,99 @@ export async function respondToOffer(_prev: ActionResult, formData: FormData): P
     ? { ok: true, message: "You are in. See you there." }
     : { ok: true, message: "No problem — the seat goes to the next person." };
 }
+
+export type ClaimState = { error: string } | null;
+
+/**
+ * Take up an invite: account, profile and members.user_id, or none of it.
+ *
+ * The password never reaches this file's logic — claim_member_account() hashes
+ * it in the same transaction that links the member, so there is no window in
+ * which an account exists without the membership it was made for.
+ */
+export async function claimAccount(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
+  const token = String(fd.get("token") ?? "");
+  const password = String(fd.get("password") ?? "");
+  const fullName = String(fd.get("full_name") ?? "");
+
+  if (password.length < 8) return { error: "Pick a password of at least 8 characters." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("claim_member_account", {
+    p_token: token, p_password: password, p_full_name: fullName || undefined,
+  });
+  if (error) return { error: error.message };
+
+  const r = data as unknown as { email: string | null; failure_reason: string | null } | null;
+  if (!r) return { error: "No response from the server." };
+
+  if (r.failure_reason) {
+    const said: Record<string, string> = {
+      invalid_token: "That link is not one of ours. Ask the studio for a new one.",
+      token_used: "That link has already been used. If it wasn't you, ask the studio for a new one.",
+      token_expired: "That link has expired. Ask the studio for a new one.",
+      already_claimed: "There is already an account for this membership. Try signing in.",
+      password_too_short: "Pick a password of at least 8 characters.",
+    };
+    return { error: said[r.failure_reason] ?? r.failure_reason };
+  }
+
+  // Sign them straight in — they have just proved they hold the invite.
+  if (r.email) {
+    await supabase.auth.signInWithPassword({ email: r.email, password });
+  }
+  redirect("/");
+}
+
+/**
+ * After a self-signup, once the address is verified, attach the account to a
+ * member record — or make one.
+ *
+ * The verification check is in claim_member_by_email(), not here. members is
+ * unique on (studio_id, email), so an address names a person: linking before
+ * the address is proven would hand their attendance and payments to anybody
+ * who knew it. A check in this file would be a promise; a check in the
+ * function is the rule.
+ */
+export async function finishSignup(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
+  const studioId = String(fd.get("studio_id") ?? "");
+  const supabase = createClient();
+
+  const { data, error } = await supabase.rpc("claim_member_by_email", { p_studio_id: studioId });
+  if (error) return { error: error.message };
+
+  const r = data as unknown as { failure_reason: string | null } | null;
+  if (r?.failure_reason) {
+    const said: Record<string, string> = {
+      email_not_verified: "Confirm your email first — we've sent you a link. Then come back and press this again.",
+      already_claimed: "Someone has already set up an account for that email at this studio. Ask the studio if that wasn't you.",
+      not_signed_in: "Sign in first.",
+      no_such_studio: "That studio is not taking signups.",
+    };
+    return { error: said[r.failure_reason] ?? r.failure_reason };
+  }
+
+  revalidateMember();
+  redirect("/");
+}
+
+/** Self-signup: create the account, Supabase sends the confirmation. */
+export async function signUp(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
+  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  const password = String(fd.get("password") ?? "");
+  const fullName = String(fd.get("full_name") ?? "").trim();
+
+  if (!email) return { error: "We need an email address." };
+  if (password.length < 8) return { error: "Pick a password of at least 8 characters." };
+
+  const supabase = createClient();
+  const { error } = await supabase.auth.signUp({
+    email, password, options: { data: { full_name: fullName } },
+  });
+  if (error) {
+    return /already registered/i.test(error.message)
+      ? { error: "There is already an account for that email. Try signing in instead." }
+      : { error: error.message };
+  }
+  redirect("/signup?sent=1");
+}

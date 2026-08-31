@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * describing the class and becomes the way in.
  */
 export default async function MemberHome() {
-  const { ctx, supabase, studioName, logoUrl, settings } = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings } = await memberScreen();
   const now = Date.now();
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }] = await Promise.all([
@@ -64,7 +64,7 @@ export default async function MemberHome() {
   const day = (iso: string) => relativeDayName(iso, ctx.timeZone) ?? fmtDayLong(iso, ctx.timeZone);
 
   return (
-    <MemberShell studioName={studioName} logoUrl={logoUrl}>
+    <MemberShell studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       {/* A live waitlist offer outranks everything: the seat is held for this
           member and only for as long as the offer lasts. §4.2. */}
       {(offers ?? []).map((o) => (

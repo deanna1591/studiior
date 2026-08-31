@@ -1943,6 +1943,88 @@ export type Database = {
           },
         ]
       }
+      member_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          id: string
+          member_id: string
+          studio_id: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          member_id: string
+          studio_id: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          member_id?: string
+          studio_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_invites_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_invites_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_invites_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_invites_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_invites_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_notes: {
         Row: {
           active: boolean
@@ -3782,6 +3864,7 @@ export type Database = {
       }
       studios: {
         Row: {
+          accent_color: string | null
           archived_at: string | null
           brand_color: string | null
           country: string | null
@@ -3789,15 +3872,18 @@ export type Database = {
           currency: string
           custom_domain: string | null
           id: string
+          login_image_url: string | null
           logo_url: string | null
           name: string
           slug: string
           status: string
           stripe_account_id: string | null
+          theme_preset: Database["public"]["Enums"]["theme_preset"]
           timezone: string
           updated_at: string
         }
         Insert: {
+          accent_color?: string | null
           archived_at?: string | null
           brand_color?: string | null
           country?: string | null
@@ -3805,15 +3891,18 @@ export type Database = {
           currency: string
           custom_domain?: string | null
           id?: string
+          login_image_url?: string | null
           logo_url?: string | null
           name: string
           slug: string
           status?: string
           stripe_account_id?: string | null
+          theme_preset?: Database["public"]["Enums"]["theme_preset"]
           timezone: string
           updated_at?: string
         }
         Update: {
+          accent_color?: string | null
           archived_at?: string | null
           brand_color?: string | null
           country?: string | null
@@ -3821,11 +3910,13 @@ export type Database = {
           currency?: string
           custom_domain?: string | null
           id?: string
+          login_image_url?: string | null
           logo_url?: string | null
           name?: string
           slug?: string
           status?: string
           stripe_account_id?: string | null
+          theme_preset?: Database["public"]["Enums"]["theme_preset"]
           timezone?: string
           updated_at?: string
         }
@@ -4113,6 +4204,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      book_class_status_ok: {
+        Args: { p_status: Database["public"]["Enums"]["member_status"] }
+        Returns: boolean
+      }
       brief_summary: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
@@ -4130,6 +4225,34 @@ export type Database = {
       checkin_code_for: {
         Args: { p_bucket: number; p_member_id: string }
         Returns: string
+      }
+      claim_member_account: {
+        Args: { p_full_name?: string; p_password: string; p_token: string }
+        Returns: Database["public"]["CompositeTypes"]["member_claim"]
+        SetofOptions: {
+          from: "*"
+          to: "member_claim"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      claim_member_by_email: {
+        Args: { p_studio_id: string }
+        Returns: Database["public"]["CompositeTypes"]["member_claim"]
+        SetofOptions: {
+          from: "*"
+          to: "member_claim"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_member_invite: {
+        Args: { p_days?: number; p_member_id: string }
+        Returns: {
+          email: string
+          expires_at: string
+          token: string
+        }[]
       }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
@@ -4170,6 +4293,16 @@ export type Database = {
         }[]
       }
       member_health: { Args: { p_member_id: string }; Returns: Json }
+      member_invite_preview: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          first_name: string
+          studio_name: string
+          studio_slug: string
+          valid: boolean
+        }[]
+      }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
@@ -4285,12 +4418,14 @@ export type Database = {
       studio_by_slug: {
         Args: { p_slug: string }
         Returns: {
-          brand_color: string
+          accent_color: string
           currency: string
           id: string
+          login_image_url: string
           logo_url: string
           name: string
           slug: string
+          theme_preset: Database["public"]["Enums"]["theme_preset"]
           timezone: string
         }[]
       }
@@ -4382,6 +4517,7 @@ export type Database = {
       plan_type: "recurring" | "class_pack" | "drop_in" | "trial"
       series_status: "active" | "ended" | "cancelled"
       staff_role: "owner" | "manager" | "instructor" | "front_desk"
+      theme_preset: "warm" | "clean" | "calm" | "bold"
     }
     CompositeTypes: {
       book_class_result: {
@@ -4409,6 +4545,13 @@ export type Database = {
         email: string | null
         expires_at: string | null
         state: string | null
+      }
+      member_claim: {
+        user_id: string | null
+        member_id: string | null
+        studio_slug: string | null
+        email: string | null
+        failure_reason: string | null
       }
       provision_result: {
         studio_id: string | null
@@ -4606,6 +4749,7 @@ export const Constants = {
       plan_type: ["recurring", "class_pack", "drop_in", "trial"],
       series_status: ["active", "ended", "cancelled"],
       staff_role: ["owner", "manager", "instructor", "front_desk"],
+      theme_preset: ["warm", "clean", "calm", "bold"],
     },
   },
 } as const
