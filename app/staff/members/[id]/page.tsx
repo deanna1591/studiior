@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isManagerUp } from "@/lib/auth";
+import { isDeskUp, isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { HealthBand, bandOf } from "@/components/health-band";
+import { MessageLink } from "@/components/message-link";
 import { formatMoney } from "@/lib/plans";
 import { dayMonthParts, fmtTime } from "@/lib/time";
 import { TimelineList } from "./timeline";
@@ -29,7 +30,12 @@ const JOURNEY_SHOWN = 14;
  * a member's medical history by the database, not by this file remembering to
  * leave it out. The one exception is payments, and it is called out below.
  */
-export default async function MemberDetail({ params }: { params: { id: string } }) {
+export default async function MemberDetail({
+  params, searchParams,
+}: {
+  params: { id: string };
+  searchParams: { sent?: string };
+}) {
   const screen = await staffScreen("/members");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -106,6 +112,13 @@ export default async function MemberDetail({ params }: { params: { id: string } 
       title={`${m.first_name} ${m.last_name}`}
       actions={<NavLink href="/members">Back to members</NavLink>}
     >
+      {searchParams.sent && (
+        <p className="mb-4 border-l-[3px] px-3 py-2 text-[13px] leading-[18px] text-ink"
+           style={{ borderLeftColor: "var(--lime-text)", background: "var(--lime-tint)" }}>
+          Queued. It will go out on the next send — nothing has left yet, and it
+          is on {m.first_name}&rsquo;s journey below.
+        </p>
+      )}
       <p className="mb-1 text-[13px] leading-[20px] text-ink-2">
         {m.email}
         {m.phone && <> · {m.phone}</>}
@@ -124,9 +137,15 @@ export default async function MemberDetail({ params }: { params: { id: string } 
         </p>
       )}
 
-      {/* The band, first and full width. */}
-      <div className="mb-8 mt-4">
-        <HealthBand band={bandOf(m.health_band)} reason={m.health_reason} size="hero" />
+      {/* The band, first and full width, with the one thing you would do about
+          it beside it. */}
+      <div className="mb-8 mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1">
+          <HealthBand band={bandOf(m.health_band)} reason={m.health_reason} size="hero" />
+        </div>
+        {isDeskUp(ctx.role) && (
+          <MessageLink href={`/members/${m.id}/message`} className="shrink-0 sm:mt-1" />
+        )}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">

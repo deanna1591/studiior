@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { isManagerUp } from "@/lib/auth";
+import { isDeskUp, isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { dayMonthParts } from "@/lib/time";
 import { AppShell, Empty, Pill, PillRow, Rows } from "@/components/ui";
 import { HealthBand, HealthChip, bandOf, isLoud, type Band } from "@/components/health-band";
+import { MessageLink } from "@/components/message-link";
 
 export const dynamic = "force-dynamic";
 
@@ -137,29 +138,44 @@ export default async function Members({
             const band = bandOf(m.health_band);
             const loud = isLoud(band) && !!m.health_reason;
             return (
-              <Link
+              // The row cannot be one big anchor any more: the message action is
+              // itself a link and an anchor inside an anchor is invalid markup
+              // that swallows the inner click. The name is stretched over the
+              // row with ::after so the whole thing still navigates, and the
+              // action is raised above it.
+              <div
                 key={m.id}
-                href={`/members/${m.id}`}
-                className={`block hover:bg-paper ${loud ? "px-3 py-3" : "px-3 py-2.5"}`}
+                className={`relative hover:bg-paper ${loud ? "px-3 py-3" : "px-3 py-2.5"}`}
               >
                 <div className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 ${loud ? "mb-1.5" : ""}`}>
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <span className="truncate text-[14px] font-medium leading-5 text-ink">
+                    <Link
+                      href={`/members/${m.id}`}
+                      className="truncate text-[14px] font-medium leading-5 text-ink after:absolute after:inset-0 after:content-['']"
+                    >
                       {m.first_name} {m.last_name}
-                    </span>
+                    </Link>
                     {!loud && <HealthChip band={band} />}
                   </span>
-                  <span className="text-[12px] leading-4 text-ink-3">
+                  <span className="flex items-center gap-3 text-[12px] leading-4 text-ink-3">
+                    <span>
                     <span className="num">{m.lifetime_visits ?? 0}</span>
                     {" visit"}{(m.lifetime_visits ?? 0) === 1 ? "" : "s"}
                     {m.last_visit_at && (() => {
                       const { day, month } = dayMonthParts(m.last_visit_at, ctx.timeZone);
                       return <>{" · last on "}<span className="num">{day}</span>{` ${month}`}</>;
                     })()}
+                    </span>
+                    {/* Non-healthy only. Eight "Message" links down a column of
+                        healthy members is noise attached to the rows that need
+                        nothing doing. */}
+                    {loud && isDeskUp(ctx.role) && (
+                      <MessageLink href={`/members/${m.id}/message`} className="relative z-10" />
+                    )}
                   </span>
                 </div>
                 {loud && <HealthBand band={band} reason={m.health_reason} />}
-              </Link>
+              </div>
             );
           })}
         </Rows>

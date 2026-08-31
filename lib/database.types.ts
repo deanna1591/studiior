@@ -2498,6 +2498,138 @@ export type Database = {
           },
         ]
       }
+      message_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          key: string
+          note: string | null
+          studio_id: string | null
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          key: string
+          note?: string | null
+          studio_id?: string | null
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          key?: string
+          note?: string | null
+          studio_id?: string | null
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_templates_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          channel: Database["public"]["Enums"]["notif_channel"]
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          member_id: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["message_status"]
+          studio_id: string
+          subject: string
+          template_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          channel?: Database["public"]["Enums"]["notif_channel"]
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          member_id: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["message_status"]
+          studio_id: string
+          subject: string
+          template_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          channel?: Database["public"]["Enums"]["notif_channel"]
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          member_id?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["message_status"]
+          studio_id?: string
+          subject?: string
+          template_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       morning_briefs: {
         Row: {
           brief_date: string
@@ -3943,34 +4075,6 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
-        Returns: undefined
-      }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
       import_dry_run: { Args: { p_import_id: string }; Returns: Json }
@@ -3987,9 +4091,10 @@ export type Database = {
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_health: { Args: { p_member_id: string }; Returns: Json }
+      message_draft_for: { Args: { p_member_id: string }; Returns: Json }
+      message_gap_phrase: { Args: { p_days: number }; Returns: string }
       provision_studio: {
         Args: {
           p_country: string
@@ -4009,12 +4114,44 @@ export type Database = {
         }
       }
       purge_demo_data: { Args: { p_studio_id: string }; Returns: Json }
+      rebuild_member_timeline: {
+        Args: { p_member_id: string }
+        Returns: number
+      }
+      rebuild_studio_timeline: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
       recompute_member_stats: {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number
       }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
+      send_message: {
+        Args: { p_message_id: string }
+        Returns: {
+          body: string
+          channel: Database["public"]["Enums"]["notif_channel"]
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          member_id: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["message_status"]
+          studio_id: string
+          subject: string
+          template_key: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       studio_by_slug: {
         Args: { p_slug: string }
         Returns: {
@@ -4077,6 +4214,7 @@ export type Database = {
         | "frozen"
         | "cancelled"
         | "expired"
+      message_status: "draft" | "queued" | "sent" | "failed"
       note_category: "general" | "injury" | "medical" | "preference" | "admin"
       notif_channel: "email" | "push" | "in_app"
       notif_status: "scheduled" | "sent" | "delivered" | "failed" | "cancelled"
@@ -4292,6 +4430,7 @@ export const Constants = {
         "cancelled",
         "expired",
       ],
+      message_status: ["draft", "queued", "sent", "failed"],
       note_category: ["general", "injury", "medical", "preference", "admin"],
       notif_channel: ["email", "push", "in_app"],
       notif_status: ["scheduled", "sent", "delivered", "failed", "cancelled"],

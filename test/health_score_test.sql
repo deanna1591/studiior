@@ -41,19 +41,27 @@ insert into profiles (id, email) values ('66666666-0000-0000-0000-0000000000a1',
 insert into platform_admins (user_id, email, note)
   values ('66666666-0000-0000-0000-0000000000a1','ops@example.com','health score suite');
 
-set role authenticated;
-select set_config('request.jwt.claim.sub','66666666-0000-0000-0000-0000000000a1',false);
-select set_config('h.tok', (select invite_token from provision_studio(
-  'Health Test Studio','health-test','Asia/Manila','PHP','PH','owner@health.example')), false);
-reset role;
+-- The studio is built here with a FIXED id rather than through
+-- provision_studio(), which mints a gen_random_uuid(). generate_demo_data()
+-- derives every member, every booking and every attendance hash from the
+-- studio id, so a random id meant a different studio every run and cohorts
+-- that landed in the right band by luck. It passed for a long time and then
+-- failed with "Luntian (booking drift) expected drifting, got healthy" — not
+-- a regression, just a different draw. Provisioning is onboarding_test's
+-- subject; this suite only needs a studio that is the same one every time.
+insert into auth.users (id) values ('66666666-0000-0000-0000-0000000000a2');
+insert into profiles (id, email) values ('66666666-0000-0000-0000-0000000000a2','owner@health.example');
+insert into studios (id, name, slug, timezone, currency, country, status) values
+  ('66666666-0000-0000-0000-000000000001','Health Test Studio','health-test',
+   'Asia/Manila','PHP','PH','active');
+insert into studio_settings (studio_id) values ('66666666-0000-0000-0000-000000000001');
+insert into locations (studio_id, name, timezone, is_primary) values
+  ('66666666-0000-0000-0000-000000000001','Main','Asia/Manila',true);
+insert into studio_staff (studio_id, user_id, email, role, status, joined_at) values
+  ('66666666-0000-0000-0000-000000000001','66666666-0000-0000-0000-0000000000a2',
+   'owner@health.example','owner','active', now());
 
-set role anon;
-select expect_text('the studio gets an owner',
-  (select failure_reason from accept_studio_invite(current_setting('h.tok'),'health-owner-pw','Hana Owner')),
-  null);
-reset role;
-
-select set_config('h.sid', (select id::text from studios where slug='health-test'), false);
+select set_config('h.sid', '66666666-0000-0000-0000-000000000001', false);
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','66666666-0000-0000-0000-0000000000a1',false);

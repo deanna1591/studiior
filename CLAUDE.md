@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Twenty-one migrations, applying clean from `supabase db reset`:
+Twenty-two migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,9 +48,10 @@ Twenty-one migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Nine suites, **389 assertions**, all passing from a clean `db reset`:
+Ten suites, **422 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -60,7 +61,8 @@ Nine suites, **389 assertions**, all passing from a clean `db reset`:
 | `test/checkin_window_test.sql` | 11 | §8 check-in window bounds, the settings that move them, the escape hatch |
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
-| `test/health_score_test.sql` | 60 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/health_score_test.sql` | 59 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
 | `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
 | `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
 
@@ -83,6 +85,8 @@ The staff app is redesigned: a persistent left rail (studio and location top, na
 The member screen is built at `/members/[id]`, and it is where the health band lands: full width at the top with its reason as a sentence, and everything under it — attendance shape, journey, membership, credits, notes, goals, payments — is the evidence for that sentence. Names link to it from the member list and from a class roster.
 
 The five band labels are five different sentences. `new` and `insufficient_history` both used to render as "Too early", which reads as though the member arrived at the wrong time and made two unrelated states look like one: `new` is a member with a clock running on them, and `insufficient_history` is the absence of a verdict. They are now "New" and "Not enough history", and the latter's dot is a hollow ring rather than a filled one.
+
+The band carries an action: **Message**, beside the hero on the member screen and on list rows for non-healthy bands only — a message link on eight healthy rows is noise attached to the rows that need nothing doing. A text link, never a filled button; the chip stays the coloured thing.
 
 `managers_only` notes are enforced where they have to be. `notes_read` is `is_manager_up(studio_id) or not managers_only`, so a front desk session never receives the row; the screen does no filtering of its own and has no way to leak one.
 
@@ -143,6 +147,10 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **A colour set in `globals.css` beats a Tailwind text utility.** Those classes are declared after `@tailwind utilities` and match on equal specificity, so source order decides. `.section-label` carried a `color` and silently repainted every health chip's label to `--ink-2`, dropping the at-risk chip from 6.42 to **2.70**. Utility classes there are not overrides; measure the rendered DOM rather than reading the markup.
 
 **Nothing AI-generated sends itself.** The model drafts, the owner approves. Hard architectural rule.
+
+That rule reaches one step earlier than the AI. `message_draft_for()` composes and stops; the compose screen puts the draft in an editable field, and what gets queued is the field's contents, not the function's output. There is deliberately no code path from "compose" to "queued" that skips a person, and adding one would be the bug rather than the optimisation.
+
+**A derived event must be written in both places or neither.** `rebuild_member_timeline()` deletes a member's events and re-derives them, so an event written only by the thing that caused it survives until the next rebuild and then disappears without trace — migration 021's own comment guessed such events would "append rather than rebuild", and they would not. `message_sent` is therefore written by `send_message()` *and* derived by the rebuild, field for field identically, so it appears at once and survives. Anything else that starts writing timeline events has the same obligation.
 
 **Deletes are soft** via `status` / `archived_at`. Hard delete only for GDPR erasure.
 
@@ -206,6 +214,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/timeline_
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/messages_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -230,6 +242,8 @@ Never run any of the seven suites against production. They create roles, insert 
 Before trusting a green run, ask what state the seed cannot produce. Empty studios, users with no membership anywhere, a studio with no owner, a plan nobody bought, a member with no bookings. If a code path keys off "no rows", the seed almost certainly has rows.
 
 The same blind spot produced migration 020: every fixture in every suite gives every caller a staff row *in the studio under test*, so `is_manager_up()` was never asked about a studio the caller is nothing to, and nothing ever saw it return null.
+
+**A fixture built through `provision_studio()` is a different studio every run.** It mints a `gen_random_uuid()`, and `generate_demo_data()` derives every member, booking and attendance hash from the studio id — so the health suite was silently testing a new dataset each time and passing on luck. It passed for weeks and then failed with *"Luntian (booking drift) expected drifting, got healthy"*, which is not a regression but a different draw. Its studio id is now pinned. Any suite that generates demo data has to pin one.
 
 **`generate_demo_data()` runs once per transaction and once per studio.** Its temp tables are `on commit drop`, so two calls in one transaction collide on `_d_room`. It also used to select the check-ins it writes by `is_demo` alone, with no studio — which meant the second studio on any database re-selected the first one's bookings and died on `check_ins_booking_id_key`. Fixed, but the shape of the mistake is worth remembering: `is_demo` is a marker, never a tenant boundary. The tenant boundary is `studio_id`, every time.
 
