@@ -87,8 +87,19 @@ begin
   -- 1. Studio, settings, location, rooms
   -- ===========================================================================
 
-  insert into studios (id, name, slug, timezone, currency, country, brand_color, status)
-  values (s, 'Reform Collective', 'reform', tz, cur, 'CZ', '#2F4F4F', 'active');
+  -- accent_color is a terracotta on purpose, and specifically NOT #BEF738.
+  -- Reform Collective sat with a null accent, so every member screen fell back
+  -- to Studiior's own lime and the white-label promise was invisible in every
+  -- screenshot and every demo — the one thing the theming work exists to
+  -- prove. A studio picking terracotta should get a terracotta app, and now
+  -- the seeded one does. Measured: white on it is 4.54 on Warm.
+  --
+  -- brand_color stays as it was and stays unused. It is an arbitrary hex with
+  -- unverified contrast; accent_color is the one that goes through the ramp.
+  insert into studios (id, name, slug, timezone, currency, country, brand_color,
+                       theme_preset, accent_color, status)
+  values (s, 'Reform Collective', 'reform', tz, cur, 'CZ', '#2F4F4F',
+          'warm', '#B85C38', 'active');
 
   -- Everything at the documented defaults. A design partner moving one of
   -- these is a deliberate act, so the seed should not pre-empt it.
@@ -116,10 +127,29 @@ begin
 
   insert into class_types (id, studio_id, name, description, duration_minutes,
                            default_capacity, difficulty, color) values
-    (ct_flow,  s, 'Reformer Flow',      'Continuous reformer work, some experience assumed.', 50,  8, 'intermediate', '#2F4F4F'),
-    (ct_begin, s, 'Reformer Beginners', 'Springs, straps and vocabulary. Start here.',        50,  8, 'beginner',     '#8FBC8F'),
-    (ct_mat,   s, 'Mat Pilates',        'Classical mat work, no equipment.',                  50, 12, 'all levels',   '#DEB887'),
-    (ct_barre, s, 'Barre',              'Small range, high repetition, borrowed from ballet.',45, 12, 'all levels',   '#CD853F');
+    (ct_flow,  s, 'Reformer Flow',
+     E'Continuous reformer work with very little standing about between exercises. '
+     'The sequence moves, so you should already know the machine and be able to '
+     'change your own springs.\n\nBest if you have done a few months of reformer. '
+     'Bring grip socks — the studio has spares if you forget.',
+     50,  8, 'intermediate', '#2F4F4F'),
+    (ct_begin, s, 'Reformer Beginners',
+     E'Springs, straps, footbar and the words for all of it. We go slowly and stop '
+     'to explain, and nobody minds if you have never seen a reformer.\n\nStart here '
+     'if you are new. Bring grip socks and arrive five minutes early so we can set '
+     'your machine up with you.',
+     50,  8, 'beginner',     '#8FBC8F'),
+    (ct_mat,   s, 'Mat Pilates',
+     E'Classical mat work — no machine, no springs, just you and the floor. Harder '
+     'than it sounds and the best hour there is for a stiff back.\n\nAny level. '
+     'Mats are here; bring water and wear something you can roll around in.',
+     50, 12, 'all levels',   '#DEB887'),
+    (ct_barre, s, 'Barre',
+     E'Small movements, high repetition, borrowed from ballet and rather harder '
+     'than that makes it sound. Expect your legs to shake; that is the exercise '
+     'working, not you failing.\n\nAny level, no dance background needed. Grip '
+     'socks, and something to tie your hair back.',
+     45, 12, 'all levels',   '#CD853F');
 
   -- ===========================================================================
   -- 3. Staff logins and instructors
@@ -154,10 +184,27 @@ begin
 
   -- Ada has a login; Bo and Cleo are teaching records with no portal account,
   -- which is the common case for part-time instructors.
-  insert into instructors (id, studio_id, staff_id, display_name, bio, color) values
-    (in_ada,  s, st_instr, 'Ada Example',    'Reformer and mat. Teaches the 7am crowd.', '#2F4F4F'),
-    (in_bo,   s, null,     'Bo Fictitious',  'Barre and mat.',                            '#CD853F'),
-    (in_cleo, s, null,     'Cleo Sampleton', 'Beginners reformer.',                       '#8FBC8F');
+  -- Bios and certifications are seeded because the member's class detail screen
+  -- shows them, and an empty section there is indistinguishable from a broken
+  -- query — the same trap the CRM tables sat in for months. avatar_url stays
+  -- null on purpose: it is null for a real studio on its first day too, so the
+  -- initials fallback is the state worth having fixtures for.
+  insert into instructors (id, studio_id, staff_id, display_name, bio, certifications, color) values
+    (in_ada,  s, st_instr, 'Ada Example',
+     'Reformer and mat, and the 7am crowd are hers. Came to Pilates through a '
+     'running injury and still teaches like someone who wants you back on your feet.',
+     '["Comprehensive Pilates (BASI)", "Reformer Levels 1-3", "Pre- and post-natal"]'::jsonb,
+     '#2F4F4F'),
+    (in_bo,   s, null,     'Bo Fictitious',
+     'Barre and mat. Fifteen years of ballet before this, which shows in the '
+     'corrections and in how long he can hold a plié.',
+     '["Barre Certification (Progressive)", "Mat Pilates Level 2"]'::jsonb,
+     '#CD853F'),
+    (in_cleo, s, null,     'Cleo Sampleton',
+     'Beginners reformer, mostly. Patient with first-timers and unhurried about '
+     'the set-up, which is why we put her on the introduction classes.',
+     '["Comprehensive Pilates (Polestar)", "Injury and rehabilitation"]'::jsonb,
+     '#8FBC8F');
 
   -- ===========================================================================
   -- 4. Plans

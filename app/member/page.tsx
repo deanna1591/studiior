@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * describing the class and becomes the way in.
  */
 export default async function MemberHome() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, settings } = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers} = await memberScreen();
   const now = Date.now();
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }] = await Promise.all([
@@ -64,7 +64,7 @@ export default async function MemberHome() {
   const day = (iso: string) => relativeDayName(iso, ctx.timeZone) ?? fmtDayLong(iso, ctx.timeZone);
 
   return (
-    <MemberShell studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       {/* A live waitlist offer outranks everything: the seat is held for this
           member and only for as long as the offer lasts. §4.2. */}
       {(offers ?? []).map((o) => (
@@ -83,7 +83,8 @@ export default async function MemberHome() {
             <input type="hidden" name="offer_id" value={o.id} />
             <div className="mt-3 flex gap-2">
               <button name="accept" value="1"
-                      className="m-action flex-1 rounded-lg bg-lime px-4 text-[16px] font-medium text-ink">
+                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                      className="m-action flex-1 rounded-xl px-4 text-[16px] font-semibold">
                 Take it
               </button>
               <button name="accept" value="0"
@@ -121,7 +122,8 @@ export default async function MemberHome() {
             <>
               <Link
                 href="/check-in"
-                className="m-action mt-4 flex w-full items-center justify-center rounded-lg bg-lime text-[16px] font-medium text-ink"
+                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                className="m-action mt-4 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold"
               >
                 Check in
               </Link>

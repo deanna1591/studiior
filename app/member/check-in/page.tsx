@@ -19,14 +19,14 @@ export const revalidate = 0;
  * counter, sometimes in a dark studio.
  */
 export default async function CheckIn() {
-  const { supabase, studioName, logoUrl, preset, accent } = await memberScreen();
+  const { supabase, studioName, logoUrl, preset, accent , openOffers} = await memberScreen();
 
   const { data } = await supabase.rpc("member_checkin_code");
   const row = Array.isArray(data) ? data[0] : data;
 
   if (!row) {
     return (
-      <MemberShell studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Check in">
+      <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Check in">
         <p className="m-body text-ink-2">
           We could not make a code for this account. Ask at the desk and they can
           check you in by name.
@@ -43,7 +43,7 @@ export default async function CheckIn() {
   });
 
   return (
-    <MemberShell studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} bare>
+    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} bare>
       <div className="flex flex-col items-center pt-6">
         <p className="m-sub text-ink-2">Show this at the desk</p>
 

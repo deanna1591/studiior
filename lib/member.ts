@@ -16,9 +16,19 @@ export async function memberScreen() {
   if (!ctx) redirect("/login");
 
   const supabase = createClient();
-  const [{ data: studio }, { data: settings }] = await Promise.all([
+  const [{ data: studio }, { data: settings }, { count: offerCount }] = await Promise.all([
     supabase.from("studios").select("name, logo_url, theme_preset, accent_color").eq("id", ctx.studioId).maybeSingle(),
     supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
+    // A live waitlist offer is the one number in this app that is worth a
+    // badge: it expires, and if the member does not answer it goes to the next
+    // person. A count of upcoming bookings would be a badge on something
+    // nobody has to do anything about, which teaches people to ignore badges.
+    supabase
+      .from("waitlist_offers")
+      .select("id, bookings!inner(member_id)", { count: "exact", head: true })
+      .is("responded_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .eq("bookings.member_id", ctx.memberId),
   ]);
 
   const s = Array.isArray(settings) ? settings[0] : settings;
@@ -28,6 +38,7 @@ export async function memberScreen() {
     supabase,
     studioName: studio?.name ?? "",
     logoUrl: studio?.logo_url ?? null,
+    openOffers: offerCount ?? 0,
     preset: (studio?.theme_preset ?? "warm") as PresetKey,
     accent: studio?.accent_color ?? null,
     settings: {

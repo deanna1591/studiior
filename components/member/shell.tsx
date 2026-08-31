@@ -1,5 +1,5 @@
 import TabBar from "./tab-bar";
-import { themeVars, type PresetKey } from "@/lib/theme";
+import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 
 /**
  * The member frame. Branded as the studio: its name and, when it has one, its
@@ -13,7 +13,7 @@ import { themeVars, type PresetKey } from "@/lib/theme";
  */
 export default function MemberShell({
   studioName, logoUrl, title, children, bare = false,
-  preset = "warm", accent,
+  preset = "warm", accent, openOffers = 0,
 }: {
   studioName: string;
   logoUrl: string | null;
@@ -22,10 +22,12 @@ export default function MemberShell({
   bare?: boolean;
   preset?: PresetKey;
   accent?: string | null;
+  /** Live waitlist offers awaiting an answer — the Home tab's badge. */
+  openOffers?: number;
 }) {
   // Scoped to this subtree, not :root — the staff app shares the same stylesheet
   // and must keep Studiior's lime. A studio brands what its members see.
-  const vars = themeVars(preset, accent ?? "#BEF738") as React.CSSProperties;
+  const vars = themeVars(preset, accent ?? neutralAccent(preset)) as React.CSSProperties;
   return (
     <div className="min-h-dvh bg-paper" style={vars}>
       {!bare && (
@@ -35,7 +37,10 @@ export default function MemberShell({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt={studioName} className="h-7 w-7 rounded object-cover" />
             ) : (
-              <span className="flex h-7 w-7 items-center justify-center rounded bg-lime text-[13px] font-semibold text-ink">
+              <span
+                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold"
+              >
                 {studioName.slice(0, 1)}
               </span>
             )}
@@ -47,7 +52,7 @@ export default function MemberShell({
         {title && <h1 className="m-display mb-4 text-ink">{title}</h1>}
         {children}
       </main>
-      <TabBar />
+      <TabBar badges={{ "/": openOffers }} />
     </div>
   );
 }

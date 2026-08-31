@@ -87,7 +87,36 @@ export type AccentRamp = {
   textContrast: number;
   /** True when no amount of darkening got there and ink is used instead. */
   fellBack: boolean;
+  /**
+   * The accent as a FILLED surface — a primary button, the today circle in the
+   * week strip, the active tab's pip. Usually the accent as chosen; adjusted
+   * only when neither ink nor the surface colour could sit on it legibly.
+   */
+  solid: string;
+  /** The text colour that sits ON `solid`. Measured, never assumed. */
+  onSolid: string;
+  /** What `onSolid` measures on `solid`. */
+  onSolidContrast: number;
+  /** True when `solid` had to move off the studio's chosen hex to stay legible. */
+  solidAdjusted: boolean;
 };
+
+/**
+ * What can legibly sit on a filled patch of `candidate`.
+ *
+ * The existing ramp answers "accent as text on our surface". A filled button
+ * asks the opposite question and the answer is not the same: #BEF738 carries
+ * near-black happily and white not at all, and a deep terracotta is the other
+ * way round. Nothing in the app may hard-code one — a studio picking a mid
+ * green would get 2.9:1 either way and a button nobody can read.
+ */
+function bestOn(candidate: string, p: (typeof PRESETS)[PresetKey]) {
+  const onInk = contrast(p.ink, candidate);
+  const onSurface = contrast(p.surface, candidate);
+  return onInk >= onSurface
+    ? { colour: p.ink, ratio: onInk }
+    : { colour: p.surface, ratio: onSurface };
+}
 
 /**
  * Derive a usable ramp from one hex, the same way `--amber-deep` was derived:
@@ -99,9 +128,24 @@ export type AccentRamp = {
  * darkness that still reads as that yellow — this returns the preset's ink and
  * says so, and the picker shows exactly that rather than silently substituting.
  */
+/**
+ * What a studio that has chosen no accent gets.
+ *
+ * Its own preset's ink, not #BEF738. Studiior's lime is Studiior's, and
+ * defaulting to it put our brand colour on the login screen, the today circle
+ * and every primary button of every studio that had not picked a colour yet —
+ * which is all of them on day one. Migration 034 already made this call for
+ * email, where the accent rule falls back to neutral grey rather than to lime;
+ * this is the same rule for the app. A monochrome member app is a deliberate
+ * look. Somebody else's brand is not.
+ */
+export function neutralAccent(preset: PresetKey): string {
+  return PRESETS[preset].ink;
+}
+
 export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
   const p = PRESETS[preset];
-  const fill = isHex(accent) ? accent.trim().toUpperCase() : "#BEF738";
+  const fill = isHex(accent) ? accent.trim().toUpperCase() : neutralAccent(preset);
 
   // Capped at 60% toward ink. Past that it is not the studio's colour any
   // more, it is ink wearing a hint of it — and quietly shipping that is the
@@ -118,6 +162,7 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
         tint: mix(fill, p.surface, 0.12),
         textContrast: Math.round(contrast(candidate, p.surface) * 100) / 100,
         fellBack: false,
+        ...solidFor(fill, p),
       };
     }
   }
@@ -127,7 +172,69 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
     tint: mix(fill, p.surface, 0.12),
     textContrast: Math.round(contrast(p.ink, p.surface) * 100) / 100,
     fellBack: true,
+    ...solidFor(fill, p),
   };
+}
+
+/**
+ * The filled-accent pair.
+ *
+ * Try the studio's colour as it is. If neither ink nor surface clears 4.5:1 on
+ * it, walk it in whichever direction is already winning — darker to carry the
+ * light text, lighter to carry the dark — and stop at the first value that
+ * passes. Capped at 60% like the text ramp, and for the same reason: past that
+ * it stops being their colour.
+ */
+function solidFor(fill: string, p: (typeof PRESETS)[PresetKey]) {
+  const asIs = bestOn(fill, p);
+  if (asIs.ratio >= 4.5) {
+    return {
+      solid: fill,
+      onSolid: asIs.colour,
+      onSolidContrast: Math.round(asIs.ratio * 100) / 100,
+      solidAdjusted: false,
+    };
+  }
+
+  // Which way to walk: toward ink if light text is closer, toward the surface
+  // if dark text is. Moving the wrong way makes both worse.
+  const toward = contrast(p.surface, fill) >= contrast(p.ink, fill) ? p.ink : p.surface;
+  for (let step = 1; step <= 15; step++) {
+    const candidate = mix(toward, fill, step * 0.04);
+    const best = bestOn(candidate, p);
+    if (best.ratio >= 4.5) {
+      return {
+        solid: candidate,
+        onSolid: best.colour,
+        onSolidContrast: Math.round(best.ratio * 100) / 100,
+        solidAdjusted: true,
+      };
+    }
+  }
+
+  // Nothing in range. Ink is a surface every preset's own surface reads on.
+  const last = bestOn(p.ink, p);
+  return {
+    solid: p.ink,
+    onSolid: last.colour,
+    onSolidContrast: Math.round(last.ratio * 100) / 100,
+    solidAdjusted: true,
+  };
+}
+
+/**
+ * The login screen's accent field, as two stops that can both carry `onSolid`.
+ *
+ * The obvious version — accent at the top, accent darkened toward ink at the
+ * bottom — is wrong on Bold, whose ink is nearly white: "darkening" lightens
+ * the accent there and white text on it fell to 3.27. The second stop
+ * therefore moves AWAY from the text colour rather than toward the preset's
+ * ink, which can only ever increase the contrast the first stop was measured
+ * for.
+ */
+export function accentGradient(ramp: AccentRamp): [string, string] {
+  const away = luminance(ramp.onSolid) > 0.4 ? "#000000" : "#FFFFFF";
+  return [ramp.solid, mix(away, ramp.solid, 0.18)];
 }
 
 /** The custom properties the member app is themed with. */
@@ -146,5 +253,10 @@ export function themeVars(preset: PresetKey, accent: string): Record<string, str
     "--lime-tint": a.tint,
     "--lime-text": a.text,
     "--lime-text-2": a.text,
+    // The filled-accent pair. Named for what they are rather than borrowing
+    // the lime names: these two are always used together and a caller that
+    // takes one without the other has made a button nobody can read.
+    "--accent-solid": a.solid,
+    "--accent-on-solid": a.onSolid,
   };
 }

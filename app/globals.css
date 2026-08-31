@@ -27,6 +27,14 @@
   --lime:        #BEF738;   /* fill only */
   --lime-tint:   #F3FAE0;   /* active pill, healthy wash */
   --lime-text:   #3F5A08;   /* 7.84 — links, active nav */
+
+  /* The filled-accent pair. The member app overrides both from the studio's
+     derived ramp (lib/theme.ts); these are the staff app's own values, and
+     they are here so a shared component can never resolve them to nothing —
+     an undefined var() falls back to the browser default in silence, which is
+     how the member settings checkboxes shipped system blue. */
+  --accent-solid:    #BEF738;
+  --accent-on-solid: #14170E;   /* 14.28 on the lime fill */
   --lime-text-2: #4C6B0B;   /* 6.15 — hover, pressed */
 
   --amber:      #E8C93A;    /* fill only; ink on it is 11.09 */
@@ -46,6 +54,11 @@
   --coral:      #D9401A;
   --coral-fill: #FF6B45;
   --coral-tint: #FBE6DE;
+  /* Coral carried 5% toward ink, the same derivation as --amber-deep and for
+     the same reason: white on --coral measures 4.47, which is the very ratio
+     that stops coral setting body text. A badge is small bold text, so it gets
+     a colour that passes rather than one that nearly does. White on this: 4.82. */
+  --coral-deep: #CF3E19;
 
   /* Health chip edges: the dot colour carried 30% into the fill, which lands
      every band on a hairline of 1.38–1.61 against its own fill — present, and
@@ -130,6 +143,14 @@ body {
   font-variation-settings: 'wdth' 112, 'wght' 620;
   font-size: 26px; line-height: 30px; letter-spacing: 0.02em;
 }
+/* A studio's own name, set as itself. .m-display uppercases, which is right
+   for our section headings and wrong for somebody's business: "REFORM
+   COLLECTIVE" is a decision about their brand that is not ours to make. */
+.m-title {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  font-variation-settings: 'wdth' 112, 'wght' 620;
+  font-size: 26px; line-height: 32px; letter-spacing: 0.01em;
+}
 .m-tap    { min-height: 44px; }
 .m-action { min-height: 56px; }
 
@@ -141,6 +162,55 @@ body {
 .m-hscroll { scrollbar-width: none; -ms-overflow-style: none; }
 .m-hscroll::-webkit-scrollbar { display: none; }
 .m-scroll { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+
+/* --- member app: card and entrance -----------------------------------------
+
+   .m-card is the one raised surface in the app. Depth is fill, hairline and a
+   2px shadow — the same recipe as the staff health chip, and for the same
+   reason: over a flat surface there is nothing behind a card to refract, so
+   blur renders as fog and costs a compositor layer per card while scrolling.
+
+   .m-glass is the single exception and is used on the login screen only, where
+   a full-bleed studio photograph is genuinely behind it. The inner highlight
+   and the hairline do most of the work; the blur alone would just be haze.
+   When a studio has no photograph the login panel uses .m-panel instead —
+   blur over a flat gradient is the fog case again. */
+.m-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+.m-card-booked { border-color: var(--lime-text); border-width: 1.5px; }
+
+.m-glass {
+  /* Dark-tinted, not white. A white frosted panel over a photograph gives you
+     white text on a pale translucent field and no way to know the ratio,
+     because the ratio is whatever the photograph is doing underneath. Tinting
+     dark and sitting it in the scrim's darkest band makes the composite
+     predictable: white text lands on something between #16181A and the photo
+     at 42% — never lighter than the scrim allows. */
+  background: rgb(16 18 20 / 0.42);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.30), 0 18px 44px rgb(0 0 0 / 0.38);
+}
+/* The field inside the glass. Translucent so the panel reads as one object
+   rather than as a dark card with white boxes punched in it. */
+.m-glass-field {
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.26);
+  color: #FFFFFF;
+}
+.m-glass-field::placeholder { color: rgb(255 255 255 / 0.62); }
+.m-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.18);
+}
 
 /* --- health chip ----------------------------------------------------------
    A pill that sits on the surface rather than being stamped into it: tinted

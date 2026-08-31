@@ -8,7 +8,7 @@ import { signOut } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function Membership() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent } = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers} = await memberScreen();
   const { live, all } = await membershipState(supabase, ctx.memberId);
 
   // Credits with the date they run out. The ledger is the truth; the number on
@@ -38,7 +38,7 @@ export default async function Membership() {
   const pastDue = live?.status === "past_due";
 
   return (
-    <MemberShell studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your plan">
+    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your plan">
       {pastDue && (
         <div className="mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}>
