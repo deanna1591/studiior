@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
+import { todaysBrief } from "@/lib/brief";
+import MorningBrief from "@/components/morning-brief";
 import { AppShell, Empty, Pill, PillRow, Rows, Segmented, SectionLabel } from "@/components/ui";
 import { ScheduleRow, type Occ } from "@/components/schedule-rows";
 import {
@@ -28,6 +30,14 @@ export default async function Schedule({
     ? weekStart(new Date(), ctx.timeZone, offset)
     : dayStart(new Date(), ctx.timeZone, offset);
   const to = addDays(from, view === "week" ? 7 : 1);
+
+  // The brief sits above the week: it is what the owner came to read, and the
+  // schedule is what they came to work from. Managers and owners only — §11's
+  // insights carry revenue and churn, which Permissions §12 note 21 keeps away
+  // from instructors and front desk.
+  const brief = isManagerUp(ctx.role)
+    ? await todaysBrief(supabase, ctx.studioId, ctx.timeZone)
+    : null;
 
   const [{ data: occurrences }, { data: rooms }] =
     await Promise.all([
@@ -116,6 +126,16 @@ export default async function Schedule({
         </PillRow>
       }
     >
+      {brief && (
+        <MorningBrief
+          summary={brief.summary}
+          insights={brief.insights}
+          money={brief.money}
+          dateLabel={brief.dateLabel}
+          handled={brief.handled}
+        />
+      )}
+
       {shown.length === 0 ? (
         <Empty>
           {roomFilter

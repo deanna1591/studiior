@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Twenty-two migrations, applying clean from `supabase db reset`:
+Twenty-three migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,10 +48,11 @@ Twenty-two migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **023** the Morning Brief: `insight_config` (every §11 threshold as a row a studio can move), `generate_morning_brief()`, `brief_summary()`, `studios_due_for_brief()` and `set_insight_status()`. Writes `ai_insights` and `morning_briefs`, which had existed since 001 with nothing writing them. No model is called and `model` / `prompt_version` stay null — a row naming a model it never saw would be worse than an empty column
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Ten suites, **422 assertions**, all passing from a clean `db reset`:
+Eleven suites, **447 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -62,6 +63,7 @@ Ten suites, **422 assertions**, all passing from a clean `db reset`:
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
 | `test/health_score_test.sql` | 59 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
 | `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
 | `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
 | `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
@@ -85,6 +87,8 @@ The staff app is redesigned: a persistent left rail (studio and location top, na
 The member screen is built at `/members/[id]`, and it is where the health band lands: full width at the top with its reason as a sentence, and everything under it — attendance shape, journey, membership, credits, notes, goals, payments — is the evidence for that sentence. Names link to it from the member list and from a class roster.
 
 The five band labels are five different sentences. `new` and `insufficient_history` both used to render as "Too early", which reads as though the member arrived at the wrong time and made two unrelated states look like one: `new` is a member with a clock running on them, and `insufficient_history` is the absence of a verdict. They are now "New" and "Not enough history", and the latter's dot is a hollow ring rather than a filled one.
+
+The Morning Brief is built and sits above the schedule on the staff home, owners and managers only. It opens with a written sentence — *"One card has been declined; four members have drifted"* — and the items sit under it, each with the one button that does something about it. Generation is a scheduled job: `studios_due_for_brief()` names the studios whose local clock has passed `morning_brief_send_at` minus the lead time, and something outside the database calls `generate_morning_brief()` for each. Opening the dashboard must never be what makes the brief exist, or a studio that does not log in never gets one and the day it does log in it gets a brief written at noon.
 
 The band carries an action: **Message**, beside the hero on the member screen and on list rows for non-healthy bands only — a message link on eight healthy rows is noise attached to the rows that need nothing doing. A text link, never a filled button; the chip stays the coloured thing.
 
@@ -147,6 +151,12 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **A colour set in `globals.css` beats a Tailwind text utility.** Those classes are declared after `@tailwind utilities` and match on equal specificity, so source order decides. `.section-label` carried a `color` and silently repainted every health chip's label to `--ink-2`, dropping the at-risk chip from 6.42 to **2.70**. Utility classes there are not overrides; measure the rendered DOM rather than reading the markup.
 
 **Nothing AI-generated sends itself.** The model drafts, the owner approves. Hard architectural rule.
+
+The brief is the same rule again and currently the stronger version of it: nothing here calls a model at all. Insights are read off the data and the summary is composed from the insights that survived the cap, so it can never describe something the owner cannot see underneath it. Every action is a link to a screen where a person does the thing.
+
+**An insight without a working button is a bug, not a feature** — data model §9 says so and §11 repeats it. `action_payload` therefore carries the resolved `href`, and `brief_test.sql` matches every one against the routes this app actually serves rather than merely checking it is non-null. `challenge_opportunity` is implemented and switched **off** in config for exactly this reason: challenges have no screen, so its button would go nowhere. Turning it on is a config change once they ship.
+
+**§11's dedupe key is (type, subject, date); the brief is stricter than that.** On real data a member whose card was declined cannot book, so she arrives as `payment_failed` and again as `retention_risk` — two of five slots for one person, and the second is downstream of the first. Only one insight per subject survives, the most severe. §11's own reason for the cap, that more than five and the owner stops reading, is the argument for it.
 
 That rule reaches one step earlier than the AI. `message_draft_for()` composes and stops; the compose screen puts the draft in an editable field, and what gets queued is the field's contents, not the function's output. There is deliberately no code path from "compose" to "queued" that skips a person, and adding one would be the bug rather than the optimisation.
 
@@ -218,6 +228,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/messages_
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/brief_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -225,7 +239,7 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 

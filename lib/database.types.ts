@@ -1474,6 +1474,45 @@ export type Database = {
           },
         ]
       }
+      insight_config: {
+        Row: {
+          key: string
+          note: string | null
+          studio_id: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          key: string
+          note?: string | null
+          studio_id?: string | null
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          key?: string
+          note?: string | null
+          studio_id?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_config_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_config_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_achievements: {
         Row: {
           acknowledged_at: string | null
@@ -4071,11 +4110,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      brief_summary: {
+        Args: { p_date: string; p_studio_id: string }
+        Returns: string
+      }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
+      generate_morning_brief: {
+        Args: { p_for_date?: string; p_studio_id: string }
+        Returns: Json
+      }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
       import_dry_run: { Args: { p_import_id: string }; Returns: Json }
       import_member_status: {
@@ -4087,6 +4134,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["membership_status"]
       }
       import_rollback: { Args: { p_import_id: string }; Returns: Json }
+      insight_threshold: {
+        Args: { p_key: string; p_studio_id: string }
+        Returns: number
+      }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
@@ -4095,6 +4146,7 @@ export type Database = {
       member_health: { Args: { p_member_id: string }; Returns: Json }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
+      milestone_visit_targets: { Args: never; Returns: number[] }
       provision_studio: {
         Args: {
           p_country: string
@@ -4128,6 +4180,7 @@ export type Database = {
       }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
+      say_count: { Args: { n: number }; Returns: string }
       send_message: {
         Args: { p_message_id: string }
         Returns: {
@@ -4148,6 +4201,43 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_insight_status: {
+        Args: {
+          p_insight_id: string
+          p_status: Database["public"]["Enums"]["insight_status"]
+        }
+        Returns: {
+          action_payload: Json
+          action_type: string
+          actioned_at: string | null
+          actioned_by: string | null
+          created_at: string
+          dismissed_at: string | null
+          estimated_impact_cents: number | null
+          for_date: string
+          id: string
+          input_snapshot: Json | null
+          model: string | null
+          observation: string
+          prompt_version: string | null
+          recommended_action: string
+          severity: string
+          status: Database["public"]["Enums"]["insight_status"]
+          studio_id: string
+          subject_id: string | null
+          subject_type: string | null
+          title: string
+          type: string
+          updated_at: string
+          why_it_matters: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ai_insights"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4175,6 +4265,13 @@ export type Database = {
         }
       }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
+      studios_due_for_brief: {
+        Args: { p_now?: string }
+        Returns: {
+          local_date: string
+          studio_id: string
+        }[]
+      }
     }
     Enums: {
       billing_interval: "week" | "month" | "quarter" | "year"
