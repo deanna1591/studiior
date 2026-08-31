@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Twenty-eight migrations, applying clean from `supabase db reset`:
+Thirty migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,8 @@ Twenty-eight migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **031** wires §12's events with triggers rather than call sites — a booking is made from four different places and a notification that depends on each caller remembering is one the next caller will miss. Also skips demo members, and an hourly credit-expiry sweep because "seven days before" is a date in the studio's timezone, not an event
+- **030** notification delivery, email only: `queue_notification()` checks preferences at queue time, `send_due_notifications()` claims with `for update skip locked` and posts through a transport behind a config row, `reconcile_notification_sends()` turns the provider's answer into sent or failed. pg_cron every minute for both
 - **029** studio branding for the member app: `theme_preset` (warm/clean/calm/bold), a shape-checked `accent_color`, a `studio-branding` storage bucket whose write policy keys on the studio id in the first path segment, and `studio_by_slug()` fixed forward to carry the branding — the login screen and the tab title are both branded before anyone signs in
 - **028** Decision 15: §2.1 rule 5 passes `lead` as well as `active`, and a second guard after §2.2 refuses a lead resolving to anything but `drop_in`. Replaced `book_class()` forward **from the live definition**, not from 002's text — 003 added a fifth parameter, so re-issuing 002's four-argument signature creates a second overload and every call fails as ambiguous
 - **027** member accounts: `member_invites` (hashed, single-use, one live per member), `claim_member_account()` for the invite path, and `claim_member_by_email()` for self-signup — which refuses until `auth.users.email_confirmed_at` is set
@@ -57,7 +59,7 @@ Twenty-eight migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Fourteen suites, **542 assertions**, all passing from a clean `db reset`:
+Fifteen suites, **583 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -68,6 +70,7 @@ Fourteen suites, **542 assertions**, all passing from a clean `db reset`:
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
 | `test/health_score_test.sql` | 59 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
+| `test/notifications_test.sql` | 41 | preferences suppress at queue time, a duplicate dedupe key is refused, a missing API key fails the row and not the cron, and a second worker run cannot re-send a claimed one |
 | `test/member_accounts_test.sql` | 31 | an unverified email cannot claim an existing member, a used or expired token fails, one login holds two memberships without either seeing the other, a lead books drop-in only |
 | `test/member_app_test.sql` | 32 | history joins to real classes while someone else's past class stays hidden, the code rotates and only the desk resolves it, cancelling returns or consumes the credit and always frees the seat |
 | `test/brief_schedule_test.sql` | 32 | a studio past its send time is picked up and one that is not is skipped, a second run the same day is a no-op, a half-finished run retries, and an authenticated caller with no JWT is still refused |
@@ -103,6 +106,8 @@ The band carries an action: **Message**, beside the hero on the member screen an
 `managers_only` notes are enforced where they have to be. `notes_read` is `is_manager_up(studio_id) or not managers_only`, so a front desk session never receives the row; the screen does no filtering of its own and has no way to leak one.
 
 **Payments on the member screen are the one place the UI shows less than RLS allows, and that is a standing disagreement, not a decision.** Permissions §9 note 18 gives front desk payment history explicitly — "individual transactions to answer a member's question" — and `payments_desk_read` implements it, so front desk can still read those rows through the API. This screen withholds the section and filters `payment` out of the journey for anyone below manager, on instruction. It is a display choice and nothing more; if it should be a boundary, §9 and the policy have to change together.
+
+Notifications send, email only, through Resend behind a one-function adapter — swapping to SMTP is a second `send_via_*` and a changed config row. The key lives in Vault or a database setting and is never in the repo. Booking confirmations, reminders at `reminder_hours_before` and waitlist offers are wired by trigger; cancelled classes, substitutions and failed payments have tested queueing functions and no caller yet, because the screens that cause them do not exist. Staff messages from migration 022 join the same queue rather than getting their own sender, so the send button finally sends. `supabase/seed.sql` clears the queue it generates — fixture data does not email anybody.
 
 Studios brand the member app at `/branding`, owner only — four presets and one accent, with a live preview that is a real member Home rather than swatches. `brand_color` stays dead and is superseded by `accent_color`.
 
@@ -179,6 +184,14 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **A member-facing subset of a settings table is a function, not a policy.** RLS is row-level, so a read policy on `studio_settings` to expose the check-in window would also expose every fee, the morning brief time and the onboarding state. `studio_member_settings()` returns the six fields the app needs, the same shape as `studio_by_slug()`.
 
 **The check-in code is an HMAC, not a row.** Member id plus a 30-second bucket, keyed by a per-studio secret the member cannot read, so it cannot be forged and a screenshot is worthless thirty seconds later. `resolve_checkin_code()` accepts the current bucket or the one before it, because a scan takes a moment and a code that dies mid-rotation is a member holding up a phone the desk has just rejected.
+
+**A preference is checked when the row is written, not when it is sent.** A notification a member opted out of is never queued, so no future worker can send it by forgetting to ask, and the queue is a list of things that may go out rather than a list of candidates. Three events have no opt-out at all — a cancelled class, a substituted instructor, a failed payment — because there is no reading of "I turned off emails" that makes it right to let somebody turn up to a class that is not running.
+
+**`dedupe_key` stops a duplicate row; only a claim stops a duplicate send.** The unique index does nothing about two worker runs both picking up the same `scheduled` row. The worker claims with `for update skip locked` and flips to `sending` in the same statement, and delivery is two passes because pg_net is asynchronous — marking a row sent at post time would be recording a hope rather than a fact.
+
+**A missing API key is an ordinary state and must not take the cron down.** A fresh local stack has none. The worker records it against the row as a failure with a readable reason and carries on; letting it raise would kill the job and lose every other studio's notifications too, which is what the test proves by reverting it.
+
+**`composite IS NOT NULL` in plpgsql is true only when every field is non-null.** `queue_notification()` first returned the `notifications` row, so `queue_notification(...) is not null` read as false on success — a fresh row has a null `sent_at` — and every caller's counter came back zero while the rows were being written perfectly well. It returns a uuid now. Any function returning a row for a caller to null-check has this bug waiting in it.
 
 **A background job needs a positive identity, never an absent one.** pg_cron runs with no JWT, so `auth.uid()` is null, `is_platform_admin()` is false and `is_manager_up()` is false — all correctly. The temptation is to let a null through, and that is precisely the hole migration 002 had and 020 finished closing: it would hand the job's powers to any caller PostgREST failed to identify. `is_service_context()` instead asks whether the effective role is one Postgres itself marks `rolsuper` or `rolbypassrls` — `postgres`, `service_role`, `supabase_admin` yes; `authenticated` and `anon` never, with or without a token. It reads `current_setting('role')` rather than `current_user`, because inside a SECURITY DEFINER function `current_user` is the owner and would answer "trusted" for everybody. `brief_schedule_test.sql` asserts an authenticated session with a null `auth.uid()` is still refused, so rewriting the guard as `auth.uid() is null` fails the suite.
 
@@ -278,6 +291,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/member_ac
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/notifications_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -285,7 +302,7 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 

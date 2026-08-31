@@ -881,3 +881,26 @@ begin
     (select count(*) from member_tag_assignments where studio_id = s),
     n_tl;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- The seed does not send email.
+--
+-- Migration 031 queues a confirmation and a reminder for every future booking,
+-- which is right — and would mean a fresh `db reset` sits on forty queued
+-- emails to @example.com addresses. On a local stack with no API key they all
+-- fail and the table reads like something is broken; on any stack with a key
+-- configured they would actually be attempted. Neither is wanted from fixture
+-- data, so the queue is cleared once the seed has finished writing.
+--
+-- Deliberately at the end rather than by disabling the trigger: the trigger
+-- firing is what proves it is wired, and the seed should exercise the same
+-- path a real booking takes.
+-- ---------------------------------------------------------------------------
+do $$
+declare n int;
+begin
+  delete from notifications
+   where studio_id = '11111111-0000-0000-0000-000000000001';
+  get diagnostics n = row_count;
+  raise notice 'seed: cleared % queued notifications — fixture data does not email anybody', n;
+end $$;
