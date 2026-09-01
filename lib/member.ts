@@ -17,7 +17,8 @@ export async function memberScreen() {
   if (!ctx) redirect("/login");
 
   const supabase = createClient();
-  const [{ data: studio }, { data: settings }, { count: offerCount }, { data: me }] = await Promise.all([
+  const [{ data: studio }, { data: settings }, { count: offerCount }, { data: me },
+         { data: billing }] = await Promise.all([
     supabase.from("studios").select("name, logo_url, theme_preset, accent_color").eq("id", ctx.studioId).maybeSingle(),
     supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
     // A live waitlist offer is the one number in this app that is worth a
@@ -35,7 +36,15 @@ export async function memberScreen() {
       .select("first_name, last_name, preferred_name, avatar_url")
       .eq("id", ctx.memberId)
       .maybeSingle(),
+    supabase.rpc("studio_billing_state", { p_studio_id: ctx.studioId }),
   ]);
+
+  // A locked studio's members see a plain page saying the studio is not taking
+  // bookings, not a broken app. They did nothing wrong and should not be shown
+  // a schedule they cannot use — nor anything about what the studio owes us,
+  // which is why studio_billing_state() returns a status and no amounts.
+  const bill = Array.isArray(billing) ? billing[0] : billing;
+  if (bill?.locked) redirect("/unavailable");
 
   // preferred_name first: it is what they asked to be called, and the greeting
   // is the one place in the app that speaks to them rather than about them.

@@ -3321,6 +3321,72 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_subscriptions: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          currency: string
+          current_period_end: string | null
+          grace_ends_at: string | null
+          id: string
+          locked_at: string | null
+          price_cents: number
+          status: Database["public"]["Enums"]["platform_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          studio_id: string
+          trial_ends_at: string
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          grace_ends_at?: string | null
+          id?: string
+          locked_at?: string | null
+          price_cents?: number
+          status?: Database["public"]["Enums"]["platform_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          studio_id: string
+          trial_ends_at: string
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          grace_ends_at?: string | null
+          id?: string
+          locked_at?: string | null
+          price_cents?: number
+          status?: Database["public"]["Enums"]["platform_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          studio_id?: string
+          trial_ends_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_subscriptions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: true
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_subscriptions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: true
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -4460,6 +4526,42 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
+      }
+      extend_trial: {
+        Args: { p_days: number; p_studio_id: string }
+        Returns: string
+      }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       generate_morning_brief: {
         Args: { p_for_date?: string; p_studio_id: string }
@@ -4485,6 +4587,7 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_checkin_code: {
         Args: never
@@ -4532,6 +4635,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       queue_all_credit_expiries: { Args: never; Returns: Json }
       queue_booking_notifications: {
@@ -4561,6 +4665,10 @@ export type Database = {
       queue_payment_failed: {
         Args: { p_membership_id: string }
         Returns: number
+      }
+      queue_platform_warning: {
+        Args: { p_day: number; p_studio_id: string }
+        Returns: string
       }
       queue_substitution: {
         Args: { p_new: string; p_occurrence_id: string; p_old: string }
@@ -4706,6 +4814,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }
         Returns: string
@@ -4726,11 +4835,30 @@ export type Database = {
         Args: { p_deleted: boolean; p_obj: Json; p_studio_id: string }
         Returns: string
       }
+      stripe_platform_handle: {
+        Args: { p_obj: Json; p_type: string }
+        Returns: string
+      }
+      stripe_platform_webhook: {
+        Args: { p_payload: string; p_signature: string }
+        Returns: Json
+      }
       stripe_secret: { Args: { p_name?: string }; Returns: string }
       stripe_setting: { Args: { p_key: string }; Returns: string }
       stripe_webhook: {
         Args: { p_payload: string; p_signature: string }
         Returns: Json
+      }
+      studio_billing_state: {
+        Args: { p_studio_id: string }
+        Returns: {
+          days_left: number
+          grace_ends_at: string
+          has_card: boolean
+          locked: boolean
+          status: Database["public"]["Enums"]["platform_status"]
+          trial_ends_at: string
+        }[]
       }
       studio_by_slug: {
         Args: { p_slug: string }
@@ -4756,6 +4884,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      studio_is_locked: { Args: { p_studio_id: string }; Returns: boolean }
       studio_member_settings: {
         Args: { p_studio_id: string }
         Returns: {
@@ -4775,6 +4904,7 @@ export type Database = {
           studio_id: string
         }[]
       }
+      sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       verify_stripe_signature: {
         Args: { p_payload: string; p_secret: string; p_signature: string }
@@ -4845,6 +4975,12 @@ export type Database = {
         | "refunded"
         | "partially_refunded"
       plan_type: "recurring" | "class_pack" | "drop_in" | "trial"
+      platform_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "locked"
+        | "cancelled"
       series_status: "active" | "ended" | "cancelled"
       staff_role: "owner" | "manager" | "instructor" | "front_desk"
       theme_preset: "warm" | "clean" | "calm" | "bold"
@@ -5086,6 +5222,13 @@ export const Constants = {
         "partially_refunded",
       ],
       plan_type: ["recurring", "class_pack", "drop_in", "trial"],
+      platform_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "locked",
+        "cancelled",
+      ],
       series_status: ["active", "ended", "cancelled"],
       staff_role: ["owner", "manager", "instructor", "front_desk"],
       theme_preset: ["warm", "clean", "calm", "bold"],

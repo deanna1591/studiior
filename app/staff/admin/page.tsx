@@ -68,6 +68,7 @@ export default async function AdminPage({
           </button>
         </form>
       }
+      actions={<NavLink href="/admin/billing">Studio billing</NavLink>}
     >
       {searchParams.token && justCreated && (
         <div className="mb-6 rounded border border-lime-text bg-lime-tint p-4">

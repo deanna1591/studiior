@@ -12,17 +12,34 @@ export async function studioBanner(
   studioId: string,
   setupComplete: boolean,
 ): Promise<BannerMsg | null> {
-  const [failed, pastDue] = await Promise.all([
+  const [failed, pastDue, { data: billing }] = await Promise.all([
     supabase.from("payments").select("id", { count: "exact", head: true })
       .eq("studio_id", studioId).eq("status", "failed"),
     supabase.from("memberships").select("id", { count: "exact", head: true })
       .eq("studio_id", studioId).eq("status", "past_due"),
+    supabase.rpc("studio_billing_state", { p_studio_id: studioId }),
   ]);
 
   const nFailed = failed.count ?? 0;
   const nPastDue = pastDue.count ?? 0;
+  const bill = Array.isArray(billing) ? billing[0] : billing;
 
   return topBanner([
+    // Above everything, including a member's failed card. Those cost the studio
+    // one booking; this one stops every class running, and a studio must never
+    // arrive at lockout surprised. It shows from day one of grace and counts
+    // down, so "14 days" turning into "2 days" is itself the warning.
+    bill?.status === "past_due"
+      ? {
+          kind: "payment_failed" as const,
+          text: `Your Studiior subscription needs attention. ${
+            bill.days_left === 0
+              ? "The studio locks today"
+              : `${bill.days_left} day${bill.days_left === 1 ? "" : "s"} left`
+          } before staff and members are locked out.`,
+          action: { href: "/billing", label: "Sort it out" },
+        }
+      : null,
     nFailed > 0
       ? {
           kind: "payment_failed",
