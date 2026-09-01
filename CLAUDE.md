@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Thirty-three migrations, applying clean from `supabase db reset`:
+Thirty-four migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,7 @@ Thirty-three migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **035** a member's own profile — `preferred_name`, a private `member-avatars` bucket whose write policy keys on the member's own id, `class_types.image_url`, a class-type image policy for managers (029's is owner-only, and Permissions §4 gives class types to managers too), and `guard_member_self_update()`. That trigger is the point: `members_self_update` had no column restriction, so a member could sign her own waiver and promote herself past the §2.1 gate
 - **034** the four faults in a real delivered booking confirmation: a reply-to (`studios.contact_email`, new and nullable — absent means no header rather than a fake one), the room folded into the sentence instead of stranded in its own paragraph, a footer of contact details and an email-settings link instead of the studio name repeated under a rule, and an accent that falls back to neutral grey rather than to Studiior's lime
 - **033** closes the notification functions. Migration 030 revoked them from `PUBLIC`, which on hosted leaves the `authenticated` grant untouched — so any signed-in member of any studio could call `notification_api_key()` and read the Resend key, `send_via_resend()` to send arbitrary mail from our domain, or `render_notification()` to read another tenant's email in cleartext. Also closes 031's three trigger functions, which came out **anon**-callable
 - **031** wires §12's events with triggers rather than call sites — a booking is made from four different places and a notification that depends on each caller remembering is one the next caller will miss. Also skips demo members, and an hourly credit-expiry sweep because "seven days before" is a date in the studio's timezone, not an event
@@ -62,7 +63,7 @@ Thirty-three migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Fifteen suites, **597 assertions**, all passing from a clean `db reset`:
+Fifteen suites, **606 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -74,7 +75,7 @@ Fifteen suites, **597 assertions**, all passing from a clean `db reset`:
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
 | `test/health_score_test.sql` | 59 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
 | `test/notifications_test.sql` | 55 | preferences suppress at queue time, a duplicate dedupe key is refused, a missing API key fails the row and not the cron, a second worker run cannot re-send a claimed one, no internal is executable by `authenticated` or `anon`, and a rendered email carries a reply-to, a folded room and a neutral accent |
-| `test/member_accounts_test.sql` | 31 | an unverified email cannot claim an existing member, a used or expired token fails, one login holds two memberships without either seeing the other, a lead books drop-in only |
+| `test/member_accounts_test.sql` | 40 | an unverified email cannot claim an existing member, a used or expired token fails, one login holds two memberships without either seeing the other, a lead books drop-in only |
 | `test/member_app_test.sql` | 32 | history joins to real classes while someone else's past class stays hidden, the code rotates and only the desk resolves it, cancelling returns or consumes the credit and always frees the seat |
 | `test/brief_schedule_test.sql` | 32 | a studio past its send time is picked up and one that is not is skipped, a second run the same day is a no-op, a half-finished run retries, and an authenticated caller with no JWT is still refused |
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
@@ -136,6 +137,10 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 
 ## Rules that are not negotiable
 
+**RLS decides which rows, never which columns.** `members_self_update` is `using (user_id = auth.uid())` and `authenticated` holds UPDATE on all 28 columns of `members`, so "a member may edit their own row" meant a member could set `status`, `waiver_signed_at`, `health_band`, `lifetime_visits` and `studio_id`. Proved: the seeded member with no waiver signed her own and booked the class the gate had just refused.
+
+Column grants cannot fix it — front desk, managers and members are all `authenticated`, so narrowing the grant takes the same columns from the staff who are meant to edit them. The rule lives in a trigger (migration 035) that compares `to_jsonb(new) - owned` against `to_jsonb(old) - owned`, so **a column added later is protected the day it is created** rather than the day somebody remembers it. Any table with a self-service write path needs the same shape.
+
 **RLS is the security boundary.** A permission that exists only in React is not a permission. Every rule in the permissions doc is a policy. Instructor access to revenue is denied at the policy level, not by hiding menu items.
 
 **Every table gets RLS and a grant.** RLS decides which rows; grants decide whether the role may touch the table at all. Both, or the table is either closed to everyone or open to everyone. See migration 001 §16 — but read migration 005 with it: §16 claims there is no pre-login surface, and since migration 004 there is exactly one, `studio_by_slug()`.
@@ -179,6 +184,14 @@ Note what migration 013 found: the query has to enumerate what is *actually ther
 **The health band is the only loud thing, and its loudness is rationed.** Full-bleed fills were built first and thrown away twice — most members are healthy, so the screen came out a wall of lime, and sorted by severity it came out a wall of coral. Healthy has no reason to carry (Decision 14 gives one to every band *except* healthy), so it renders as a chip and nothing more.
 
 **The chip is a pill, and the colour lives in its dot.** A hard-cornered, tracked-out, fully saturated slab is the shape of an enum member, and twelve down a column read as a database column rather than as a remark about a person. Tinted fill, 6px dot, a hairline a step darker, a 2px shadow at 5%, sentence case, no letter-spacing. A dot is a non-text UI element and needs 3:1 against its own fill — lime manages **1.23** there and amber **1.54**, both being near-white by value, so the dot takes each band's deepest available value instead: `--lime-text` for healthy, `--coral` for at risk, and `--amber-deep` (#938228, amber carried 40% toward ink) for drifting, which is the one derived colour in the file and exists because the brand has no dark amber. Measured live: labels 15.08–18.12, dots 3.41–7.84.
+
+**Softness is measured too.** Cards are 22px, tinted with `--accent-wash` and lifted on two shadows rather than outlined with a hairline — one wide soft shadow to float them, one tight dark one to give them an edge. The wash is the accent at **3.5%, not 4**: at 4% a deep purple on Warm takes `--ink-3` to 4.47, and `--ink-3` IS the muted floor. A background tint that costs a fifth of a point on every secondary line in the app is not worth having.
+
+**A type ramp is a ratio, not a set of sizes.** Everything sat between 12 and 17px, which is why the cards read as paragraphs — nothing said "this is the thing you are looking for". The time on a class card is now 21px against 13px metadata. 21 and not 24 because it was measured: at 375px the card gives the time and its duration pill 243px, and at 24px the time alone was 185 and the pill wrapped.
+
+**Every icon sits on a chip.** A bare glyph beside a 13px line is a mark on a page; the same glyph on a filled `--accent-chip` square is a component, and a column of them lines up on a grid instead of drifting with the text. The pill and chip labels take `--ink-2` (worst 5.92 on the tint) — `--ink-3` measures 3.72 there and fails.
+
+**Member photographs are private; studio photographs are not.** `member-avatars` is a private bucket read through signed URLs, and `members.avatar_url` holds an object PATH rather than a URL. A logo and a class photograph are things a studio publishes; a member's face is not, and tenant one's data is production data. Instructor avatars stay public — the studio publishes those deliberately.
 
 **The accent is a pair, never a single colour.** `bg-lime text-ink` was hard-coded in seven places in the member app: fine while the accent is our near-yellow lime, unreadable the moment a studio picks navy. `accentRamp()` now derives `solid` and `onSolid` together - the fill, and the ink-or-surface that was *measured* on it - and moves the fill only when neither could sit on it. Across 8 accents x 4 presets the worst pair is 4.54:1 and only 2 of 32 needed adjusting. A caller takes both or neither.
 

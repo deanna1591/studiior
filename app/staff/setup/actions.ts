@@ -56,6 +56,56 @@ export async function saveRoom(_prev: SetupState, fd: FormData): Promise<SetupSt
   redirect("/rooms");
 }
 
+/**
+ * A photograph of a class.
+ *
+ * Into studio-branding under `<studio id>/class-types/`, which migration 035
+ * opened to managers — migration 029's write policy is owner-only, so a manager
+ * uploading here would have been refused by storage while the screen said
+ * nothing. Permissions §4 gives class types to Owner AND Manager, so the policy
+ * had to move rather than the screen.
+ *
+ * Public, unlike a member's photograph: this is studio marketing.
+ */
+export async function uploadClassTypeImage(_prev: SetupState, fd: FormData): Promise<SetupState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "Not signed in." };
+
+  const id = text(fd, "id");
+  if (!id) return { error: "Save the class type before adding a photo." };
+
+  const file = fd.get("image") as File | null;
+  if (!file || file.size === 0) return { error: "Choose a photo first." };
+  if (file.size > 2_000_000) {
+    return { error: "That photo is over 2 MB, which is the most this can store. About 1600px wide is usually well inside." };
+  }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    return { error: "JPEG, PNG or WebP." };
+  }
+
+  const supabase = createClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const path = `${ctx.studioId}/class-types/${id}-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from("studio-branding").upload(path, file, { cacheControl: "3600", upsert: false });
+  if (error) {
+    return /row-level security|Unauthorized/i.test(error.message)
+      ? refusal("class types")
+      : { error: error.message };
+  }
+
+  const { data: pub } = supabase.storage.from("studio-branding").getPublicUrl(path);
+  const { data, error: upErr } = await supabase
+    .from("class_types").update({ image_url: pub.publicUrl }).eq("id", id).select("id");
+  if (upErr) return { error: upErr.message };
+  if (!data?.length) return refusal("class types");
+
+  revalidatePath("/class-types");
+  revalidatePath(`/class-types/${id}`);
+  return null;
+}
+
 export async function saveClassType(_prev: SetupState, fd: FormData): Promise<SetupState> {
   const ctx = await getStaffContext();
   if (!ctx) return { error: "Not signed in." };

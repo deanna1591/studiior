@@ -81,8 +81,22 @@ export type AccentRamp = {
   fill: string;
   /** Darkened (or lightened, on a dark preset) until it clears 4.5:1 on the surface. */
   text: string;
-  /** 12% over the surface, for a quiet background. */
+  /** 12% over the surface, for a quiet background — chips, active nav. */
   tint: string;
+  /**
+   * 3.5% over the surface. A card ground that is warm on a terracotta studio
+   * and cool on a navy one, without being a colour anybody would name — pure
+   * white cards on a pure white page are why the app read as a document.
+   *
+   * 3.5 and not 4: at 4% a deep purple on Warm takes --ink-3 to 4.47, and
+   * --ink-3 IS the muted floor (4.59 on plain white). A background tint that
+   * costs a fifth of a point of contrast on every secondary line in the app is
+   * not a background tint worth having. Measured across 32 combinations, the
+   * worst at 3.5% is 4.51.
+   */
+  wash: string;
+  /** 14% over the surface, for the square behind an icon. */
+  chip: string;
   /** What `text` actually measures on the surface. */
   textContrast: number;
   /** True when no amount of darkening got there and ink is used instead. */
@@ -160,6 +174,8 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
         fill,
         text,
         tint: mix(fill, p.surface, 0.12),
+        wash: mix(fill, p.surface, 0.035),
+        chip: mix(fill, p.surface, 0.14),
         textContrast: Math.round(contrast(candidate, p.surface) * 100) / 100,
         fellBack: false,
         ...solidFor(fill, p),
@@ -170,6 +186,8 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
     fill,
     text: p.ink,
     tint: mix(fill, p.surface, 0.12),
+    wash: mix(fill, p.surface, 0.035),
+    chip: mix(fill, p.surface, 0.14),
     textContrast: Math.round(contrast(p.ink, p.surface) * 100) / 100,
     fellBack: true,
     ...solidFor(fill, p),
@@ -258,5 +276,7 @@ export function themeVars(preset: PresetKey, accent: string): Record<string, str
     // takes one without the other has made a button nobody can read.
     "--accent-solid": a.solid,
     "--accent-on-solid": a.onSolid,
+    "--accent-wash": a.wash,
+    "--accent-chip": a.chip,
   };
 }

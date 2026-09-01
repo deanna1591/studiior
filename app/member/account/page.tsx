@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Avatar from "@/components/member/avatar";
+import { Icon } from "@/components/member/icons";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { formatMoney } from "@/lib/plans";
@@ -8,7 +10,7 @@ import { signOut } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function Membership() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers, memberName, avatarUrl} = await memberScreen();
   const { live, all } = await membershipState(supabase, ctx.memberId);
 
   // Credits with the date they run out. The ledger is the truth; the number on
@@ -38,7 +40,18 @@ export default async function Membership() {
   const pastDue = live?.status === "past_due";
 
   return (
-    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your plan">
+    <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Account">
+      {/* The tab is Account, so it opens with the person before the plan. */}
+      <Link href="/account/profile"
+            className="m-card mb-4 flex items-center gap-4 p-5">
+        <Avatar name={memberName || studioName} url={avatarUrl} size={52} />
+        <span className="min-w-0 flex-1">
+          <span className="m-body block font-semibold text-ink">{memberName || "Your details"}</span>
+          <span className="m-meta block text-ink-3">Photo, name, phone, emergency contact</span>
+        </span>
+        <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
+      </Link>
+
       {pastDue && (
         <div className="mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}>

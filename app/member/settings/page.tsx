@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * degrades delivery for all of them.
  */
 export default async function Settings() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers, memberName, avatarUrl} = await memberScreen();
 
   const { data: prefs } = await supabase
     .from("notification_preferences")
@@ -29,7 +29,7 @@ export default async function Settings() {
   const on = (v: boolean | null | undefined) => v ?? true;
 
   return (
-    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}
+    <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}
                  title="Email settings">
       <p className="m-sub mb-5 text-ink-2">
         Choose what {studioName} emails you about. You can change this whenever
@@ -60,8 +60,8 @@ export default async function Settings() {
         </ul>
       </section>
 
-      <Link href="/membership" className="m-sub mt-8 block text-ink-2 underline">
-        Back to your plan
+      <Link href="/account" className="m-sub mt-8 block text-ink-2 underline">
+        Back to your account
       </Link>
     </MemberShell>
   );

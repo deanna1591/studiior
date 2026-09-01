@@ -21,7 +21,7 @@ export default async function Book({
 }: {
   searchParams: { d?: string; type?: string; instructor?: string };
 }) {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers, memberName, avatarUrl} = await memberScreen();
 
   const offset = Number(searchParams.d ?? 0) || 0;
   const from = dayStart(new Date(), ctx.timeZone, offset);
@@ -47,7 +47,7 @@ export default async function Book({
     await Promise.all([
       supabase
         .from("class_occurrences")
-        .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, instructors!instructor_id(display_name), rooms(name)")
+        .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name)")
         .gte("starts_at", from.toISOString())
         .lt("starts_at", to.toISOString())
         .order("starts_at"),
@@ -125,7 +125,7 @@ export default async function Book({
     b ? Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000) : null;
 
   return (
-    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+    <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       <WeekStrip
         days={days}
         monthLabel={monthLabel}
@@ -219,7 +219,9 @@ export default async function Book({
                 durationLabel={mins ? <><span className="num">{mins}</span> mins</> : "—"}
                 name={o.name}
                 instructor={o.instructors?.display_name ?? "Instructor to be confirmed"}
+                instructorAvatar={o.instructors?.avatar_url ?? null}
                 room={o.rooms?.name ?? null}
+                imageUrl={o.class_types?.image_url ?? null}
                 statusLabel={status}
                 statusTone={booked ? "booked" : full && !waiting ? "full" : "quiet"}
                 action={action}

@@ -4,6 +4,7 @@ import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
+import IconChip from "@/components/member/icon-chip";
 import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/components/member/ui";
 import { bookClass, cancelBooking } from "../../actions";
 import { fmtTime, fmtDayLong } from "@/lib/time";
@@ -24,7 +25,7 @@ export const dynamic = "force-dynamic";
  * member session rather than assuming migration 025 had left them staff-only.
  */
 export default async function ClassDetail({ params }: { params: { id: string } }) {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers, memberName, avatarUrl} = await memberScreen();
 
   const { data: occ } = await supabase
     .from("class_occurrences")
@@ -39,7 +40,7 @@ export default async function ClassDetail({ params }: { params: { id: string } }
 
   const [{ data: type }, { data: booking }] = await Promise.all([
     occ.class_type_id
-      ? supabase.from("class_types").select("name, description").eq("id", occ.class_type_id).maybeSingle()
+      ? supabase.from("class_types").select("name, description, image_url").eq("id", occ.class_type_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("bookings")
       .select("id, status, waitlist_position")
@@ -64,7 +65,7 @@ export default async function ClassDetail({ params }: { params: { id: string } }
     : [];
 
   return (
-    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+    <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       <Link href="/book" className="m-sub mb-3 inline-flex items-center gap-1 text-ink-2">
         <Icon name="chevron-left" size={16} /> All classes
       </Link>
@@ -73,6 +74,14 @@ export default async function ClassDetail({ params }: { params: { id: string } }
           .m-display uppercases. "MAT PILATES" is a typographic decision about
           someone else's content — the same call as not shouting the studio's
           own name on the login screen. */}
+      {/* Large here, small on the list card. This is the screen where a member
+          is deciding, so the photograph gets to do some persuading. */}
+      {type?.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={type.image_url} alt="" aria-hidden
+             className="mb-4 h-52 w-full rounded-[22px] object-cover" />
+      )}
+
       <h1 className="m-title text-ink">{occ.name}</h1>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -88,8 +97,8 @@ export default async function ClassDetail({ params }: { params: { id: string } }
       </div>
       <p className="m-sub mt-1 text-ink-2">{fmtDayLong(occ.starts_at, ctx.timeZone)}</p>
       {occ.rooms?.name && (
-        <p className="m-sub mt-2 flex items-center gap-2 text-ink-2">
-          <Icon name="door" size={16} className="text-ink-3" /> {occ.rooms.name}
+        <p className="m-meta mt-3 flex items-center gap-2.5 text-ink-2">
+          <IconChip name="door" /> {occ.rooms.name}
         </p>
       )}
 

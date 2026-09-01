@@ -25,7 +25,10 @@ const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: "/book", label: "Book", icon: "calendar" },
   { href: "/check-in", label: "Check in", icon: "qr" },
   { href: "/history", label: "History", icon: "clock" },
-  { href: "/membership", label: "Plan", icon: "card" },
+  // "Account", not "Plan": this tab holds the membership, the credits, the
+  // payment state AND the member's own profile, and a card icon promised only
+  // the first of those.
+  { href: "/account", label: "Account", icon: "user" },
 ];
 
 export default function TabBar({ badges = {} }: { badges?: Partial<Record<string, number>> }) {

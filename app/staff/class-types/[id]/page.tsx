@@ -18,7 +18,7 @@ export default async function EditClassType({ params }: { params: { id: string }
     );
   }
   const { data: t } = await supabase.from("class_types")
-    .select("id, name, description, duration_minutes, default_capacity, difficulty, color, status")
+    .select("id, name, description, duration_minutes, default_capacity, difficulty, color, status, image_url")
     .eq("id", params.id).maybeSingle();
   if (!t) notFound();
   return (

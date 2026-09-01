@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
-import { saveClassType, type SetupState } from "../setup/actions";
+import { saveClassType, uploadClassTypeImage, type SetupState } from "../setup/actions";
 
 export type ClassTypeDraft = {
   id?: string; name: string; description: string | null; duration_minutes: number;
   default_capacity: number; difficulty: string | null; color: string | null; status: string;
+  image_url?: string | null;
 };
 
 function Submit({ label }: { label: string }) {
@@ -17,7 +18,9 @@ function Submit({ label }: { label: string }) {
 
 export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; mode: "create" | "edit" }) {
   const [state, action] = useFormState<SetupState, FormData>(saveClassType, null);
+  const [imgState, imgAction] = useFormState<SetupState, FormData>(uploadClassTypeImage, null);
   return (
+    <>
     <form action={action} className="max-w-md space-y-4">
       {state && <Notice kind="error">{state.error}</Notice>}
       {draft.id && <input type="hidden" name="id" value={draft.id} />}
@@ -70,5 +73,34 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
         <Link href="/class-types" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>
       </div>
     </form>
+
+    {/* A second form, not a field in the first one: an image upload is a
+        separate request and putting it inside the save form would mean a
+        member could not change a photograph without re-submitting everything
+        else. Only offered once the class type exists — an image needs a row to
+        belong to. */}
+    {draft.id && (
+      <form action={imgAction} className="mt-8 max-w-md space-y-3 border-t border-line pt-6">
+        {imgState && <Notice kind="error">{imgState.error}</Notice>}
+        <input type="hidden" name="id" value={draft.id} />
+        <span className="block text-[13px] font-medium leading-[18px] text-ink">Photo</span>
+        {draft.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={draft.image_url} alt="" className="h-32 w-full rounded-lg border border-line object-cover" />
+        ) : (
+          <p className="text-[12px] leading-4 text-ink-3">
+            No photo yet. Members see a card with no picture on it.
+          </p>
+        )}
+        <input name="image" type="file" accept="image/png,image/jpeg,image/webp"
+               className="block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-paper" />
+        <p className="text-[12px] leading-4 text-ink-3">
+          Shown on the member&rsquo;s class list and detail screen. Landscape, under 2 MB.
+        </p>
+        <Submit label="Upload" />
+      </form>
+    )}
+
+    </>
   );
 }

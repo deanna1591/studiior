@@ -1,4 +1,5 @@
 import TabBar from "./tab-bar";
+import MemberHeader from "./header";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 
 /**
@@ -14,9 +15,12 @@ import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 export default function MemberShell({
   studioName, logoUrl, title, children, bare = false,
   preset = "warm", accent, openOffers = 0,
+  memberName = "", avatarUrl = null,
 }: {
   studioName: string;
   logoUrl: string | null;
+  memberName?: string;
+  avatarUrl?: string | null;
   title?: string;
   children: React.ReactNode;
   bare?: boolean;
@@ -31,25 +35,15 @@ export default function MemberShell({
   return (
     <div className="min-h-dvh bg-paper" style={vars}>
       {!bare && (
-        <header className="sticky top-0 z-20 border-b border-line bg-surface px-4 py-3">
-          <div className="mx-auto flex max-w-lg items-center gap-2.5">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={studioName} className="h-7 w-7 rounded object-cover" />
-            ) : (
-              <span
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
-                className="flex h-7 w-7 items-center justify-center rounded text-[13px] font-semibold"
-              >
-                {studioName.slice(0, 1)}
-              </span>
-            )}
-            <span className="truncate text-[15px] font-medium leading-5 text-ink">{studioName}</span>
-          </div>
-        </header>
+        <MemberHeader
+          studioName={studioName}
+          logoUrl={logoUrl}
+          memberName={memberName}
+          avatarUrl={avatarUrl}
+        />
       )}
-      <main className={`m-scroll mx-auto max-w-lg px-4 ${bare ? "pt-4" : "pt-4"}`}>
-        {title && <h1 className="m-display mb-4 text-ink">{title}</h1>}
+      <main className={`m-scroll mx-auto max-w-lg px-4 ${bare ? "pt-4" : "pt-2"}`}>
+        {title && <h1 className="m-display mb-5 text-ink">{title}</h1>}
         {children}
       </main>
       <TabBar badges={{ "/": openOffers }} />

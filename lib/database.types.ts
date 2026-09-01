@@ -1075,6 +1075,7 @@ export type Database = {
           difficulty: string | null
           duration_minutes: number
           id: string
+          image_url: string | null
           is_demo: boolean
           name: string
           status: string
@@ -1089,6 +1090,7 @@ export type Database = {
           difficulty?: string | null
           duration_minutes: number
           id?: string
+          image_url?: string | null
           is_demo?: boolean
           name: string
           status?: string
@@ -1103,6 +1105,7 @@ export type Database = {
           difficulty?: string | null
           duration_minutes?: number
           id?: string
+          image_url?: string | null
           is_demo?: boolean
           name?: string
           status?: string
@@ -2223,6 +2226,7 @@ export type Database = {
           lifetime_visits: number
           marketing_opt_in: boolean
           phone: string | null
+          preferred_name: string | null
           source: string | null
           status: Database["public"]["Enums"]["member_status"]
           studio_id: string
@@ -2253,6 +2257,7 @@ export type Database = {
           lifetime_visits?: number
           marketing_opt_in?: boolean
           phone?: string | null
+          preferred_name?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["member_status"]
           studio_id: string
@@ -2283,6 +2288,7 @@ export type Database = {
           lifetime_visits?: number
           marketing_opt_in?: boolean
           phone?: string | null
+          preferred_name?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["member_status"]
           studio_id?: string

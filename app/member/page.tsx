@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
-import { ActionForm, BookForm, PrimaryButton, QuietButton } from "@/components/member/ui";
+import { ActionForm, BookForm, QuietButton } from "@/components/member/ui";
+import IconChip from "@/components/member/icon-chip";
+import Avatar from "@/components/member/avatar";
+import { Icon } from "@/components/member/icons";
 import { bookClass, cancelBooking, respondToOffer } from "./actions";
 import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts } from "@/lib/time";
 
@@ -16,13 +19,22 @@ export const dynamic = "force-dynamic";
  * describing the class and becomes the way in.
  */
 export default async function MemberHome() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers, memberName, avatarUrl} = await memberScreen();
   const now = Date.now();
 
-  const [{ data: bookings }, { data: offers }, membership, { data: upcoming }] = await Promise.all([
+  // The first of this month, in the studio's zone — not UTC, or a member in
+  // Prague sees "classes this month" tick over at 2am on the wrong day.
+  const monthStart = new Date(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: ctx.timeZone, year: "numeric", month: "2-digit",
+    }).format(new Date()) + "-01T00:00:00Z",
+  );
+
+  const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth }] =
+    await Promise.all([
     supabase
       .from("bookings")
-      .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, instructors!instructor_id(display_name), rooms(name))")
+      .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name))")
       .eq("member_id", ctx.memberId)
       .in("status", ["booked", "waitlisted"])
       .order("booked_at"),
@@ -34,10 +46,15 @@ export default async function MemberHome() {
     membershipState(supabase, ctx.memberId),
     supabase
       .from("class_occurrences")
-      .select("id, name, starts_at, capacity, booked_count, instructors!instructor_id(display_name)")
+      .select("id, name, starts_at, capacity, booked_count, instructors!instructor_id(display_name), class_types(image_url)")
       .gt("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(3),
+    supabase
+      .from("check_ins")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", ctx.memberId)
+      .gte("checked_in_at", monthStart.toISOString()),
   ]);
 
   const mine = (bookings ?? [])
@@ -63,13 +80,34 @@ export default async function MemberHome() {
 
   const day = (iso: string) => relativeDayName(iso, ctx.timeZone) ?? fmtDayLong(iso, ctx.timeZone);
 
+  // Their morning, not the server's. A member in Prague opening this at 7am
+  // should not be told good evening because the box is in Virginia.
+  const localHour = Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, hour: "numeric", hour12: false })
+      .format(new Date()),
+  );
+  const greeting = localHour < 12 ? "Good morning" : localHour < 18 ? "Good afternoon" : "Good evening";
+
   return (
-    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+    <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+      {/* The greeting. First person, their name, their part of the day — the one
+          line in the app that speaks TO them rather than about their booking. */}
+      {/* Text only. The greeting had the member's photograph beside it and the
+          header has it too, a hundred pixels above — the same face twice on one
+          screen reads as a duplication bug rather than as warmth. The header
+          keeps it, because that is the one place it appears on every screen. */}
+      <div className="mb-5">
+        <p className="m-meta text-ink-3">{greeting}</p>
+        <p className="text-[22px] font-semibold leading-7 text-ink">
+          {memberName || "there"}
+        </p>
+      </div>
+
       {/* A live waitlist offer outranks everything: the seat is held for this
           member and only for as long as the offer lasts. §4.2. */}
       {(offers ?? []).map((o) => (
         <ActionForm key={o.id} action={respondToOffer} className="mb-4">
-          <div className="rounded-lg border border-line-2 bg-lime-tint p-4">
+          <div className="rounded-[22px] p-5" style={{ background: "var(--lime-tint)" }}>
             <p className="m-body text-ink">
               A place has opened in{" "}
               <span className="font-medium">{o.class_occurrences?.name}</span>
@@ -97,7 +135,7 @@ export default async function MemberHome() {
       ))}
 
       {pastDue && (
-        <div className="mb-4 border-l-[3px] px-3 py-2.5"
+        <div className="mb-4 rounded-[22px] border-l-[3px] px-4 py-3.5"
              style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}>
           <p className="m-sub text-ink">
             Your last payment didn&rsquo;t go through. Pop into the studio or reply
@@ -108,15 +146,35 @@ export default async function MemberHome() {
 
       {/* ---- the next class ---- */}
       {occ ? (
-        <section className="rounded-xl border border-line bg-surface p-4">
-          <p className="m-micro text-ink-3">
+        <section className="m-card overflow-hidden">
+          {/* The photograph runs to the card's edges and the type sits under it.
+              Text over the image would need a scrim and would be unreadable
+              against whatever the studio uploaded; the card is not the login
+              screen and does not have a scrim to hide behind. */}
+          {occ.class_types?.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={occ.class_types.image_url} alt="" aria-hidden
+                 className="h-40 w-full object-cover" />
+          )}
+          <div className="p-5">
+          <p className="m-meta text-ink-3">
             {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone)}</span>
           </p>
-          <h1 className="m-display mt-1 text-ink">{occ.name}</h1>
-          <p className="m-sub mt-1 text-ink-2">
-            {occ.instructors?.display_name ?? "Instructor to be confirmed"}
-            {occ.rooms?.name ? ` · ${occ.rooms.name}` : ""}
-          </p>
+          <h1 className="m-title mt-1 text-ink">{occ.name}</h1>
+          <div className="mt-3 space-y-2.5">
+            <p className="m-meta flex items-center gap-2.5 text-ink-2">
+              {occ.instructors?.avatar_url
+                ? <Avatar name={occ.instructors.display_name} url={occ.instructors.avatar_url} size={32} />
+                : <IconChip name="person" />}
+              {occ.instructors?.display_name ?? "Instructor to be confirmed"}
+            </p>
+            {occ.rooms?.name && (
+              <p className="m-meta flex items-center gap-2.5 text-ink-2">
+                <IconChip name="door" />
+                {occ.rooms.name}
+              </p>
+            )}
+          </div>
 
           {inWindow ? (
             <>
@@ -151,10 +209,11 @@ export default async function MemberHome() {
               )}
             </div>
           )}
+          </div>
         </section>
       ) : (
-        <section className="rounded-xl border border-dashed border-line-2 p-4">
-          <h1 className="m-display text-ink">Nothing booked</h1>
+        <section className="m-card p-5">
+          <h1 className="m-title text-ink">Nothing booked</h1>
           <p className="m-sub mt-1 text-ink-2">Here&rsquo;s what&rsquo;s on next.</p>
           <ul className="mt-3 divide-y divide-line">
             {(upcoming ?? []).map((o) => (
@@ -184,40 +243,40 @@ export default async function MemberHome() {
         </section>
       )}
 
-      {/* ---- the two numbers that matter ---- */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-line bg-surface p-3">
-          <p className="m-micro text-ink-3">
-            {credits === null && membership.live ? "Membership" : "Classes left"}
-          </p>
-          <p className="mt-0.5 text-ink">
+      {/* ---- the three numbers that matter ----
+          A row of tinted squares, each with its icon on a chip. Three and not
+          two because "classes this month" is the one a member actually counts,
+          and it was the only one the app knew and never showed. */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="m-card p-4">
+          <IconChip name="ticket" size={36} icon={18} />
+          <p className="num m-stat mt-2.5 text-ink">
             {membership.live
-              ? credits === null
-                ? <span className="m-body">Unlimited</span>
-                : <><span className="num text-[26px] leading-8">{credits}</span></>
-              : <span className="m-body text-ink-2">None yet</span>}
+              ? credits === null ? "∞" : credits
+              : "—"}
           </p>
-          {membership.live && (
-            <p className="m-micro text-ink-3">{membership.live.membership_plans?.name}</p>
-          )}
+          <p className="m-meta text-ink-3">
+            {membership.live && credits === null ? "Unlimited" : "Classes left"}
+          </p>
         </div>
-        <div className="rounded-lg border border-line bg-surface p-3">
-          <p className="m-micro text-ink-3">Weekly streak</p>
-          <p className="mt-0.5 text-ink">
-            <span className="num text-[26px] leading-8">{ctx.streak}</span>
-            <span className="m-micro ml-1 text-ink-3">
-              {ctx.streak === 1 ? "week" : "weeks"}
-            </span>
-          </p>
+        <div className="m-card p-4">
+          <IconChip name="flame" size={36} icon={18} />
+          <p className="num m-stat mt-2.5 text-ink">{ctx.streak}</p>
+          <p className="m-meta text-ink-3">{ctx.streak === 1 ? "Week streak" : "Week streak"}</p>
+        </div>
+        <div className="m-card p-4">
+          <IconChip name="calendar" size={36} icon={18} />
+          <p className="num m-stat mt-2.5 text-ink">{thisMonth ?? 0}</p>
+          <p className="m-meta text-ink-3">This month</p>
         </div>
       </div>
 
       {mine.filter((b) => b.status === "booked" && b.id !== next?.id).length > 0 && (
-        <section className="mt-4">
-          <h2 className="m-sub mb-2 font-medium text-ink">Also booked</h2>
-          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+        <section className="mt-6">
+          <h2 className="m-sub mb-2.5 font-medium text-ink">Also booked</h2>
+          <ul className="m-card divide-y divide-line overflow-hidden">
             {mine.filter((b) => b.status === "booked" && b.id !== next?.id).map((b) => (
-              <li key={b.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
                 <span className="min-w-0">
                   <span className="m-body block truncate text-ink">{b.class_occurrences!.name}</span>
                   <span className="m-micro block text-ink-3">

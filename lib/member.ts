@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { signAvatar } from "@/lib/avatars";
 import { getMemberContext } from "@/lib/auth";
 import type { PresetKey } from "@/lib/theme";
 
@@ -16,7 +17,7 @@ export async function memberScreen() {
   if (!ctx) redirect("/login");
 
   const supabase = createClient();
-  const [{ data: studio }, { data: settings }, { count: offerCount }] = await Promise.all([
+  const [{ data: studio }, { data: settings }, { count: offerCount }, { data: me }] = await Promise.all([
     supabase.from("studios").select("name, logo_url, theme_preset, accent_color").eq("id", ctx.studioId).maybeSingle(),
     supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
     // A live waitlist offer is the one number in this app that is worth a
@@ -29,7 +30,18 @@ export async function memberScreen() {
       .is("responded_at", null)
       .gt("expires_at", new Date().toISOString())
       .eq("bookings.member_id", ctx.memberId),
+    supabase
+      .from("members")
+      .select("first_name, last_name, preferred_name, avatar_url")
+      .eq("id", ctx.memberId)
+      .maybeSingle(),
   ]);
+
+  // preferred_name first: it is what they asked to be called, and the greeting
+  // is the one place in the app that speaks to them rather than about them.
+  const displayName = me?.preferred_name?.trim() || me?.first_name || "";
+  // members.avatar_url holds an object path, not a URL — the bucket is private.
+  const avatarUrl = await signAvatar(supabase, me?.avatar_url);
 
   const s = Array.isArray(settings) ? settings[0] : settings;
 
@@ -39,6 +51,9 @@ export async function memberScreen() {
     studioName: studio?.name ?? "",
     logoUrl: studio?.logo_url ?? null,
     openOffers: offerCount ?? 0,
+    memberName: displayName,
+    memberFullName: [me?.first_name, me?.last_name].filter(Boolean).join(" "),
+    avatarUrl,
     preset: (studio?.theme_preset ?? "warm") as PresetKey,
     accent: studio?.accent_color ?? null,
     settings: {

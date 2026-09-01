@@ -346,4 +346,105 @@ select expect_num('and cannot read the invites',
   (select count(*) from member_invites), 0);
 reset role;
 
+-- =============================================================================
+-- A member owns their contact details and nothing else (migration 035)
+-- =============================================================================
+-- members_self_update is `using (user_id = auth.uid())` with no column
+-- restriction, and authenticated holds UPDATE on all 28 columns — RLS is
+-- row-level and decides which ROWS, never which columns. Before the guard a
+-- member could sign her own waiver and promote herself past the §2.1 gate.
+
+-- Vera claimed an account earlier in this suite, so she is a member editing her
+-- own row — which is exactly the case the guard exists for.
+select set_config('a.vera_uid',
+  (select user_id::text from members where id = 'abababab-0000-0000-0000-00000000dd01'), false);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub', current_setting('a.vera_uid'), false);
+
+do $$
+begin
+  update members set waiver_signed_at = now() - interval '1 day'
+   where id = 'abababab-0000-0000-0000-00000000dd01';
+  raise exception 'FAIL  a member signed her own waiver';
+exception when sqlstate 'PT403' then
+  raise notice 'PASS  a member cannot sign her own waiver';
+end $$;
+
+do $$
+begin
+  update members set status = 'lead' where id = 'abababab-0000-0000-0000-00000000dd01';
+  raise exception 'FAIL  a member changed her own status';
+exception when sqlstate 'PT403' then
+  raise notice 'PASS  a member cannot change her own status';
+end $$;
+
+do $$
+begin
+  update members set health_band = 'healthy', lifetime_visits = 999
+   where id = 'abababab-0000-0000-0000-00000000dd01';
+  raise exception 'FAIL  a member rewrote her own health and visit count';
+exception when sqlstate 'PT403' then
+  raise notice 'PASS  a member cannot rewrite her health band or visit count';
+end $$;
+
+-- Moving a row to another studio would be a tenant break, not just an edit.
+do $$
+begin
+  update members set studio_id = 'abababab-0000-0000-0000-000000000002'
+   where id = 'abababab-0000-0000-0000-00000000dd01';
+  raise exception 'FAIL  a member moved herself to another studio';
+exception when sqlstate 'PT403' or sqlstate '42501' then
+  raise notice 'PASS  a member cannot move herself to another studio';
+end $$;
+
+-- And the things that ARE hers.
+update members
+   set preferred_name = 'Vee', phone = '+420 700 000 111',
+       avatar_url = 'abababab-0000-0000-0000-00000000dd01/a.jpg',
+       emergency_contact = '{"name":"Kin","phone":"+420 700 000 222"}'::jsonb
+ where id = 'abababab-0000-0000-0000-00000000dd01';
+select expect_text('a member can set what we call her',
+  (select preferred_name from members where id = 'abababab-0000-0000-0000-00000000dd01'), 'Vee');
+select expect_text('...her own photograph',
+  (select avatar_url from members where id = 'abababab-0000-0000-0000-00000000dd01'),
+  'abababab-0000-0000-0000-00000000dd01/a.jpg');
+select expect_text('...and her emergency contact',
+  (select emergency_contact ->> 'name' from members where id = 'abababab-0000-0000-0000-00000000dd01'), 'Kin');
+reset role;
+
+-- Front desk is unaffected: editing a member is their job (Permissions §5).
+-- Counting rows, because RLS refuses an UPDATE by making the row invisible and
+-- PostgREST calls that a 200 with an empty array.
+-- The front desk this suite already created at the top, reused rather than
+-- inserted again: studio_staff is unique on (studio_id, lower(email)).
+set role authenticated;
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000a1',false);
+do $$
+declare n int;
+begin
+  update members set status = 'lead', waiver_signed_at = now()
+   where id = 'abababab-0000-0000-0000-00000000dd01';
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'FAIL  the guard blocked front desk (% rows)', n;
+  end if;
+  raise notice 'PASS  front desk still edits a member, guard and all';
+end $$;
+reset role;
+
+-- The storage policy scopes on the member's own id, the same shape as the
+-- studio prefix in migration 029.
+set role authenticated;
+select set_config('request.jwt.claim.sub', current_setting('a.vera_uid'), false);
+do $$
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('member-avatars', 'abababab-0000-0000-0000-00000000dd03/hijack.jpg');
+  raise exception 'FAIL  a member wrote into another member''s avatar folder';
+exception when insufficient_privilege or check_violation then
+  raise notice 'PASS  a member cannot write into another member''s avatar folder';
+end $$;
+reset role;
+
 select 'ALL MEMBER ACCOUNT TESTS PASSED' as result;

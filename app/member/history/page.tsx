@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * is what puts the class names back.
  */
 export default async function History() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers, memberName, avatarUrl} = await memberScreen();
 
   const [{ data: visits }, { data: achievements }] = await Promise.all([
     supabase
@@ -42,7 +42,7 @@ export default async function History() {
   }
 
   return (
-    <MemberShell openOffers={openOffers} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your history">
+    <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your history">
       <div className="mb-5 grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-line bg-surface p-3">
           <p className="m-micro text-ink-3">Classes</p>

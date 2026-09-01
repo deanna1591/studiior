@@ -156,6 +156,18 @@ body {
    in one corner of somebody's photo from eating a letter. Never used on the
    gradient, which is a known colour and needs no help. */
 .m-on-photo { text-shadow: 0 1px 12px rgb(0 0 0 / 0.55), 0 1px 3px rgb(0 0 0 / 0.45); }
+/* The type range. Everything used to sit between 12 and 17px, which is why the
+   cards read as paragraphs: no size said "this is the thing you are looking
+   for". The time is what a member scans a list for, so it is the biggest thing
+   on the card, and the instructor and room drop to 13 to get out of its way. */
+/* Sized by measuring, not by taste. At 375px the card is 343 wide; minus its
+   padding, the thumbnail and the gap, the time and its duration pill share
+   243px. At 24px the time alone was 185 and the pill wrapped; at 22 it was 169
+   and the pair overflowed by exactly the gap. 21px measures 161, which leaves
+   ten to spare. Still 1.6x the 13px metadata, which is the range that matters. */
+.m-time  { font-size: 21px; line-height: 25px; font-weight: 600; letter-spacing: -0.01em; }
+.m-meta  { font-size: 13px; line-height: 17px; }
+.m-stat  { font-size: 26px; line-height: 30px; font-weight: 650; letter-spacing: -0.015em; }
 .m-tap    { min-height: 44px; }
 .m-action { min-height: 56px; }
 
@@ -181,12 +193,38 @@ body {
    When a studio has no photograph the login panel uses .m-panel instead —
    blur over a flat gradient is the fog case again. */
 .m-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  /* Tinted, not white: --accent-wash is the studio's accent at 3.5% over the
+     surface, so a terracotta studio gets a warm card and a navy one a cool
+     card, and neither reads as a colour. A white card on a white page has no
+     edge except its hairline, which is what made this look like a document.
+
+     Depth is two shadows and no border. One soft wide shadow puts the card
+     above the page; one tight dark one gives it an edge where it meets the
+     page. A 1px hairline does the second job flatly and the first not at all. */
+  background: var(--accent-wash);
+  border: none;
+  border-radius: 22px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 6px 16px -6px rgb(0 0 0 / 0.10),
+    0 16px 32px -12px rgb(0 0 0 / 0.08);
 }
-.m-card-booked { border-color: var(--lime-text); border-width: 1.5px; }
+/* A booked class keeps a ring, because it is the one card whose state has to
+   survive being glanced at. Inset so it does not add a pixel to the layout. */
+.m-card-booked { box-shadow: inset 0 0 0 1.5px var(--lime-text), 0 1px 2px rgb(0 0 0 / 0.05), 0 6px 16px -6px rgb(0 0 0 / 0.10); }
+
+/* The square behind an icon. Small, fully soft-cornered, filled with the
+   accent at 14% — an icon floating on a card is a mark, an icon on a chip is a
+   component, and the difference is most of what makes a list of metadata read
+   as an app. */
+.m-icon-chip {
+  background: var(--accent-chip);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
 
 /* Both login panels are bottom sheets: full width, anchored to the bottom
    edge, rounded on the top corners only and with a hairline only along the top.

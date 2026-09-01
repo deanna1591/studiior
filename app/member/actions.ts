@@ -102,7 +102,7 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
 
 /** Every member screen shows some slice of the same booking state. */
 function revalidateMember() {
-  for (const p of ["/", "/book", "/history", "/membership"]) revalidatePath(p);
+  for (const p of ["/", "/book", "/history", "/account"]) revalidatePath(p);
 }
 
 export type ActionResult = { ok: boolean; message: string } | null;
@@ -321,4 +321,104 @@ export async function updateEmailPreferences(
 
   revalidatePath("/settings");
   return "ok";
+}
+
+/**
+ * The member's own profile.
+ *
+ * Writes straight to `members` under members_self_update, which is now bounded
+ * by the trigger from migration 035: a member may change these fields and
+ * nothing else. Before that trigger this same policy let a member sign their
+ * own waiver and promote themselves to active, so the screen this action backs
+ * would have been a form over a hole.
+ */
+export async function updateProfile(
+  _prev: ActionResult, formData: FormData,
+): Promise<ActionResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const supabase = createClient();
+  const str = (k: string) => {
+    const v = String(formData.get(k) ?? "").trim();
+    return v === "" ? null : v;
+  };
+
+  const ecName = str("emergency_name");
+  const ecPhone = str("emergency_phone");
+
+  const { data, error } = await supabase
+    .from("members")
+    .update({
+      preferred_name: str("preferred_name"),
+      phone: str("phone"),
+      // Stored as one object so it is either a usable contact or absent — a
+      // name with no number is not somebody you can ring.
+      emergency_contact: ecName || ecPhone ? { name: ecName, phone: ecPhone } : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ctx.memberId)
+    .select("id");
+
+  if (error) {
+    return error.code === "PT403" || /may change their own contact details/.test(error.message)
+      ? { ok: false, message: "That is not something you can change here — ask the studio." }
+      : { ok: false, message: error.message };
+  }
+  // RLS refuses an UPDATE by making the row invisible, which PostgREST returns
+  // as 200 and an empty array rather than an error.
+  if (!data || data.length === 0) return { ok: false, message: "That did not save. Please try again." };
+
+  revalidatePath("/account");
+  revalidatePath("/");
+  return { ok: true, message: "Saved." };
+}
+
+/**
+ * Their photograph.
+ *
+ * Into `member-avatars`, which is private, under a path whose first segment is
+ * the member's own id — the storage policy joins that back to `members` and
+ * checks the caller owns the row, so a member uploads their photograph and
+ * nobody else's whatever this function does. `members.avatar_url` holds the
+ * object PATH, not a URL: every read is signed at render.
+ */
+export async function uploadAvatar(
+  _prev: ActionResult, formData: FormData,
+): Promise<ActionResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const file = formData.get("avatar") as File | null;
+  if (!file || file.size === 0) return { ok: false, message: "Choose a photo first." };
+  if (file.size > 2_000_000) {
+    return { ok: false, message: "That photo is over 2 MB. Most phones can export a smaller one." };
+  }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    return { ok: false, message: "JPEG, PNG or WebP." };
+  }
+
+  const supabase = createClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const path = `${ctx.memberId}/avatar-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from("member-avatars")
+    .upload(path, file, { cacheControl: "3600", upsert: false });
+  if (error) {
+    return /row-level security|Unauthorized/i.test(error.message)
+      ? { ok: false, message: "That photo could not be saved to your account." }
+      : { ok: false, message: error.message };
+  }
+
+  const { data, error: upErr } = await supabase
+    .from("members").update({ avatar_url: path }).eq("id", ctx.memberId).select("id");
+  if (upErr) return { ok: false, message: upErr.message };
+  if (!data || data.length === 0) {
+    return { ok: false, message: "The photo uploaded but your profile could not be updated." };
+  }
+
+  revalidatePath("/account");
+  revalidatePath("/");
+  return { ok: true, message: "Photo updated." };
 }
