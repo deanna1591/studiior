@@ -3052,9 +3052,17 @@ export type Database = {
           is_demo: boolean
           member_id: string | null
           membership_id: string | null
+          method: string | null
+          method_note: string | null
           next_retry_at: string | null
           paid_at: string | null
           promo_code_id: string | null
+          provider: Database["public"]["Enums"]["payment_provider"]
+          recorded_by: string | null
+          reference: string | null
+          refund_reason: string | null
+          refunded_at: string | null
+          refunded_cents: number
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
           stripe_invoice_id: string | null
@@ -3078,9 +3086,17 @@ export type Database = {
           is_demo?: boolean
           member_id?: string | null
           membership_id?: string | null
+          method?: string | null
+          method_note?: string | null
           next_retry_at?: string | null
           paid_at?: string | null
           promo_code_id?: string | null
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          recorded_by?: string | null
+          reference?: string | null
+          refund_reason?: string | null
+          refunded_at?: string | null
+          refunded_cents?: number
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_invoice_id?: string | null
@@ -3104,9 +3120,17 @@ export type Database = {
           is_demo?: boolean
           member_id?: string | null
           membership_id?: string | null
+          method?: string | null
+          method_note?: string | null
           next_retry_at?: string | null
           paid_at?: string | null
           promo_code_id?: string | null
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          recorded_by?: string | null
+          reference?: string | null
+          refund_reason?: string | null
+          refunded_at?: string | null
+          refunded_cents?: number
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_invoice_id?: string | null
@@ -3155,6 +3179,13 @@ export type Database = {
             columns: ["promo_code_id"]
             isOneToOne: false
             referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -3848,6 +3879,7 @@ export type Database = {
           payment_grace_days: number
           reminder_hours_before: number
           require_waiver: boolean
+          setup_optional_items: string[]
           setup_progress: Json
           studio_id: string
           sub_late_free_cancel: boolean
@@ -3879,6 +3911,7 @@ export type Database = {
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
+          setup_optional_items?: string[]
           setup_progress?: Json
           studio_id: string
           sub_late_free_cancel?: boolean
@@ -3910,6 +3943,7 @@ export type Database = {
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
+          setup_optional_items?: string[]
           setup_progress?: Json
           studio_id?: string
           sub_late_free_cancel?: boolean
@@ -4323,6 +4357,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      activate_purchase: {
+        Args: {
+          p_currency: string
+          p_member_id: string
+          p_plan_id: string
+          p_price_cents: number
+          p_stripe_customer?: string
+          p_stripe_subscription?: string
+          p_studio_id: string
+        }
+        Returns: string
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_role_in: {
@@ -4369,6 +4415,7 @@ export type Database = {
         Args: { p_bucket: number; p_member_id: string }
         Returns: string
       }
+      choose_pay_at_desk: { Args: { p_booking_id: string }; Returns: Json }
       claim_member_account: {
         Args: { p_full_name?: string; p_password: string; p_token: string }
         Returns: Database["public"]["CompositeTypes"]["member_claim"]
@@ -4393,6 +4440,10 @@ export type Database = {
         Args: { p_account_id: string; p_state: string }
         Returns: string
       }
+      confirm_dropin_payment: {
+        Args: { p_booking_id: string; p_studio_id: string }
+        Returns: boolean
+      }
       create_member_invite: {
         Args: { p_days?: number; p_member_id: string }
         Returns: {
@@ -4408,38 +4459,6 @@ export type Database = {
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
-      }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
-        Returns: undefined
       }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       generate_morning_brief: {
@@ -4466,7 +4485,6 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_checkin_code: {
         Args: never
@@ -4562,6 +4580,31 @@ export type Database = {
         Returns: number
       }
       reconcile_notification_sends: { Args: never; Returns: Json }
+      record_manual_payment: {
+        Args: {
+          p_amount_cents: number
+          p_booking_id?: string
+          p_currency?: string
+          p_description?: string
+          p_kind: string
+          p_member_id: string
+          p_method: string
+          p_method_note?: string
+          p_paid_at?: string
+          p_plan_id?: string
+          p_reference?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      record_refund: {
+        Args: {
+          p_amount_cents?: number
+          p_payment_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
       render_notification: {
@@ -4663,7 +4706,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }
         Returns: string
@@ -4789,6 +4831,7 @@ export type Database = {
         | "failed"
         | "cancelled"
       occurrence_status: "scheduled" | "cancelled" | "completed"
+      payment_provider: "manual" | "stripe"
       payment_source:
         | "membership"
         | "class_pack"
@@ -5027,6 +5070,7 @@ export const Constants = {
         "cancelled",
       ],
       occurrence_status: ["scheduled", "cancelled", "completed"],
+      payment_provider: ["manual", "stripe"],
       payment_source: [
         "membership",
         "class_pack",

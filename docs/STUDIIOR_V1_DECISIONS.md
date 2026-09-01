@@ -325,3 +325,19 @@ Because rule 5 is evaluated *before* §2.2 resolves who pays, a second guard run
 Attending as a drop-in does not itself promote a lead to `active`. Status is a thing staff set when they sell something, and a booking that is never paid for at the desk should not leave a `lead` looking like a member.
 
 **Where:** Business Rules §2.1 rule 5, §2.2; migration 027. **Status:** settled.
+
+---
+
+## 16 — Studiior is a booking platform, not a payment processor
+
+Payments were built Stripe-first: migration 038 made Connect the way a membership gets sold, and a studio without a connected account could not take money through the product at all.
+
+That is the wrong foundation. **A studio records payments however it already takes money** — cash, bank transfer, GCash, a card terminal on the counter, anything. Online card payment through a connected provider is an **optional adapter on top of that**, not the thing everything else is built on.
+
+**Why.** The design partners span countries where provider coverage varies, and Stripe does not support the Philippines at all. Requiring a provider would exclude studios whose only problem is booking — which is the problem we actually solve. It is also precisely the rigidity we position against: Mindbody makes you do it their way, and a studio that already has a working way of taking money should not have to change banks to get a schedule.
+
+**What this means concretely.** `payments` carries a `provider` — `manual` or `stripe` — so revenue reporting can tell them apart and a studio can reconcile. A manual payment activates a membership, grants a pack and confirms a drop-in through *the same functions* a Stripe payment does; there is one path, not two that drift. Refunds and adjustments work the same way for both. The Stripe work stays exactly as built, as the first adapter.
+
+**The tradeoff, recorded rather than hidden.** A manual payment is the studio's own bookkeeping: they reconcile it themselves, and a membership can be marked paid when no money actually moved. Nothing in the product prevents that and nothing should try to. It is the studio's business, and a booking platform that polices its customers' cash handling has misunderstood what it is for. What we owe them is that the record says who recorded it, when, by what method and against what reference — enough to reconcile, not enough to police.
+
+**Where:** Business Rules §7.1; data model §7; migrations 040 and 041. **Status:** settled.

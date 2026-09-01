@@ -560,3 +560,29 @@ export async function startCheckout(
   if (!url) return { ok: false, message: "Stripe did not return a checkout link." };
   redirect(url);
 }
+
+/**
+ * "I'll pay at the studio."
+ *
+ * Decision 16 makes an online provider optional for the studio; this makes it
+ * optional for the member too. Somebody who does not want to type a card number
+ * into a phone at 6am confirms their seat and settles at the counter, which is
+ * what they would do at a studio with no provider at all.
+ */
+export async function payAtDesk(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("choose_pay_at_desk", {
+    p_booking_id: String(formData.get("booking_id") ?? ""),
+  });
+  if (error) {
+    return /PT409/.test(error.message)
+      ? { ok: false, message: "That hold has already been settled." }
+      : { ok: false, message: error.message };
+  }
+
+  revalidateMember();
+  return { ok: true, message: "You're booked in. Pay at the studio when you arrive." };
+}

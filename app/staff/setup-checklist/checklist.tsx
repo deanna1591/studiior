@@ -14,7 +14,7 @@ const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
   { key: "plans",          label: "Set up what you sell", hint: "Memberships, packs and drop-ins.", href: "/plans" },
   { key: "schedule",       label: "Put your week on",     hint: "Your first classes, so members have something to book.", href: "/classes/new" },
   { key: "staff",          label: "Invite your team",     hint: "Front desk and managers, so you are not the only login." },
-  { key: "connect_stripe", label: "Connect Stripe",       hint: "Take payments through your own Stripe account.", href: "/settings/stripe" },
+  { key: "connect_stripe", label: "Take card payments online", hint: "Optional. Connect Stripe to sell online — you can take cash, transfers or a terminal without it.", href: "/settings/stripe" },
 ];
 
 function Tick({ done }: { done: boolean }) {
@@ -27,7 +27,7 @@ function Tick({ done }: { done: boolean }) {
   );
 }
 
-function Row({ item, state }: { item: (typeof ITEMS)[number]; state: { done: boolean; dismissed: boolean } }) {
+function Row({ item, state }: { item: (typeof ITEMS)[number]; state: { done: boolean; dismissed: boolean; optional?: boolean } }) {
   const [, action] = useFormState<ActionState, FormData>(dismissSetupItem, null);
   return (
     <li className="flex items-start justify-between gap-4 px-3 py-2.5">
@@ -41,6 +41,14 @@ function Row({ item, state }: { item: (typeof ITEMS)[number]; state: { done: boo
           ) : (
             <span className={`text-[13px] leading-[18px] ${state.done ? "text-ink-3" : "font-medium text-ink"}`}>
               {item.label}
+            </span>
+          )}
+          {/* Decision 16: an optional item is nice to have, not outstanding. A
+              studio taking cash in Manila has finished setting up, and a list
+              that can never reach zero teaches people to stop reading it. */}
+          {state.optional && !state.done && (
+            <span className="ml-2 rounded-full bg-paper px-1.5 py-0.5 text-[11px] leading-4 text-ink-3">
+              optional
             </span>
           )}
           {!state.done && <p className="mt-0.5 text-[12px] leading-4 text-ink-3">{item.hint}</p>}
@@ -61,12 +69,16 @@ function Row({ item, state }: { item: (typeof ITEMS)[number]; state: { done: boo
 
 export default function SetupChecklist({ state }: { state: SetupState }) {
   const live = ITEMS.filter((i) => !state[i.key]?.dismissed);
-  const done = live.filter((i) => state[i.key]?.done).length;
+  // Optional items are shown while the list is up, but they do not keep it up:
+  // a studio that will never connect a provider should still see the checklist
+  // disappear when the work that actually matters is finished.
+  const required = live.filter((i) => !state[i.key]?.optional);
+  const done = required.filter((i) => state[i.key]?.done).length;
   const hidden = ITEMS.length - live.length;
 
   // Ticks come from live data, so finishing the last item makes the whole
   // thing disappear on the next load rather than lingering as a done list.
-  if (live.length === 0 || done === live.length) return null;
+  if (required.length === 0 || done === required.length) return null;
 
   return (
     <section className="mb-6 border-y border-line bg-surface">

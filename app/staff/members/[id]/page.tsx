@@ -35,7 +35,7 @@ export default async function MemberDetail({
   params, searchParams,
 }: {
   params: { id: string };
-  searchParams: { sent?: string };
+  searchParams: { sent?: string; recorded?: string };
 }) {
   const screen = await staffScreen("/members");
   if (screen.gate) return screen.gate;
@@ -90,7 +90,7 @@ export default async function MemberDetail({
   // a boundary the policy has to change.
   const { data: payments } = manager
     ? await supabase.from("payments")
-        .select("id, amount_cents, currency, status, description, card_brand, card_last4, paid_at, created_at, failure_message")
+        .select("id, amount_cents, currency, status, description, card_brand, card_last4, paid_at, created_at, failure_message, provider, method, method_note, reference, refunded_cents")
         .eq("member_id", params.id).order("created_at", { ascending: false }).limit(20)
     : { data: null };
 
@@ -111,8 +111,24 @@ export default async function MemberDetail({
     <AppShell
       {...shell}
       title={`${m.first_name} ${m.last_name}`}
-      actions={<NavLink href="/members">Back to members</NavLink>}
+      actions={
+        <>
+          {/* Front desk sells (§9) but cannot see the Payments section below,
+              which is manager-only by display choice — so their way in is here
+              rather than buried in a section they never see. */}
+          {isDeskUp(ctx.role) && (
+            <NavLink href={`/members/${params.id}/payment`}>Record a payment</NavLink>
+          )}
+          <NavLink href="/members">Back to members</NavLink>
+        </>
+      }
     >
+      {searchParams.recorded && (
+        <p className="mb-4 border-l-[3px] px-3 py-2 text-[13px] leading-[18px] text-ink"
+           style={{ borderLeftColor: "var(--lime-text)", background: "var(--lime-tint)" }}>
+          Payment recorded.
+        </p>
+      )}
       {searchParams.sent && (
         <p className="mb-4 border-l-[3px] px-3 py-2 text-[13px] leading-[18px] text-ink"
            style={{ borderLeftColor: "var(--lime-text)", background: "var(--lime-tint)" }}>
@@ -200,9 +216,15 @@ export default async function MemberDetail({
 
           {manager && (
             <section>
-              <SectionLabel>Payments</SectionLabel>
+              <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                <SectionLabel>Payments</SectionLabel>
+                <NavLink href={`/members/${params.id}/payment`}>Record a payment</NavLink>
+              </div>
               {(payments ?? []).length === 0 ? (
-                <Empty>Nothing has been charged to this member yet.</Empty>
+                <Empty>
+                  Nothing recorded yet.{" "}
+                  <NavLink href={`/members/${params.id}/payment`}>Record a payment</NavLink>
+                </Empty>
               ) : (
                 <Rows>
                   {(payments ?? []).map((p) => (
@@ -213,8 +235,19 @@ export default async function MemberDetail({
                         </span>
                         <span className="block text-[11px] leading-4 text-ink-3">
                           {d(p.paid_at ?? p.created_at)}
+                          {/* How the money arrived, which is the whole point of
+                              recording it: this is what the studio reconciles
+                              against their own books. */}
+                          {p.provider === "manual" && p.method && (
+                            <> · {p.method.replace("_", " ")}
+                              {p.method_note ? ` (${p.method_note})` : ""}</>
+                          )}
                           {p.card_brand && <> · {p.card_brand} ····{p.card_last4}</>}
+                          {p.reference && <> · ref {p.reference}</>}
                           {p.status !== "succeeded" && <> · {p.status.replace("_", " ")}</>}
+                          {p.refunded_cents > 0 && p.status === "partially_refunded" && (
+                            <> · {formatMoney(p.refunded_cents, p.currency)} back</>
+                          )}
                         </span>
                         {p.failure_message && (
                           <span className="mt-0.5 block text-[11px] leading-4 text-ink">

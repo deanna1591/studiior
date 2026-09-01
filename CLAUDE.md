@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Thirty-nine migrations, applying clean from `supabase db reset`:
+Forty-three migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,10 @@ Thirty-nine migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **043** `choose_pay_at_desk()` — a member at a studio that HAS a provider can still say they will pay at the counter. Confirms the held seat and leaves a pending payment for the desk
+- **042** `studio_setup_state()` gains an `optional` flag per item, so a checklist can say "nice to have" rather than nagging forever
+- **041** Stripe stops being the foundation and becomes the first adapter: its handlers call `activate_purchase()` and `confirm_dropin_payment()` instead of granting anything themselves, and every row it writes is stamped `provider = 'stripe'`
+- **040** Decision 16: `payments.provider`, `method`, `reference`, `recorded_by`; `record_manual_payment()` for front desk and up; `record_refund()` for managers and up; and the two shared grant functions both providers go through
 - **039** the setup checklist stops taking a studio's word for Stripe: `connect_stripe` derived from `stripe_account_id` rather than from the stub's stored flag, which was the one item in that checklist that could go stale
 - **038** Stripe Connect Standard: OAuth with a single-use state, hosted Checkout on the connected account, `stripe_webhook()` and six handlers. §7.3's `invoice.payment_failed` finally calls `queue_payment_failed()`, which migration 031 left with no caller
 - **037** a drop-in holds its seat while the member pays — `book_class()` and `cancel_booking()` replaced from their live definitions, plus `sweep_unpaid_dropins()` on pg_cron
@@ -67,7 +71,7 @@ Thirty-nine migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Sixteen suites, **646 assertions**, all passing from a clean `db reset`:
+Seventeen suites, **678 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -85,6 +89,7 @@ Sixteen suites, **646 assertions**, all passing from a clean `db reset`:
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
 | `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
 | `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
+| `test/manual_payments_test.sql` | 32 | a studio with no provider sells a membership, grants a pack and takes a drop-in; a cash membership and a Stripe membership are the same row; a refund takes back the credits she had left and not the ones she used; front desk sells but cannot refund |
 | `test/stripe_connect_test.sql` | 38 | a forged signature is refused, an event for an unknown account is rejected rather than misattributed, a replay is a no-op, a plan price rise does not reprice existing members, a failed payment blocks new bookings while existing ones stand, and an abandoned hold is swept back to the waitlist |
 | `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
 
@@ -165,6 +170,18 @@ supabase db query --linked "select p.proname, has_function_privilege('anon',p.oi
 The only names of ours that belong in that output are the six pre-login surfaces: `studio_by_slug(text)`, `studio_invite_preview(text)`, `accept_studio_invite(text,text,text)`, `member_invite_preview(text)`, `claim_member_account(text,text)` and `stripe_webhook(text,text)`. The last is the only one that WRITES, and the only one with no session behind it — see the rule below. As of migration 014 that query returns exactly those three on hosted, with no filtering needed.
 
 Note what migration 013 found: the query has to enumerate what is *actually there* on hosted, not what this repo creates. `rls_auto_enable()` is installed by the platform, exists on no local stack, and sat anon-callable through migration 011 because 011 only checked its own list.
+
+**Studiior is a booking platform, not a payment processor — Decision 16.** A studio records payments however it already takes money: cash, bank transfer, GCash, a terminal on the counter. An online provider is an optional adapter on top. Stripe does not serve the Philippines at all, and a Stripe-shaped product would have excluded design partners whose only problem is booking.
+
+**One path, not two that match.** What makes a manual payment activate a membership *identically* to a Stripe one is that both call `activate_purchase()` and `confirm_dropin_payment()` — the only code that grants anything. Two implementations would agree the day they were written and drift after. The test proves it by diffing the two membership rows field for field.
+
+**The tradeoff is recorded, not policed.** A manual payment is the studio's own bookkeeping: they reconcile it, and a membership can be marked paid when no money moved. Nothing tries to stop that. What the row owes them is who recorded it, when, by what method and against what reference — enough to reconcile, not enough to police. A booking platform that audits its customers' cash handling has misunderstood what it is for.
+
+**Front desk takes money; only a manager gives it back.** Permissions §9 reads front desk "Payments" as *taking* payment. `record_manual_payment()` is `is_desk_up()`, `record_refund()` is `is_manager_up()` — money leaving the studio needs a second pair of hands.
+
+**A full refund takes back what is left, never what was used.** Refunding a pack removes the unused credits and cancels the membership; it does not claw back classes already attended, because you cannot un-attend a Tuesday. A partial refund does not touch credits at all — what a half-refunded pack is worth is the studio's judgement, not a function's guess.
+
+**An optional checklist item does not hold the list open.** `connect_stripe` is optional under Decision 16, so it is excluded from the count in `lib/setup.ts` as well as marked in the UI. A studio taking cash in Manila has finished setting up, and a checklist stuck at "6 of 7" forever teaches people to stop reading it.
 
 **A webhook has no session, so the signature is the credential.** Every other write in this codebase goes through RLS with a real user behind it. Stripe has no user and RLS cannot express "Stripe said so", so the choice was a service-role key that can do anything to any tenant, or a function that will not act without a valid signature. `stripe_webhook()` recomputes the HMAC-SHA256 over the raw body in Postgres before it reads a single field — the same shape as `resolve_checkin_code()`, where the cryptography is the gate rather than the caller's identity. There is still no service-role client in this codebase.
 
@@ -374,6 +391,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/stripe_co
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/manual_payments_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -381,7 +402,7 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `5757` stripe, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `5757` stripe, `cafe` manual payments, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 

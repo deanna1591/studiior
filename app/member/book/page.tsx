@@ -4,7 +4,7 @@ import MemberShell from "@/components/member/shell";
 import WeekStrip, { type WeekDay } from "@/components/member/week-strip";
 import ClassCard from "@/components/member/class-card";
 import { BookForm, ActionForm, CardAction, CardActionOutline } from "@/components/member/ui";
-import { bookClass, cancelBooking, startCheckout } from "../actions";
+import { bookClass, cancelBooking, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -197,13 +197,23 @@ export default async function Book({
 
             const action = past ? null
               : holding ? (
-                  // The way back to Checkout. One tap, no re-booking: the seat
-                  // is already theirs for as long as the window lasts.
-                  <BookForm action={startCheckout}>
-                    <input type="hidden" name="kind" value="dropin" />
-                    <input type="hidden" name="booking_id" value={booking!.id} />
-                    <CardAction>Finish payment</CardAction>
-                  </BookForm>
+                  // Two ways to settle a held seat, because Decision 16 makes
+                  // paying by card optional for the member as well as for the
+                  // studio. Card is the filled button because they are already
+                  // on their phone; the desk is a quiet link beside it.
+                  <span className="flex flex-col items-end gap-1.5">
+                    <BookForm action={startCheckout}>
+                      <input type="hidden" name="kind" value="dropin" />
+                      <input type="hidden" name="booking_id" value={booking!.id} />
+                      <CardAction>Pay now</CardAction>
+                    </BookForm>
+                    <ActionForm action={payAtDesk}>
+                      <input type="hidden" name="booking_id" value={booking!.id} />
+                      <button className="m-meta text-ink-2 underline decoration-line-2 underline-offset-4">
+                        Pay at the studio
+                      </button>
+                    </ActionForm>
+                  </span>
                 )
               : booked || waiting ? (
                   <ActionForm action={cancelBooking}>
