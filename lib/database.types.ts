@@ -3660,6 +3660,24 @@ export type Database = {
           },
         ]
       }
+      stripe_config: {
+        Row: {
+          key: string
+          note: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          note?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          note?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       stripe_events: {
         Row: {
           created_at: string
@@ -3701,6 +3719,55 @@ export type Database = {
           },
           {
             foreignKeyName: "stripe_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stripe_oauth_states: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          state: string
+          studio_id: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          state: string
+          studio_id: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          state?: string
+          studio_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stripe_oauth_states_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stripe_oauth_states_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stripe_oauth_states_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -3769,6 +3836,7 @@ export type Database = {
           checkin_secret: string
           checkin_window_enforced: boolean
           created_at: string
+          dropin_payment_window_minutes: number
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -3799,6 +3867,7 @@ export type Database = {
           checkin_secret?: string
           checkin_window_enforced?: boolean
           created_at?: string
+          dropin_payment_window_minutes?: number
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -3829,6 +3898,7 @@ export type Database = {
           checkin_secret?: string
           checkin_window_enforced?: boolean
           created_at?: string
+          dropin_payment_window_minutes?: number
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -4260,6 +4330,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["staff_role"]
       }
       auth_staff_studios: { Args: never; Returns: string[] }
+      begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
         Args: {
           p_member_id: string
@@ -4318,6 +4389,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_stripe_connect: {
+        Args: { p_account_id: string; p_state: string }
+        Returns: string
+      }
       create_member_invite: {
         Args: { p_days?: number; p_member_id: string }
         Returns: {
@@ -4333,6 +4408,38 @@ export type Database = {
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
+      }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
       }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       generate_morning_brief: {
@@ -4359,6 +4466,7 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_checkin_code: {
         Args: never
@@ -4555,6 +4663,33 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
+      stripe_handle_charge_refunded: {
+        Args: { p_obj: Json; p_studio_id: string }
+        Returns: string
+      }
+      stripe_handle_checkout_completed: {
+        Args: { p_obj: Json; p_studio_id: string }
+        Returns: string
+      }
+      stripe_handle_invoice_failed: {
+        Args: { p_obj: Json; p_studio_id: string }
+        Returns: string
+      }
+      stripe_handle_invoice_paid: {
+        Args: { p_obj: Json; p_studio_id: string }
+        Returns: string
+      }
+      stripe_handle_subscription_changed: {
+        Args: { p_deleted: boolean; p_obj: Json; p_studio_id: string }
+        Returns: string
+      }
+      stripe_secret: { Args: { p_name?: string }; Returns: string }
+      stripe_setting: { Args: { p_key: string }; Returns: string }
+      stripe_webhook: {
+        Args: { p_payload: string; p_signature: string }
+        Returns: Json
+      }
       studio_by_slug: {
         Args: { p_slug: string }
         Returns: {
@@ -4598,6 +4733,11 @@ export type Database = {
           studio_id: string
         }[]
       }
+      sweep_unpaid_dropins: { Args: never; Returns: Json }
+      verify_stripe_signature: {
+        Args: { p_payload: string; p_secret: string; p_signature: string }
+        Returns: boolean
+      }
     }
     Enums: {
       billing_interval: "week" | "month" | "quarter" | "year"
@@ -4609,6 +4749,7 @@ export type Database = {
         | "late_cancelled"
         | "attended"
         | "no_show"
+        | "pending_payment"
       challenge_audience: "member" | "instructor"
       challenge_status: "draft" | "scheduled" | "active" | "ended" | "archived"
       challenge_type: "class_count" | "streak" | "class_type_count"
@@ -4841,6 +4982,7 @@ export const Constants = {
         "late_cancelled",
         "attended",
         "no_show",
+        "pending_payment",
       ],
       challenge_audience: ["member", "instructor"],
       challenge_status: ["draft", "scheduled", "active", "ended", "archived"],

@@ -35,7 +35,7 @@ export default function ClassCard({
   room: string | null;
   imageUrl?: string | null;
   statusLabel: React.ReactNode;
-  statusTone?: "quiet" | "booked" | "full";
+  statusTone?: "quiet" | "booked" | "full" | "holding";
   action: React.ReactNode;
   dimmed?: boolean;
   booked?: boolean;
@@ -93,9 +93,13 @@ export default function ClassCard({
           <div className="flex min-h-[44px] items-center justify-between gap-3">
             <span
               className={`m-sub flex items-center gap-1.5 ${
-                statusTone === "booked" ? "font-medium" : "text-ink-2"
+                statusTone === "booked" || statusTone === "holding" ? "font-medium" : "text-ink-2"
               }`}
-              style={statusTone === "booked" ? { color: "var(--lime-text)" } : undefined}
+              style={
+                statusTone === "booked"  ? { color: "var(--lime-text)" }
+                : statusTone === "holding" ? { color: "var(--amber-deep)" }
+                : undefined
+              }
             >
               {statusTone === "booked" && (
                 <span className="flex h-5 w-5 items-center justify-center rounded-full"

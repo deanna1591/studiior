@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberContext } from "@/lib/auth";
+import { stripeFor } from "@/lib/stripe";
+import { memberOrigin } from "@/lib/tenant";
 
 export async function signIn(_prev: string | null, formData: FormData) {
   const supabase = createClient();
@@ -88,6 +90,16 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
 
   if (result.status === "waitlisted") {
     return { ok: true, message: `You are #${result.waitlist_position} on the waitlist. No credit taken.` };
+  }
+
+  // A held seat is not a booking yet, and saying "Booked" would be a lie with
+  // a fifteen-minute fuse on it — the sweep takes the seat back if the member
+  // never finishes paying.
+  if (result.status === "pending_payment") {
+    return {
+      ok: true,
+      message: "We're holding your spot. Finish paying to confirm it.",
+    };
   }
 
   const paid =
@@ -421,4 +433,130 @@ export async function uploadAvatar(
   revalidatePath("/account");
   revalidatePath("/");
   return { ok: true, message: "Photo updated." };
+}
+
+/**
+ * Send a member to Stripe Checkout, hosted, on the STUDIO's account.
+ *
+ * Direct charges with no application fee: the money lands in the studio's own
+ * balance and Studiior never holds it. Card details never touch this server —
+ * the member leaves for Stripe and comes back.
+ *
+ * Everything the webhook will need travels in metadata, including price_cents,
+ * which is the price the member is agreeing to right now. §7.1 is that editing
+ * a plan never reprices anyone already on it, so the snapshot has to be taken
+ * here, at the moment of agreement, and not re-read from the plan later.
+ */
+export async function startCheckout(
+  _prev: ActionResult, formData: FormData,
+): Promise<ActionResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const kind = String(formData.get("kind") ?? "");
+  const planId = String(formData.get("plan_id") ?? "");
+  const bookingId = String(formData.get("booking_id") ?? "");
+
+  const supabase = createClient();
+  const { data: studio } = await supabase
+    .from("studios").select("id, name, slug, currency, stripe_account_id")
+    .eq("id", ctx.studioId).maybeSingle();
+
+  if (!studio?.stripe_account_id) {
+    return { ok: false, message: "This studio is not taking card payments yet." };
+  }
+
+  const { data: member } = await supabase
+    .from("members").select("email, first_name").eq("id", ctx.memberId).maybeSingle();
+
+  const origin = memberOrigin(studio.slug);
+  let url: string | null = null;
+
+  try {
+    const s = stripeFor(studio.stripe_account_id);
+
+    if (kind === "dropin") {
+      // The seat is already held as pending_payment; this is only the money.
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("id, status, class_occurrences(name)")
+        .eq("id", bookingId).eq("member_id", ctx.memberId).maybeSingle();
+      if (!booking || booking.status !== "pending_payment") {
+        return { ok: false, message: "That hold has expired. Book the class again." };
+      }
+
+      const { data: price } = await supabase
+        .from("membership_plans").select("price_cents, currency")
+        .eq("studio_id", studio.id).eq("type", "drop_in").eq("status", "active")
+        .order("sort_order").limit(1).maybeSingle();
+      if (!price) {
+        return { ok: false, message: "This studio has not set a drop-in price yet." };
+      }
+
+      const session = await s.checkout.sessions.create({
+        mode: "payment",
+        customer_email: member?.email ?? undefined,
+        line_items: [{
+          quantity: 1,
+          price_data: {
+            currency: (price.currency ?? studio.currency ?? "usd").toLowerCase(),
+            unit_amount: price.price_cents,
+            product_data: { name: booking.class_occurrences?.name ?? "Drop-in class" },
+          },
+        }],
+        success_url: `${origin}/?paid=1`,
+        cancel_url: `${origin}/book?cancelled=1`,
+        metadata: {
+          kind: "dropin",
+          studio_id: studio.id,
+          member_id: ctx.memberId,
+          booking_id: bookingId,
+          price_cents: String(price.price_cents),
+        },
+      });
+      url = session.url;
+    } else {
+      const { data: plan } = await supabase
+        .from("membership_plans")
+        .select("id, name, type, price_cents, currency, billing_interval, billing_interval_count")
+        .eq("id", planId).eq("studio_id", studio.id).eq("status", "active").maybeSingle();
+      if (!plan) return { ok: false, message: "That plan is no longer on sale." };
+
+      const recurring = plan.type === "recurring";
+      const session = await s.checkout.sessions.create({
+        mode: recurring ? "subscription" : "payment",
+        customer_email: member?.email ?? undefined,
+        line_items: [{
+          quantity: 1,
+          price_data: {
+            currency: (plan.currency ?? studio.currency ?? "usd").toLowerCase(),
+            unit_amount: plan.price_cents,
+            product_data: { name: plan.name },
+            ...(recurring
+              ? { recurring: {
+                    interval: (plan.billing_interval ?? "month") as "day" | "week" | "month" | "year",
+                    interval_count: plan.billing_interval_count ?? 1,
+                  } }
+              : {}),
+          },
+        }],
+        success_url: `${origin}/account?paid=1`,
+        cancel_url: `${origin}/account?cancelled=1`,
+        metadata: {
+          kind: "plan",
+          studio_id: studio.id,
+          member_id: ctx.memberId,
+          plan_id: plan.id,
+          // The snapshot. Taken now, never re-read from the plan later.
+          price_cents: String(plan.price_cents),
+        },
+      });
+      url = session.url;
+    }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Stripe refused that." };
+  }
+
+  if (!url) return { ok: false, message: "Stripe did not return a checkout link." };
+  redirect(url);
 }

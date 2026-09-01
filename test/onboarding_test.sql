@@ -325,10 +325,21 @@ select expect_text('the owner can dismiss it',
   (select dismiss_setup_item((select id from studios where slug='bright-test'), 'connect_stripe')::text), 'true');
 select expect_text('and it stays dismissed',
   (select (studio_setup_state((select id from studios where slug='bright-test')) -> 'connect_stripe' ->> 'dismissed')), 'true');
-select expect_text('the Stripe stub can be marked done',
+-- connect_stripe used to tick from a stored flag set by "I've done this" on the
+-- stub screen. Migration 039 derives it from a connected account instead, so
+-- the button no longer ticks anything and the checklist cannot claim a studio
+-- takes payments when it does not.
+select expect_text('the old stub button still answers',
   (select mark_stripe_stub_done((select id from studios where slug='bright-test'))::text), 'true');
-select expect_text('and reads as done',
+select expect_text('...but pressing it no longer ticks the checklist',
+  (select (studio_setup_state((select id from studios where slug='bright-test')) -> 'connect_stripe' ->> 'done')), 'false');
+
+update studios set stripe_account_id = 'acct_test_bright' where slug = 'bright-test';
+select expect_text('connecting an account is what ticks it',
   (select (studio_setup_state((select id from studios where slug='bright-test')) -> 'connect_stripe' ->> 'done')), 'true');
+update studios set stripe_account_id = null where slug = 'bright-test';
+select expect_text('and disconnecting unticks — a stored flag would have lied here too',
+  (select (studio_setup_state((select id from studios where slug='bright-test')) -> 'connect_stripe' ->> 'done')), 'false');
 
 -- Front desk has no business dismissing setup items.
 reset role;

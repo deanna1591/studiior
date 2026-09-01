@@ -14,7 +14,7 @@ const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
   { key: "plans",          label: "Set up what you sell", hint: "Memberships, packs and drop-ins.", href: "/plans" },
   { key: "schedule",       label: "Put your week on",     hint: "Your first classes, so members have something to book.", href: "/classes/new" },
   { key: "staff",          label: "Invite your team",     hint: "Front desk and managers, so you are not the only login." },
-  { key: "connect_stripe", label: "Connect Stripe",       hint: "Take payments through your own Stripe account.", href: "/stripe" },
+  { key: "connect_stripe", label: "Connect Stripe",       hint: "Take payments through your own Stripe account.", href: "/settings/stripe" },
 ];
 
 function Tick({ done }: { done: boolean }) {

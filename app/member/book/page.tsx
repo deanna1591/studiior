@@ -4,7 +4,7 @@ import MemberShell from "@/components/member/shell";
 import WeekStrip, { type WeekDay } from "@/components/member/week-strip";
 import ClassCard from "@/components/member/class-card";
 import { BookForm, ActionForm, CardAction, CardActionOutline } from "@/components/member/ui";
-import { bookClass, cancelBooking } from "../actions";
+import { bookClass, cancelBooking, startCheckout } from "../actions";
 import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -171,6 +171,11 @@ export default async function Book({
             const booking = byOcc.get(o.id);
             const booked = booking?.status === "booked";
             const waiting = booking?.status === "waitlisted";
+            // A seat held while the member finishes paying. Deliberately not
+            // rendered as booked: they have not paid, the sweep will take it
+            // back, and telling them they are in the class would be a lie with
+            // a fifteen-minute fuse on it.
+            const holding = booking?.status === "pending_payment";
             const spaces = o.capacity - o.booked_count;
             const full = spaces <= 0;
             const past = new Date(o.starts_at).getTime() < now;
@@ -184,12 +189,22 @@ export default async function Book({
             );
 
             const status = booked ? "Booked"
+              : holding ? "Holding your spot"
               : waiting ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the list</>
               : past ? "This one has started"
               : full ? "Fully booked"
               : <><span className="num">{spaces}</span> left</>;
 
             const action = past ? null
+              : holding ? (
+                  // The way back to Checkout. One tap, no re-booking: the seat
+                  // is already theirs for as long as the window lasts.
+                  <BookForm action={startCheckout}>
+                    <input type="hidden" name="kind" value="dropin" />
+                    <input type="hidden" name="booking_id" value={booking!.id} />
+                    <CardAction>Finish payment</CardAction>
+                  </BookForm>
+                )
               : booked || waiting ? (
                   <ActionForm action={cancelBooking}>
                     <input type="hidden" name="booking_id" value={booking!.id} />
@@ -223,7 +238,7 @@ export default async function Book({
                 room={o.rooms?.name ?? null}
                 imageUrl={o.class_types?.image_url ?? null}
                 statusLabel={status}
-                statusTone={booked ? "booked" : full && !waiting ? "full" : "quiet"}
+                statusTone={booked ? "booked" : holding ? "holding" : full && !waiting ? "full" : "quiet"}
                 action={action}
                 booked={booked}
                 dimmed={past}

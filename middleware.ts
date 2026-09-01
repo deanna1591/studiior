@@ -51,5 +51,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
+  // `api` is excluded deliberately. Every other path is rewritten into the
+  // host's own subtree, and a Stripe webhook has no tenant host to be rewritten
+  // for — it arrives at one fixed URL and resolves its tenant from the signed
+  // payload's account field instead.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
 };
