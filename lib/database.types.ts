@@ -828,6 +828,7 @@ export type Database = {
           name: string
           room_id: string | null
           series_id: string | null
+          staffing: Database["public"]["Enums"]["staffing_state"]
           starts_at: string
           status: Database["public"]["Enums"]["occurrence_status"]
           studio_id: string
@@ -853,6 +854,7 @@ export type Database = {
           name: string
           room_id?: string | null
           series_id?: string | null
+          staffing?: Database["public"]["Enums"]["staffing_state"]
           starts_at: string
           status?: Database["public"]["Enums"]["occurrence_status"]
           studio_id: string
@@ -878,6 +880,7 @@ export type Database = {
           name?: string
           room_id?: string | null
           series_id?: string | null
+          staffing?: Database["public"]["Enums"]["staffing_state"]
           starts_at?: string
           status?: Database["public"]["Enums"]["occurrence_status"]
           studio_id?: string
@@ -3757,6 +3760,84 @@ export type Database = {
           },
         ]
       }
+      shift_applications: {
+        Row: {
+          applied_at: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          instructor_id: string
+          note: string | null
+          occurrence_id: string
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          instructor_id: string
+          note?: string | null
+          occurrence_id: string
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          instructor_id?: string
+          note?: string | null
+          occurrence_id?: string
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_applications_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_applications_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_applications_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_applications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_applications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_config: {
         Row: {
           key: string
@@ -4435,6 +4516,14 @@ export type Database = {
         }
         Returns: string
       }
+      apply_for_shift: {
+        Args: { p_note?: string; p_occurrence_id: string }
+        Returns: Json
+      }
+      approve_shift_application: {
+        Args: { p_application_id: string }
+        Returns: Json
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_role_in: {
@@ -4518,6 +4607,10 @@ export type Database = {
           token: string
         }[]
       }
+      decline_shift_application: {
+        Args: { p_application_id: string; p_reason?: string }
+        Returns: Json
+      }
       deliver_notification: {
         Args: { p_notification_id: string }
         Returns: number
@@ -4582,6 +4675,15 @@ export type Database = {
         Args: { p_key: string; p_studio_id: string }
         Returns: number
       }
+      instructor_available_at: {
+        Args: {
+          p_ends_at: string
+          p_instructor_id: string
+          p_starts_at: string
+        }
+        Returns: boolean
+      }
+      instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
@@ -4611,6 +4713,18 @@ export type Database = {
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
+      move_occurrence: {
+        Args: {
+          p_clear_instructor?: boolean
+          p_confirm?: boolean
+          p_ends_at?: string
+          p_instructor_id?: string
+          p_occurrence_id: string
+          p_room_id?: string
+          p_starts_at?: string
+        }
+        Returns: Json
+      }
       notification_api_key: { Args: never; Returns: string }
       notification_setting: { Args: { p_key: string }; Returns: string }
       notification_wanted: {
@@ -4642,6 +4756,10 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: number
       }
+      queue_class_moved: {
+        Args: { p_occurrence_id: string; p_old_starts_at: string }
+        Returns: number
+      }
       queue_credit_expiries: { Args: { p_studio_id: string }; Returns: number }
       queue_milestone: {
         Args: { p_body: string; p_member_id: string; p_name: string }
@@ -4669,6 +4787,25 @@ export type Database = {
       queue_platform_warning: {
         Args: { p_day: number; p_studio_id: string }
         Returns: string
+      }
+      queue_shift_notice: {
+        Args: {
+          p_dedupe: string
+          p_payload: Json
+          p_studio_id: string
+          p_template: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      queue_shift_notice_to_staff: {
+        Args: {
+          p_dedupe_prefix: string
+          p_payload: Json
+          p_studio_id: string
+          p_template: string
+        }
+        Returns: number
       }
       queue_substitution: {
         Args: { p_new: string; p_occurrence_id: string; p_old: string }
@@ -4910,6 +5047,7 @@ export type Database = {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
+      withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
     }
     Enums: {
       billing_interval: "week" | "month" | "quarter" | "year"
@@ -4983,6 +5121,7 @@ export type Database = {
         | "cancelled"
       series_status: "active" | "ended" | "cancelled"
       staff_role: "owner" | "manager" | "instructor" | "front_desk"
+      staffing_state: "assigned" | "open" | "pending_approval"
       theme_preset: "warm" | "clean" | "calm" | "bold"
     }
     CompositeTypes: {
@@ -5231,6 +5370,7 @@ export const Constants = {
       ],
       series_status: ["active", "ended", "cancelled"],
       staff_role: ["owner", "manager", "instructor", "front_desk"],
+      staffing_state: ["assigned", "open", "pending_approval"],
       theme_preset: ["warm", "clean", "calm", "bold"],
     },
   },

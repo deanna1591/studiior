@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Forty-six migrations, applying clean from `supabase db reset`:
+Forty-nine migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,9 @@ Forty-six migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **049** the Morning Brief learns `unstaffed_class` — an open shift with members booked, ranked above a failed card because a declined card can wait until Thursday and a 7am class cannot. Also fixes a latent `text[] || text || text` bug in `brief_summary()` that appended an empty part
+- **048** applications: `apply_for_shift`, `approve_shift_application` (auto-declines the rest in the same transaction), `decline`, `withdraw_from_shift`, five templates, and `class_moved` for members whose class is rescheduled
+- **047** Decision 17's schema — `staffing_state`, `shift_applications`, the first GiST exclusion constraints in the codebase, and `move_occurrence()`, the only thing that moves a class
 - **046** the platform webhook — a SECOND endpoint with a SECOND secret, refusing anything carrying an `account` — plus the grace warnings, `sweep_platform_billing()` on a daily cron, and `render_notification()` extended to address a person at the studio rather than only a member
 - **045** what a locked studio cannot do: `book_class`, `resolve_checkin_code`, `import_commit` and `record_manual_payment`. Deliberately NOT `cancel_booking`, and not any read
 - **044** `platform_subscriptions` — Studiior charging the studio, $79/month USD, thirty-day trial stamped by a trigger on `studios` as well as by `provision_studio()`, plus `studio_is_locked()`, `studio_billing_state()` and `extend_trial()`
@@ -74,7 +77,7 @@ Forty-six migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Eighteen suites, **717 assertions**, all passing from a clean `db reset`:
+Nineteen suites, **751 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -92,6 +95,7 @@ Eighteen suites, **717 assertions**, all passing from a clean `db reset`:
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
 | `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
 | `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
+| `test/scheduling_test.sql` | 34 | a room cannot hold two classes and an instructor cannot teach two, a cancelled class stops holding its room, a move with members booked refuses until confirmed and then emails them, two instructors apply and approving one auto-declines the other, and withdrawing returns the class to open |
 | `test/platform_billing_test.sql` | 39 | a studio in grace still books and takes money, past grace both apps lock, cancellation survives lockout, paying reinstates with row counts proving nothing was lost, and neither webhook endpoint accepts the other's events |
 | `test/manual_payments_test.sql` | 32 | a studio with no provider sells a membership, grants a pack and takes a drop-in; a cash membership and a Stripe membership are the same row; a refund takes back the credits she had left and not the ones she used; front desk sells but cannot refund |
 | `test/stripe_connect_test.sql` | 38 | a forged signature is refused, an event for an unknown account is rejected rather than misattributed, a replay is a no-op, a plan price rise does not reprice existing members, a failed payment blocks new bookings while existing ones stand, and an abandoned hold is swept back to the waitlist |
@@ -214,6 +218,16 @@ It is a status and not a flag on purpose: thirty-four places filter on booking s
 **The sweep cancels through `cancel_booking()`, never by updating rows itself.** That is the only reason that function accepts a service context. Doing the update inline would be shorter and would skip §4.2, so the seat would come free and nobody on the waitlist would ever hear about it — worse than not freeing it. A seat that was only ever held is also never recorded as a *late* cancellation: no member should carry a black mark for a class they never paid for.
 
 **How long the hold lasts is the studio's setting**, `dropin_payment_window_minutes`, beside the other timing rules. A 6am reformer class wants its seat back quickly and a quiet Sunday mat class does not.
+
+**What cannot physically overlap is an exclusion constraint, not a check.** A room cannot hold two classes and a person cannot teach two at once. `occ_room_no_overlap` and `occ_instructor_no_overlap` are GiST exclusions — the first use of the `btree_gist` that migration 014 left installed — so they hold against every writer including an import, the seed and a hand-typed UPDATE. Both are partial: a cancelled class stops holding its room, and an open shift has no instructor to clash with but still holds its slot. The opclass is named explicitly (`extensions.gist_uuid_ops`) rather than resolved through search_path.
+
+**Availability is a warning; overlap is a wall.** Decision 9's rule that a hard block gets worked around by not using the feature applies to availability, which is a judgement. It does not apply to two classes in one room, which is not.
+
+**One function moves a class.** `move_occurrence()` backs the calendar's drag, its resize and the edit form. Before Decision 17 there was nothing to share — `createClass` was a bare insert with no conflict checking at all — so "the calendar must not bypass the form's rules" meant writing the rules, not reusing them. With members booked it refuses on the first call and returns the count; the caller confirms and the second call moves it and queues `class_moved`. A drag that silently emails forty people because a finger slipped is worse than one that asks.
+
+**A derived column needs a trigger, not a default.** `class_occurrences.staffing` has a CHECK tying it to `instructor_id`, and no default can satisfy it — 'assigned' is wrong for a row inserted without an instructor and 'open' is wrong for one with. `tg_derive_staffing()` makes staffing follow `instructor_id` unless the caller already wrote a consistent pair. Without it the CHECK rejected ten existing suites and the seed, none of which know the column exists and none of which should have to.
+
+**A library stylesheet imported from a component wins on source order.** react-big-calendar's CSS is imported inside the calendar component, which Next injects AFTER `globals.css` — so a bare `.rbc-today` override loses at equal specificity and the grid stayed the library's blue. Every override is scoped under `.rbc-calendar`, which wins on specificity rather than on order. Same lesson as the health chip's label, in reverse.
 
 **Booking runs in one transaction with a row lock.** `select ... from class_occurrences where id = $1 for update` before reading `booked_count`. Application-level check-then-insert will overbook under load and is not acceptable.
 
@@ -415,6 +429,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/platform_
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/scheduling_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -422,7 +440,7 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `5757` stripe, `cafe` manual payments, `b111` platform billing, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `5757` stripe, `cafe` manual payments, `b111` platform billing, `f00d` scheduling, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 

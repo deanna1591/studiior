@@ -16,10 +16,19 @@ export function railItems(
     { href: "/", label: "Schedule" },
     { href: "/members", label: "Members" },
   ];
+  // Decision 17: an instructor's whole reason to open the staff app is to see
+  // what is going and say they will take it.
+  if (ctx.role === "instructor") items.push({ href: "/shifts", label: "Open shifts" });
   if (isManagerUp(ctx.role)) {
     // Setup leaves the rail the moment the list is finished. A permanent link
     // to a one-time task is clutter for every day after the first.
     if (setupIncomplete) items.push({ href: "/setup", label: "Setup" });
+    // "Calendar", not "Schedule": "/" is already Schedule — the day list front
+    // desk lives in — and two identical labels in one rail is worse than a
+    // slightly loose word.
+    items.push(
+      { href: "/schedule", label: "Calendar" },
+    );
     items.push(
       { href: "/plans", label: "Plans" },
       { href: "/rooms", label: "Rooms" },

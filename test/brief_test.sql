@@ -114,7 +114,9 @@ insert into _routes values
   ('^/members/[0-9a-f-]{36}$'),
   ('^/members/[0-9a-f-]{36}/message$'),
   ('^/roster/[0-9a-f-]{36}$'),
-  ('^/plans/[0-9a-f-]{36}$');
+  ('^/plans/[0-9a-f-]{36}$'),
+  -- Decision 17's unstaffed_class opens the calendar on the class in question.
+  ('^/schedule\?occurrence=[0-9a-f-]{36}$');
 
 select expect_num('every insight carries an action_type',
   (select count(*) from ai_insights

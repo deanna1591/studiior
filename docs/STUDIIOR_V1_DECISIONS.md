@@ -341,3 +341,27 @@ That is the wrong foundation. **A studio records payments however it already tak
 **The tradeoff, recorded rather than hidden.** A manual payment is the studio's own bookkeeping: they reconcile it themselves, and a membership can be marked paid when no money actually moved. Nothing in the product prevents that and nothing should try to. It is the studio's business, and a booking platform that polices its customers' cash handling has misunderstood what it is for. What we owe them is that the record says who recorded it, when, by what method and against what reference — enough to reconcile, not enough to police.
 
 **Where:** Business Rules §7.1; data model §7; migrations 040 and 041. **Status:** settled.
+
+---
+
+## 17 — Instructors can apply for open shifts, superseding part of Decision 9
+
+Decision 9 said instructors submit availability and never touch the timetable. That was right about **assignment** and wrong about **asking**.
+
+**What Decision 9 keeps, unchanged.** An instructor never assigns themselves. They cannot create, move, cancel or reschedule a class. Approval is always staff — owner or manager. Assigning outside stated availability remains permitted with a warning, never blocked.
+
+**What is new.** A class can be published **unassigned**, as an open shift. Instructors see the open shifts and apply for them; staff approve or decline. This is what studios running on freelance instructors actually need, and without it every shift has to be filled by a manager chasing people individually.
+
+`class_occurrences` carries a staffing state — `assigned`, `open`, `pending_approval` — which is explicit rather than inferred from a null `instructor_id`, because "nobody is teaching this" and "we have not got round to it" are different problems and were previously the same value.
+
+**The edges.**
+
+- **Several people apply for one shift.** Every application stands until staff approve one. Approving auto-declines the rest *in the same transaction*, so there is no window in which two instructors both believe they have it, and each of the declined is told.
+- **An approved instructor withdraws.** The class returns to `open`, staff are notified, and it is loud — the notification carries how many members are booked, because "nobody is teaching this" and "nobody is teaching this and eleven people are coming" are different emergencies. This is the worst state the system can be in and the product should behave like it.
+- **Applying outside stated availability.** Permitted, and the warning travels with the application so the person deciding sees it at the moment they decide. Same reasoning as Decision 9's assignment rule.
+- **An open shift with members booked and no instructor.** Raised in the Morning Brief as `unstaffed_class`, ranked above every other insight including a failed payment: a declined card can be sorted out on Thursday, and a 7am class tomorrow cannot. §11 had no type for this.
+- **An open shift still holds its room and its slot.** It has a time, a capacity and possibly members booked; only the person is missing. The room exclusion constraint applies regardless of staffing.
+
+**Also settled here, because the calendar forced it:** room and instructor double-booking are now database exclusion constraints rather than nothing at all. `createClass` had never checked either. Moving a class with members booked emails them (`class_moved`, not opt-outable) — cancelling and rebooking would have been the alternative and is wrong in the data.
+
+**Where:** Business Rules §5; Data Model §5; Permissions §4 and §6; migrations 047, 048 and 049. **Status:** settled. **Supersedes:** Decision 9's implication that instructors have no route to the timetable at all.

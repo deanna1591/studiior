@@ -310,3 +310,47 @@ body {
   outline-offset: 2px;
   border-radius: 2px;
 }
+
+/* --- the schedule calendar -------------------------------------------------
+   react-big-calendar ships its own stylesheet, which is a different design
+   system: blue selections, heavy borders, its own type scale. These overrides
+   are the minimum to make it use ours — no raw colours, all tokens, so a
+   change to the palette reaches the calendar like everything else. */
+.rbc-calendar { font-family: inherit; color: var(--ink); }
+.rbc-time-view, .rbc-time-header, .rbc-time-content,
+.rbc-time-header-content, .rbc-day-slot, .rbc-timeslot-group,
+.rbc-time-gutter, .rbc-header, .rbc-time-content > * + * > * {
+  border-color: var(--line) !important;
+}
+.rbc-calendar .rbc-time-view { border-radius: 14px; overflow: hidden; background: var(--surface); }
+.rbc-calendar .rbc-header {
+  padding: 10px 8px; font-weight: 600; font-size: 13px; line-height: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.rbc-label, .rbc-time-gutter .rbc-timeslot-group {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+/* Every override here is scoped under .rbc-calendar rather than written bare.
+   react-big-calendar's stylesheet is imported from the component, which Next
+   injects AFTER globals.css, so a bare `.rbc-today` loses on source order at
+   equal specificity — the same trap as the health chip's label, in reverse.
+   The extra class is what wins it, not !important. */
+.rbc-calendar .rbc-today { background-color: var(--paper); }
+/* The library's "off-range"/selection blues, removed rather than re-tinted. */
+.rbc-day-slot .rbc-time-slot { border-top-color: color-mix(in srgb, var(--line) 55%, transparent); }
+.rbc-calendar .rbc-current-time-indicator { background-color: var(--coral); height: 2px; }
+.rbc-addons-dnd .rbc-addons-dnd-resize-ns-anchor { visibility: visible; }
+.rbc-event { box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+.rbc-event.rbc-selected, .rbc-day-slot .rbc-selected.rbc-background-event {
+  outline: 2px solid var(--lime-text); outline-offset: -2px;
+}
+.rbc-calendar .rbc-toolbar button {
+  color: var(--ink-2); border-color: var(--line-2); border-radius: 8px;
+  font-size: 13px;
+}
+.rbc-calendar .rbc-toolbar button.rbc-active {
+  background: var(--lime-tint); color: var(--lime-text);
+  border-color: var(--lime-text);
+}
+.rbc-toolbar-label { font-weight: 600; font-size: 14px; color: var(--ink); }
