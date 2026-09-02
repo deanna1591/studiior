@@ -16,6 +16,9 @@ export type StaffContext = {
   currency: string;
   onboardingComplete: boolean;
   studioStatus: string;
+  /** Both arrive with the context now rather than as their own requests. */
+  isPlatformAdmin: boolean;
+  billing: { status: string | null; locked: boolean; daysLeft: number };
 };
 
 /**
@@ -43,17 +46,24 @@ export type StaffAccess =
 
 export async function getStaffAccess(): Promise<StaffAccess> {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { kind: "anonymous" };
+  // getClaims(), verified locally — see currentUserId() below. This used to be
+  // getUser(), and then getStaffContext() called getUser() again a line later:
+  // two network round trips to GoTrue to establish one identity.
+  const userId = await currentUserId();
+  if (!userId) return { kind: "anonymous" };
 
   const ctx = await getStaffContext();
   if (ctx) return { kind: "staff", ctx };
 
+  // Only for the caller who is staff of nowhere — a platform admin, which is
+  // the rare path. The common one has already answered this inside the
+  // bootstrap.
   const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+  const { data: claims } = await supabase.auth.getClaims();
   return {
     kind: "no_studio",
-    userId: user.id,
-    email: user.email ?? "",
+    userId,
+    email: (claims?.claims?.email as string | undefined) ?? "",
     isPlatformAdmin: isPlatformAdmin === true,
   };
 }
@@ -67,48 +77,32 @@ export async function getStaffAccess(): Promise<StaffAccess> {
  */
 export async function getStaffContext(): Promise<StaffContext | null> {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
 
-  const { data } = await supabase
-    .from("studio_staff")
-    .select("id, role, studio_id, studios(name, timezone, currency, status)")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!data || !data.studios) return null;
-
-  // studio_settings is keyed by studio_id and has no foreign key from
-  // studio_staff, so it cannot be embedded in the query above. The primary
-  // location comes along for the ride: the rail names the place people are
-  // standing in, and a timezone is not that.
-  const [{ data: settings }, { data: loc }] = await Promise.all([
-    supabase
-      .from("studio_settings")
-      .select("onboarding_completed_at")
-      .eq("studio_id", data.studio_id)
-      .maybeSingle(),
-    supabase
-      .from("locations")
-      .select("name")
-      .eq("studio_id", data.studio_id)
-      .eq("is_primary", true)
-      .maybeSingle(),
-  ]);
+  // One request. It used to be getUser(), then the staff row, then
+  // studio_settings and locations in parallel — and the last two could not
+  // start until the staff row named the studio.
+  const { data } = await supabase.rpc("staff_bootstrap");
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
 
   return {
-    userId: user.id,
-    email: user.email ?? "",
-    staffId: data.id,
-    role: data.role as StaffRole,
-    studioId: data.studio_id,
-    studioName: data.studios.name,
-    locationName: loc?.name ?? null,
-    timeZone: data.studios.timezone,
-    currency: data.studios.currency,
-    studioStatus: data.studios.status,
-    onboardingComplete: settings?.onboarding_completed_at != null,
+    userId: row.user_id,
+    email: row.email ?? "",
+    staffId: row.staff_id,
+    role: row.role as StaffRole,
+    studioId: row.studio_id,
+    studioName: row.studio_name,
+    locationName: row.location_name ?? null,
+    timeZone: row.studio_timezone,
+    currency: row.studio_currency,
+    studioStatus: row.studio_status,
+    onboardingComplete: row.onboarding_complete === true,
+    isPlatformAdmin: row.is_platform_admin === true,
+    billing: {
+      status: row.billing_status,
+      locked: row.billing_locked === true,
+      daysLeft: row.billing_days_left ?? 0,
+    },
   };
 }
 
@@ -136,6 +130,25 @@ export type MemberContext = {
   /** Caches on members, recomputed on check-in and nightly (Business Rules §8). */
   streak: number;
   lifetimeVisits: number;
+  /**
+   * Everything member_bootstrap() returned, carried so memberScreen() does not
+   * have to ask again. This is the whole point of the one-trip bootstrap: the
+   * studio, its settings and its billing state arrive with the member.
+   */
+  bootstrap?: MemberBootstrap;
+};
+
+export type MemberBootstrap = {
+  member_id: string; studio_id: string;
+  first_name: string; last_name: string; preferred_name: string | null;
+  avatar_path: string | null;
+  studio_name: string; studio_timezone: string;
+  logo_url: string | null; theme_preset: string | null; accent_color: string | null;
+  checkin_opens_minutes_before: number; checkin_closes_minutes_after: number;
+  cancellation_cutoff_minutes: number; booking_cutoff_minutes: number;
+  waitlist_enabled: boolean;
+  billing_locked: boolean;
+  open_offers: number;
 };
 
 /** Who is making this request, on the member PWA. */
@@ -151,37 +164,95 @@ export type MemberContext = {
  * they had no studio access. Scoping by studio fixes it properly; taking the
  * first row would have hidden it and shown people the wrong studio's data.
  */
+/**
+ * Who is signed in, without a round trip.
+ *
+ * getClaims() verifies the JWT signature LOCALLY, with WebCrypto against a
+ * cached JWKS — it is not getSession(), which reads the cookie and checks
+ * nothing. Both this project's local stack and its hosted one sign ES256.
+ *
+ * It falls back to a network getUser() for symmetric HS256 keys, silently, so
+ * assertAsymmetricSigning() below exists to make that visible rather than to
+ * let it quietly cost what it used to.
+ *
+ * Even if this were wrong, no data would follow from it: PostgREST verifies the
+ * signature on every request (a forged one is 401 PGRST301, an expired one the
+ * same), and every policy keys on auth.uid() from that verified claim rather
+ * than on anything read here.
+ */
+async function currentUserId(): Promise<string | null> {
+  void assertAsymmetricSigning();
+  const supabase = createClient();
+  const { data } = await supabase.auth.getClaims();
+  return data?.claims?.sub ?? null;
+}
+
 export async function getMemberContext(): Promise<MemberContext | null> {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const userId = await currentUserId();
+  if (!userId) return null;
 
   const slug = currentSlug();
   if (!slug) return null;
 
-  const { data } = await supabase
-    .from("members")
-    .select("id, first_name, last_name, current_streak, lifetime_visits, status, studio_id, studios!inner(name, slug, timezone)")
-    .eq("user_id", user.id)
-    .eq("studios.slug", slug)
-    .maybeSingle();
-
-  if (!data || !data.studios) return null;
+  // One request for the member, their studio, its settings, its billing state
+  // and any live offer. This used to be the member lookup followed by four more
+  // that could not start until it returned.
+  const { data } = await supabase.rpc("member_bootstrap", { p_slug: slug });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
 
   return {
-    userId: user.id,
-    memberId: data.id,
-    name: `${data.first_name} ${data.last_name}`,
-    firstName: data.first_name,
-    status: data.status,
-    streak: data.current_streak ?? 0,
-    lifetimeVisits: data.lifetime_visits ?? 0,
-    studioId: data.studio_id,
-    studioName: data.studios.name,
-    timeZone: data.studios.timezone,
+    userId,
+    memberId: row.member_id,
+    name: `${row.first_name} ${row.last_name}`,
+    firstName: row.first_name,
+    status: row.status,
+    streak: row.current_streak ?? 0,
+    lifetimeVisits: row.lifetime_visits ?? 0,
+    studioId: row.studio_id,
+    studioName: row.studio_name,
+    timeZone: row.studio_timezone,
+    bootstrap: row,
   };
 }
 
 export const isManagerUp = (r: StaffRole) => r === "owner" || r === "manager";
 export const isDeskUp = (r: StaffRole) =>
   r === "owner" || r === "manager" || r === "front_desk";
+
+/**
+ * Fail loudly if this project stops signing asymmetrically.
+ *
+ * getClaims() verifies the JWT locally against a cached JWKS for ES256 and
+ * RS256, and silently falls back to a network getUser() for symmetric HS256.
+ * Silently is the problem: the app would still be correct, still pass every
+ * test, and quietly cost a round trip per request again — which is precisely
+ * the local-versus-hosted trap that migrations 006, 011 and 033 were each
+ * written to undo.
+ *
+ * Checked once per process against the project's public JWKS, and only warned
+ * about: refusing to boot over a performance regression would be worse than
+ * the regression.
+ */
+let signingChecked = false;
+export async function assertAsymmetricSigning() {
+  if (signingChecked) return;
+  signingChecked = true;
+  try {
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/.well-known/jwks.json`;
+    const jwks = await fetch(url, { cache: "force-cache" }).then((r) => r.json());
+    const keys: { alg?: string; kty?: string }[] = jwks?.keys ?? [];
+    const asymmetric = keys.some((k) => k.kty === "EC" || k.kty === "RSA");
+    if (!asymmetric) {
+      console.warn(
+        "[auth] This project is not signing asymmetrically, so getClaims() is " +
+        "falling back to a network call to GoTrue on every request. The member " +
+        "app will be roughly one round trip slower per navigation. Switch the " +
+        "project to asymmetric JWT signing keys to get it back.",
+      );
+    }
+  } catch {
+    // A JWKS fetch that fails tells us nothing worth crashing over.
+  }
+}

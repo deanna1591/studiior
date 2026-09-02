@@ -30,7 +30,7 @@ export default function ClassCard({
   timeRange: React.ReactNode;
   durationLabel: React.ReactNode;
   name: string;
-  instructor: string;
+  instructor: string | null;
   instructorAvatar?: string | null;
   room: string | null;
   imageUrl?: string | null;
@@ -75,12 +75,17 @@ export default function ClassCard({
         </div>
 
         <div className="mt-4 space-y-2.5">
-          <p className="m-meta flex items-center gap-2.5 text-ink-2">
-            {instructorAvatar
-              ? <Avatar name={instructor} url={instructorAvatar} size={32} />
-              : <IconChip name="person" />}
-            {instructor}
-          </p>
+          {/* Absent, not "TBC". Decision 17: an open shift reads as a normal
+              class to a member, and a row saying nobody has agreed to teach it
+              is a doubt they can do nothing with. */}
+          {instructor && (
+            <p className="m-meta flex items-center gap-2.5 text-ink-2">
+              {instructorAvatar
+                ? <Avatar name={instructor} url={instructorAvatar} size={32} />
+                : <IconChip name="person" />}
+              {instructor}
+            </p>
+          )}
           {room && (
             <p className="m-meta flex items-center gap-2.5 text-ink-2">
               <IconChip name="door" />

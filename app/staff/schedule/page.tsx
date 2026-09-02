@@ -36,7 +36,7 @@ export default async function Schedule() {
   const to = new Date();
   to.setDate(to.getDate() + 28);
 
-  const [{ data: instructors }, { data: occurrences }, { data: pending }] =
+  const [{ data: instructors }, { data: occurrences }, { data: pending }, { data: settings }] =
     await Promise.all([
       supabase.from("instructors")
         .select("id, display_name").eq("status", "active").order("display_name"),
@@ -48,7 +48,11 @@ export default async function Schedule() {
         .order("starts_at"),
       supabase.from("shift_applications")
         .select("occurrence_id").eq("status", "pending"),
+      supabase.from("studio_settings")
+        .select("unstaffed_deadline_hours").eq("studio_id", ctx.studioId).maybeSingle(),
     ]);
+
+  const deadlineHours = settings?.unstaffed_deadline_hours ?? 48;
 
   const appCount = new Map<string, number>();
   for (const a of pending ?? []) {
@@ -75,6 +79,7 @@ export default async function Schedule() {
     capacity: o.capacity,
     room: o.rooms?.name ?? null,
     pendingApplications: appCount.get(o.id) ?? 0,
+    hoursAway: (new Date(o.starts_at).getTime() - Date.now()) / 3_600_000,
   }));
 
   return (
@@ -91,7 +96,8 @@ export default async function Schedule() {
           <NavLink href="/instructors">Add one</NavLink>
         </Empty>
       ) : (
-        <ScheduleCalendar events={events} resources={resources} timeZone={ctx.timeZone} />
+        <ScheduleCalendar events={events} resources={resources}
+                          timeZone={ctx.timeZone} deadlineHours={deadlineHours} />
       )}
     </AppShell>
   );

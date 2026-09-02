@@ -365,3 +365,10 @@ Decision 9 said instructors submit availability and never touch the timetable. T
 **Also settled here, because the calendar forced it:** room and instructor double-booking are now database exclusion constraints rather than nothing at all. `createClass` had never checked either. Moving a class with members booked emails them (`class_moved`, not opt-outable) — cancelling and rebooking would have been the alternative and is wrong in the data.
 
 **Where:** Business Rules §5; Data Model §5; Permissions §4 and §6; migrations 047, 048 and 049. **Status:** settled. **Supersedes:** Decision 9's implication that instructors have no route to the timetable at all.
+
+**Amendments to 17, settled during the build.**
+
+- **Substitution needs no carve-out.** `substitute_for` records history; `instructor_id` is the effective teaching instructor, so a class being subbed already stops counting against the original. What was actually blocked was a *swap* of two instructors between two simultaneous classes — a valid end state refused on the way there. The instructor constraint is now `DEFERRABLE INITIALLY IMMEDIATE`, which tolerates the intermediate state and still refuses to commit a double-booking. Rooms remain immediate and have the same swap friction.
+- **A significant move owes a free cancellation** — further than `studio_settings.significant_move_hours` (default 2) or onto a different day in studio time. Same reasoning as Decision 2: the member agreed to a time and the studio changed it.
+- **An unstaffed class has a deadline**, `studio_settings.unstaffed_deadline_hours` (default 48). Past it with nobody assigned, the Morning Brief raises it, and the calendar shows it hatched in coral rather than merely a different colour.
+- **Members are not told a class is unstaffed.** They see a normal class and the instructor's name once there is one. Advertising the uncertainty invites them not to book, and the class is what they came for.

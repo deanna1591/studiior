@@ -439,4 +439,39 @@ select expect_text('and the other studio''s setup progress is untouched',
   coalesce((select setup_progress::text from studio_settings
              where studio_id='88888888-0000-0000-0000-000000000009'), '{}'), '{}');
 
+-- =============================================================================
+-- staff_bootstrap() — the one call every staff screen now depends on
+-- =============================================================================
+-- It replaced five sequential requests. The interesting case is the one the
+-- seed cannot produce and which broke sign-in once already: a signed-in user
+-- who is staff of NO studio. A platform admin is exactly that.
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','88888888-0000-0000-0000-0000000000a2',false);
+select expect_num('the bootstrap returns one row for real staff',
+  (select count(*) from staff_bootstrap()), 1);
+select expect_text('...with their role',
+  (select role::text from staff_bootstrap()), 'owner');
+select expect_text('...their studio, so nothing else has to ask',
+  (select (studio_name is not null and studio_timezone is not null)::text from staff_bootstrap()), 'true');
+select expect_text('...and whether onboarding is done',
+  (select (onboarding_complete is not null)::text from staff_bootstrap()), 'true');
+reset role;
+
+-- Staff of nowhere. getStaffContext() must return null here rather than
+-- erroring, because callers read null as "not staff" and the sign-in loop that
+-- once shipped came from getting this wrong.
+set role authenticated;
+-- The platform admin, who is deliberately staff of nothing.
+select set_config('request.jwt.claim.sub','88888888-0000-0000-0000-0000000000a1',false);
+select expect_num('a user who is staff of no studio gets no row, not an error',
+  (select count(*) from staff_bootstrap()), 0);
+reset role;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000000',false);
+select expect_num('and a stranger gets nothing',
+  (select count(*) from staff_bootstrap()), 0);
+reset role;
+
 select 'ALL ONBOARDING TESTS PASSED' as result;

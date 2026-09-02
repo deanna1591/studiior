@@ -162,12 +162,19 @@ export default async function MemberHome() {
           </p>
           <h1 className="m-title mt-1 text-ink">{occ.name}</h1>
           <div className="mt-3 space-y-2.5">
-            <p className="m-meta flex items-center gap-2.5 text-ink-2">
-              {occ.instructors?.avatar_url
-                ? <Avatar name={occ.instructors.display_name} url={occ.instructors.avatar_url} size={32} />
-                : <IconChip name="person" />}
-              {occ.instructors?.display_name ?? "Instructor to be confirmed"}
-            </p>
+            {/* Decision 17: an unstaffed class is shown as a normal class. A
+                member books a Reformer class because of the class; telling them
+                nobody has agreed to teach it yet advertises a doubt they cannot
+                act on and invites them not to book. The name appears the moment
+                somebody is assigned. */}
+            {occ.instructors?.display_name && (
+              <p className="m-meta flex items-center gap-2.5 text-ink-2">
+                {occ.instructors.avatar_url
+                  ? <Avatar name={occ.instructors.display_name} url={occ.instructors.avatar_url} size={32} />
+                  : <IconChip name="person" />}
+                {occ.instructors.display_name}
+              </p>
+            )}
             {occ.rooms?.name && (
               <p className="m-meta flex items-center gap-2.5 text-ink-2">
                 <IconChip name="door" />
@@ -223,7 +230,7 @@ export default async function MemberHome() {
                     <span className="m-body block truncate text-ink">{o.name}</span>
                     <span className="m-micro block text-ink-3">
                       {day(o.starts_at)} · <span className="num">{fmtTime(o.starts_at, ctx.timeZone)}</span>
-                      {" · "}{o.instructors?.display_name ?? "TBC"}
+                      {o.instructors?.display_name ? ` · ${o.instructors.display_name}` : ""}
                     </span>
                   </span>
                   <input type="hidden" name="occurrence_id" value={o.id} />

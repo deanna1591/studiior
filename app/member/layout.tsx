@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { currentSlug } from "@/lib/tenant";
 import type { Database } from "@/lib/database.types";
@@ -27,7 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
   );
   const { data } = await anon.rpc("studio_by_slug", { p_slug: slug });
   const studio = Array.isArray(data) ? data[0] : data;
-  if (!studio?.name) return {};
+  // An unknown slug used to 404 in middleware, which paid for a studio_by_slug
+  // round trip on EVERY request to answer a question this call already answers.
+  // notFound() here costs nothing extra.
+  if (!studio?.name) notFound();
 
   return {
     title: studio.name,

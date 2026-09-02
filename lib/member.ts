@@ -17,60 +17,38 @@ export async function memberScreen() {
   if (!ctx) redirect("/login");
 
   const supabase = createClient();
-  const [{ data: studio }, { data: settings }, { count: offerCount }, { data: me },
-         { data: billing }] = await Promise.all([
-    supabase.from("studios").select("name, logo_url, theme_preset, accent_color").eq("id", ctx.studioId).maybeSingle(),
-    supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
-    // A live waitlist offer is the one number in this app that is worth a
-    // badge: it expires, and if the member does not answer it goes to the next
-    // person. A count of upcoming bookings would be a badge on something
-    // nobody has to do anything about, which teaches people to ignore badges.
-    supabase
-      .from("waitlist_offers")
-      .select("id, bookings!inner(member_id)", { count: "exact", head: true })
-      .is("responded_at", null)
-      .gt("expires_at", new Date().toISOString())
-      .eq("bookings.member_id", ctx.memberId),
-    supabase
-      .from("members")
-      .select("first_name, last_name, preferred_name, avatar_url")
-      .eq("id", ctx.memberId)
-      .maybeSingle(),
-    supabase.rpc("studio_billing_state", { p_studio_id: ctx.studioId }),
-  ]);
+  const b = ctx.bootstrap;
 
-  // A locked studio's members see a plain page saying the studio is not taking
-  // bookings, not a broken app. They did nothing wrong and should not be shown
-  // a schedule they cannot use — nor anything about what the studio owes us,
-  // which is why studio_billing_state() returns a status and no amounts.
-  const bill = Array.isArray(billing) ? billing[0] : billing;
-  if (bill?.locked) redirect("/unavailable");
+  // Everything here arrived with the member, in the same request. It used to be
+  // four more: studios, studio_member_settings, the waitlist-offer count and a
+  // second read of the member row for their photo — none of which could start
+  // until the member lookup returned, because they all needed the studio id.
+  if (b?.billing_locked) redirect("/unavailable");
 
-  // preferred_name first: it is what they asked to be called, and the greeting
-  // is the one place in the app that speaks to them rather than about them.
-  const displayName = me?.preferred_name?.trim() || me?.first_name || "";
-  // members.avatar_url holds an object path, not a URL — the bucket is private.
-  const avatarUrl = await signAvatar(supabase, me?.avatar_url);
+  // The photograph is the one thing that still needs its own request, because
+  // signing is a Storage call rather than a query. It no longer waits for a
+  // batch to finish first — the path came back with the member.
+  const avatarUrl = await signAvatar(supabase, b?.avatar_path);
 
-  const s = Array.isArray(settings) ? settings[0] : settings;
+  const displayName = b?.preferred_name?.trim() || b?.first_name || "";
 
   return {
     ctx,
     supabase,
-    studioName: studio?.name ?? "",
-    logoUrl: studio?.logo_url ?? null,
-    openOffers: offerCount ?? 0,
+    studioName: b?.studio_name ?? ctx.studioName,
+    logoUrl: b?.logo_url ?? null,
+    preset: (b?.theme_preset ?? "warm") as PresetKey,
+    accent: b?.accent_color ?? null,
+    openOffers: b?.open_offers ?? 0,
     memberName: displayName,
-    memberFullName: [me?.first_name, me?.last_name].filter(Boolean).join(" "),
+    memberFullName: [b?.first_name, b?.last_name].filter(Boolean).join(" "),
     avatarUrl,
-    preset: (studio?.theme_preset ?? "warm") as PresetKey,
-    accent: studio?.accent_color ?? null,
     settings: {
-      checkinOpensBefore: s?.checkin_opens_minutes_before ?? 60,
-      checkinClosesAfter: s?.checkin_closes_minutes_after ?? 30,
-      cancellationCutoff: s?.cancellation_cutoff_minutes ?? 720,
-      bookingCutoff: s?.booking_cutoff_minutes ?? 0,
-      waitlistEnabled: s?.waitlist_enabled ?? true,
+      checkinOpensBefore: b?.checkin_opens_minutes_before ?? 60,
+      checkinClosesAfter: b?.checkin_closes_minutes_after ?? 30,
+      cancellationCutoff: b?.cancellation_cutoff_minutes ?? 720,
+      bookingCutoff: b?.booking_cutoff_minutes ?? 0,
+      waitlistEnabled: b?.waitlist_enabled ?? true,
     },
   };
 }

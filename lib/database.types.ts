@@ -260,6 +260,7 @@ export type Database = {
           created_at: string
           credit_entry_id: string | null
           fee_charged_cents: number
+          free_cancel_until: string | null
           id: string
           is_demo: boolean
           is_late_cancel: boolean
@@ -282,6 +283,7 @@ export type Database = {
           created_at?: string
           credit_entry_id?: string | null
           fee_charged_cents?: number
+          free_cancel_until?: string | null
           id?: string
           is_demo?: boolean
           is_late_cancel?: boolean
@@ -304,6 +306,7 @@ export type Database = {
           created_at?: string
           credit_entry_id?: string | null
           fee_charged_cents?: number
+          free_cancel_until?: string | null
           id?: string
           is_demo?: boolean
           is_late_cancel?: boolean
@@ -4028,8 +4031,10 @@ export type Database = {
           require_waiver: boolean
           setup_optional_items: string[]
           setup_progress: Json
+          significant_move_hours: number
           studio_id: string
           sub_late_free_cancel: boolean
+          unstaffed_deadline_hours: number
           updated_at: string
           waitlist_cutoff_minutes: number
           waitlist_enabled: boolean
@@ -4060,8 +4065,10 @@ export type Database = {
           require_waiver?: boolean
           setup_optional_items?: string[]
           setup_progress?: Json
+          significant_move_hours?: number
           studio_id: string
           sub_late_free_cancel?: boolean
+          unstaffed_deadline_hours?: number
           updated_at?: string
           waitlist_cutoff_minutes?: number
           waitlist_enabled?: boolean
@@ -4092,8 +4099,10 @@ export type Database = {
           require_waiver?: boolean
           setup_optional_items?: string[]
           setup_progress?: Json
+          significant_move_hours?: number
           studio_id?: string
           sub_late_free_cancel?: boolean
+          unstaffed_deadline_hours?: number
           updated_at?: string
           waitlist_cutoff_minutes?: number
           waitlist_enabled?: boolean
@@ -4619,38 +4628,6 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -4689,8 +4666,34 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      member_bootstrap: {
+        Args: { p_slug: string }
+        Returns: {
+          accent_color: string
+          avatar_path: string
+          billing_locked: boolean
+          billing_status: Database["public"]["Enums"]["platform_status"]
+          booking_cutoff_minutes: number
+          cancellation_cutoff_minutes: number
+          checkin_closes_minutes_after: number
+          checkin_opens_minutes_before: number
+          current_streak: number
+          first_name: string
+          last_name: string
+          lifetime_visits: number
+          logo_url: string
+          member_id: string
+          open_offers: number
+          preferred_name: string
+          status: Database["public"]["Enums"]["member_status"]
+          studio_id: string
+          studio_name: string
+          studio_timezone: string
+          theme_preset: Database["public"]["Enums"]["theme_preset"]
+          waitlist_enabled: boolean
+        }[]
+      }
       member_checkin_code: {
         Args: never
         Returns: {
@@ -4749,7 +4752,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       queue_all_credit_expiries: { Args: never; Returns: Json }
       queue_booking_notifications: {
@@ -4951,7 +4953,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
+      staff_bootstrap: {
+        Args: never
+        Returns: {
+          billing_days_left: number
+          billing_locked: boolean
+          billing_status: Database["public"]["Enums"]["platform_status"]
+          email: string
+          is_platform_admin: boolean
+          location_name: string
+          onboarding_complete: boolean
+          role: Database["public"]["Enums"]["staff_role"]
+          staff_id: string
+          studio_currency: string
+          studio_id: string
+          studio_name: string
+          studio_status: string
+          studio_timezone: string
+          user_id: string
+        }[]
+      }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }
         Returns: string
@@ -5040,6 +5061,10 @@ export type Database = {
           local_date: string
           studio_id: string
         }[]
+      }
+      swap_instructors: {
+        Args: { p_occurrence_a: string; p_occurrence_b: string }
+        Returns: Json
       }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }

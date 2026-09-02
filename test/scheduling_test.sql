@@ -336,4 +336,108 @@ select expect_num('...and the members keep their bookings',
   (select count(*) from bookings
     where occurrence_id='f00df00d-0000-0000-0000-00000000f002' and status='booked'), 1);
 
+-- =============================================================================
+-- 5. What a move costs (migration 050)
+-- =============================================================================
+-- A swap: two instructors exchange two simultaneous classes. The end state is
+-- valid and every intermediate one is not, which is what DEFERRABLE is for.
+update class_occurrences set instructor_id = 'f00df00d-0000-0000-0000-00000000d101',
+       staffing = 'assigned' where id = 'f00df00d-0000-0000-0000-00000000f001';
+update class_occurrences set starts_at = date_trunc('day', now()) + interval '2 days 9 hours',
+       ends_at = date_trunc('day', now()) + interval '2 days 10 hours'
+ where id = 'f00df00d-0000-0000-0000-00000000f001';
+update class_occurrences set instructor_id = 'f00df00d-0000-0000-0000-00000000d102',
+       staffing = 'assigned',
+       starts_at = date_trunc('day', now()) + interval '2 days 9 hours',
+       ends_at = date_trunc('day', now()) + interval '2 days 10 hours'
+ where id = 'f00df00d-0000-0000-0000-00000000f002';
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+select expect_text('two instructors can swap two simultaneous classes',
+  (select swap_instructors('f00df00d-0000-0000-0000-00000000f001',
+                           'f00df00d-0000-0000-0000-00000000f002') ->> 'swapped'), 'true');
+reset role;
+select expect_text('...and they really did swap',
+  (select (instructor_id = 'f00df00d-0000-0000-0000-00000000d102')::text
+     from class_occurrences where id = 'f00df00d-0000-0000-0000-00000000f001'), 'true');
+
+-- But the end state is still enforced: you cannot COMMIT a double-booking.
+do $$
+begin
+  set constraints occ_instructor_no_overlap deferred;
+  update class_occurrences set instructor_id = 'f00df00d-0000-0000-0000-00000000d102'
+   where id = 'f00df00d-0000-0000-0000-00000000f002';
+  set constraints occ_instructor_no_overlap immediate;
+  raise exception 'FAIL  a double-booking survived to commit';
+exception when exclusion_violation then
+  raise notice 'PASS  deferring tolerates the journey, never the destination';
+end $$;
+
+-- A blocked move now names what is in the way.
+set role authenticated;
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+select expect_text('a blocked move names the class in the way',
+  (select move_occurrence('f00df00d-0000-0000-0000-00000000f001',
+     (select starts_at from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'),
+     (select ends_at   from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'),
+     p_room_id => (select room_id from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'),
+     p_confirm => true) -> 'blocked_by' ->> 'name'), 'Reformer');
+reset role;
+
+-- Significance, and the free cancellation it owes.
+update class_occurrences set booked_count = 1 where id='f00df00d-0000-0000-0000-00000000f001';
+insert into bookings (studio_id, occurrence_id, member_id, status, source, payment_source)
+values ('f00df00d-0000-0000-0000-000000000001','f00df00d-0000-0000-0000-00000000f001',
+        'f00df00d-0000-0000-0000-00000000dd01','booked','staff','class_pack')
+on conflict do nothing;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+select expect_text('a fifteen-minute nudge is not significant',
+  (select move_occurrence('f00df00d-0000-0000-0000-00000000f001',
+     date_trunc('day', now()) + interval '2 days 9 hours 15 minutes',
+     date_trunc('day', now()) + interval '2 days 10 hours 15 minutes',
+     p_confirm => true) ->> 'significant'), 'false');
+select expect_num('...so nobody is owed a free cancellation',
+  (select count(*) from bookings
+    where occurrence_id='f00df00d-0000-0000-0000-00000000f001' and free_cancel_until is not null), 0);
+
+select expect_text('moving it to the evening is significant',
+  (select move_occurrence('f00df00d-0000-0000-0000-00000000f001',
+     date_trunc('day', now()) + interval '2 days 18 hours',
+     date_trunc('day', now()) + interval '2 days 19 hours',
+     p_confirm => true) ->> 'significant'), 'true');
+select expect_num('...and every booked member may now cancel without penalty',
+  (select count(*) from bookings
+    where occurrence_id='f00df00d-0000-0000-0000-00000000f001' and free_cancel_until is not null), 1);
+reset role;
+
+-- That grant beats the studio's cutoff, which is the whole point: they agreed
+-- to a time and the studio changed it.
+select expect_text('a granted free cancellation is not a late cancellation',
+  (select (cancel_booking((select id from bookings
+                            where occurrence_id='f00df00d-0000-0000-0000-00000000f001'
+                              and status='booked' limit 1))).status::text), 'cancelled');
+
+-- The undo window.
+select expect_num('the evening move queued an email',
+  (select count(*) from notifications
+    where template_key='class_moved' and studio_id='f00df00d-0000-0000-0000-000000000001'), 1);
+update class_occurrences set booked_count = 1 where id='f00df00d-0000-0000-0000-00000000f001';
+insert into bookings (studio_id, occurrence_id, member_id, status, source, payment_source)
+values ('f00df00d-0000-0000-0000-000000000001','f00df00d-0000-0000-0000-00000000f001',
+        'f00df00d-0000-0000-0000-00000000dd01','booked','staff','class_pack');
+set role authenticated;
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+select expect_text('dragging it straight back reads as an undo',
+  (select move_occurrence('f00df00d-0000-0000-0000-00000000f001',
+     date_trunc('day', now()) + interval '2 days 9 hours 15 minutes',
+     date_trunc('day', now()) + interval '2 days 10 hours 15 minutes',
+     p_confirm => true) ->> 'undo'), 'true');
+reset role;
+select expect_num('...and the unsent email is withdrawn rather than followed by a second',
+  (select count(*) from notifications
+    where template_key='class_moved' and studio_id='f00df00d-0000-0000-0000-000000000001'), 0);
+
 select 'ALL SCHEDULING TESTS PASSED' as result;

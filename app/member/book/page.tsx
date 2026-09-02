@@ -243,7 +243,7 @@ export default async function Book({
                 timeRange={timeRange}
                 durationLabel={mins ? <><span className="num">{mins}</span> mins</> : "—"}
                 name={o.name}
-                instructor={o.instructors?.display_name ?? "Instructor to be confirmed"}
+                instructor={o.instructors?.display_name ?? null}
                 instructorAvatar={o.instructors?.avatar_url ?? null}
                 room={o.rooms?.name ?? null}
                 imageUrl={o.class_types?.image_url ?? null}

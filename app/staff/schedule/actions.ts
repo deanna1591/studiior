@@ -4,10 +4,15 @@ import { revalidatePath } from "next/cache";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+export type BlockedBy = {
+  occurrenceId: string; name: string; at: string;
+  who: string | null; room: string | null;
+};
+
 export type MoveResult =
-  | { ok: true; warnings: string[] }
+  | { ok: true; warnings: string[]; significant: boolean }
   | { ok: false; kind: "confirm"; bookedCount: number }
-  | { ok: false; kind: "error"; message: string };
+  | { ok: false; kind: "error"; message: string; blockedBy?: BlockedBy | null };
 
 /**
  * The only thing the calendar is allowed to do.
@@ -58,22 +63,32 @@ export async function moveClass(input: {
 
   const r = data as unknown as {
     ok: boolean; requires_confirmation?: boolean; reason?: string;
-    booked_count?: number; warnings?: string[];
+    booked_count?: number; warnings?: string[]; significant?: boolean;
+    blocked_by?: {
+      occurrence_id: string; name: string; at: string;
+      who: string | null; room: string | null;
+    } | null;
   };
 
   if (r.ok) {
     revalidatePath("/schedule");
     revalidatePath("/");
-    return { ok: true, warnings: r.warnings ?? [] };
+    return { ok: true, warnings: r.warnings ?? [], significant: r.significant ?? false };
   }
   if (r.requires_confirmation) {
     return { ok: false, kind: "confirm", bookedCount: r.booked_count ?? 0 };
   }
   return {
     ok: false, kind: "error",
+    // The sentence stops short so the screen can finish it with a link to
+    // whatever is in the way.
     message:
-      r.reason === "room_busy" ? "That room is already in use at that time."
-      : r.reason === "instructor_busy" ? "They are already teaching then."
+      r.reason === "room_busy" ? "That room is taken —"
+      : r.reason === "instructor_busy" ? "They are already teaching —"
       : "That move was refused.",
+    blockedBy: r.blocked_by
+      ? { occurrenceId: r.blocked_by.occurrence_id, name: r.blocked_by.name,
+          at: r.blocked_by.at, who: r.blocked_by.who, room: r.blocked_by.room }
+      : null,
   };
 }

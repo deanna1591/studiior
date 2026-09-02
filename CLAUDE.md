@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Forty-nine migrations, applying clean from `supabase db reset`:
+Fifty-two migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,9 @@ Forty-nine migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **052** `staff_bootstrap()` — the same collapse for the staff app: the staff row, the studio, its primary location, onboarding state, the platform-admin flag and billing state in one request instead of five in sequence
+- **051** `member_bootstrap(slug)` — the member context, the studio, its member-facing settings, its billing state and any live offer in ONE request. Replaced four that had to run in sequence
+- **050** what a move costs: the instructor constraint becomes DEFERRABLE so a swap is possible, a significant move grants every booked member a free cancellation (finally implementing `sub_late_free_cancel`, declared in 001 and read by nothing), an undo window withdraws the unsent email, and a blocked move names the class in the way
 - **049** the Morning Brief learns `unstaffed_class` — an open shift with members booked, ranked above a failed card because a declined card can wait until Thursday and a 7am class cannot. Also fixes a latent `text[] || text || text` bug in `brief_summary()` that appended an empty part
 - **048** applications: `apply_for_shift`, `approve_shift_application` (auto-declines the rest in the same transaction), `decline`, `withdraw_from_shift`, five templates, and `class_moved` for members whose class is rescheduled
 - **047** Decision 17's schema — `staffing_state`, `shift_applications`, the first GiST exclusion constraints in the codebase, and `move_occurrence()`, the only thing that moves a class
@@ -77,7 +80,7 @@ Forty-nine migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Nineteen suites, **751 assertions**, all passing from a clean `db reset`:
+Nineteen suites, **776 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -95,7 +98,7 @@ Nineteen suites, **751 assertions**, all passing from a clean `db reset`:
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
 | `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
 | `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
-| `test/scheduling_test.sql` | 34 | a room cannot hold two classes and an instructor cannot teach two, a cancelled class stops holding its room, a move with members booked refuses until confirmed and then emails them, two instructors apply and approving one auto-declines the other, and withdrawing returns the class to open |
+| `test/scheduling_test.sql` | 46 | a room cannot hold two classes and an instructor cannot teach two, a cancelled class stops holding its room, a move with members booked refuses until confirmed and then emails them, two instructors apply and approving one auto-declines the other, and withdrawing returns the class to open |
 | `test/platform_billing_test.sql` | 39 | a studio in grace still books and takes money, past grace both apps lock, cancellation survives lockout, paying reinstates with row counts proving nothing was lost, and neither webhook endpoint accepts the other's events |
 | `test/manual_payments_test.sql` | 32 | a studio with no provider sells a membership, grants a pack and takes a drop-in; a cash membership and a Stripe membership are the same row; a refund takes back the credits she had left and not the ones she used; front desk sells but cannot refund |
 | `test/stripe_connect_test.sql` | 38 | a forged signature is refused, an event for an unknown account is rejected rather than misattributed, a replay is a no-op, a plan price rise does not reprice existing members, a failed payment blocks new bookings while existing ones stand, and an abandoned hold is swept back to the waitlist |
@@ -219,6 +222,16 @@ It is a status and not a flag on purpose: thirty-four places filter on booking s
 
 **How long the hold lasts is the studio's setting**, `dropin_payment_window_minutes`, beside the other timing rules. A 6am reformer class wants its seat back quickly and a quiet Sunday mat class does not.
 
+**Deferrable is not a carve-out.** The instructor constraint is `DEFERRABLE INITIALLY IMMEDIATE`, so two instructors can swap two simultaneous classes inside one transaction — a valid end state that is refused statement by statement without it. The database still refuses to COMMIT a double-booking; it only tolerates the journey. The room constraint is left immediate as instructed, and has the same swap friction.
+
+**`substitute_for` is historical; `instructor_id` is who teaches.** A class being subbed already stops counting against the original instructor, so no carve-out was needed for substitution — subbing somebody in is refused only when they genuinely cannot be in two places.
+
+**A move that changes the arrangement owes a free cancellation.** More than `significant_move_hours`, or onto a different day in studio time, sets `bookings.free_cancel_until`, which `cancel_booking()` honours over the studio's cutoff. Decision 2's reasoning: they agreed to a time and the studio changed it, so charging them for cancelling is charging them for the studio's decision.
+
+**Nothing moves on screen until the database has answered.** The calendar's first version applied the drag optimistically and reverted on refusal, which meant an accidental two-pixel drag visibly relocated a class with eight people in it before anyone was asked. The confirm now comes first, and it says how many members will be emailed.
+
+**An undo withdraws the email rather than sending a second one.** Moving a class back within sixty seconds is read as a correction: the unsent `class_moved` rows are deleted and nothing new is queued. Any move also deletes the previous unsent notice for that class, because it describes a move that has been superseded.
+
 **What cannot physically overlap is an exclusion constraint, not a check.** A room cannot hold two classes and a person cannot teach two at once. `occ_room_no_overlap` and `occ_instructor_no_overlap` are GiST exclusions — the first use of the `btree_gist` that migration 014 left installed — so they hold against every writer including an import, the seed and a hand-typed UPDATE. Both are partial: a cancelled class stops holding its room, and an open shift has no instructor to clash with but still holds its slot. The opclass is named explicitly (`extensions.gist_uuid_ops`) rather than resolved through search_path.
 
 **Availability is a warning; overlap is a wall.** Decision 9's rule that a hard block gets worked around by not using the feature applies to availability, which is a judgement. It does not apply to two classes in one room, which is not.
@@ -292,6 +305,18 @@ It is a status and not a flag on purpose: thirty-four places filter on booking s
 **One login, many memberships — and Permissions line 267 was wrong about it.** It said a person who is a member of two studios "has two accounts, and no policy anywhere joins them". `auth.users` carries `users_email_partial_key`, a global unique index on email, so one address is one account project-wide; and `auth_member_studios()` returns a *set*, so it is exactly such a policy. Corrected in the doc. The consequence was live: `getMemberContext()` selected on `user_id` alone with `.maybeSingle()`, so a second membership made PostgREST error and the member PWA told those people they had no studio access. It is now scoped by the subdomain's slug — not by taking the first row, which would have hidden the bug and shown somebody the wrong studio's data.
 
 **An email address names a member, so a match must wait for verification.** `members` is unique on `(studio_id, lower(email))`. If self-signup linked on an email match alone, anyone who knew a member's address could take their account and read their attendance and payment history. `claim_member_by_email()` reads `auth.users.email_confirmed_at` itself and refuses otherwise — in the function, not in the screen that calls it, because a check in the screen is a promise and a check in the function is the rule. `enable_confirmations` is on in `config.toml` for the same reason: a test that passes because verification was off proves nothing.
+
+**Serial depth is the cost, not the number of queries.** One member Home render made 14 requests to Supabase, 7 of them strictly sequential — 1.75 s of pure latency from Manila to Frankfurt before anything rendered. It now makes 6, 2 deep. The staff app was 11 and 5, and is now 4 and 2. In both cases the removed *hops* were worth far more than the removed requests.
+
+**A bootstrap carries what every page needs, and no more.** `member_bootstrap()` and `staff_bootstrap()` return the context plus the handful of things every screen reads. The billing screen's trial and grace dates are NOT in them: one screen needs those, and putting them in the bootstrap would make every other render pay for them.
+
+**`getClaims()` verifies; `getSession()` does not.** getClaims checks the JWT signature locally with WebCrypto against a cached JWKS — measured: one JWKS fetch, then ~0.6 ms and zero requests per call, versus 52 ms and a network call every time for `getUser()`. A forged signature is rejected locally with "Invalid JWT signature". getSession, by contrast, reads the cookie and checks nothing, and is used nowhere.
+
+It falls back to a network `getUser()` for symmetric HS256 keys, **silently**. This project signs ES256 on local and on hosted (checked against the hosted JWKS before relying on it), and `assertAsymmetricSigning()` warns once per process if that ever stops being true — otherwise it is the local-versus-hosted trap of migrations 006, 011 and 033 all over again, with no error and no failing test.
+
+**Nothing decides who you are from a cookie.** Even where the claims are read locally, the member row comes from an RLS-scoped query: PostgREST verifies the signature on every request (forged and expired both 401 `PGRST301`), and `members_self` keys on `auth.uid()` from that verified claim, not on the filter the app passes. Asking for another member's row with a genuine token returns `[]`.
+
+**Middleware resolves nothing.** It used to call `studio_by_slug()` on every matched request purely to 404 an unknown slug — a round trip to answer a question `app/member/layout.tsx` already answers on the same request. The 404 moved there.
 
 **Ask the database what a member session returns before designing the screen that shows it.** Signed in as a real member: 76 check-ins visible, **0 with a class name**, 0 past occurrences, 0 rooms, 0 settings rows. `occ_member_read` is `status = 'scheduled'`, which is right for a schedule and wrong for a history — a class leaves the member's view the moment it runs. The History screen would have rendered seventy-six rows reading "Visit" and looked finished. The fix is narrow on purpose: readable if you have a booking or a check-in for it, not "all statuses", which would hand every member the studio's entire past schedule.
 

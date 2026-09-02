@@ -35,21 +35,27 @@ export type CalEvent = {
   staffing: "assigned" | "open" | "pending_approval";
   bookedCount: number;
   capacity: number;
+  /** Hours from now until it starts, so "approaching" can be decided here. */
+  hoursAway: number;
   room: string | null;
   pendingApplications: number;
 };
 
 export default function ScheduleCalendar({
-  events: initial, resources, timeZone,
+  events: initial, resources, timeZone, deadlineHours,
 }: {
   events: CalEvent[];
   resources: Resource[];
   timeZone: string;
+  deadlineHours: number;
 }) {
   const [events, setEvents] = useState(initial);
   const [view, setView] = useState<View>(Views.DAY);
   const [date, setDate] = useState(new Date());
   const [notice, setNotice] = useState<string | null>(null);
+  const [blockedBy, setBlockedBy] = useState<
+    { occurrenceId: string; name: string; at: string; who: string | null; room: string | null } | null
+  >(null);
   const [, startTransition] = useTransition();
 
   // Optimistic, and reverted the moment the database says no. The calendar is
@@ -61,10 +67,17 @@ export default function ScheduleCalendar({
     ) => {
       const target = resourceId ?? ev.resourceId;
       const before = events;
-      const optimistic = events.map((e) =>
-        e.id === ev.id ? { ...e, start, end, resourceId: target } : e);
-      setEvents(optimistic);
       setNotice(null);
+
+      // NOTHING moves on screen until the answer comes back. The first version
+      // moved the class optimistically and then reverted it if the database
+      // refused — which meant an accidental two-pixel drag visibly relocated a
+      // class with eight people in it before anyone was asked. The class stays
+      // where it is until we know.
+      if (confirm) {
+        setEvents(events.map((e) =>
+          e.id === ev.id ? { ...e, start, end, resourceId: target } : e));
+      }
 
       const res = await moveClass({
         occurrenceId: ev.id,
@@ -75,10 +88,17 @@ export default function ScheduleCalendar({
       });
 
       if (res.ok) {
+        setEvents(events.map((e) =>
+          e.id === ev.id ? { ...e, start, end, resourceId: target } : e));
+        const bits: string[] = [];
         if (res.warnings.includes("outside_availability")) {
-          // Decision 9: permitted, and said out loud. The move already happened.
-          setNotice("Moved — but that is outside the availability they gave us.");
+          // Decision 9: permitted, and said out loud.
+          bits.push("that is outside the availability they gave us");
         }
+        if (res.significant) {
+          bits.push("everyone booked can now cancel without penalty, because the time they agreed to has changed");
+        }
+        if (bits.length) setNotice(`Moved — ${bits.join(", and ")}.`);
         startTransition(() => {});
         return;
       }
@@ -86,13 +106,17 @@ export default function ScheduleCalendar({
       if (res.kind === "confirm") {
         const n = res.bookedCount;
         const yes = window.confirm(
-          `${n} member${n === 1 ? " is" : "s are"} booked into this class.\n\n` +
-          `Moving it will email ${n === 1 ? "them" : "all of them"} to say the time has changed. Go ahead?`,
+          `This class has ${n} member${n === 1 ? "" : "s"} booked.\n\n` +
+          `Moving it will email ${n === 1 ? "them" : "all ${n} of them"} to say the time has changed.\n\n` +
+          `Move it back within a minute and no email goes out at all.`,
         );
         if (yes) return apply(ev, start, end, target, true);
-      } else {
-        setNotice(res.message);
+        setEvents(before);
+        return;
       }
+
+      setNotice(res.message);
+      setBlockedBy(res.blockedBy ?? null);
       setEvents(before);
     },
     [events],
@@ -117,11 +141,19 @@ export default function ScheduleCalendar({
   const eventPropGetter = useCallback((e: CalEvent) => {
     const unstaffed = e.staffing !== "assigned";
     const waiting = e.staffing === "pending_approval";
+    // The single worst state in the timetable: people are coming, the deadline
+    // is close, and nobody has agreed to teach it. Given the hatching used for
+    // "something is wrong here" elsewhere, plus coral, plus a marker in the
+    // label — a slightly different pastel would not carry it.
+    const alarming = unstaffed && e.bookedCount > 0 && e.hoursAway <= deadlineHours;
     return {
+      className: alarming ? "hatched" : undefined,
       style: {
-        background: unstaffed ? "var(--amber-tint)" : "var(--lime-tint)",
-        borderLeft: `3px solid ${waiting ? "var(--amber-deep)"
-                    : unstaffed ? "var(--coral)" : "var(--lime-text)"}`,
+        background: alarming ? "var(--coral-tint)"
+                    : unstaffed ? "var(--amber-tint)" : "var(--lime-tint)",
+        borderLeft: `3px solid ${alarming ? "var(--coral)"
+                    : waiting ? "var(--amber-deep)"
+                    : unstaffed ? "var(--amber-deep)" : "var(--lime-text)"}`,
         color: "var(--ink)",
         borderRadius: 8,
         border: "none",
@@ -130,12 +162,17 @@ export default function ScheduleCalendar({
         padding: "2px 6px",
       },
     };
-  }, []);
+  }, [deadlineHours]);
 
   const components = useMemo(() => ({
     event: ({ event }: { event: CalEvent }) => (
       <div className="text-[12px] leading-4">
-        <div className="font-medium">{event.title}</div>
+        <div className="font-medium">
+          {event.staffing !== "assigned" && event.bookedCount > 0 && (
+            <span aria-label="unstaffed with members booked" title="Nobody is teaching this">⚠ </span>
+          )}
+          {event.title}
+        </div>
         <div className="text-ink-2">
           {event.room ?? "No room"} · <span className="num">{event.bookedCount}</span>/
           <span className="num">{event.capacity}</span>
@@ -154,6 +191,19 @@ export default function ScheduleCalendar({
            style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}
            role="alert">
           {notice}
+          {/* Naming what is in the way, and offering to go there. "Conflict
+              detected" tells somebody holding a mouse nothing they can act on. */}
+          {blockedBy && (
+            <>
+              {" "}
+              <a href={`/roster/${blockedBy.occurrenceId}`}
+                 className="font-medium underline underline-offset-4">
+                {blockedBy.who ? `${blockedBy.who} is teaching ` : ""}
+                {blockedBy.name} at {blockedBy.at}
+                {blockedBy.room ? ` in ${blockedBy.room}` : ""}
+              </a>.
+            </>
+          )}
         </p>
       )}
       <div style={{ height: "72vh" }}>

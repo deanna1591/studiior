@@ -24,11 +24,17 @@ export async function staffScreen(path?: string) {
   const ctx = requireOnboarded(access.ctx);
   const supabase = createClient();
 
-  const [{ data: isPlatformAdmin }, summary, { data: billing }] = await Promise.all([
-    supabase.rpc("is_platform_admin"),
+  // is_platform_admin and the billing state used to be two requests here. Both
+  // arrive with the staff context now (migration 052), so what is left is the
+  // setup checklist and the banner's two counts — and those no longer wait on
+  // each other: the banner needed `summary.complete` only to decide whether to
+  // show the setup nudge, which is a decision, not a dependency.
+  const [summary, bannerCounts] = await Promise.all([
     setupSummary(supabase, ctx.studioId),
-    supabase.rpc("studio_billing_state", { p_studio_id: ctx.studioId }),
+    studioBanner(supabase, ctx.studioId, true, ctx.billing),
   ]);
+  const isPlatformAdmin = ctx.isPlatformAdmin;
+  const billing = ctx.billing;
 
   // Lockout is enforced HERE rather than in middleware. Middleware would have
   // to resolve the signed-in user's studio on every request — including static
@@ -39,18 +45,17 @@ export async function staffScreen(path?: string) {
   // It is not the only enforcement either way: migration 045 gates book_class,
   // resolve_checkin_code, import_commit and record_manual_payment in the
   // database, because a permission that exists only in the app is not one.
-  const bill = Array.isArray(billing) ? billing[0] : billing;
-  if (bill?.locked && path !== "/billing") {
+  if (billing.locked && path !== "/billing") {
     redirect("/billing");
   }
 
-  // The banner is part of the frame, so it follows you rather than living on
-  // one screen. It is dropped when it would point at the screen you are
-  // already looking at — "finish setting up" on the setup page is noise.
-  // Matched whole, query included. Comparing paths alone hid the failed-payment
-  // banner on /members — but its link goes to /members?filter=payment, and
-  // standing on the unfiltered list is not the same as having seen who.
-  const raw = await studioBanner(supabase, ctx.studioId, summary.complete);
+  // The setup nudge is applied here rather than inside the banner, because it
+  // is the one candidate that depended on a query running first.
+  const raw = bannerCounts ?? (summary.complete ? null : {
+    kind: "setup" as const,
+    text: "Your studio is not finished being set up.",
+    action: { href: "/setup", label: "Pick up where you left off" },
+  });
   const banner = raw && path && raw.action?.href === path ? null : raw;
 
   return {
@@ -59,7 +64,7 @@ export async function staffScreen(path?: string) {
     supabase,
     summary,
     banner,
-    billing: bill ?? null,
+    billing,
     shell: {
       ...shellProps(ctx, isPlatformAdmin === true, summary.complete),
       banner,

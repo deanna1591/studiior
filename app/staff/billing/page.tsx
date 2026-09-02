@@ -22,7 +22,16 @@ export default async function Billing({
 }) {
   const screen = await staffScreen("/billing");
   if (screen.gate) return screen.gate;
-  const { ctx, shell, billing } = screen;
+  const { ctx, supabase, shell } = screen;
+
+  // The full state, fetched by the one screen that needs the dates. The staff
+  // context carries status/locked/daysLeft because every page needs those; the
+  // trial and grace dates and the card flag belong here rather than on every
+  // render of every other screen.
+  const { data: detail } = await supabase.rpc("studio_billing_state", {
+    p_studio_id: ctx.studioId,
+  });
+  const billing = Array.isArray(detail) ? detail[0] : detail;
 
   const status = billing?.status ?? "trialing";
   const locked = billing?.locked ?? false;

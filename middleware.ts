@@ -1,31 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
 import { APP_HEADER, SLUG_HEADER, resolveHost } from "@/lib/tenant";
-import type { Database } from "@/lib/database.types";
 
 /** Anon client with no cookie access at all — it cannot touch the session. */
-function anonClient() {
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } },
-  );
-}
 
 export async function middleware(request: NextRequest) {
   const { app, slug } = resolveHost(request.headers.get("host") ?? "");
 
-  if (app === "member") {
-    // Resolve the slug to a real studio before anything renders. Deliberately
-    // on a cookie-less anon client: this is a pre-login lookup through
-    // studio_by_slug(), the one function anon may execute (migration 004), and
-    // it has no business reading or writing anybody's session.
-    const { data, error } = await anonClient().rpc("studio_by_slug", { p_slug: slug! });
-    if (error || !data || data.length === 0) {
-      return new NextResponse(`Unknown studio "${slug}"`, { status: 404 });
-    }
-  }
+  // The slug is NOT resolved here any more. It was a Supabase round trip on
+  // every single request — including ones that then made the same call again —
+  // and the only thing it decided was whether to 404. app/member/layout.tsx
+  // already calls studio_by_slug() for the browser-tab title, and the login
+  // screen calls it for the studio's branding, so the 404 is raised there on a
+  // request that was going to make the call regardless.
 
   // Pass the resolved tenant to the pages on the REQUEST headers. headers() in
   // a Server Component reads the request, so setting these on the response
@@ -42,8 +29,18 @@ export async function middleware(request: NextRequest) {
   // Refresh the session. Server Components cannot write cookies, so this is
   // where an expiring token gets renewed; the refreshed cookies are copied
   // onto the response actually returned.
+  //
+  // getClaims(), not getUser(). getUser() asks GoTrue over the network on every
+  // request — 17-23 ms locally, a quarter of a second from Manila — and this
+  // call never reads the answer: nothing here branches on who you are. What it
+  // needs is the refresh, which getClaims() performs the same way.
+  //
+  // It is not getSession() either. getClaims() VERIFIES the signature, locally,
+  // with WebCrypto against a cached JWKS. This project signs ES256 on local and
+  // on hosted; see assertAsymmetricSigning() in lib/auth.ts for what happens if
+  // that ever stops being true.
   const { supabase, response } = createMiddlewareClient(request);
-  await supabase.auth.getUser();
+  await supabase.auth.getClaims();
 
   const rewritten = NextResponse.rewrite(url, { request: { headers: forwarded } });
   response.cookies.getAll().forEach((c) => rewritten.cookies.set(c));

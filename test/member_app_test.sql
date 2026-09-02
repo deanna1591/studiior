@@ -273,4 +273,36 @@ exception when sqlstate 'PT409' then
 end $$;
 reset role;
 
+-- =============================================================================
+-- member_bootstrap() — the one call every member screen now depends on
+-- =============================================================================
+-- It replaced four sequential requests, so if it is wrong the whole app is
+-- wrong quietly rather than loudly. Keyed on auth.uid(): the slug picks which
+-- of the caller's memberships is meant and can never reach past them.
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','eeeeeeee-0000-0000-0000-0000000000a1',false);
+
+select expect_num('the bootstrap returns exactly one row for its caller',
+  (select count(*) from member_bootstrap('member-test')), 1);
+select expect_text('...it is the caller''s own member row',
+  (select member_id::text from member_bootstrap('member-test')),
+  'eeeeeeee-0000-0000-0000-00000000dd01');
+select expect_text('...carrying the studio, so nothing has to ask again',
+  (select studio_name from member_bootstrap('member-test')), 'Member App Studio');
+select expect_text('...and the member-facing settings, which they cannot read directly',
+  (select (cancellation_cutoff_minutes is not null)::text from member_bootstrap('member-test')), 'true');
+select expect_num('a member still cannot read studio_settings itself',
+  (select count(*) from studio_settings), 0);
+select expect_num('a slug they are not a member of returns nothing',
+  (select count(*) from member_bootstrap('some-other-studio')), 0);
+reset role;
+
+-- Somebody else's session gets their own context, never the first caller's.
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000000',false);
+select expect_num('a stranger gets no context at all',
+  (select count(*) from member_bootstrap('member-test')), 0);
+reset role;
+
 select 'ALL MEMBER APP TESTS PASSED' as result;

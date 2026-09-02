@@ -11,18 +11,20 @@ export async function studioBanner(
   supabase: SupabaseClient<Database>,
   studioId: string,
   setupComplete: boolean,
+  // Passed in rather than fetched. It arrived with the staff context, and
+  // asking for it again here was a third request for an answer already held.
+  billing?: { status: string | null; daysLeft: number },
 ): Promise<BannerMsg | null> {
-  const [failed, pastDue, { data: billing }] = await Promise.all([
+  const [failed, pastDue] = await Promise.all([
     supabase.from("payments").select("id", { count: "exact", head: true })
       .eq("studio_id", studioId).eq("status", "failed"),
     supabase.from("memberships").select("id", { count: "exact", head: true })
       .eq("studio_id", studioId).eq("status", "past_due"),
-    supabase.rpc("studio_billing_state", { p_studio_id: studioId }),
   ]);
 
   const nFailed = failed.count ?? 0;
   const nPastDue = pastDue.count ?? 0;
-  const bill = Array.isArray(billing) ? billing[0] : billing;
+  const bill = billing ?? null;
 
   return topBanner([
     // Above everything, including a member's failed card. Those cost the studio
@@ -33,9 +35,9 @@ export async function studioBanner(
       ? {
           kind: "payment_failed" as const,
           text: `Your Studiior subscription needs attention. ${
-            bill.days_left === 0
+            bill.daysLeft === 0
               ? "The studio locks today"
-              : `${bill.days_left} day${bill.days_left === 1 ? "" : "s"} left`
+              : `${bill.daysLeft} day${bill.daysLeft === 1 ? "" : "s"} left`
           } before staff and members are locked out.`,
           action: { href: "/billing", label: "Sort it out" },
         }
