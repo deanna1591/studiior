@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "./icons";
 
 /**
- * The week, as a strip.
+ * The week, as seven cards.
  *
  * This is the component that decides whether the app reads as an app. A
  * previous/next pair around a single day label is a webpage's answer: it tells
@@ -10,18 +10,22 @@ import { Icon } from "./icons";
  * you the shape of the week — which days have classes, how far Saturday is,
  * that Thursday is empty — before you tap anything.
  *
- * SELECTED, not today, takes the filled circle. The member is navigating, and
- * the filled disc has to answer "which day am I looking at". Today is still
- * marked when it is not the one selected, in accent text with its label above
- * it, so the two states never look the same.
+ * EACH DAY IS A CARD, not a bare number. On the washed page a plain numeral has
+ * nothing holding it, and seven of them read as a line of text; a white tile
+ * reads as seven things you can press. The selected one fills with the accent
+ * and takes a coloured glow — the only glow in the app, spent here because this
+ * is the control a member touches most.
  *
- * The dot under a day is presence, not count. A number there would be a second
+ * SELECTED, not today, takes the fill. The member is navigating, and the filled
+ * tile has to answer "which day am I looking at". Today is still marked when it
+ * is not the one selected, in accent text, so the two never look the same.
+ *
+ * The pip under a day is presence, not count. A number there would be a second
  * thing to read in a row of seven, and the count is on the screen below.
  */
 export type WeekDay = {
   /** Midnight in the studio's zone, as an offset in days from today. */
   offset: number;
-  /** 1–31, in the studio's zone. */
   dayOfMonth: number;
   /** MON…SUN, already localised. */
   weekdayLabel: string;
@@ -32,86 +36,141 @@ export type WeekDay = {
 };
 
 export default function WeekStrip({
-  days, monthLabel, hrefFor, prevHref, nextHref,
+  days, hrefFor,
 }: {
   days: WeekDay[];
-  monthLabel: string;
   hrefFor: (offset: number) => string;
-  prevHref: string;
-  nextHref: string;
 }) {
   return (
-    <section aria-label="Choose a day" className="mb-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="m-body font-medium text-ink">{monthLabel}</h2>
-        <div className="flex items-center gap-1.5">
+    <ol className="flex items-stretch gap-1.5">
+      {days.map((d) => (
+        <li key={d.offset} className="flex-1">
           <Link
-            href={prevHref}
-            aria-label="Previous week"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-line-2 bg-surface text-ink-2"
+            href={hrefFor(d.offset)}
+            aria-current={d.isSelected ? "date" : undefined}
+            aria-label={`${d.weekdayLabel} ${d.dayOfMonth}${d.hasClasses ? ", has classes" : ", no classes"}`}
+            className="flex flex-col items-center gap-1 rounded-2xl py-2.5"
+            style={
+              d.isSelected
+                ? {
+                    background: "var(--accent-solid)",
+                    color: "var(--accent-on-solid)",
+                    boxShadow: "0 6px 16px -4px color-mix(in srgb, var(--accent-solid) 45%, transparent)",
+                  }
+                : { background: "var(--surface)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.05)" }
+            }
           >
-            <Icon name="chevron-left" size={18} />
+            <span
+              className="text-[10px] font-semibold uppercase leading-3 tracking-[0.05em]"
+              style={d.isSelected ? undefined : { color: "var(--ink-3)" }}
+            >
+              {d.weekdayLabel}
+            </span>
+            <span
+              className="num text-[15px] font-bold leading-5"
+              style={
+                d.isSelected ? undefined
+                : d.isToday ? { color: "var(--lime-text)" }
+                : d.isPast ? { color: "var(--ink-3)" }
+                : { color: "var(--ink)" }
+              }
+            >
+              {d.dayOfMonth}
+            </span>
+            {/* Always rendered, so a row never changes height when a day is
+                empty. On the filled tile it takes the ink measured on that
+                fill, because a --accent-solid pip on --accent-solid is
+                invisible. */}
+            <span
+              aria-hidden
+              className="h-1 w-1 rounded-full"
+              style={{
+                background: !d.hasClasses ? "transparent"
+                  : d.isSelected ? "var(--accent-on-solid)"
+                  // --lime-text, not --accent-solid: on the white tile a light
+                  // accent is 1.23 and the pip vanishes. On the FILLED tile
+                  // the ground is the accent itself, so the measured on-solid
+                  // ink is the right one there.
+                  : "var(--lime-text)",
+              }}
+            />
           </Link>
-          <Link
-            href={nextHref}
-            aria-label="Next week"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-line-2 bg-surface text-ink-2"
-          >
-            <Icon name="chevron-right" size={18} />
-          </Link>
-        </div>
-      </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
-      <ol className="flex items-stretch justify-between">
+/**
+ * The same information over a whole month.
+ *
+ * It exists because the mockup draws a Week/Month toggle, and a segmented
+ * control with a dead half is exactly the decorative control this build refuses
+ * to ship. What it is actually FOR: the week strip answers "what is on this
+ * week" and cannot answer "when is the next Saturday class" — over a month the
+ * pips make the studio's rhythm visible at a glance.
+ *
+ * Tapping a day selects it and drops back to the week, because the list below
+ * is still a day's worth of classes and the week is the better frame once you
+ * know which day you want.
+ */
+export type MonthDay = WeekDay & { inMonth: boolean };
+
+export function MonthGrid({
+  days, hrefFor,
+}: {
+  days: MonthDay[];
+  hrefFor: (offset: number) => string;
+}) {
+  return (
+    <div className="m-card p-3">
+      <ol className="grid grid-cols-7 gap-1" role="grid">
+        {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+          <li key={i} className="pb-1 text-center text-[10px] font-semibold uppercase leading-4 tracking-[0.05em] text-ink-3">
+            {l}
+          </li>
+        ))}
         {days.map((d) => (
-          <li key={d.offset} className="flex-1">
+          <li key={d.offset}>
             <Link
               href={hrefFor(d.offset)}
               aria-current={d.isSelected ? "date" : undefined}
               aria-label={`${d.weekdayLabel} ${d.dayOfMonth}${d.hasClasses ? ", has classes" : ", no classes"}`}
-              className="flex flex-col items-center gap-1 py-1"
+              className={`flex h-11 flex-col items-center justify-center gap-1 rounded-xl ${d.inMonth ? "" : "opacity-35"}`}
+              style={
+                d.isSelected
+                  ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                  : undefined
+              }
             >
               <span
-                className={`text-[11px] font-medium uppercase leading-3 tracking-[0.04em] ${
-                  d.isSelected ? "text-ink" : d.isPast ? "text-ink-3" : "text-ink-3"
-                }`}
-              >
-                {d.weekdayLabel}
-              </span>
-
-              {/* 36px disc inside a 44px column: the tap target is the whole
-                  cell, and the disc is what it looks like. */}
-              <span
-                className="num flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-medium"
+                className="num text-[13px] font-semibold leading-4"
                 style={
-                  d.isSelected
-                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
-                    : d.isToday
-                      ? { color: "var(--lime-text)", fontWeight: 700 }
-                      : undefined
+                  d.isSelected ? undefined
+                  : d.isToday ? { color: "var(--lime-text)" }
+                  : d.isPast ? { color: "var(--ink-3)" }
+                  : { color: "var(--ink)" }
                 }
               >
-                <span className={d.isSelected || d.isToday ? "" : d.isPast ? "text-ink-3" : "text-ink"}>
-                  {d.dayOfMonth}
-                </span>
+                {d.dayOfMonth}
               </span>
-
-              {/* Always rendered, so the row never changes height when a day
-                  has nothing on. */}
               <span
                 aria-hidden
-                className="h-1.5 w-1.5 rounded-full"
-                // One colour for every dot. The selected day's dot was given
-                // the accent's text colour to contrast against the filled
-                // circle — but it sits below the circle on the page, not on
-                // it, so all that achieved was one grey dot in a row of
-                // accent ones, which reads as "this day is different".
-                style={{ background: d.hasClasses ? "var(--accent-solid)" : "transparent" }}
+                className="h-1 w-1 rounded-full"
+                style={{
+                  background: !d.hasClasses ? "transparent"
+                    : d.isSelected ? "var(--accent-on-solid)"
+                    // --lime-text, not --accent-solid: on the white tile a light
+                  // accent is 1.23 and the pip vanishes. On the FILLED tile
+                  // the ground is the accent itself, so the measured on-solid
+                  // ink is the right one there.
+                  : "var(--lime-text)",
+                }}
               />
             </Link>
           </li>
         ))}
       </ol>
-    </section>
+    </div>
   );
 }

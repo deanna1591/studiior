@@ -76,6 +76,44 @@ export function isHex(v: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(v.trim());
 }
 
+/**
+ * Nudge a colour round the wheel, keeping its lightness and saturation.
+ *
+ * The page gradient needs a second stop that is recognisably the same colour
+ * and not the same value — the mockup's terracotta wash drifts a whisper
+ * toward violet on the way down. Rotating the hue does that for ANY accent,
+ * where a hand-picked second hex would only ever have worked for terracotta.
+ *
+ * NEGATIVE, and measured against the mockup: terracotta sits at hue 18, and
+ * its second stop #F2E6F0 is up at 310. Rotating +25 went the other way, into
+ * orange, and the gradient came out warmer at the bottom than the top —
+ * the opposite of what the mockup does and, at equal lightness, invisible.
+ */
+export function rotateHue(hex: string, degrees: number): string {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return hex.toUpperCase();
+  const sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let hue =
+    max === r ? ((g - b) / d + (g < b ? 6 : 0))
+    : max === g ? (b - r) / d + 2
+    : (r - g) / d + 4;
+  hue = ((hue * 60 + degrees) % 360 + 360) % 360;
+
+  const c = (1 - Math.abs(2 * l - 1)) * sat;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [rr, gg, bb] =
+    hue < 60 ? [c, x, 0] : hue < 120 ? [x, c, 0] : hue < 180 ? [0, c, x]
+    : hue < 240 ? [0, x, c] : hue < 300 ? [x, 0, c] : [c, 0, x];
+  return "#" + [rr, gg, bb]
+    .map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0").toUpperCase())
+    .join("");
+}
+
 export type AccentRamp = {
   /** As chosen. Large fills only — it has not been asked to carry text. */
   fill: string;
@@ -97,6 +135,15 @@ export type AccentRamp = {
   wash: string;
   /** 14% over the surface, for the square behind an icon. */
   chip: string;
+  /**
+   * The page itself. Two stops: the accent over the surface, and the same
+   * accent rotated a little round the wheel so the gradient has somewhere to
+   * go. White cards float on this — the single change that stops the app
+   * reading as a document, because a white card on a cream page has nothing to
+   * separate it from the page.
+   */
+  washTop: string;
+  washBottom: string;
   /** What `text` actually measures on the surface. */
   textContrast: number;
   /** True when no amount of darkening got there and ink is used instead. */
@@ -165,10 +212,17 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
   // more, it is ink wearing a hint of it — and quietly shipping that is the
   // silent substitution this is supposed to avoid. Stopping here is what makes
   // `fellBack` a real answer the picker can show rather than dead code.
+  //
+  // Measured against the PAGE WASH as well as the surface. Accent text used to
+  // appear only inside white cards, so clearing 4.5 on --surface was the whole
+  // requirement. The wash put the same colour on a tinted page — "See all"
+  // landed at 4.21 — and a step that is safe on one and not the other is worse
+  // than no step, because nothing at the call site says which ground it is on.
+  const washFloor = mix(rotateHue(fill, -45), p.surface, 0.10);
   let text = fill;
   for (let step = 0; step <= 15; step++) {
     const candidate = mix(p.ink, fill, step * 0.04);
-    if (contrast(candidate, p.surface) >= 4.5) {
+    if (contrast(candidate, p.surface) >= 4.5 && contrast(candidate, washFloor) >= 4.5) {
       text = candidate;
       return {
         fill,
@@ -176,6 +230,8 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
         tint: mix(fill, p.surface, 0.12),
         wash: mix(fill, p.surface, 0.035),
         chip: mix(fill, p.surface, 0.14),
+        washTop: mix(fill, p.surface, 0.06),
+        washBottom: mix(rotateHue(fill, -45), p.surface, 0.10),
         textContrast: Math.round(contrast(candidate, p.surface) * 100) / 100,
         fellBack: false,
         ...solidFor(fill, p),
@@ -188,6 +244,8 @@ export function accentRamp(accent: string, preset: PresetKey): AccentRamp {
     tint: mix(fill, p.surface, 0.12),
     wash: mix(fill, p.surface, 0.035),
     chip: mix(fill, p.surface, 0.14),
+    washTop: mix(fill, p.surface, 0.06),
+    washBottom: mix(rotateHue(fill, -45), p.surface, 0.10),
     textContrast: Math.round(contrast(p.ink, p.surface) * 100) / 100,
     fellBack: true,
     ...solidFor(fill, p),
@@ -278,5 +336,8 @@ export function themeVars(preset: PresetKey, accent: string): Record<string, str
     "--accent-on-solid": a.onSolid,
     "--accent-wash": a.wash,
     "--accent-chip": a.chip,
+    // The page itself, as two stops. White cards float on this.
+    "--page-top": a.washTop,
+    "--page-bottom": a.washBottom,
   };
 }

@@ -11,11 +11,12 @@ import { Icon } from "./icons";
  * second one at its own subdomain, so a picker here would be a control with one
  * item in it for almost everybody.
  *
- * The bell has no unread count of its own because nothing in the app writes
- * one: notifications are email, and inventing a badge for a screen that does
- * not exist is the "insight without a working button" mistake. It goes to the
- * email settings, which is the only thing a member can actually do about
- * notifications today.
+ * THE MOCKUP'S BELL IS NOT HERE, deliberately. Nothing in this app writes an
+ * unread count: notifications are email, and there is no notification centre to
+ * open. The one thing that is genuinely waiting on a member — a waitlist offer
+ * — is already carried as a badge on the Home tab, where their thumb is. A bell
+ * would be a second indicator for the same fact, and on the days there is no
+ * offer it would be a control that opens nothing.
  */
 export default function MemberHeader({
   studioName, logoUrl, memberName, avatarUrl,
@@ -26,7 +27,7 @@ export default function MemberHeader({
   avatarUrl: string | null;
 }) {
   return (
-    <header className="sticky top-0 z-20 bg-paper/95 px-4 py-3 backdrop-blur-[2px]">
+    <header className="px-4 pb-2 pt-3">
       <div className="mx-auto flex max-w-lg items-center gap-3">
         <Link href="/account" className="flex min-w-0 flex-1 items-center gap-2.5">
           {logoUrl ? (
@@ -43,10 +44,6 @@ export default function MemberHeader({
           <Icon name="chevron-down" size={16} className="shrink-0 text-ink-3" />
         </Link>
 
-        <Link href="/settings" aria-label="Email settings"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-2">
-          <Icon name="bell" size={20} />
-        </Link>
         <Link href="/account" aria-label="Your account">
           <Avatar name={memberName} url={avatarUrl} size={36} />
         </Link>

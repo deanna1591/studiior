@@ -192,26 +192,124 @@ body {
    and the hairline do most of the work; the blur alone would just be haze.
    When a studio has no photograph the login panel uses .m-panel instead —
    blur over a flat gradient is the fog case again. */
-.m-card {
-  /* Tinted, not white: --accent-wash is the studio's accent at 3.5% over the
-     surface, so a terracotta studio gets a warm card and a navy one a cool
-     card, and neither reads as a colour. A white card on a white page has no
-     edge except its hairline, which is what made this look like a document.
+/* --- the member app's page, and the cards floating on it -------------------
 
-     Depth is two shadows and no border. One soft wide shadow puts the card
-     above the page; one tight dark one gives it an edge where it meets the
-     page. A 1px hairline does the second job flatly and the first not at all. */
-  background: var(--accent-wash);
+   THE tinted wash. Everything before this put white cards on a cream page, so
+   nothing separated: the card and the page were the same value and only a
+   hairline told them apart. The page is now the studio's accent at 7%, drifting
+   25 degrees round the wheel on the way down, and the cards are pure white with
+   layered shadows. That one change is most of why it reads as an app.
+
+   MEASURED, and it constrains the type: --ink-3 is 4.59 on pure white, so ANY
+   tint puts it under the floor — 4.37 at 5%, 4.19 at 7%. Text sitting directly
+   on the wash therefore takes --ink-2 (6.66 worst across 8 accents x 4 presets)
+   and --ink-3 is only ever used inside a white card. */
+.m-page {
+  background: linear-gradient(170deg, var(--page-top) 0%, var(--page-bottom) 100%);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+.m-card {
+  /* Pure white, not a tint. The tint moved to the page; a card that is also
+     tinted has nothing to lift it off one. No border at all — depth is two
+     shadows, one tight for the edge and one wide and soft for the float. */
+  background: var(--surface);
   border: none;
   border-radius: 22px;
   box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.05),
-    0 6px 16px -6px rgb(0 0 0 / 0.10),
-    0 16px 32px -12px rgb(0 0 0 / 0.08);
+    0 2px 6px rgb(26 21 18 / 0.05),
+    0 12px 28px rgb(26 21 18 / 0.08);
 }
-/* A booked class keeps a ring, because it is the one card whose state has to
-   survive being glanced at. Inset so it does not add a pixel to the layout. */
-.m-card-booked { box-shadow: inset 0 0 0 1.5px var(--lime-text), 0 1px 2px rgb(0 0 0 / 0.05), 0 6px 16px -6px rgb(0 0 0 / 0.10); }
+/* The one card that has to survive a glance. A ring, not a border: it adds no
+   pixel to the layout and cannot shift anything when it appears. */
+.m-card-booked {
+  box-shadow:
+    /* The accent's text step, like the stripe. The ring says "you are in this
+       class" against a white card, and the fill step is 1.23 there on a light
+       accent — the ring all but disappeared on lime. */
+    0 0 0 1.6px var(--lime-text),
+    0 2px 6px rgb(26 21 18 / 0.05),
+    0 12px 28px rgb(26 21 18 / 0.08);
+}
+
+/* The colour down the left of a class card. */
+/* Absolute, not a stretched flex child: the card has vertical padding, so a
+   stretched child stops at the content box and the stripe floats short of both
+   corners. */
+.m-stripe {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  border-radius: 0 4px 4px 0;
+  /* The accent's TEXT step, not its fill. The fill is measured against the ink
+     that sits ON it; here the stripe sits on the white card, and a light accent
+     measures 1.23 there — lime on white is invisible. The text step is
+     darkened until it clears 4.5 on the surface, so as a 3:1 mark it is safe
+     for every accent. */
+  background: var(--lime-text);
+}
+.m-stripe-muted { background: var(--line-2); }
+
+/* --- the photographic hero ------------------------------------------------
+   Text sits ON the image, which the previous card refused to do because the
+   composite against an unknown photograph is unmeasurable. A scrim makes it
+   measurable, the same argument as the login screen: white over a WHITE
+   photograph needs the overlay at 0.82 or darker to clear 4.5:1, so the
+   gradient reaches 0.88 at the bottom and the type is anchored there. The
+   frosted tag near the top has no such band to sit in, so it carries its own
+   near-opaque fill rather than trusting the picture behind it. */
+.m-hero { position: relative; height: 172px; border-radius: 22px; overflow: hidden; }
+.m-hero-scrim {
+  position: absolute; inset: 0;
+  /* Held back until 44% so the top of the photograph is actually visible, then
+     ramped hard — the type is anchored in the bottom band where the overlay is
+     at or past 0.82, which is what white needs over a WHITE photograph. */
+  background: linear-gradient(180deg,
+    rgb(20 16 14 / 0.02) 0%, rgb(20 16 14 / 0.10) 44%, rgb(20 16 14 / 0.90) 100%);
+}
+.m-hero-tag {
+  background: rgb(20 16 14 / 0.82);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  color: #FFFFFF;
+}
+
+/* The square behind a stat's icon. 26px at 9px radius, per the mockup — small
+   enough to read as a mark rather than as a second card inside the card. */
+.m-icon-sq {
+  width: 26px; height: 26px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-chip); color: var(--ink-2);
+}
+
+/* The floating tab bar. Inset from the edges and rounded, so the list scrolls
+   under it rather than stopping at it. */
+.m-tabbar-float {
+  position: fixed; left: 12px; right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  border-radius: 26px;
+  /* The preset's own surface, not white. On Bold the surface is dark and the
+     ink is near-white — a hardcoded white bar measured 2.40 with the inactive
+     label on it. */
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  box-shadow: 0 2px 6px rgb(26 21 18 / 0.05), 0 12px 28px rgb(26 21 18 / 0.10);
+}
+
+/* The type ratio the mockup is built on: the time is 16px Archivo bold against
+   11.5px metadata. Everything used to sit between 12 and 15. */
+.m-time-lg { font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+             font-size: 16px; line-height: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.m-dur     { font-size: 10.5px; line-height: 14px; font-weight: 500; }
+.m-name    { font-size: 14.5px; line-height: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.m-subtle  { font-size: 11.5px; line-height: 17px; }
+.m-eyebrow { font-size: 12px; line-height: 16px; font-weight: 500; }
+/* Archivo without the uppercase. --m-display is the staff app's voice and it
+   shouts: "NIKOLA" and "MAT PILATES" set in caps read as a poster, not as a
+   greeting and a class. Sentence case, same face, same tight tracking. */
+.m-head {
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  font-variation-settings: 'wdth' 112, 'wght' 640;
+  letter-spacing: -0.015em;
+}
 
 /* The square behind an icon. Small, fully soft-cornered, filled with the
    accent at 14% — an icon floating on a card is a mark, an icon on a chip is a

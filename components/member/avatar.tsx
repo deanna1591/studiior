@@ -40,8 +40,11 @@ export default function Avatar({
       aria-hidden
       style={{
         width: size, height: size,
-        background: "var(--lime-tint)",
-        color: "var(--lime-text)",
+        // Ink on the chip, not accent-on-tint. The accent's text step is
+        // derived against the surface and the wash; the tint is neither, and
+        // the initial measured 3.88 on it.
+        background: "var(--accent-chip)",
+        color: "var(--ink)",
         fontSize: Math.round(size * 0.34),
       }}
       className="flex shrink-0 items-center justify-center rounded-full border border-line font-semibold"

@@ -63,7 +63,7 @@ export default async function Membership() {
       )}
 
       {!live ? (
-        <div className="rounded-xl border border-dashed border-line-2 p-5 text-center">
+        <div className="m-card p-5 text-center">
           <p className="m-body text-ink">No plan yet.</p>
           <p className="m-sub mt-1 text-ink-2">
             The studio can set you up with one at the desk, and then classes are
@@ -75,8 +75,8 @@ export default async function Membership() {
           </p>
         </div>
       ) : (
-        <section className="rounded-xl border border-line bg-surface p-4">
-          <h2 className="m-display text-ink">{live.membership_plans?.name}</h2>
+        <section className="m-card p-4">
+          <h2 className="m-head text-[24px] leading-8 text-ink">{live.membership_plans?.name}</h2>
           <p className="m-sub mt-1 text-ink-2">
             <span className="num">{formatMoney(live.price_cents, live.currency)}</span>
             {live.status !== "active" && <> · {live.status.replace("_", " ")}</>}
@@ -114,7 +114,7 @@ export default async function Membership() {
       {(ledger ?? []).length > 0 && (
         <section className="mt-5">
           <h2 className="m-sub mb-2 font-medium text-ink">Recent activity</h2>
-          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+          <ul className="m-card divide-y divide-line overflow-hidden">
             {(ledger ?? []).slice(0, 8).map((c) => (
               <li key={c.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
                 <span className="m-sub min-w-0 truncate text-ink-2">
@@ -142,12 +142,12 @@ export default async function Membership() {
       )}
 
       <Link href="/settings"
-            className="m-tap mt-8 flex w-full items-center justify-center rounded-lg border border-line-2 bg-surface text-[14px] text-ink-2">
+            className="m-tap m-card mt-8 flex w-full items-center justify-center text-[14px] font-semibold text-ink-2">
         Email settings
       </Link>
 
       <form action={signOut} className="mt-3">
-        <button className="m-tap w-full rounded-lg border border-line-2 bg-surface text-[14px] text-ink-2">
+        <button className="m-tap m-card w-full text-[14px] font-semibold text-ink-2">
           Sign out
         </button>
       </form>

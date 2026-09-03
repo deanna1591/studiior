@@ -1,126 +1,92 @@
 import Link from "next/link";
-import IconChip from "./icon-chip";
-import Avatar from "./avatar";
 
 /**
- * One class, as a card.
+ * One class, as a card on the washed page.
  *
- * Rows were right for the staff roster, where the job is to scan forty names.
- * A member sees six classes and is choosing between them, so each one gets room
- * to say what it is and to look like something you press.
+ * THE SHAPE IS HORIZONTAL, not stacked. The old card put the time, then the
+ * name, then the instructor, then a divider, then the action — five bands down
+ * a card, which is a paragraph with a button under it. This one reads left to
+ * right: a colour stripe, the time, what it is, and the one thing you can do.
+ * Six of them down a screen scan as a timetable rather than as six documents.
  *
- * THE TYPE DOES THE WORK. The time is 24px and the instructor 13 — a ratio of
- * nearly two, where everything used to sit between 12 and 17 and the card read
- * as a paragraph. A member scanning a day is looking for a time, so the time is
- * the biggest thing on it.
+ * THE STRIPE is the accent, and it is also the status. Booked adds a ring; a
+ * class that has gone or filled takes --line-2 instead, so a member can tell
+ * the dead rows from the live ones from the left edge alone, before reading a
+ * word.
  *
- * The whole card opens the detail view and the action button books — two
- * targets in one card, which HTML will not nest (a form inside an anchor is
- * invalid). The link is an overlay and the action sits above it on its own
- * layer; the divider is what makes that split legible to a person.
+ * THE TYPE RATIO does the rest: the time is 16px Archivo bold against 11.5px
+ * metadata. Everything used to sit between 12 and 15px.
  *
- * No glass. A card sits on a flat surface with nothing behind it to refract,
- * and a blurred layer per card is paid for on every scroll frame.
+ * Two targets in one card, which HTML will not nest — a form inside an anchor
+ * is invalid. The link is an overlay; the action sits above it on its own
+ * layer.
  */
 export default function ClassCard({
-  href, timeRange, durationLabel, name, instructor, instructorAvatar, room,
-  imageUrl, statusLabel, statusTone = "quiet", action, dimmed = false, booked = false,
+  href, startLabel, endLabel, durationLabel, name, instructor, room,
+  statusLabel, statusTone = "quiet", action, dimmed = false, booked = false,
 }: {
   href: string;
-  timeRange: React.ReactNode;
-  durationLabel: React.ReactNode;
+  /** "06:30" — the start alone, in the studio's zone. */
+  startLabel: string;
+  /** "07:20" — the end, set small beneath it. The mockup puts AM/PM here;
+      fmtTime is a 24-hour clock, so there is no meridiem to set, and the end
+      of the class is the thing a member actually wants in that space. */
+  endLabel: string | null;
+  durationLabel: string;
   name: string;
   instructor: string | null;
-  instructorAvatar?: string | null;
   room: string | null;
-  imageUrl?: string | null;
   statusLabel: React.ReactNode;
   statusTone?: "quiet" | "booked" | "full" | "holding";
   action: React.ReactNode;
   dimmed?: boolean;
   booked?: boolean;
 }) {
+  const muted = dimmed || statusTone === "full";
   return (
-    <li className={`m-card relative ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-70" : ""}`}>
+    <li className={`m-card relative flex items-stretch gap-3 py-4 pl-4 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}>
       <Link href={href} className="absolute inset-0 rounded-[22px]" aria-label={`Open ${name}`}>
         <span className="sr-only">Open {name}</span>
       </Link>
 
-      <div className="pointer-events-none relative p-5">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-x-2.5">
-              <span className="num m-time whitespace-nowrap text-ink">{timeRange}</span>
-              {/* --accent-chip, not --paper: on a card whose ground is
-                  --accent-wash the paper fill was within a hair of the card and
-                  the pill read as loose text. Label in --ink-2 (5.92 worst on
-                  the tint); --ink-3 measures 3.72 there and would fail. */}
-              <span className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] leading-4 text-ink-2"
-                    style={{ background: "var(--accent-chip)" }}>
-                {durationLabel}
-              </span>
-            </div>
-            <p className={`mt-1 text-[17px] font-semibold leading-6 ${dimmed ? "text-ink-3" : "text-ink"}`}>
-              {name}
-            </p>
-          </div>
+      <span aria-hidden className={`m-stripe ${muted ? "m-stripe-muted" : ""}`} />
 
-          {/* The class photograph. Small on a list card — it is here to tell
-              one class from another at a glance, not to be the subject. */}
-          {imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="" aria-hidden
-                 className="h-12 w-12 shrink-0 rounded-[14px] object-cover" />
-          )}
-        </div>
+      {/* A fixed column, so six cards line their times up on one edge. Ragged
+          times are what made the old list read as prose. */}
+      <div className="pointer-events-none w-[56px] shrink-0 pt-0.5">
+        <p className="num m-time-lg text-ink">{startLabel}</p>
+        {endLabel && <p className="num m-dur mt-0.5 text-ink-3">{endLabel}</p>}
+      </div>
 
-        <div className="mt-4 space-y-2.5">
+      <div className="pointer-events-none min-w-0 flex-1">
+        <p className={`m-name truncate ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
+        <p className="m-subtle mt-0.5 truncate text-ink-3">
           {/* Absent, not "TBC". Decision 17: an open shift reads as a normal
               class to a member, and a row saying nobody has agreed to teach it
               is a doubt they can do nothing with. */}
-          {instructor && (
-            <p className="m-meta flex items-center gap-2.5 text-ink-2">
-              {instructorAvatar
-                ? <Avatar name={instructor} url={instructorAvatar} size={32} />
-                : <IconChip name="person" />}
-              {instructor}
-            </p>
-          )}
-          {room && (
-            <p className="m-meta flex items-center gap-2.5 text-ink-2">
-              <IconChip name="door" />
-              {room}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-5 border-t border-line pt-4">
-          <div className="flex min-h-[44px] items-center justify-between gap-3">
-            <span
-              className={`m-sub flex items-center gap-1.5 ${
-                statusTone === "booked" || statusTone === "holding" ? "font-medium" : "text-ink-2"
-              }`}
-              style={
-                statusTone === "booked"  ? { color: "var(--lime-text)" }
-                : statusTone === "holding" ? { color: "var(--amber-deep)" }
-                : undefined
-              }
-            >
-              {statusTone === "booked" && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full"
-                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-                  <svg width="12" height="12" viewBox="0 0 22 22" aria-hidden>
-                    <path d="M4.5 11.5 9 16l8.5-9" fill="none" stroke="currentColor"
-                          strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-              )}
-              {statusLabel}
-            </span>
-            <span className="pointer-events-auto shrink-0">{action}</span>
-          </div>
-        </div>
+          {[instructor, room].filter(Boolean).join(" · ")}
+        </p>
+        <p className="m-subtle mt-1.5">
+          {/* Duration and seats on one line, in one weight, with the status
+              carrying the only colour. An icon chip belongs on a stat, where
+              it is the only thing distinguishing three identical numbers —
+              here it would be a third mark competing with the stripe. */}
+          <span className="text-ink-3">{durationLabel} · </span>
+          <span
+            className={statusTone === "quiet" ? "text-ink-3" : "font-semibold"}
+            style={
+              statusTone === "booked"  ? { color: "var(--lime-text)" }
+              : statusTone === "holding" ? { color: "var(--amber-deep)" }
+              : statusTone === "full"    ? { color: "var(--ink-3)" }
+              : undefined
+            }
+          >
+            {statusLabel}
+          </span>
+        </p>
       </div>
+
+      <div className="pointer-events-auto flex shrink-0 items-center">{action}</div>
     </li>
   );
 }

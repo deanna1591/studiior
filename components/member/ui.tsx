@@ -50,7 +50,7 @@ export function CardAction({ children }: { children: React.ReactNode }) {
     <button
       disabled={pending}
       style={accentFill}
-      className="m-tap min-w-[124px] rounded-xl px-5 text-[15px] font-semibold disabled:opacity-60"
+      className="m-tap min-w-[84px] rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "…" : children}
     </button>
@@ -71,7 +71,16 @@ export function CardActionOutline({ children }: { children: React.ReactNode }) {
   return (
     <button
       disabled={pending}
-      className="m-tap min-w-[124px] rounded-xl border border-line-2 bg-surface px-5 text-[15px] font-medium text-ink disabled:opacity-60"
+      // No border. On a white card a hairline is the one thing the redesign
+      // removed everywhere else, and an outlined button beside a filled one is
+      // two different idioms in the same 44px row. Tint and accent text
+      // instead — the same pair the ramp already measures.
+      // Ink on the accent's chip, not accent-on-tint. --lime-text is derived
+      // by darkening until it clears 4.5 against the SURFACE; the tint is that
+      // surface with 12% accent over it, so the same colour lands at 3.88 on
+      // it. Ink is measured on both.
+      style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+      className="m-tap min-w-[84px] rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "…" : children}
     </button>
@@ -83,7 +92,8 @@ export function QuietButton({ children }: { children: React.ReactNode }) {
   return (
     <button
       disabled={pending}
-      className="m-tap inline-flex items-center rounded-lg border border-line-2 bg-surface px-4 text-[14px] text-ink disabled:opacity-60"
+      style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+      className="m-tap inline-flex items-center rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "…" : children}
     </button>

@@ -7,6 +7,7 @@ import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
 import { bookClass, cancelBooking, respondToOffer } from "./actions";
 import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts } from "@/lib/time";
+import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,16 @@ export default async function MemberHome() {
   );
   const greeting = localHour < 12 ? "Good morning" : localHour < 18 ? "Good afternoon" : "Good evening";
 
+  // The hero's fallback when a studio has uploaded no class photograph — the
+  // accent's own gradient, derived, never a stock image and never Studiior's
+  // lime. accentGradient moves its second stop AWAY from the text colour, so
+  // the white type over it can only gain contrast.
+  const [g1, g2] = accentGradient(accentRamp(accent ?? neutralAccent(preset), preset));
+  // The scrim sits over this as well as over a photograph, so white type is
+  // measured against the composite, not against the accent — a light accent
+  // like lime is 1.3 with white on it bare and 7.0 under the scrim.
+  const heroFallback = `linear-gradient(140deg, ${g1} 0%, ${g2} 100%)`;
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       {/* The greeting. First person, their name, their part of the day — the one
@@ -96,11 +107,12 @@ export default async function MemberHome() {
           header has it too, a hundred pixels above — the same face twice on one
           screen reads as a duplication bug rather than as warmth. The header
           keeps it, because that is the one place it appears on every screen. */}
-      <div className="mb-5">
-        <p className="m-meta text-ink-3">{greeting}</p>
-        <p className="text-[22px] font-semibold leading-7 text-ink">
-          {memberName || "there"}
-        </p>
+      {/* --ink-3 measures 4.19 on the page wash and is only safe inside a white
+          card. On the wash the floor is --ink-2 (6.66 worst across 8 accents
+          and 4 presets). */}
+      <div className="mb-4">
+        <p className="m-eyebrow text-ink-2">{greeting}</p>
+        <p className="m-head text-[23px] leading-7 text-ink">{memberName || "there"}</p>
       </div>
 
       {/* A live waitlist offer outranks everything: the seat is held for this
@@ -146,107 +158,152 @@ export default async function MemberHome() {
 
       {/* ---- the next class ---- */}
       {occ ? (
-        <section className="m-card overflow-hidden">
-          {/* The photograph runs to the card's edges and the type sits under it.
-              Text over the image would need a scrim and would be unreadable
-              against whatever the studio uploaded; the card is not the login
-              screen and does not have a scrim to hide behind. */}
+        <section className="m-hero" style={!occ.class_types?.image_url ? { background: heroFallback } : undefined}>
           {occ.class_types?.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={occ.class_types.image_url} alt="" aria-hidden
-                 className="h-40 w-full object-cover" />
+                 className="absolute inset-0 h-full w-full object-cover" />
           )}
-          <div className="p-5">
-          <p className="m-meta text-ink-3">
-            {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone)}</span>
-          </p>
-          <h1 className="m-title mt-1 text-ink">{occ.name}</h1>
-          <div className="mt-3 space-y-2.5">
-            {/* Decision 17: an unstaffed class is shown as a normal class. A
-                member books a Reformer class because of the class; telling them
-                nobody has agreed to teach it yet advertises a doubt they cannot
-                act on and invites them not to book. The name appears the moment
-                somebody is assigned. */}
-            {occ.instructors?.display_name && (
-              <p className="m-meta flex items-center gap-2.5 text-ink-2">
-                {occ.instructors.avatar_url
-                  ? <Avatar name={occ.instructors.display_name} url={occ.instructors.avatar_url} size={32} />
-                  : <IconChip name="person" />}
-                {occ.instructors.display_name}
-              </p>
-            )}
-            {occ.rooms?.name && (
-              <p className="m-meta flex items-center gap-2.5 text-ink-2">
-                <IconChip name="door" />
-                {occ.rooms.name}
-              </p>
-            )}
-          </div>
+          <span aria-hidden className="m-hero-scrim" />
 
-          {inWindow ? (
-            <>
-              <Link
-                href="/check-in"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
-                className="m-action mt-4 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold"
-              >
-                Check in
-              </Link>
-              <p className="m-micro mt-2 text-center text-ink-3">
-                Show the code at the desk.
-              </p>
-            </>
-          ) : (
-            <div className="mt-4">
-              <p className="m-sub text-ink-2">You&rsquo;re booked in.</p>
-              {/* A text link, not a button. Nothing needs doing on this screen
-                  and a big bordered Cancel is the loudest thing on it, which
-                  points a member at the one action they did not come for. */}
-              {canCancel ? (
-                <ActionForm action={cancelBooking} className="mt-2">
-                  <input type="hidden" name="booking_id" value={next!.id} />
-                  <button className="m-tap text-[14px] text-ink-3 underline decoration-line-2 underline-offset-4">
-                    Cancel this booking
-                  </button>
-                </ActionForm>
-              ) : (
-                <p className="m-micro mt-2 text-ink-3">
-                  Too late to cancel without using the class. Come anyway if you can.
+          <div className="relative flex h-full flex-col justify-between p-4">
+            <span className="m-hero-tag self-start rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
+              {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone)}</span>
+            </span>
+
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="m-head truncate text-[19px] leading-6 text-white">{occ.name}</h1>
+                <p className="mt-0.5 truncate text-[12px] leading-4 text-white/90">
+                  {/* Decision 17: an unstaffed class reads as a normal class.
+                      Telling a member nobody has agreed to teach it advertises
+                      a doubt they cannot act on. */}
+                  {[occ.instructors?.display_name, occ.rooms?.name].filter(Boolean).join(" · ")
+                    || "You\u2019re booked in"}
                 </p>
+              </div>
+
+              {/* The check-in button lives INSIDE the hero, and only inside the
+                  window. Outside it there is nothing to press: the card is
+                  telling you about a class, not asking for anything. */}
+              {inWindow && (
+                <Link href="/check-in"
+                      className="m-tap flex shrink-0 items-center rounded-full px-4 text-[13px] font-bold"
+                      // The accent's own measured pair. A white pill with
+                      // --ink on it measured 1.09 on Bold, whose ink is nearly
+                      // white; the pair is derived together and cannot come
+                      // apart like that.
+                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  Check in
+                </Link>
               )}
             </div>
-          )}
           </div>
         </section>
-      ) : (
-        <section className="m-card p-5">
-          <h1 className="m-title text-ink">Nothing booked</h1>
-          <p className="m-sub mt-1 text-ink-2">Here&rsquo;s what&rsquo;s on next.</p>
-          <ul className="mt-3 divide-y divide-line">
-            {(upcoming ?? []).map((o) => (
-              <li key={o.id}>
-                <BookForm action={bookClass} className="flex items-center justify-between gap-3 py-2.5">
-                  <span className="min-w-0">
-                    <span className="m-body block truncate text-ink">{o.name}</span>
-                    <span className="m-micro block text-ink-3">
-                      {day(o.starts_at)} · <span className="num">{fmtTime(o.starts_at, ctx.timeZone)}</span>
-                      {o.instructors?.display_name ? ` · ${o.instructors.display_name}` : ""}
-                    </span>
-                  </span>
+      ) : null}
+
+      {occ && !inWindow && (
+        <div className="mt-2.5 px-1">
+          {canCancel ? (
+            <ActionForm action={cancelBooking}>
+              <input type="hidden" name="booking_id" value={next!.id} />
+              {/* A text link, not a button. Nothing needs doing on this screen
+                  and a filled Cancel would be the loudest thing on it. */}
+              <button className="m-tap text-[12.5px] text-ink-2 underline decoration-line-2 underline-offset-4">
+                Cancel this booking
+              </button>
+            </ActionForm>
+          ) : (
+            <p className="m-subtle text-ink-2">
+              Too late to cancel without using the class. Come anyway if you can.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Nothing booked. The hero is still a hero — the next class ON THE
+          SCHEDULE, with the button that books it. An empty state that only
+          says "nothing booked" makes the member go and find the schedule
+          themselves, which is the one thing this screen exists to save them. */}
+      {!occ && (() => {
+        const o = (upcoming ?? [])[0];
+        if (!o) {
+          return (
+            <section className="m-card p-5">
+              <h1 className="m-title text-ink">Nothing booked</h1>
+              <p className="m-sub mt-1 text-ink-2">
+                No classes on the schedule yet. Your studio will add them soon.
+              </p>
+            </section>
+          );
+        }
+        return (
+          <section className="m-hero" style={!o.class_types?.image_url ? { background: heroFallback } : undefined}>
+            {o.class_types?.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={o.class_types.image_url} alt="" aria-hidden
+                   className="absolute inset-0 h-full w-full object-cover" />
+            )}
+            <span aria-hidden className="m-hero-scrim" />
+            <div className="relative flex h-full flex-col justify-between p-4">
+              <span className="m-hero-tag self-start rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
+                Next up · {day(o.starts_at)}
+              </span>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="m-head truncate text-[19px] leading-6 text-white">{o.name}</h1>
+                  <p className="mt-0.5 truncate text-[12px] leading-4 text-white/90">
+                    <span className="num">{fmtTime(o.starts_at, ctx.timeZone)}</span>
+                    {o.instructors?.display_name ? ` \u00b7 ${o.instructors.display_name}` : ""}
+                  </p>
+                </div>
+                <BookForm action={bookClass} className="shrink-0">
                   <input type="hidden" name="occurrence_id" value={o.id} />
-                  <QuietButton>Book</QuietButton>
+                  <button className="m-tap flex items-center rounded-full px-4 text-[13px] font-bold"
+                          style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                    Book
+                  </button>
                 </BookForm>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* ---- coming up ----
+          A row that scrolls sideways, each card opening the class detail. It is
+          here because the hero answers "what is next" and nothing answered
+          "what else". Every card is a link to a real screen. */}
+      {(upcoming ?? []).length > 0 && (
+        <section className="mt-5">
+          <div className="mb-2.5 flex items-baseline justify-between">
+            <h2 className="m-eyebrow font-semibold text-ink">Coming up</h2>
+            <Link href="/book" className="m-subtle font-medium" style={{ color: "var(--lime-text)" }}>
+              See all
+            </Link>
+          </div>
+          <ul className="m-hscroll -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+            {(upcoming ?? []).map((o) => (
+              <li key={o.id} className="w-[124px] shrink-0">
+                <Link href={`/class/${o.id}`} className="block">
+                  <span
+                    className="mb-2 block h-[88px] w-full overflow-hidden rounded-2xl"
+                    style={!o.class_types?.image_url ? { background: heroFallback } : undefined}
+                  >
+                    {o.class_types?.image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={o.class_types.image_url} alt="" aria-hidden
+                           className="h-full w-full object-cover" />
+                    )}
+                  </span>
+                  <span className="m-name block truncate text-ink">{o.name}</span>
+                  <span className="m-subtle block truncate text-ink-2">
+                    {day(o.starts_at)} · <span className="num">{fmtTime(o.starts_at, ctx.timeZone)}</span>
+                  </span>
+                </Link>
               </li>
             ))}
-            {(upcoming ?? []).length === 0 && (
-              <li className="m-sub py-3 text-ink-3">
-                No classes on the schedule yet. Your studio will add them soon.
-              </li>
-            )}
           </ul>
-          <Link href="/book" className="m-sub mt-3 inline-block text-lime-text underline underline-offset-4">
-            See the whole week
-          </Link>
         </section>
       )}
 
@@ -254,33 +311,26 @@ export default async function MemberHome() {
           A row of tinted squares, each with its icon on a chip. Three and not
           two because "classes this month" is the one a member actually counts,
           and it was the only one the app knew and never showed. */}
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <div className="m-card p-4">
-          <IconChip name="ticket" size={36} icon={18} />
-          <p className="num m-stat mt-2.5 text-ink">
-            {membership.live
-              ? credits === null ? "∞" : credits
-              : "—"}
-          </p>
-          <p className="m-meta text-ink-3">
-            {membership.live && credits === null ? "Unlimited" : "Classes left"}
-          </p>
-        </div>
-        <div className="m-card p-4">
-          <IconChip name="flame" size={36} icon={18} />
-          <p className="num m-stat mt-2.5 text-ink">{ctx.streak}</p>
-          <p className="m-meta text-ink-3">{ctx.streak === 1 ? "Week streak" : "Week streak"}</p>
-        </div>
-        <div className="m-card p-4">
-          <IconChip name="calendar" size={36} icon={18} />
-          <p className="num m-stat mt-2.5 text-ink">{thisMonth ?? 0}</p>
-          <p className="m-meta text-ink-3">This month</p>
-        </div>
+      <div className="mt-4 grid grid-cols-3 gap-2.5">
+        {([
+          ["ticket",   membership.live ? (credits === null ? "\u221e" : String(credits)) : "\u2014",
+                       membership.live && credits === null ? "Unlimited" : "Classes left"],
+          ["flame",    String(ctx.streak), "Week streak"],
+          ["calendar", String(thisMonth ?? 0), "This month"],
+        ] as const).map(([icon, value, label]) => (
+          <div key={label} className="m-card p-3">
+            <span className="m-icon-sq" aria-hidden><Icon name={icon} size={14} /></span>
+            <p className="num mt-2 text-[21px] font-bold leading-6 text-ink">{value}</p>
+            {/* Inside a white card, so --ink-3 is back on the table: it is 4.59
+                on --surface. On the page wash it would be 4.19 and fail. */}
+            <p className="m-subtle text-ink-3">{label}</p>
+          </div>
+        ))}
       </div>
 
       {mine.filter((b) => b.status === "booked" && b.id !== next?.id).length > 0 && (
-        <section className="mt-6">
-          <h2 className="m-sub mb-2.5 font-medium text-ink">Also booked</h2>
+        <section className="mt-5">
+          <h2 className="m-eyebrow mb-2.5 font-semibold text-ink">Also booked</h2>
           <ul className="m-card divide-y divide-line overflow-hidden">
             {mine.filter((b) => b.status === "booked" && b.id !== next?.id).map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-3.5">

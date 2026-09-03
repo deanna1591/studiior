@@ -48,12 +48,12 @@ export default async function CheckIn() {
         <p className="m-sub text-ink-2">Show this at the desk</p>
 
         <div
-          className="mt-4 w-[78vw] max-w-[340px] rounded-2xl border border-line bg-white p-3"
+          className="m-card mt-4 w-[78vw] max-w-[340px] p-3"
           // The SVG is the whole point of the screen; it scales to the box.
           dangerouslySetInnerHTML={{ __html: svg.replace("<svg", '<svg width="100%" height="100%"') }}
         />
 
-        <p className="m-display mt-5 text-ink">{row.member_name}</p>
+        <p className="m-head text-[24px] leading-8 mt-5 text-ink">{row.member_name}</p>
 
         {/* The code in words as well, because a scanner that will not focus in
             a dark studio is a real thing and reading eight characters aloud is

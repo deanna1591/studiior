@@ -37,7 +37,7 @@ export default async function Signup({
   if (user) {
     return (
       <main className="mx-auto max-w-lg px-5 py-10">
-        <h1 className="m-display text-ink">Almost there</h1>
+        <h1 className="m-head text-[24px] leading-8 text-ink">Almost there</h1>
         <p className="m-body mt-2 text-ink-2">
           {user.email_confirmed_at
             ? `Confirmed. One tap and ${studio?.name ?? "the studio"} is yours.`
@@ -50,7 +50,7 @@ export default async function Signup({
 
   return (
     <main className="mx-auto max-w-lg px-5 py-10">
-      <h1 className="m-display text-ink">Join {studio?.name ?? "the studio"}</h1>
+      <h1 className="m-head text-[24px] leading-8 text-ink">Join {studio?.name ?? "the studio"}</h1>
       <p className="m-body mt-2 text-ink-2">
         Make an account and you can book a class straight away.
       </p>

@@ -44,11 +44,11 @@ export default async function History() {
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your history">
       <div className="mb-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-line bg-surface p-3">
+        <div className="m-card p-3.5">
           <p className="m-micro text-ink-3">Classes</p>
           <p className="num text-[26px] leading-8 text-ink">{ctx.lifetimeVisits}</p>
         </div>
-        <div className="rounded-lg border border-line bg-surface p-3">
+        <div className="m-card p-3.5">
           <p className="m-micro text-ink-3">Weekly streak</p>
           <p className="num text-[26px] leading-8 text-ink">{ctx.streak}</p>
           {/* Decision 5: weeks, not days. Daily streaks punish rest days, which
@@ -80,7 +80,7 @@ export default async function History() {
       )}
 
       {(visits ?? []).length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line-2 p-5 text-center">
+        <div className="m-card p-5 text-center">
           <p className="m-body text-ink">No classes yet.</p>
           <p className="m-sub mt-1 text-ink-2">
             Your first one will show up here.{" "}
@@ -95,7 +95,7 @@ export default async function History() {
           {groups.map((g) => (
             <section key={g.label}>
               <h2 className="m-micro mb-1.5 uppercase tracking-[0.06em] text-ink-3">{g.label}</h2>
-              <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+              <ul className="m-card divide-y divide-line overflow-hidden">
                 {g.items.map((v) => {
                   const { day, month } = dayMonthParts(v.checked_in_at, ctx.timeZone);
                   return (

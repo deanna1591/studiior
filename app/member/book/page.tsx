@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { Icon } from "@/components/member/icons";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
-import WeekStrip, { type WeekDay } from "@/components/member/week-strip";
+import WeekStrip, { MonthGrid, type WeekDay, type MonthDay } from "@/components/member/week-strip";
 import ClassCard from "@/components/member/class-card";
 import { BookForm, ActionForm, CardAction, CardActionOutline } from "@/components/member/ui";
 import { bookClass, cancelBooking, startCheckout, payAtDesk } from "../actions";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function Book({
   searchParams,
 }: {
-  searchParams: { d?: string; type?: string; instructor?: string };
+  searchParams: { d?: string; type?: string; instructor?: string; v?: string };
 }) {
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers, memberName, avatarUrl} = await memberScreen();
 
@@ -39,9 +40,30 @@ export default async function Book({
   const dow = Math.max(0, WEEKDAYS.indexOf(
     new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, weekday: "short" }).format(from),
   ));
+  const monthView = searchParams.v === "month";
   const weekFromOffset = offset - dow;
-  const weekStartDay = dayStart(new Date(), ctx.timeZone, weekFromOffset);
-  const weekEndDay = addDays(weekStartDay, 7);
+
+  // What the strip or the grid needs pips for. In week view that is seven days
+  // from the selected week's Monday; in month view it is the whole calendar
+  // block, leading and trailing days included, because those cells are drawn
+  // and a drawn cell with no pip has to mean "nothing on", not "not asked".
+  const monthStart = (() => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: ctx.timeZone, day: "numeric",
+    }).formatToParts(from);
+    return offset - (Number(parts.find((p) => p.type === "day")?.value ?? 1) - 1);
+  })();
+  const monthStartDow = (() => {
+    const d = dayStart(new Date(), ctx.timeZone, monthStart);
+    return Math.max(0, WEEKDAYS.indexOf(
+      new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, weekday: "short" }).format(d),
+    ));
+  })();
+  const gridFromOffset = monthView ? monthStart - monthStartDow : weekFromOffset;
+  const gridLength = monthView ? 42 : 7;
+
+  const weekStartDay = dayStart(new Date(), ctx.timeZone, gridFromOffset);
+  const weekEndDay = addDays(weekStartDay, gridLength);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine }] =
     await Promise.all([
@@ -77,7 +99,8 @@ export default async function Book({
 
   const qs = (over: Record<string, string | number | undefined>) => {
     const p = new URLSearchParams();
-    const merged = { d: offset, type: typeFilter || undefined, instructor: instFilter || undefined, ...over };
+    const merged = { d: offset, v: monthView ? "month" : undefined,
+                     type: typeFilter || undefined, instructor: instFilter || undefined, ...over };
     for (const [k, v] of Object.entries(merged)) {
       if (v !== undefined && v !== "" && !(k === "d" && v === 0)) p.set(k, String(v));
     }
@@ -86,16 +109,28 @@ export default async function Book({
   };
 
   // Which days in the visible week have anything on.
-  const busy = new Set((week ?? []).map((o) => zonedDateKey(o.starts_at, ctx.timeZone)));
+  const busy = new Set((week ?? []).map((o: { starts_at: string }) => zonedDateKey(o.starts_at, ctx.timeZone)));
   const todayKey = zonedDateKey(new Date().toISOString(), ctx.timeZone);
   const selectedKey = zonedDateKey(from.toISOString(), ctx.timeZone);
 
-  const days: WeekDay[] = Array.from({ length: 7 }, (_, i) => {
-    const dayOffset = weekFromOffset + i;
+  // Which month the selected day falls in, so a leading or trailing cell in
+  // the grid can be dimmed rather than pretending to belong here.
+  //
+  // NUMBERS, not strings. An Intl field is formatted in the context of the
+  // whole option set, not on its own: month:"numeric" alone gives "9", and the
+  // same option beside a weekday and a day gives "09". Comparing the two as
+  // text matched on no day of any month, so every cell in the grid rendered as
+  // though it belonged to the next one.
+  const selectedMonth = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: ctx.timeZone, month: "numeric",
+  }).format(from));
+
+  const days: MonthDay[] = Array.from({ length: gridLength }, (_, i) => {
+    const dayOffset = gridFromOffset + i;
     const d = dayStart(new Date(), ctx.timeZone, dayOffset);
     const key = zonedDateKey(d.toISOString(), ctx.timeZone);
     const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: ctx.timeZone, weekday: "short", day: "numeric",
+      timeZone: ctx.timeZone, weekday: "short", day: "numeric", month: "numeric",
     }).formatToParts(d);
     return {
       offset: dayOffset,
@@ -105,6 +140,7 @@ export default async function Book({
       isToday: key === todayKey,
       isSelected: key === selectedKey,
       isPast: key < todayKey,
+      inMonth: Number(parts.find((p) => p.type === "month")?.value ?? 0) === selectedMonth,
     };
   });
 
@@ -114,9 +150,12 @@ export default async function Book({
 
   const Pill = ({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) => (
     <Link href={href}
-          className={`m-tap inline-flex shrink-0 items-center rounded-full border px-3.5 text-[13px] ${
-            active ? "border-lime-text bg-lime-tint font-medium text-lime-text"
-                   : "border-line-2 bg-surface text-ink-2"}`}>
+          aria-pressed={active}
+          className="m-tap inline-flex shrink-0 items-center rounded-full px-3.5 text-[13px] font-semibold"
+          style={active
+            ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+            : { background: "var(--surface)", color: "var(--ink-2)",
+                boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
       {children}
     </Link>
   );
@@ -126,13 +165,52 @@ export default async function Book({
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
-      <WeekStrip
-        days={days}
-        monthLabel={monthLabel}
-        hrefFor={(o) => qs({ d: o })}
-        prevHref={qs({ d: offset - 7 })}
-        nextHref={qs({ d: offset + 7 })}
-      />
+      <section aria-label="Choose a day" className="mb-4">
+        <div className="mb-2.5 flex items-center gap-2">
+          <h2 className="m-head flex-1 truncate text-[17px] leading-6 text-ink">{monthLabel}</h2>
+
+          {/* Week / Month. Both halves work: Week pages seven days at a time,
+              Month draws the calendar block with the same pips. A segmented
+              control with a dead half is exactly the decorative control this
+              build refuses to draw. */}
+          <div className="flex rounded-full p-0.5"
+               style={{ background: "var(--surface)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+            {([["week", "Week"], ["month", "Month"]] as const).map(([v, label]) => {
+              const on = monthView === (v === "month");
+              return (
+                <Link
+                  key={v}
+                  href={qs({ v: v === "week" ? undefined : v })}
+                  aria-pressed={on}
+                  className="rounded-full px-3 py-1.5 text-[12px] font-semibold leading-4"
+                  style={on
+                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                    : { color: "var(--ink-2)" }}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Link href={qs({ d: offset - (monthView ? 28 : 7) })} aria-label={monthView ? "Earlier" : "Previous week"}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-2"
+                  style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+              <Icon name="chevron-left" size={16} />
+            </Link>
+            <Link href={qs({ d: offset + (monthView ? 28 : 7) })} aria-label={monthView ? "Later" : "Next week"}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-2"
+                  style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+              <Icon name="chevron-right" size={16} />
+            </Link>
+          </div>
+        </div>
+
+        {monthView
+          ? <MonthGrid days={days} hrefFor={(o) => qs({ d: o, v: undefined })} />
+          : <WeekStrip days={days as WeekDay[]} hrefFor={(o) => qs({ d: o })} />}
+      </section>
 
       <div className="m-hscroll -mx-4 mb-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
         <Pill href={qs({ type: undefined, instructor: undefined })} active={!typeFilter && !instFilter}>All</Pill>
@@ -142,7 +220,7 @@ export default async function Book({
           </Pill>
         ))}
         {(instructors ?? []).length > 0 && (
-          <span className="m-micro flex shrink-0 items-center gap-2 pl-1 text-ink-3">
+          <span className="m-micro flex shrink-0 items-center gap-2 pl-1 text-ink-2">
             <span className="h-5 w-px bg-line-2" aria-hidden />
             Taught by
           </span>
@@ -180,13 +258,6 @@ export default async function Book({
             const full = spaces <= 0;
             const past = new Date(o.starts_at).getTime() < now;
             const mins = minutes(o.starts_at, o.ends_at);
-
-            const timeRange = (
-              <>
-                {fmtTime(o.starts_at, ctx.timeZone)}
-                {o.ends_at && <> – {fmtTime(o.ends_at, ctx.timeZone)}</>}
-              </>
-            );
 
             const status = booked ? "Booked"
               : holding ? "Holding your spot"
@@ -240,13 +311,12 @@ export default async function Book({
               <ClassCard
                 key={o.id}
                 href={`/class/${o.id}`}
-                timeRange={timeRange}
-                durationLabel={mins ? <><span className="num">{mins}</span> mins</> : "—"}
+                startLabel={fmtTime(o.starts_at, ctx.timeZone)}
+                endLabel={o.ends_at ? fmtTime(o.ends_at, ctx.timeZone) : null}
+                durationLabel={mins ? `${mins} min` : "—"}
                 name={o.name}
                 instructor={o.instructors?.display_name ?? null}
-                instructorAvatar={o.instructors?.avatar_url ?? null}
                 room={o.rooms?.name ?? null}
-                imageUrl={o.class_types?.image_url ?? null}
                 statusLabel={status}
                 statusTone={booked ? "booked" : holding ? "holding" : full && !waiting ? "full" : "quiet"}
                 action={action}

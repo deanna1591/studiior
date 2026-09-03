@@ -5,24 +5,28 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./icons";
 
 /**
- * Five tabs, fixed to the bottom.
+ * Five tabs, as a pill floating clear of the screen edges.
  *
- * Not the staff rail shrunk: a rail costs horizontal space a phone has none of
- * and puts navigation under the hand holding the device. Check in sits in the
- * middle because it is the one you press with a bag on your shoulder.
+ * Floating rather than flush, and this is the one place blur earns itself in
+ * the member app: the washed page scrolls UNDER the bar, so there is a moving
+ * gradient and moving cards behind it to refract. A flush bar sits on the app's
+ * own surface with nothing behind it, which is the case the "no glass" rule was
+ * written for — and it also cuts the page off with a hard line, which is what
+ * made the app read as a document with a footer.
  *
- * The active tab takes the studio's accent, not Studiior's lime — including
- * the pill behind the icon, which is the accent's tint. Both come from the
- * derived ramp, so a studio on Bold gets a light accent on a dark bar and one
- * on Warm gets the opposite, without either being written down here.
+ * The list gets bottom padding to clear it, so nothing is ever parked under the
+ * bar with no way to scroll it out.
  *
- * No glass. The bar sits on the app's own surface with content scrolling to
- * its edge, not under it, so there is nothing behind it to refract — and a
- * blurred layer pinned to the viewport is repainted on every scroll frame.
+ * The active tab takes the studio's accent, never Studiior's lime, from the
+ * derived ramp — a studio on Bold gets a light accent on the bar and one on
+ * Warm the opposite, without either being written down here.
  */
 const TABS: { href: string; label: string; icon: IconName }[] = [
-  { href: "/", label: "Home", icon: "home" },
+  // Book first, per the mockup. A member opens this app to book far more often
+  // than to look at anything else, and the leftmost tab is the one the thumb
+  // finds without aiming.
   { href: "/book", label: "Book", icon: "calendar" },
+  { href: "/", label: "Home", icon: "home" },
   { href: "/check-in", label: "Check in", icon: "qr" },
   { href: "/history", label: "History", icon: "clock" },
   // "Account", not "Plan": this tab holds the membership, the credits, the
@@ -34,8 +38,8 @@ const TABS: { href: string; label: string; icon: IconName }[] = [
 export default function TabBar({ badges = {} }: { badges?: Partial<Record<string, number>> }) {
   const pathname = usePathname();
   return (
-    <nav className="m-tabbar fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface">
-      <ul className="mx-auto flex max-w-lg">
+    <nav className="m-tabbar-float z-30 mx-auto max-w-lg">
+      <ul className="flex items-stretch px-1.5 py-1.5">
         {TABS.map((t) => {
           const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
           const badge = badges[t.href] ?? 0;
@@ -44,17 +48,18 @@ export default function TabBar({ badges = {} }: { badges?: Partial<Record<string
               <Link
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className="flex min-h-[56px] flex-col items-center justify-center gap-0.5"
-                style={{ color: active ? "var(--lime-text)" : "var(--ink-3)" }}
+                className="flex min-h-[50px] flex-col items-center justify-center gap-1 rounded-[20px]"
+                style={
+                  active
+                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                    : { color: "var(--ink-2)" }
+                }
               >
-                <span
-                  className="relative flex h-7 w-11 items-center justify-center rounded-full"
-                  style={active ? { background: "var(--lime-tint)" } : undefined}
-                >
-                  <Icon name={t.icon} size={22} active={active} />
+                <span className="relative flex items-center justify-center">
+                  <Icon name={t.icon} size={20} active={active} />
                   {badge > 0 && (
                     <span
-                      className="num absolute -right-0.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none"
+                      className="num absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none"
                       style={{ background: "var(--coral-deep)", color: "#FFFFFF" }}
                     >
                       {badge > 9 ? "9+" : badge}
@@ -62,7 +67,7 @@ export default function TabBar({ badges = {} }: { badges?: Partial<Record<string
                     </span>
                   )}
                 </span>
-                <span className={`text-[11px] leading-3 ${active ? "font-medium" : ""}`}>{t.label}</span>
+                <span className="text-[10px] font-medium leading-none">{t.label}</span>
               </Link>
             </li>
           );

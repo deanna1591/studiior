@@ -33,7 +33,7 @@ export default function MemberShell({
   // and must keep Studiior's lime. A studio brands what its members see.
   const vars = themeVars(preset, accent ?? neutralAccent(preset)) as React.CSSProperties;
   return (
-    <div className="min-h-dvh bg-paper" style={vars}>
+    <div className="m-page" style={vars}>
       {!bare && (
         <MemberHeader
           studioName={studioName}
@@ -42,8 +42,8 @@ export default function MemberShell({
           avatarUrl={avatarUrl}
         />
       )}
-      <main className={`m-scroll mx-auto max-w-lg px-4 ${bare ? "pt-4" : "pt-2"}`}>
-        {title && <h1 className="m-display mb-5 text-ink">{title}</h1>}
+      <main className={`m-scroll mx-auto max-w-lg px-4 pb-24 ${bare ? "pt-4" : "pt-1"}`}>
+        {title && <h1 className="m-head text-[24px] leading-8 mb-5 text-ink">{title}</h1>}
         {children}
       </main>
       <TabBar badges={{ "/": openOffers }} />

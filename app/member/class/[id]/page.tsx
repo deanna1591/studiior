@@ -90,7 +90,7 @@ export default async function ClassDetail({ params }: { params: { id: string } }
           {occ.ends_at && <> – {fmtTime(occ.ends_at, ctx.timeZone)}</>}
         </span>
         {mins && (
-          <span className="rounded-full bg-paper px-2 py-0.5 text-[11px] leading-4 text-ink-2">
+          <span className="rounded-full px-2 py-0.5 text-[11px] leading-4 text-ink-2" style={{ background: "var(--accent-chip)" }}>
             <span className="num">{mins}</span> mins
           </span>
         )}
