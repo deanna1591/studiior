@@ -4891,6 +4891,15 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_instructors_run: {
+        Args: {
+          p_dry_run?: boolean
+          p_from?: string
+          p_studio_id: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_role_in: {
@@ -4991,9 +5000,51 @@ export type Database = {
         Args: { p_notification_id: string }
         Returns: number
       }
+      demo_purge_census: { Args: { p_studio_id: string }; Returns: Json }
+      demo_purge_preview: { Args: { p_studio_id: string }; Returns: Json }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
+      }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -5006,7 +5057,11 @@ export type Database = {
         Returns: Json
       }
       generate_occurrences: {
-        Args: { p_horizon_months?: number; p_series_id: string }
+        Args: {
+          p_from?: string
+          p_horizon_months?: number
+          p_series_id: string
+        }
         Returns: Json
       }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
@@ -5057,6 +5112,7 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -5144,7 +5200,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      purge_demo_data: { Args: { p_studio_id: string }; Returns: Json }
+      psig: { Args: { body: string; secret?: string }; Returns: string }
+      purge_demo_data: {
+        Args: { p_confirm?: boolean; p_studio_id: string }
+        Returns: Json
+      }
       queue_all_credit_expiries: { Args: never; Returns: Json }
       queue_booking_notifications: {
         Args: { p_booking_id: string }
@@ -5293,6 +5353,10 @@ export type Database = {
         Returns: Json
       }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
+      rrule_last_date: {
+        Args: { p_rrule: string; p_starts_on: string }
+        Returns: string
+      }
       rrule_part: { Args: { p_key: string; p_rrule: string }; Returns: string }
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_morning_briefs: { Args: never; Returns: Json }
@@ -5332,6 +5396,15 @@ export type Database = {
           p_to: string
         }
         Returns: number
+      }
+      series_rule_matches: {
+        Args: {
+          p_day: string
+          p_ends_on: string
+          p_rrule: string
+          p_starts_on: string
+        }
+        Returns: boolean
       }
       set_availability_exception: {
         Args: {
@@ -5405,6 +5478,7 @@ export type Database = {
         Args: { p_class_type_ids: string[]; p_instructor_id: string }
         Returns: number
       }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -5525,6 +5599,25 @@ export type Database = {
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
+      update_series: {
+        Args: {
+          p_capacity: number
+          p_class_type_id: string
+          p_confirm?: boolean
+          p_description: string
+          p_duration_minutes: number
+          p_effective_from?: string
+          p_ends_on: string
+          p_instructor_id: string
+          p_name: string
+          p_room_id: string
+          p_rrule: string
+          p_series_id: string
+          p_starts_on: string
+          p_time_of_day: string
+        }
+        Returns: Json
+      }
       verify_stripe_signature: {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean

@@ -12,8 +12,15 @@ const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
   { key: "class_types",    label: "Add your class types", hint: "Reformer, mat, barre — with default length and capacity.", href: "/class-types" },
   { key: "instructors",    label: "Add your instructors", hint: "Who teaches. They do not need logins yet.", href: "/instructors" },
   { key: "plans",          label: "Set up what you sell", hint: "Memberships, packs and drop-ins.", href: "/plans" },
-  { key: "schedule",       label: "Put your week on",     hint: "Your first classes, so members have something to book.", href: "/classes/new" },
+  // /series, not /classes/new: a studio's week is recurring, and pointing this
+  // at the one-off form asked people to add fifty-two classes by hand.
+  { key: "schedule",       label: "Put your week on",     hint: "Your recurring classes, so members have something to book.", href: "/series/new" },
   { key: "staff",          label: "Invite your team",     hint: "Front desk and managers, so you are not the only login." },
+  // The three "fill a month" needs. A studio could tick everything above and
+  // get an empty month back, with nothing on this list explaining why.
+  { key: "qualifications", label: "Say who teaches what", hint: "Nobody is assumed to teach everything — an unmapped instructor can be assigned nothing at all.", href: "/instructors" },
+  { key: "availability",   label: "Add instructor availability", hint: "Optional. Without it the scheduler will assign anyone to anything.", href: "/instructors" },
+  { key: "commitments",    label: "Set weekly targets",   hint: "Optional. Without them the scheduler shares classes out by who has fewest, and says so.", href: "/instructors" },
   { key: "connect_stripe", label: "Take card payments online", hint: "Optional. Connect Stripe to sell online — you can take cash, transfers or a terminal without it.", href: "/settings/stripe" },
 ];
 

@@ -33,6 +33,10 @@ export function railItems(
       { href: "/shifts/cover", label: "Cover" },
     );
     items.push(
+      // The standing timetable, above the one-off setup lists: a studio's week
+      // is a set of recurring classes, and until now there was no way to make
+      // one through the product at all.
+      { href: "/series", label: "Recurring" },
       { href: "/plans", label: "Plans" },
       { href: "/rooms", label: "Rooms" },
       { href: "/class-types", label: "Class types" },
