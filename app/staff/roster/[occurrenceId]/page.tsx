@@ -34,6 +34,23 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
       supabase.from("check_ins").select("booking_id").eq("occurrence_id", params.occurrenceId),
     ]);
 
+  // PINNED NOTES, which is the whole reason pinning exists — and this screen
+  // has never read them. "Pin to the roster" was a checkbox that changed a
+  // boolean nothing looked at, so an instructor arriving at a class knew
+  // nothing about the shoulder. One query for the whole roster rather than one
+  // per row; notes_read already withholds managers_only from front desk and
+  // instructors, so this receives only what the caller may see.
+  const memberIds = (bookings ?? []).map((b) => b.member_id).filter(Boolean);
+  const { data: pinned } = memberIds.length
+    ? await supabase.from("member_notes")
+        .select("member_id, category, body")
+        .in("member_id", memberIds).eq("pinned", true).eq("active", true)
+    : { data: [] };
+  const notesFor = new Map<string, { category: string; body: string }[]>();
+  for (const n of pinned ?? []) {
+    notesFor.set(n.member_id, [...(notesFor.get(n.member_id) ?? []), n]);
+  }
+
   // One round trip for the whole roster rather than one signed URL per row.
   const avatars = await signAvatars(supabase, (bookings ?? []).map((b) => b.members?.avatar_url));
 
@@ -79,7 +96,8 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
             // standing in front of them.
             const flag = band === "drifting" || band === "at_risk";
             return (
-              <div key={b.id} className="flex items-center justify-between gap-4 px-3 py-2.5">
+              <div key={b.id} className="px-3 py-2.5">
+                <div className="flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {/* The member's own photograph, so an instructor can put a
                       name to the person walking in. Private bucket: these are
@@ -107,6 +125,19 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                   occurrenceId={occ.id}
                   alreadyIn={checkedIn.has(b.id) || b.status === "attended"}
                 />
+                </div>
+                {/* Under the name, not beside it: an instructor reading the
+                    roster before a class is reading down the list, and a note
+                    about a shoulder has to be in the column their eye is
+                    already in. */}
+                {(notesFor.get(b.member_id) ?? []).map((n, i) => (
+                  <p key={i} className="mt-1 pl-9 text-[12px] leading-[18px]"
+                     style={{ color: n.category === "injury" || n.category === "medical"
+                              ? "var(--coral-deep)" : "var(--ink-2)" }}>
+                    {n.category === "injury" || n.category === "medical" ? "\u26a0 " : ""}
+                    {n.body}
+                  </p>
+                ))}
               </div>
             );
           })}

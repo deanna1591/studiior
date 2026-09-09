@@ -316,7 +316,7 @@ export default async function MemberDetail({
                 {manager ? "Sell them a plan to get them booking." : "An owner or manager can sell them one."}
               </Empty>
             ) : (
-              <div className="border-y border-line bg-surface px-3 py-2.5">
+              <div className="rounded-xl px-3 py-2.5" style={{ background: "var(--paper)" }}>
                 <div className="text-[14px] leading-5 text-ink">{live.membership_plans?.name}</div>
                 <div className="mt-0.5 text-[12px] leading-4 text-ink-3">
                   <span className="num">{formatMoney(live.price_cents, live.currency)}</span>
