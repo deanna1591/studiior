@@ -23,7 +23,7 @@ export default async function EditInstructor({ params }: { params: { id: string 
   if (!i) notFound();
   const certs = Array.isArray(i.certifications) ? (i.certifications as string[]) : [];
   return (
-    <AppShell {...shell} title={i.display_name} actions={<NavLink href="/instructors">Back to instructors</NavLink>}>
+    <AppShell {...shell} title={i.display_name} actions={<><NavLink href={`/instructors/${i.id}/availability`}>Availability &amp; commitment</NavLink>{" "}<NavLink href="/instructors">Back to instructors</NavLink></>}>
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">{i.status}</p>
       <InstructorForm mode="edit" draft={{
         id: i.id, display_name: i.display_name, bio: i.bio, avatar_url: i.avatar_url,

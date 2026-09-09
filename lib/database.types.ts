@@ -1135,6 +1135,103 @@ export type Database = {
           },
         ]
       }
+      cover_requests: {
+        Row: {
+          covered_by: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          escalated_at: string | null
+          id: string
+          instructor_id: string
+          occurrence_id: string
+          reason: string | null
+          requested_at: string
+          resolution: string | null
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          covered_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          escalated_at?: string | null
+          id?: string
+          instructor_id: string
+          occurrence_id: string
+          reason?: string | null
+          requested_at?: string
+          resolution?: string | null
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          covered_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          escalated_at?: string | null
+          id?: string
+          instructor_id?: string
+          occurrence_id?: string
+          reason?: string | null
+          requested_at?: string
+          resolution?: string | null
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cover_requests_covered_by_fkey"
+            columns: ["covered_by"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cover_requests_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cover_requests_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cover_requests_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cover_requests_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cover_requests_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_ledger: {
         Row: {
           actor_user_id: string | null
@@ -1654,6 +1751,83 @@ export type Database = {
           },
           {
             foreignKeyName: "instructor_availability_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_commitments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ends_on: string | null
+          id: string
+          instructor_id: string
+          min_per_week: number
+          note: string | null
+          shift_preference: string
+          starts_on: string
+          status: string
+          studio_id: string
+          target_per_week: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ends_on?: string | null
+          id?: string
+          instructor_id: string
+          min_per_week?: number
+          note?: string | null
+          shift_preference?: string
+          starts_on: string
+          status?: string
+          studio_id: string
+          target_per_week?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ends_on?: string | null
+          id?: string
+          instructor_id?: string
+          min_per_week?: number
+          note?: string | null
+          shift_preference?: string
+          starts_on?: string
+          status?: string
+          studio_id?: string
+          target_per_week?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_commitments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_commitments_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_commitments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_commitments_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -4016,6 +4190,8 @@ export type Database = {
           checkin_opens_minutes_before: number
           checkin_secret: string
           checkin_window_enforced: boolean
+          commitment_shortfall_weeks: number
+          cover_escalation_hours: number
           created_at: string
           dropin_payment_window_minutes: number
           late_cancel_consumes_credit: boolean
@@ -4050,6 +4226,8 @@ export type Database = {
           checkin_opens_minutes_before?: number
           checkin_secret?: string
           checkin_window_enforced?: boolean
+          commitment_shortfall_weeks?: number
+          cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
           late_cancel_consumes_credit?: boolean
@@ -4084,6 +4262,8 @@ export type Database = {
           checkin_opens_minutes_before?: number
           checkin_secret?: string
           checkin_window_enforced?: boolean
+          commitment_shortfall_weeks?: number
+          cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
           late_cancel_consumes_credit?: boolean
@@ -4529,6 +4709,10 @@ export type Database = {
         Args: { p_note?: string; p_occurrence_id: string }
         Returns: Json
       }
+      approve_cover_request: {
+        Args: { p_instructor_id?: string; p_mode: string; p_request_id: string }
+        Returns: Json
+      }
       approve_shift_application: {
         Args: { p_application_id: string }
         Returns: Json
@@ -4600,6 +4784,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      clear_availability_exception: {
+        Args: { p_date: string; p_instructor_id: string }
+        Returns: number
+      }
       complete_stripe_connect: {
         Args: { p_account_id: string; p_state: string }
         Returns: string
@@ -4615,6 +4803,10 @@ export type Database = {
           expires_at: string
           token: string
         }[]
+      }
+      decline_cover_request: {
+        Args: { p_reason?: string; p_request_id: string }
+        Returns: Json
       }
       decline_shift_application: {
         Args: { p_application_id: string; p_reason?: string }
@@ -4652,6 +4844,10 @@ export type Database = {
         Args: { p_key: string; p_studio_id: string }
         Returns: number
       }
+      instructor_availability_week: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
       instructor_available_at: {
         Args: {
           p_ends_at: string
@@ -4661,6 +4857,13 @@ export type Database = {
         Returns: boolean
       }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
+      instructor_weekly_load: {
+        Args: { p_instructor_id: string; p_weeks?: number }
+        Returns: {
+          classes: number
+          week_start: string
+        }[]
+      }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
@@ -4763,6 +4966,10 @@ export type Database = {
         Returns: number
       }
       queue_credit_expiries: { Args: { p_studio_id: string }; Returns: number }
+      queue_instructor_assigned: {
+        Args: { p_occurrence_id: string }
+        Returns: string
+      }
       queue_milestone: {
         Args: { p_body: string; p_member_id: string; p_name: string }
         Returns: number
@@ -4865,6 +5072,10 @@ export type Database = {
           to_email: string
         }[]
       }
+      request_cover: {
+        Args: { p_occurrence_id: string; p_reason?: string }
+        Returns: Json
+      }
       resolve_checkin_code: {
         Args: { p_code: string }
         Returns: {
@@ -4916,6 +5127,15 @@ export type Database = {
         }
         Returns: number
       }
+      set_availability_exception: {
+        Args: {
+          p_date: string
+          p_instructor_id: string
+          p_note?: string
+          p_ranges?: Json
+        }
+        Returns: number
+      }
       set_insight_status: {
         Args: {
           p_insight_id: string
@@ -4952,6 +5172,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_instructor_availability: {
+        Args: {
+          p_days: Json
+          p_effective_from?: string
+          p_effective_to?: string
+          p_instructor_id: string
+        }
+        Returns: number
       }
       staff_bootstrap: {
         Args: never
@@ -5066,12 +5295,14 @@ export type Database = {
         Args: { p_occurrence_a: string; p_occurrence_b: string }
         Returns: Json
       }
+      sweep_cover_escalations: { Args: never; Returns: number }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       verify_stripe_signature: {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
+      withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
     }
     Enums: {

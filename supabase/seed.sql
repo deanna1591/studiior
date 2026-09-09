@@ -939,6 +939,54 @@ end $$;
 -- configured they would actually be attempted. Neither is wanted from fixture
 -- data, so the queue is cleared once the seed has finished writing.
 --
+-- ---------------------------------------------------------------------------
+-- Decision 18: commitments and a standing availability pattern
+-- ---------------------------------------------------------------------------
+-- Without these, instructor_availability is empty in every environment — which
+-- is exactly the state it was in for fifty-two migrations, and the reason every
+-- scheduling warning it produced was correct by accident. An empty table here
+-- makes the availability editor, the commitment panel and the shortfall insight
+-- all render their empty states, and an empty state is indistinguishable from a
+-- broken query. Same trap as the CRM tables and the terracotta accent.
+--
+-- The pattern matches the studio's real model: consecutive 50-minute classes
+-- either side of a midday break, five days, weekends off.
+do $$
+declare
+  s uuid := '11111111-0000-0000-0000-000000000001';
+  r record;
+  d int;
+begin
+  for r in select id, display_name from instructors where studio_id = s order by display_name loop
+    insert into instructor_commitments
+      (studio_id, instructor_id, starts_on, ends_on, min_per_week, target_per_week,
+       shift_preference, note)
+    values (s, r.id, current_date - 45, current_date + 45,
+            case when r.display_name like 'Ada%' then 9 else 6 end,
+            case when r.display_name like 'Ada%' then 12 else 9 end,
+            case when r.display_name like 'Ada%' then 'morning'
+                 when r.display_name like 'Bo%'  then 'evening' else 'both' end,
+            'Seeded: a three-month commitment, the studio''s usual shape.')
+    on conflict do nothing;
+
+    for d in 1..5 loop
+      insert into instructor_availability
+        (studio_id, instructor_id, day_of_week, starts_at_time, ends_at_time,
+         effective_from, effective_to, is_available)
+      values (s, r.id, d, '07:00', '12:00', current_date - 45, current_date + 45, true),
+             (s, r.id, d, '13:00', '19:00', current_date - 45, current_date + 45, true);
+    end loop;
+  end loop;
+
+  -- One planned absence, so the exceptions list has something in it and the
+  -- distinction between the pattern and a dated override is visible.
+  insert into instructor_availability
+    (studio_id, instructor_id, exception_date, is_available, note)
+  select s, id, current_date + 12, false, 'Away'
+    from instructors where studio_id = s and display_name like 'Bo%';
+  raise notice 'seed: availability patterns and commitments for every instructor';
+end $$;
+
 -- Deliberately at the end rather than by disabling the trigger: the trigger
 -- firing is what proves it is wired, and the seed should exercise the same
 -- path a real booking takes.

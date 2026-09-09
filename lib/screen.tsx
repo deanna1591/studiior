@@ -31,7 +31,7 @@ export async function staffScreen(path?: string) {
   // show the setup nudge, which is a decision, not a dependency.
   const [summary, bannerCounts] = await Promise.all([
     setupSummary(supabase, ctx.studioId),
-    studioBanner(supabase, ctx.studioId, true, ctx.billing),
+    studioBanner(supabase, ctx.studioId, true, ctx.billing, ctx.role),
   ]);
   const isPlatformAdmin = ctx.isPlatformAdmin;
   const billing = ctx.billing;

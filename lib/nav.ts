@@ -28,6 +28,9 @@ export function railItems(
     // slightly loose word.
     items.push(
       { href: "/schedule", label: "Calendar" },
+      // Decision 18. Staff always approve cover, so an unanswered request is
+      // its own emergency and needs somewhere to live that is not a banner.
+      { href: "/shifts/cover", label: "Cover" },
     );
     items.push(
       { href: "/plans", label: "Plans" },

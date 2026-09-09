@@ -232,8 +232,13 @@ select expect_num('both applications stand until staff decide',
   (select count(*) from shift_applications
     where occurrence_id='f00df00d-0000-0000-0000-00000000f002' and status='pending'), 2);
 -- Two applications, and the studio has an owner and a manager: four rows.
+-- SCOPED TO THIS STUDIO. The suites share one `db reset` and this counted every
+-- row in the table, so it was correct only for as long as no other suite wrote
+-- the same template. The cover suite does, and this went from 4 to 6 without
+-- anything in scheduling changing.
 select expect_num('the studio is told, once per manager-or-above',
-  (select count(*) from notifications where template_key='shift_application_received'), 4);
+  (select count(*) from notifications where studio_id='f00df00d-0000-0000-0000-000000000001'
+    and template_key='shift_application_received'), 4);
 -- Front desk is deliberately not among them. Who teaches a class is not
 -- something they can do anything about, and a notification you cannot act on
 -- is the thing that teaches people to ignore notifications.
@@ -291,9 +296,11 @@ select expect_text('...to the instructor who was approved',
   (select (instructor_id = 'f00df00d-0000-0000-0000-00000000d101')::text
      from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'), 'true');
 select expect_num('...the approved one is told',
-  (select count(*) from notifications where template_key='shift_approved'), 1);
+  (select count(*) from notifications where studio_id='f00df00d-0000-0000-0000-000000000001'
+    and template_key='shift_approved'), 1);
 select expect_num('...and so is the one who was not chosen',
-  (select count(*) from notifications where template_key='shift_declined'), 1);
+  (select count(*) from notifications where studio_id='f00df00d-0000-0000-0000-000000000001'
+    and template_key='shift_declined'), 1);
 select expect_num('no application is left pending',
   (select count(*) from shift_applications
     where occurrence_id='f00df00d-0000-0000-0000-00000000f002' and status='pending'), 0);
@@ -321,17 +328,31 @@ select set_config('t.withdrew',
   (select withdraw_from_shift('f00df00d-0000-0000-0000-00000000f002')::text), false);
 reset role;
 
-select expect_text('withdrawing returns the class to open',
-  (select staffing::text from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'), 'open');
-select expect_text('...with nobody teaching it',
-  (select (instructor_id is null)::text from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'), 'true');
+-- CHANGED BY DECISION 18, which overturns this edge of Decision 17 rather than
+-- extending it. Withdrawing used to clear instructor_id and set staffing to
+-- 'open' with nobody's approval — unconditional self-release. Decision 18 says
+-- staff always approve, however urgent, so withdrawing now raises a cover
+-- request and the instructor stays on the class until a person decides. The old
+-- assertions are kept below, inverted, because what they used to assert is
+-- exactly what must no longer happen.
+select expect_text('withdrawing does NOT release the class any more',
+  (select staffing::text from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'), 'assigned');
+select expect_text('...the instructor is still on it',
+  (select (instructor_id is not null)::text from class_occurrences where id='f00df00d-0000-0000-0000-00000000f002'), 'true');
+select expect_text('...and it says so, rather than reporting a release',
+  (current_setting('t.withdrew')::jsonb ->> 'still_assigned'), 'true');
+select expect_num('...a cover request was raised instead',
+  (select count(*) from cover_requests
+    where occurrence_id='f00df00d-0000-0000-0000-00000000f002' and status='pending'), 1);
 select expect_num('...the studio is told, owner and manager both',
-  (select count(*) from notifications where template_key='shift_withdrawn'), 2);
+  (select count(*) from notifications where studio_id='f00df00d-0000-0000-0000-000000000001'
+    and template_key in ('cover_requested','cover_urgent')), 2);
 -- The number is the point: "nobody is teaching this" and "nobody is teaching
 -- this and somebody is coming" are different emergencies.
 select expect_text('...and told how many members are expecting a class',
   (select (payload ->> 'booked_line' like '%1 member is booked%')::text from notifications
-    where template_key='shift_withdrawn' limit 1), 'true');
+    where studio_id='f00df00d-0000-0000-0000-000000000001'
+      and template_key in ('cover_requested','cover_urgent') limit 1), 'true');
 select expect_num('...and the members keep their bookings',
   (select count(*) from bookings
     where occurrence_id='f00df00d-0000-0000-0000-00000000f002' and status='booked'), 1);

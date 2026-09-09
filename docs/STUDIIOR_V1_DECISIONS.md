@@ -357,7 +357,7 @@ Decision 9 said instructors submit availability and never touch the timetable. T
 **The edges.**
 
 - **Several people apply for one shift.** Every application stands until staff approve one. Approving auto-declines the rest *in the same transaction*, so there is no window in which two instructors both believe they have it, and each of the declined is told.
-- **An approved instructor withdraws.** The class returns to `open`, staff are notified, and it is loud — the notification carries how many members are booked, because "nobody is teaching this" and "nobody is teaching this and eleven people are coming" are different emergencies. This is the worst state the system can be in and the product should behave like it.
+- **An approved instructor withdraws.** The class returns to `open`, staff are notified, and it is loud — the notification carries how many members are booked, because "nobody is teaching this" and "nobody is teaching this and eleven people are coming" are different emergencies. This is the worst state the system can be in and the product should behave like it. **Superseded by Decision 18:** withdrawing now raises a cover request and the instructor stays on the class until staff answer. The loudness and the booked count survive; the automatic release does not.
 - **Applying outside stated availability.** Permitted, and the warning travels with the application so the person deciding sees it at the moment they decide. Same reasoning as Decision 9's assignment rule.
 - **An open shift with members booked and no instructor.** Raised in the Morning Brief as `unstaffed_class`, ranked above every other insight including a failed payment: a declined card can be sorted out on Thursday, and a 7am class tomorrow cannot. §11 had no type for this.
 - **An open shift still holds its room and its slot.** It has a time, a capacity and possibly members booked; only the person is missing. The room exclusion constraint applies regardless of staffing.
@@ -372,3 +372,62 @@ Decision 9 said instructors submit availability and never touch the timetable. T
 - **A significant move owes a free cancellation** — further than `studio_settings.significant_move_hours` (default 2) or onto a different day in studio time. Same reasoning as Decision 2: the member agreed to a time and the studio changed it.
 - **An unstaffed class has a deadline**, `studio_settings.unstaffed_deadline_hours` (default 48). Past it with nobody assigned, the Morning Brief raises it, and the calendar shows it hatched in coral rather than merely a different colour.
 - **Members are not told a class is unstaffed.** They see a normal class and the instructor's name once there is one. Advertising the uncertainty invites them not to book, and the class is what they came for.
+
+---
+
+## 18 — Availability is a standing pattern, and cover is always granted by staff
+
+Extends Decisions 9 and 17. Neither is overturned.
+
+**Context, which is what makes this different from Decision 9's version of availability.** The studio's instructors are on a fixed recurring weekly schedule with a minimum three-month commitment: 9–12 classes a week, consecutive 50-minute slots, planned absences given in advance, and a willingness to cover for each other. Availability under that model is not a thing an instructor re-enters every Sunday. It is a **standing pattern with a start and an end date**, entered once by the studio when the commitment begins, and amended by exception.
+
+`instructor_availability` has carried `day_of_week`, `starts_at_time`, `ends_at_time`, `effective_from`, `effective_to` and `exception_date` since migration 001, and `instructor_available_at()` has read all of them since 047. **The schema was never the gap — the editor was.** No screen in the product could write a single row of it, which is why every warning that function produces has been computed against an empty table.
+
+### The editor is per instructor and entered in one go
+
+A row per weekday, Sunday to Saturday; several time ranges per day; a day with no ranges reads "Unavailable". **Copy-a-day-to-other-days is the control that makes the feature usable** — 9–12 consecutive classes a week means most days are the same two ranges, and entering them seven times by hand is how a studio decides not to bother.
+
+**The whole week is written as one replacement, not row by row.** `set_instructor_availability()` takes the entire pattern and swaps it inside one transaction. Editing a weekly pattern by INSERT and DELETE per range means a half-applied week is reachable — and a half-applied week silently changes who `instructor_available_at()` says can teach. Copy-to-days is therefore a client-side operation on the form, and what reaches the database is always a complete week.
+
+Dated exceptions are a separate list and a separate call, because they are a different act: the pattern is the commitment, an exception is a Tuesday in September.
+
+**Manager-up writes it, the instructor writes their own, and both write the same rows** — `availability_manager_all` and `availability_self` already say so. Decision 9's rule that assignment outside stated availability is permitted with a warning is untouched.
+
+### The commitment is a record, so the studio can see it being kept
+
+New table `instructor_commitments`: instructor, start and end date, minimum and target classes per week, shift preference, status. It is what `effective_from` / `effective_to` default to, so the pattern and the agreement cannot drift apart.
+
+**An instructor persistently under their weekly minimum reaches the Morning Brief.** That is the entire point of recording it. A three-month commitment that quietly ran at six classes a week instead of nine is a conversation that has to happen in week three, not in month three when it is a grievance. "Persistently" is a studio threshold, not a single bad week — one week under is a holiday and everybody knows it.
+
+This is a scheduling record, not a compensation one. Decision 10 keeps anything that resolves to money owed out of V1, and counting classes against a commitment does not cross that line: nothing here computes a rate or a total.
+
+### Cover is requested, never taken
+
+An instructor who cannot teach a class requests cover. **Staff always approve. There is no self-release at any notice, however urgent** — that is Decision 9's rule about the timetable, and urgency is exactly when it matters most.
+
+**Requesting cover does not change who is teaching.** Until staff act, the original instructor is still assigned and the class is still staffed. A cover request is a row in its own table and touches `class_occurrences` not at all.
+
+The database backs this up, though **not in the way it first appears**. `occ_staffing_matches_instructor` from migration 047 forbids the pair, but the constraint never fires: `tg_derive_staffing()` from the same migration runs first and *silently rewrites* `staffing` to agree with `instructor_id`. So `update class_occurrences set staffing = 'open'` on an assigned class does not error — it succeeds, and leaves the row `assigned`. The state Decision 18 depends on is genuinely unreachable, but the mechanism is coercion rather than refusal, and the difference matters to anyone reading the constraint and concluding a stray write would be caught. It would not be caught. It would be corrected, quietly, and the only way to release a class is to clear the instructor deliberately.
+
+**This overturns one edge of Decision 17 rather than extending it, and the two cannot both stand.** Decision 17 said an approved instructor who withdraws returns the class to `open`, loudly — and `withdraw_from_shift()` implemented exactly that: unconditional self-release, clearing `instructor_id` with nobody's approval. A rule saying "no self-release, however urgent" with a button next to it that releases the class is decorative. Withdrawing from an assigned class therefore now **raises a cover request**: the studio still hears immediately and still gets the booked count, and a person decides. `scheduling_test.sql` asserted the old behaviour and now asserts its inverse, because what it used to prove is precisely what must no longer happen.
+
+Withdrawing a **pending application** is untouched. Nobody is counting on you before you have been approved, and taking your name off a list you put it on is not releasing a class.
+
+On approval staff choose one of two things, and both are Decision 17's machinery rather than a new system:
+
+- **Assign someone directly** — `move_occurrence()` with a new instructor, which is already the only thing that moves a class and already carries the exclusion constraints and the availability warning.
+- **Publish it as an open shift** — clear the instructor, `staffing = 'open'`, and it appears in the shifts list for instructors to apply for. From there it is `apply_for_shift` and `approve_shift_application`, unchanged.
+
+**Approval is the risk, because approval is required.** A request nobody sees is a class nobody teaches. So: every owner and manager is notified the moment it arrives; it sits at the top of the staff app until it is answered; and **if the class starts within `cover_escalation_hours` and the request is still unanswered, it escalates** — the notification repeats, the banner changes its language, and it becomes the loudest item in the Morning Brief, ranked above the unstaffed class that Decision 17 put above a failed card. An unanswered cover request four hours out is the same emergency as an unstaffed class, arriving earlier and still fixable.
+
+**What members are told is Decision 2, unchanged.** A substitution announced after the cancellation cutoff has passed grants a penalty-free cancellation under `sub_late_free_cancel`. Decision 18 does not restate that rule; it finally *calls* it — `queue_substitution()` has existed since migration 030 with no caller, so changing a class's instructor has until now told the booked members nothing at all.
+
+### Being given a class is itself news
+
+**An instructor assigned to a class is told.** Nothing in the product did this: `move_occurrence()` wrote an audit log and sent no one anything, and an instructor found out by looking. Assignment, cover requested, cover approved, cover declined, and cover picked up by somebody else all queue through the existing `queue_` functions.
+
+**Push is not built and this decision does not pretend otherwise.** `push_subscriptions` has existed since migration 001 with nothing writing it, there is no service worker subscription, no VAPID keys and no transport — and `send_due_notifications()` claims every scheduled row regardless of channel, so a queued push row would be posted to Resend and delivered as an email. The worker is now scoped to `channel = 'email'` so that cannot happen. Escalation is therefore email plus two in-app surfaces that a working studio cannot miss. **Gap, stated rather than implied:** same-day cover on a phone that is not open wants push, and push needs a subscription table write path, a service worker and a second `send_via_*`.
+
+**Reading someone's availability is a permission, not a convenience.** The three functions that read it are `SECURITY DEFINER`, so the grant to `authenticated` is the whole of their access control unless they check for themselves — and they did not. An ordinary member of an unrelated studio could read any instructor's full weekly pattern by id while the table's own policy correctly returned nothing. Migration 056 applies the write path's rule to the reads: manager-up of that instructor's studio, or the instructor themselves. An id that does not exist is refused identically, so the error cannot be used to enumerate instructors.
+
+**Where:** Business Rules §3.3 and §5; Data Model §5; Permissions §4 and §6; migrations 053, 054, 055 and 056. **Status:** settled. **Extends:** Decisions 9 and 17. **Reuses:** Decision 2 for members, Decision 17 for open shifts.
