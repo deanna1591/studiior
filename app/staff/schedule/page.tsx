@@ -52,7 +52,8 @@ export default async function Schedule({
   const from = shiftDateKey(weekStart, -1);
   const to = shiftDateKey(weekStart, view === "week" ? 7 : 1);
 
-  const [{ data: instructors }, { data: rows }, { data: pending }, { data: settings },
+  const [{ data: instructors }, { data: rows, error: rangeError }, { data: pending },
+         { data: settings },
          { data: quietPct }, { data: quietDays }, { data: fullPct }] =
     await Promise.all([
       supabase.from("instructors")
@@ -69,6 +70,29 @@ export default async function Schedule({
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "overfilled_pct" }),
     ]);
+
+  // A FAILED QUERY MUST NOT LOOK LIKE AN EMPTY WEEK. `schedule_range()` raised
+  // on every call on hosted for a week — PostgREST returned the error, this
+  // page read only `data`, and `rows ?? []` drew a blank grid that was
+  // indistinguishable from a studio with no classes. The blankness was the bug
+  // report; the error had been there the whole time and nothing showed it.
+  if (rangeError) {
+    return (
+      <AppShell {...shell} title="Schedule">
+        <div className="max-w-[62ch] border-l-[3px] px-3.5 py-3"
+             style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}
+             role="alert">
+          <p className="text-[13px] leading-[19px] text-ink">
+            The timetable could not be read, so this is not an empty week — it is
+            a failure. Nothing has been changed.
+          </p>
+          <p className="num mt-2 break-words text-[12px] leading-[17px] text-ink-2">
+            {rangeError.message}
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
 
   const deadlineHours = settings?.unstaffed_deadline_hours ?? 48;
   // Prefixed names: an OUT parameter called `id` shadows the column inside the
@@ -132,6 +156,14 @@ export default async function Schedule({
                 </>
               }>
       {resources.length > 1 && <FillPanel />}
+
+      {events.length === 0 && (
+        <p className="mb-4 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
+          No classes on {view === "week" ? "this week" : "this day"} in{" "}
+          {ctx.timeZone.replace("_", " ")} — the studio&rsquo;s own clock, not
+          yours. Use the arrows to look at another {view === "week" ? "week" : "day"}.
+        </p>
+      )}
 
       {resources.length === 1 ? (
         <Empty>

@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Seventy migrations, applying clean from `supabase db reset`:
+Seventy-one migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,7 @@ Seventy migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **071** converging hosted with the files after **two migrations were edited in place once already applied** — `schedule_range` was raising on every call in production, and `purge_demo_data` had never gained its confirmation step there
 - **070** `schedule_range()` and `studio_today()` — the calendar asks for a range of the STUDIO's days and the day boundary is resolved in the database, after it rendered an empty grid for every day
 - **069** `reconcile_booked_counts()` — the nightly recount `booked_count` was assumed to already have and never had, plus `occurrence_seats_taken()` as the one definition of what the cache is a cache of
 - **068** the occurrence horizon becomes days, defaults to 60, gains a screen, and finally does something when it SHORTENS: `set_occurrence_horizon()` two-step, deleting rather than cancelling and refusing outright over a booking
@@ -244,6 +245,16 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 **Rebuild a function from the latest migration FILE that defines it, never from the database you have been iterating on.** Twice in one session a copy taken with `pg_get_functiondef` contained an earlier, wrong draft of the very migration being written, because that database had already had it applied — once producing a function that called itself and died on stack depth, once silently reverting a fix made minutes earlier. And migration 017's text was equally wrong for `generate_demo_data`, because 057 already owned it: the right base is the newest file, not the oldest.
 
 **Detaching, not deleting, is the right trade for a real row on a demo parent.** A real class generated against a demo series keeps its bookings and loses its link to the series; a real class taught by a demo instructor becomes a Decision 17 open shift. The series is fiction, the class is not. This also unblocks migration 058's delete guards, which count references and would otherwise refuse to delete a demo instructor a real class still names.
+
+**The calendar was STILL empty on hosted after all three of those were fixed, and the reason was that a migration had been edited in place.** `schedule_range()` in production raised on its own first statement — `42702 column reference "id" is ambiguous` on `select timezone from studios where id = p_studio_id` — because hosted carried the FIRST draft of migration 070, whose `RETURNS TABLE` begins `id uuid, name text`: OUT parameters that shadow the columns the body reads. That was hit locally, the names were changed to `occ_*` **in the migration file**, and `db reset` replayed from scratch and looked fixed. Hosted had already recorded `20260830800000` as applied and never replays it. **An applied migration is immutable — fix forward, never edit in place.** The rule was already in this file; this is what breaking it costs.
+
+**Every symptom followed from the function raising, including the one that looked like a separate bug.** PostgREST returned the error, the page read `data` and ignored `error`, `rows ?? []` came out empty, the grid drew nothing — and with no rows the derived visible hours fell back to their default, which is why the gutter still began at 06:00 and looked hardcoded when it was not.
+
+**A FAILED QUERY MUST NOT LOOK LIKE AN EMPTY WEEK.** That is the fix worth more than the migration. A function that raised on every call for a week was indistinguishable from a studio with nothing on, so the blankness became the bug report while the error message sat unread in the response the whole time. `/schedule` now renders the failure, in words and with the database's own message, and its empty state says which timezone it is empty in.
+
+**`supabase migration list` records THAT a version ran, never WHICH.** It showed all seventy applied and agreed with itself while two functions differed from their files. **Diff the definitions instead** — `scripts/check-hosted-drift.sh` md5s every function in `public` on both sides and prints what differs. It found the second divergence in one pass: `purge_demo_data(uuid)` on hosted with no two-argument signature and no `demo_purge_preview`, meaning migration 062 had been edited in place too, in an earlier session. Migration 062's census guard IS present there — the protection that refuses to commit when a non-demo row has gone is intact — but the confirmation step never reached production, so on hosted that function still deletes without asking until 071 is pushed.
+
+**Reasoning from local cannot find a hosted-only fault, and "it works locally" is the evidence that it will not.** The Manila fixture, the three-zone check and 1,275 passing assertions were all true and all irrelevant: local replays the files and hosted replays history, and the whole class of bug lives in the gap. Diagnose against hosted.
 
 **The staff calendar rendered an empty grid for every day, and three separate faults were doing it.** Diagnosed before changing anything, against a fixture reproducing the reported data — a Manila studio with classes on Wednesday 18 November:
 
@@ -613,7 +624,7 @@ That rule reaches one step earlier than the AI. `message_draft_for()` composes a
 
 **Credits derive from `credit_ledger`.** Never edited in place. `memberships.credits_remaining` is a cache written in the same transaction as the ledger row.
 
-**An applied migration is immutable.** Once a migration has run against a hosted Supabase project, it is history: fix forward with a new migration, never edit the file in place. A hosted database records which migrations it has applied and will not replay an edited one, so the file and the live schema silently diverge — and every environment that already ran the old version keeps it.
+**An applied migration is immutable.** Once a migration has run against a hosted Supabase project, it is history: fix forward with a new migration, never edit the file in place. **This has now been broken twice, in migrations 062 and 070, and both times the symptom appeared weeks later as a screen that rendered nothing.** A local `db reset` replays the corrected file and passes; hosted keeps the draft forever. After any migration work, run `scripts/check-hosted-drift.sh` — the migration list will agree with itself while the definitions differ. A hosted database records which migrations it has applied and will not replay an edited one, so the file and the live schema silently diverge — and every environment that already ran the old version keeps it.
 
 Until something is actually hosted, editing in place is safe and `db reset` replays from scratch, so migration 002's authorisation predicate was corrected in the file rather than patched over. **That grace expires the first time a migration reaches a hosted project.** After that the rule is absolute, including for a comment.
 
