@@ -1001,6 +1001,26 @@ begin
   raise notice 'seed: availability patterns and commitments for every instructor';
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- Decision: who can teach what (migration 060)
+-- ---------------------------------------------------------------------------
+-- An empty mapping means qualified for NOTHING, so without this every seeded
+-- instructor is ineligible for everything and the scheduler leaves the whole
+-- timetable open. Mapped to what each of them actually teaches in the seed's
+-- own thirteen-class week, so the demo shows the feature working rather than
+-- showing its warning.
+do $$
+declare s uuid := '11111111-0000-0000-0000-000000000001';
+begin
+  insert into instructor_class_types (studio_id, instructor_id, class_type_id)
+  select distinct s, o.instructor_id, o.class_type_id
+    from class_occurrences o
+   where o.studio_id = s and o.instructor_id is not null and o.class_type_id is not null
+  on conflict do nothing;
+  raise notice 'seed: % instructor/class-type pairs',
+    (select count(*) from instructor_class_types where studio_id = s);
+end $$;
+
 -- Deliberately at the end rather than by disabling the trigger: the trigger
 -- firing is what proves it is wired, and the seed should exercise the same
 -- path a real booking takes.

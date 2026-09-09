@@ -61,18 +61,31 @@ export default async function Cover() {
 
   // Availability per candidate per class, asked rather than assumed — the same
   // answer the person deciding would get from the scheduler.
+  // TWO QUESTIONS, and they are different. `valid` is whether this person's
+  // stated pattern is in force on that DATE at all — a hard gate, so somebody
+  // valid only for November is not offered for a December class. `free` is
+  // whether they said they are around at that TIME, which stays context rather
+  // than a filter, per Decision 9.
   const freeMap = new Map<string, Set<string>>();
+  const validMap = new Map<string, Set<string>>();
   await Promise.all(rows.map(async (r) => {
     const o = r.class_occurrences!;
+    const day = o.starts_at.slice(0, 10);
     const free = new Set<string>();
+    const valid = new Set<string>();
     await Promise.all((instructors ?? []).map(async (x) => {
       if (x.id === r.instructor_id) return;
-      const { data } = await supabase.rpc("instructor_available_at", {
-        p_instructor_id: x.id, p_starts_at: o.starts_at, p_ends_at: o.ends_at,
-      });
-      if (data !== false) free.add(x.id);
+      const [{ data: ok }, { data: inWindow }] = await Promise.all([
+        supabase.rpc("instructor_available_at", {
+          p_instructor_id: x.id, p_starts_at: o.starts_at, p_ends_at: o.ends_at,
+        }),
+        supabase.rpc("instructor_valid_on", { p_instructor_id: x.id, p_on: day }),
+      ]);
+      if (inWindow !== false) valid.add(x.id);
+      if (ok !== false) free.add(x.id);
     }));
     freeMap.set(r.id, free);
+    validMap.set(r.id, valid);
   }));
 
   const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone)}`;
@@ -86,6 +99,7 @@ export default async function Cover() {
   const Card = ({ r, loud }: { r: (typeof rows)[number]; loud: boolean }) => {
     const o = r.class_occurrences!;
     const free = freeMap.get(r.id) ?? new Set<string>();
+    const valid = validMap.get(r.id) ?? new Set<string>();
     return (
       <li className={`rounded-xl p-4 ${loud ? "" : "bg-paper"}`}
           style={loud ? { background: "var(--coral-tint)" } : undefined}>
@@ -113,6 +127,8 @@ export default async function Cover() {
           bookedCount={o.booked_count}
           instructors={(instructors ?? [])
             .filter((x) => x.id !== r.instructor_id)
+            // Outside their availability DATES is not offered at all.
+            .filter((x) => valid.has(x.id))
             .map((x) => ({ ...x, free: free.has(x.id) }))}
         />
       </li>

@@ -169,3 +169,31 @@ export async function endCommitment(_prev: AvailState, fd: FormData): Promise<Av
   refresh(String(fd.get("instructor_id") ?? ""));
   return { ok: true, message: "Ended. Their availability pattern stays as it is." };
 }
+
+/**
+ * Who this instructor can teach.
+ *
+ * The whole list in one call, same reason as the week: a half-applied set
+ * silently changes who the scheduler will pick.
+ */
+export async function saveQualifications(_prev: AvailState, fd: FormData): Promise<AvailState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const id = String(fd.get("instructor_id") ?? "");
+  const ids = String(fd.get("class_type_ids") ?? "").split(",").filter(Boolean);
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_instructor_class_types", {
+    p_instructor_id: id, p_class_type_ids: ids,
+  });
+  if (error) return { ok: false, message: say(error) };
+
+  refresh(id);
+  const n = Number(data ?? 0);
+  return {
+    ok: true,
+    message: n === 0
+      ? "Saved. They are not down to teach anything, so the scheduler will leave their classes open."
+      : `Saved — ${n} class type${n === 1 ? "" : "s"}.`,
+  };
+}

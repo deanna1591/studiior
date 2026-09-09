@@ -5,6 +5,7 @@ import { AppShell, Denied, NavLink, SectionLabel } from "@/components/ui";
 import WeekEditor, { type Day } from "./week-editor";
 import Exceptions, { type Exception } from "./exceptions";
 import CommitmentForm, { type Commitment } from "./commitment";
+import Qualifications from "./qualifications";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,17 @@ export default async function Availability({ params }: { params: { id: string } 
     );
   }
 
-  const [{ data: week }, { data: commitment }, { data: load }] = await Promise.all([
+  const [{ data: week }, { data: commitment }, { data: load },
+         { data: types }, { data: quals }] = await Promise.all([
     supabase.rpc("instructor_availability_week", { p_instructor_id: i.id }),
     supabase.from("instructor_commitments")
       .select("id, starts_on, ends_on, min_per_week, target_per_week, shift_preference")
       .eq("instructor_id", i.id).eq("status", "active").maybeSingle(),
     supabase.rpc("instructor_weekly_load", { p_instructor_id: i.id, p_weeks: 6 }),
+    supabase.from("class_types").select("id, name")
+      .eq("status", "active").order("name"),
+    supabase.from("instructor_class_types").select("class_type_id")
+      .eq("instructor_id", i.id),
   ]);
 
   const w = (week ?? {}) as {
@@ -85,6 +91,21 @@ export default async function Availability({ params }: { params: { id: string } 
               instructorId={i.id}
               exceptions={(w.exceptions ?? []).map((e) => ({ ...e, label: fmt(e.date) }))}
               canEdit={manager || isThem}
+            />
+          </section>
+
+          <section>
+            <SectionLabel>Can teach</SectionLabel>
+            <p className="mb-3 text-[13px] leading-[20px] text-ink-2">
+              What the scheduler is allowed to give them. Nothing ticked means
+              nothing, not everything.
+            </p>
+            <Qualifications
+              instructorId={i.id}
+              name={i.display_name}
+              types={types ?? []}
+              selected={(quals ?? []).map((q) => q.class_type_id)}
+              canEdit={manager}
             />
           </section>
 

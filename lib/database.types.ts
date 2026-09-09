@@ -814,6 +814,7 @@ export type Database = {
       }
       class_occurrences: {
         Row: {
+          assigned_by: string | null
           booked_count: number
           cancellation_reason: string | null
           cancelled_at: string | null
@@ -841,6 +842,7 @@ export type Database = {
           waitlist_count: number
         }
         Insert: {
+          assigned_by?: string | null
           booked_count?: number
           cancellation_reason?: string | null
           cancelled_at?: string | null
@@ -868,6 +870,7 @@ export type Database = {
           waitlist_count?: number
         }
         Update: {
+          assigned_by?: string | null
           booked_count?: number
           cancellation_reason?: string | null
           cancelled_at?: string | null
@@ -895,6 +898,13 @@ export type Database = {
           waitlist_count?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "class_occurrences_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "class_occurrences_class_type_id_fkey"
             columns: ["class_type_id"]
@@ -1754,6 +1764,66 @@ export type Database = {
           },
           {
             foreignKeyName: "instructor_availability_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_class_types: {
+        Row: {
+          class_type_id: string
+          created_at: string
+          created_by: string | null
+          instructor_id: string
+          studio_id: string
+        }
+        Insert: {
+          class_type_id: string
+          created_at?: string
+          created_by?: string | null
+          instructor_id: string
+          studio_id: string
+        }
+        Update: {
+          class_type_id?: string
+          created_at?: string
+          created_by?: string | null
+          instructor_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_class_types_class_type_id_fkey"
+            columns: ["class_type_id"]
+            isOneToOne: false
+            referencedRelation: "class_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_class_types_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_class_types_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_class_types_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_class_types_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -4812,6 +4882,15 @@ export type Database = {
         Args: { p_confirm?: boolean; p_id: string; p_kind: string }
         Returns: Json
       }
+      assign_instructors: {
+        Args: {
+          p_dry_run?: boolean
+          p_from?: string
+          p_studio_id: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_role_in: {
@@ -4916,22 +4995,6 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -4973,7 +5036,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_qualified: {
+        Args: { p_class_type_id: string; p_instructor_id: string }
+        Returns: boolean
+      }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
+      instructor_valid_on: {
+        Args: { p_instructor_id: string; p_on: string }
+        Returns: boolean
+      }
       instructor_weekly_load: {
         Args: { p_instructor_id: string; p_weeks?: number }
         Returns: {
@@ -5271,6 +5342,10 @@ export type Database = {
         }
         Returns: number
       }
+      set_class_type_instructors: {
+        Args: { p_class_type_id: string; p_instructor_ids: string[] }
+        Returns: number
+      }
       set_insight_status: {
         Args: {
           p_insight_id: string
@@ -5317,6 +5392,19 @@ export type Database = {
         }
         Returns: number
       }
+      set_instructor_availability_rows: {
+        Args: {
+          p_days: Json
+          p_effective_from?: string
+          p_effective_to?: string
+          p_instructor_id: string
+        }
+        Returns: number
+      }
+      set_instructor_class_types: {
+        Args: { p_class_type_ids: string[]; p_instructor_id: string }
+        Returns: number
+      }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -5336,6 +5424,10 @@ export type Database = {
           studio_timezone: string
           user_id: string
         }[]
+      }
+      stamp_open_shift: {
+        Args: { p_occurrence_id: string }
+        Returns: undefined
       }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }
