@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Sixty-eight migrations, applying clean from `supabase db reset`:
+Sixty-nine migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,7 @@ Sixty-eight migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **069** `reconcile_booked_counts()` — the nightly recount `booked_count` was assumed to already have and never had, plus `occurrence_seats_taken()` as the one definition of what the cache is a cache of
 - **068** the occurrence horizon becomes days, defaults to 60, gains a screen, and finally does something when it SHORTENS: `set_occurrence_horizon()` two-step, deleting rather than cancelling and refusing outright over a booking
 - **067** weekly confirmation: one press for the whole week, per-class cover beside it, and an ask/remind/escalate cycle whose every day and window is a per-studio column
 - **066** an instructor submits their own month and staff approve it: `availability_submissions`, `approval_status` defaulting to approved so nothing existing is invalidated, and the monthly cycle keyed on `availability_due_day`
@@ -96,12 +97,12 @@ Sixty-eight migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Twenty-eight suites, **1,252 assertions**, all passing from a clean `db reset`:
+Twenty-eight suites, **1,263 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
 | `test/rls_test.sql` | 36 | tenant isolation, role boundaries, restricted views |
-| `test/book_class_test.sql` | 57 | authorisation, gate reason codes, payment resolution, overrides, comp |
+| `test/book_class_test.sql` | 69 | authorisation, gate reason codes, payment resolution, overrides, comp, and migration 069's reconcile: a no-show keeps their seat, a hand-written booking drifts the cache and the recount fixes it, a dry run writes nothing, and a studio that only ever used book_class has no drift at all |
 | `test/booking_concurrency_test.sql` | 20 | 50 simultaneous bookings against a 10-seat class |
 | `test/checkin_window_test.sql` | 11 | §8 check-in window bounds, the settings that move them, the escape hatch |
 | `test/plan_management_test.sql` | 56 | Permissions §9 on plans and templates, the delete guard, price snapshotting |
@@ -242,6 +243,22 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 **Rebuild a function from the latest migration FILE that defines it, never from the database you have been iterating on.** Twice in one session a copy taken with `pg_get_functiondef` contained an earlier, wrong draft of the very migration being written, because that database had already had it applied — once producing a function that called itself and died on stack depth, once silently reverting a fix made minutes earlier. And migration 017's text was equally wrong for `generate_demo_data`, because 057 already owned it: the right base is the newest file, not the oldest.
 
 **Detaching, not deleting, is the right trade for a real row on a demo parent.** A real class generated against a demo series keeps its bookings and loses its link to the series; a real class taught by a demo instructor becomes a Decision 17 open shift. The series is fiction, the class is not. This also unblocks migration 058's delete guards, which count references and would otherwise refuse to delete a demo instructor a real class still names.
+
+**`/` is the Dashboard and `/schedule` is the Schedule.** The home screen was labelled "Schedule" and the actual timetable was labelled "Calendar", which had them exactly backwards. Every label, title and link swept: the rail, the home screen's own heading, five "Back to schedule" links, and the applications screen's "Back to the calendar". The day being shown moved from the page title into a section label beside the rows — it was the only place the date appeared in day view, so the title could not simply be renamed.
+
+**The Dashboard does not yet meet its name, and that is recorded rather than implied.** Bible Ch. 4 lays the screen out as ten blocks — AI Daily Brief, KPI cards, revenue chart, attendance chart, today's classes, AI insights, member health, recent activity, upcoming tasks and a calendar — against the five questions an owner should be able to answer in thirty seconds. **We have two of them**: the Morning Brief (which carries the insights) and today's classes, plus a money banner. No KPI cards, no charts, no member-health block, no recent activity, no tasks. Calling it Dashboard is right — it is the brief and what needs attention — but the name is currently a promise.
+
+**The calendar shows fullness, and the number is the biggest thing on the block.** `booked/capacity` in tabular mono, right-aligned so a column of them lines up, which is the whole reason to read one. Waitlist beside it when there is one. A ring for full, a plain surface and a grey rule for quiet, amber for unstaffed, coral and hatching for unstaffed-with-members-booked-and-close. **Staffing outranks fullness** — nobody teaching it is a bigger problem than nobody in it, and two loud states on one block is neither.
+
+**"Quiet" is §11's definition, not a second one.** The Morning Brief already decides what underfilled means — below `underfilled_pct` of capacity within `underfilled_window_days`, with `overfilled_pct` for the other end — so the calendar reads those same `insight_config` rows through `insight_threshold()`. A second threshold on this screen would have agreed with the brief exactly once. Quiet also only shows inside the window: a class three days out at two of eight is a decision, the same class in five weeks is just early.
+
+**No second fetch.** `booked_count` and `waitlist_count` are columns on `class_occurrences`, which the calendar was already selecting; the change is one more column in an existing select. The per-instructor column headers are derived from the events already in hand, so a column reads as one person's day — "2 classes · 7/16", or "Free all day" — rather than as an anonymous grid.
+
+**Clicking a block opens the roster that already exists.** `/roster/[occurrenceId]` knows about photos, pinned notes and check-in state; the calendar links to it rather than growing a second one.
+
+**`booked_count` was checked before being trusted, and the first check was wrong.** Counting "currently booked" reported **312 of 891 occurrences drifting**. The rule `book_class()` and `cancel_booking()` actually implement is +1 on book, −1 on cancel — so `attended` and `no_show` KEEP their seat, and a seat is taken by anything that is not cancelled, late-cancelled or waitlisted. Under the real rule: **Reform Collective, 455 occurrences, 0 booked drift, 0 waitlist drift.** The cache is trustworthy. The eight disagreements on the whole database are all in test-suite studios whose fixtures insert bookings directly.
+
+**There was no nightly reconcile behind it — that had been assumed.** Grepping every function in the schema for `booked_count` returns the two writers and nothing that recounts. Any other writer of `bookings` drifts silently and forever. That was tolerable while the number lived in a metadata line; it is not now that it is the largest thing on every calendar block. Migration 069 adds `reconcile_booked_counts()` on pg_cron at 03:40 — after the generator at 03:10 — writing only the rows that are actually wrong, because rewriting all of them would touch `updated_at` on every occurrence every night and lie about when the class last changed.
 
 **The occurrence horizon was a setting no screen had ever read or written**, which is the third instance of this exact shape after `instructor_availability` and `class_series`. Its default of twelve months is why Reform Collective was carrying **1,421 open classes through September 2027 that nobody had agreed to teach and any member could book**. It is now days rather than months, defaults to **60**, and lives at `/settings`.
 

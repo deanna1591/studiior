@@ -41,7 +41,7 @@ export default async function SeriesList() {
       title="Recurring classes"
       blurb="Your standing timetable. A series materialises twelve months of classes and keeps
              itself topped up every night, so a member can always book a month ahead.
-             One-off classes are added from the calendar instead."
+             One-off classes are added from the schedule instead."
       newHref="/series/new" newLabel="Add a series" count={live.length}
       empty="No recurring classes yet — this is where a studio's week comes from."
       archived={

@@ -455,4 +455,83 @@ select expect_text('membership cannot be forced',
               'ffffffff-0000-0000-0000-0000000000d9','front_desk',null,'membership')).failure_reason,
   'unsupported_payment_source');
 
+-- =============================================================================
+-- booked_count is a cache, and migration 069 is the net under it
+-- =============================================================================
+-- book_class() and cancel_booking() are the only writers, both inside the
+-- booking transaction. Nothing had ever RECOUNTED it, so any other writer of
+-- `bookings` — an import, a fixture, a hand-typed row — drifted silently and
+-- forever. The calendar now shows this number as the largest thing on every
+-- block, so a drift would be believed there first.
+reset role;
+select set_config('request.jwt.claims', null, false);
+select set_config('request.jwt.claim.sub', null, false);
+
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at)
+values ('ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-000000000001',
+        'ffffffff-0000-0000-0000-00000000000c','ffffffff-0000-0000-0000-0000000000c1',
+        'Cache Test', 10, now() + interval '9 days', now() + interval '9 days 50 minutes');
+
+-- The rule the two writers implement: a seat is taken by anything that is not
+-- cancelled, late-cancelled or waitlisted. attended and no_show KEEP their seat.
+insert into bookings (studio_id, occurrence_id, member_id, status) values
+  ('ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-0000000000d1','booked'),
+  ('ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-0000000000d2','attended'),
+  ('ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-0000000000d3','no_show'),
+  ('ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-0000000000d4','cancelled'),
+  ('ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-0000000000d5','late_cancelled'),
+  ('ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000cc01','ffffffff-0000-0000-0000-0000000000d6','waitlisted');
+
+select expect_text('a no-show keeps their seat, a cancellation gives it back',
+  occurrence_seats_taken('ffffffff-0000-0000-0000-00000000cc01')::text, '3');
+
+-- Written straight into the table, so the cache never heard about any of it.
+select expect_text('...and the cache is now wrong, which is the whole problem',
+  (select booked_count::text from class_occurrences
+    where id = 'ffffffff-0000-0000-0000-00000000cc01'), '0');
+
+select expect_text('a dry run reports the drift',
+  (reconcile_booked_counts('ffffffff-0000-0000-0000-000000000001', true) ->> 'corrected'), '1');
+select expect_text('...and writes nothing',
+  (select booked_count::text from class_occurrences
+    where id = 'ffffffff-0000-0000-0000-00000000cc01'), '0');
+select expect_text('...naming what it would change, and to what',
+  (select d ->> 'booked_now' from jsonb_array_elements(
+     reconcile_booked_counts('ffffffff-0000-0000-0000-000000000001', true) -> 'detail') d
+    where d ->> 'occurrence_id' = 'ffffffff-0000-0000-0000-00000000cc01'), '3');
+
+select expect_text('reconciling corrects it',
+  (reconcile_booked_counts('ffffffff-0000-0000-0000-000000000001', false) ->> 'corrected'), '1');
+select expect_text('...to the real number',
+  (select booked_count::text from class_occurrences
+    where id = 'ffffffff-0000-0000-0000-00000000cc01'), '3');
+select expect_text('...and the waitlist with it',
+  (select waitlist_count::text from class_occurrences
+    where id = 'ffffffff-0000-0000-0000-00000000cc01'), '1');
+select expect_text('running it again corrects nothing, because nothing is wrong',
+  (reconcile_booked_counts('ffffffff-0000-0000-0000-000000000001', false) ->> 'corrected'), '0');
+
+-- It must not "fix" what book_class already got right. Every other occurrence in
+-- this suite was booked through the real path.
+select expect_text('a studio that has only ever booked through book_class has no drift at all',
+  (reconcile_booked_counts('ffffffff-0000-0000-0000-000000000001', true) ->> 'corrected'), '0');
+
+-- Reconciling every studio is a background job. Asked as a real signed-in
+-- session — the front desk this suite already has.
+set role authenticated;
+select set_config('request.jwt.claim.sub','ffffffff-0000-0000-0000-00000000a001',false);
+
+do $$
+begin
+  perform reconcile_booked_counts(null, true);
+  raise exception 'FAIL  an ordinary session cannot reconcile the whole platform: nothing was raised';
+exception when others then
+  if sqlstate = 'PT403' then
+    raise notice 'PASS  an ordinary session cannot reconcile the whole platform  (got PT403)';
+  elsif sqlerrm like 'FAIL%' then raise;
+  else raise exception 'FAIL  expected PT403, got % (%)', sqlstate, sqlerrm;
+  end if;
+end $$;
+
 select 'ALL book_class BEHAVIOUR TESTS PASSED' as result;

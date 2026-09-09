@@ -26,8 +26,8 @@ export default async function NewSeries() {
     <AppShell {...shell} title="Add a series"
               actions={<NavLink href="/series">Back to recurring classes</NavLink>}>
       <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">
-        Saving this puts twelve months of classes on the calendar straight away, and a
-        nightly job keeps that horizon rolling forward.
+        Saving this puts classes on the schedule straight away, as far ahead as your
+        horizon runs, and a nightly job keeps that rolling forward.
       </p>
       <SeriesForm
         mode="create"

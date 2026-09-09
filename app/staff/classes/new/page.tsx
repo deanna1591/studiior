@@ -18,7 +18,7 @@ export default async function NewClass() {
 
   return (
     <AppShell {...shell} title="Add a class"
-              actions={<NavLink href="/">Back to schedule</NavLink>}>
+              actions={<NavLink href="/">Back to the dashboard</NavLink>}>
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
         Times are {ctx.timeZone.replace("_", " ")}, and stay that way across the
         clock change — a 07:00 class is 07:00 in March and in November.

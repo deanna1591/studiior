@@ -13,7 +13,10 @@ export function railItems(
   setupIncomplete = false,
 ): RailItem[] {
   const items: RailItem[] = [
-    { href: "/", label: "Schedule" },
+    // "Dashboard", not "Schedule". `/` is the morning brief, today's classes and
+    // what needs attention; `/schedule` is the timetable. Having the home screen
+    // called Schedule and the actual schedule called Calendar had them backwards.
+    { href: "/", label: "Dashboard" },
     { href: "/members", label: "Members" },
   ];
   // Decision 17: an instructor's whole reason to open the staff app is to see
@@ -32,11 +35,8 @@ export function railItems(
     // Setup leaves the rail the moment the list is finished. A permanent link
     // to a one-time task is clutter for every day after the first.
     if (setupIncomplete) items.push({ href: "/setup", label: "Setup" });
-    // "Calendar", not "Schedule": "/" is already Schedule — the day list front
-    // desk lives in — and two identical labels in one rail is worse than a
-    // slightly loose word.
     items.push(
-      { href: "/schedule", label: "Calendar" },
+      { href: "/schedule", label: "Schedule" },
       // Decision 18. Staff always approve cover, so an unanswered request is
       // its own emergency and needs somewhere to live that is not a banner.
       { href: "/shifts/cover", label: "Cover" },

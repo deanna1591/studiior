@@ -37,7 +37,7 @@ export default async function StripeSettings({
   const connected = !!studio?.stripe_account_id;
 
   return (
-    <AppShell {...shell} title="Payments" actions={<NavLink href="/">Back to schedule</NavLink>}>
+    <AppShell {...shell} title="Payments" actions={<NavLink href="/">Back to the dashboard</NavLink>}>
       <div className="max-w-xl space-y-4">
         {searchParams.connected && <Notice kind="ok">Stripe is connected. You can sell plans now.</Notice>}
         {searchParams.e && <Notice kind="error">{searchParams.e}</Notice>}

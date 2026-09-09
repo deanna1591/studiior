@@ -55,7 +55,7 @@ export default async function Applications() {
 
   return (
     <AppShell {...shell} title="Applications"
-              actions={<NavLink href="/schedule">Back to the calendar</NavLink>}>
+              actions={<NavLink href="/schedule">Back to the schedule</NavLink>}>
       <SectionLabel>Waiting on you</SectionLabel>
       {byOcc.size === 0 ? (
         <Empty>Nobody is waiting on an answer.</Empty>

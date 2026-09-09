@@ -76,11 +76,13 @@ export default async function Schedule({
   const days = Array.from({ length: view === "week" ? 7 : 1 }, (_, i) => addDays(from, i));
   const now = Date.now();
 
-  const heading = (() => {
-    const iso = from.toISOString();
-    if (view === "week") return "Schedule";
-    return relativeDayName(iso, ctx.timeZone) ?? fmtDayLong(iso, ctx.timeZone);
-  })();
+  // "Dashboard" in both views. The day this screen is showing moves into a
+  // section label beside the rows, the way the week view already labels each of
+  // its days — the title used to be the only place the date appeared in day
+  // view, so it could not simply be dropped.
+  const heading = "Dashboard";
+  const dayLabel = relativeDayName(from.toISOString(), ctx.timeZone)
+    ?? fmtDayLong(from.toISOString(), ctx.timeZone);
 
   return (
     <AppShell
@@ -145,11 +147,14 @@ export default async function Schedule({
               : <>No classes {view === "week" ? "this week" : "today"}.</>}
         </Empty>
       ) : view === "day" ? (
-        <Rows>
-          {shown.map((o) => (
-            <ScheduleRow key={o.id} o={o as Occ} timeZone={ctx.timeZone} now={now} />
-          ))}
-        </Rows>
+        <section>
+          <SectionLabel>{dayLabel}</SectionLabel>
+          <Rows>
+            {shown.map((o) => (
+              <ScheduleRow key={o.id} o={o as Occ} timeZone={ctx.timeZone} now={now} />
+            ))}
+          </Rows>
+        </section>
       ) : (
         <div className="space-y-6">
           {days.map((d) => {

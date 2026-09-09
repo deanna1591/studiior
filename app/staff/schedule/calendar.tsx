@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Calendar, Views, dateFnsLocalizer, type View } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
@@ -35,6 +36,7 @@ export type CalEvent = {
   staffing: "assigned" | "open" | "pending_approval";
   bookedCount: number;
   capacity: number;
+  waitlistCount: number;
   /** Hours from now until it starts, so "approaching" can be decided here. */
   hoursAway: number;
   room: string | null;
@@ -43,11 +45,16 @@ export type CalEvent = {
 
 export default function ScheduleCalendar({
   events: initial, resources, timeZone, deadlineHours,
+  quietPct, quietWindowDays, fullPct,
 }: {
   events: CalEvent[];
   resources: Resource[];
   timeZone: string;
   deadlineHours: number;
+  /** §11's own thresholds, passed in so the calendar and the brief agree. */
+  quietPct: number;
+  quietWindowDays: number;
+  fullPct: number;
 }) {
   const [events, setEvents] = useState(initial);
   const [view, setView] = useState<View>(Views.DAY);
@@ -57,6 +64,14 @@ export default function ScheduleCalendar({
     { occurrenceId: string; name: string; at: string; who: string | null; room: string | null } | null
   >(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  // The roster is built and knows about photos, pinned notes and check-in
+  // state; the calendar links to it rather than growing a second one. A drag
+  // does not fire this — react-big-calendar's DnD addon separates the two.
+  const openRoster = useCallback((e: CalEvent) => {
+    router.push(`/roster/${e.id}`);
+  }, [router]);
 
   // Optimistic, and reverted the moment the database says no. The calendar is
   // a view of what move_occurrence() allows, never a second opinion about it.
@@ -138,6 +153,25 @@ export default function ScheduleCalendar({
 
   // Colour carries the one thing you scan a timetable for: is anybody teaching
   // this. Everything else is text — a rainbow by class type would drown it.
+  //
+  // FULLNESS IS THE OTHER THING A PLANNER READS, and it is decided once here so
+  // the fill, the label and the tooltip cannot disagree. The thresholds are
+  // §11's own — the Morning Brief already says what "underfilled" means, and a
+  // second definition on this screen would agree with it exactly once.
+  const fullness = useCallback((e: CalEvent) => {
+    if (e.capacity <= 0) return "unknown" as const;
+    const share = e.bookedCount / e.capacity;
+    if (e.bookedCount >= e.capacity) return "full" as const;
+    if (share >= fullPct) return "nearly_full" as const;
+    // "Quiet" only means something while there is still time to act on it. A
+    // class three days out at two of eight is a decision; the same class in
+    // five weeks is just early.
+    if (share < quietPct && e.hoursAway > 0 && e.hoursAway <= quietWindowDays * 24) {
+      return "quiet" as const;
+    }
+    return "ok" as const;
+  }, [quietPct, quietWindowDays, fullPct]);
+
   const eventPropGetter = useCallback((e: CalEvent) => {
     const unstaffed = e.staffing !== "assigned";
     const waiting = e.staffing === "pending_approval";
@@ -146,14 +180,24 @@ export default function ScheduleCalendar({
     // "something is wrong here" elsewhere, plus coral, plus a marker in the
     // label — a slightly different pastel would not carry it.
     const alarming = unstaffed && e.bookedCount > 0 && e.hoursAway <= deadlineHours;
+    // Staffing outranks fullness: nobody teaching it is a bigger problem than
+    // nobody in it, and two loud states on one block is neither.
+    const f = fullness(e);
     return {
       className: alarming ? "hatched" : undefined,
       style: {
         background: alarming ? "var(--coral-tint)"
-                    : unstaffed ? "var(--amber-tint)" : "var(--lime-tint)",
+                    : unstaffed ? "var(--amber-tint)"
+                    : f === "quiet" ? "var(--surface)" : "var(--lime-tint)",
         borderLeft: `3px solid ${alarming ? "var(--coral)"
                     : waiting ? "var(--amber-deep)"
-                    : unstaffed ? "var(--amber-deep)" : "var(--lime-text)"}`,
+                    : unstaffed ? "var(--amber-deep)"
+                    : f === "quiet" ? "var(--ink-3)" : "var(--lime-text)"}`,
+        // A full class is closed, and the ring says so without another colour:
+        // the palette's loud slots are spent on staffing.
+        boxShadow: f === "full" || f === "nearly_full"
+          ? "inset 0 0 0 1.5px var(--lime-text)" : undefined,
+        opacity: f === "quiet" ? 0.92 : 1,
         color: "var(--ink)",
         borderRadius: 8,
         border: "none",
@@ -162,27 +206,87 @@ export default function ScheduleCalendar({
         padding: "2px 6px",
       },
     };
-  }, [deadlineHours]);
+  }, [deadlineHours, fullness]);
+
+  // How full each instructor's day is, for the column headers. Derived from the
+  // events already in hand — the point of a column is that it reads as one
+  // person's day rather than as an anonymous grid, and a name on its own does
+  // not do that.
+  const loadByResource = useMemo(() => {
+    const m = new Map<string, { classes: number; booked: number; seats: number }>();
+    const key = date.toDateString();
+    for (const e of events) {
+      if (view === Views.DAY && e.start.toDateString() !== key) continue;
+      const cur = m.get(e.resourceId) ?? { classes: 0, booked: 0, seats: 0 };
+      cur.classes += 1;
+      cur.booked += e.bookedCount;
+      cur.seats += e.capacity;
+      m.set(e.resourceId, cur);
+    }
+    return m;
+  }, [events, date, view]);
 
   const components = useMemo(() => ({
-    event: ({ event }: { event: CalEvent }) => (
-      <div className="text-[12px] leading-4">
-        <div className="font-medium">
-          {event.staffing !== "assigned" && event.bookedCount > 0 && (
-            <span aria-label="unstaffed with members booked" title="Nobody is teaching this">⚠ </span>
-          )}
-          {event.title}
+    event: ({ event }: { event: CalEvent }) => {
+      const f = fullness(event);
+      const unstaffed = event.staffing !== "assigned";
+      return (
+        <div className="text-[12px] leading-4">
+          <div className="flex items-baseline justify-between gap-1.5">
+            <span className="min-w-0 truncate font-medium">
+              {unstaffed && (
+                <span aria-hidden title="Nobody is teaching this">⚠ </span>
+              )}
+              {event.title}
+            </span>
+            {/* The number a planner is actually scanning for, so it is the
+                biggest thing on the block and set in mono — tabular figures
+                line up down a column, which is the whole reason to read one. */}
+            <span className="num shrink-0 text-[13px] font-semibold tabular-nums">
+              {event.bookedCount}/{event.capacity}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-1.5 text-ink-2">
+            <span className="min-w-0 truncate">
+              {unstaffed ? "Nobody assigned" : (event.room ?? "No room")}
+              {event.pendingApplications > 0 && (
+                <> · <span className="num">{event.pendingApplications}</span> applied</>
+              )}
+            </span>
+            <span className="shrink-0">
+              {event.waitlistCount > 0 && (
+                <span className="num" title={`${event.waitlistCount} on the waitlist`}>
+                  +{event.waitlistCount} wait
+                </span>
+              )}
+              {event.waitlistCount === 0 && f === "full" && <span>Full</span>}
+              {event.waitlistCount === 0 && f === "quiet" && <span>Quiet</span>}
+            </span>
+          </div>
         </div>
-        <div className="text-ink-2">
-          {event.room ?? "No room"} · <span className="num">{event.bookedCount}</span>/
-          <span className="num">{event.capacity}</span>
-          {event.pendingApplications > 0 && (
-            <> · <span className="num">{event.pendingApplications}</span> applied</>
-          )}
+      );
+    },
+    // One person's day, summarised at the top of their own column.
+    resourceHeader: ({ label, resource }: { label: React.ReactNode; resource: Resource }) => {
+      const l = loadByResource.get(resource.resourceId);
+      const open = resource.resourceId === UNASSIGNED;
+      return (
+        <div className="px-1 py-1 leading-4">
+          <div className={`text-[12.5px] font-medium ${open ? "text-ink" : "text-ink"}`}>
+            {open ? "Nobody assigned" : label}
+          </div>
+          <div className="text-[11px] text-ink-3">
+            {!l ? (open ? "Nothing open" : "Free all day")
+               : <>
+                   <span className="num">{l.classes}</span>
+                   {l.classes === 1 ? " class" : " classes"}
+                   {l.seats > 0 && <> · <span className="num">{l.booked}/{l.seats}</span></>}
+                 </>}
+          </div>
         </div>
-      </div>
-    ),
-  }), []);
+      );
+    },
+  }), [fullness, loadByResource]);
 
   return (
     <div>
@@ -234,13 +338,19 @@ export default function ScheduleCalendar({
           selectable={false}
           eventPropGetter={eventPropGetter}
           components={components}
+          onSelectEvent={openRoster}
           tooltipAccessor={(e: CalEvent) =>
-            `${e.title} — ${e.room ?? "no room"} — ${e.bookedCount}/${e.capacity} booked`}
+            `${e.title} — ${e.room ?? "no room"} — ${e.bookedCount}/${e.capacity} booked`
+            + (e.waitlistCount > 0 ? ` — ${e.waitlistCount} waiting` : "")
+            + (e.staffing !== "assigned" ? " — nobody assigned" : "")
+            + " — click to open the roster"}
         />
       </div>
       <p className="mt-3 text-[12px] leading-4 text-ink-3">
-        Times shown in {timeZone}. Drag to move a class between times or
-        instructors; drag its edge to change how long it runs.
+        Times shown in {timeZone}. Click a class to open its roster. Drag to move
+        one between times or instructors; drag its edge to change how long it
+        runs. A ring means full, a plain block means quiet with the class close
+        enough to do something about, and amber means nobody is teaching it.
       </p>
     </div>
   );

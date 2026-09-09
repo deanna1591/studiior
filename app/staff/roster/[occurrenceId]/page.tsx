@@ -65,7 +65,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
     <AppShell
       {...shell}
       title={occ.name}
-      actions={<NavLink href="/">Back to schedule</NavLink>}
+      actions={<NavLink href="/">Back to the dashboard</NavLink>}
     >
       {/* The facts of the class, as a line of text rather than a row of stat
           cards. Four numbers do not need four boxes. */}

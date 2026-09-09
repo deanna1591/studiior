@@ -47,7 +47,7 @@ export default async function Billing({
 
   return (
     <AppShell {...shell} title="Billing"
-              actions={!locked ? <NavLink href="/">Back to schedule</NavLink> : undefined}>
+              actions={!locked ? <NavLink href="/">Back to the dashboard</NavLink> : undefined}>
       <div className="max-w-xl space-y-4">
         {searchParams.paid && <Notice kind="ok">Thank you — your subscription is active.</Notice>}
         {searchParams.cancelled && <Notice kind="error">Checkout was cancelled. Nothing has changed.</Notice>}

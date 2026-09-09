@@ -50,7 +50,7 @@ export default async function EditSeries({ params }: { params: { id: string } })
           <span className="num text-ink">{future ?? 0}</span> classes still to come,{" "}
           <span className="num text-ink">{booked ?? 0}</span> with people booked.{" "}
           <Link href="/schedule" className="text-lime-text underline underline-offset-4">
-            See them on the calendar
+            See them on the schedule
           </Link>
           , where one class can be moved on its own without touching the rest.
         </p>

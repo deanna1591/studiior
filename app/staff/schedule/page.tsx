@@ -37,12 +37,13 @@ export default async function Schedule() {
   const to = new Date();
   to.setDate(to.getDate() + 28);
 
-  const [{ data: instructors }, { data: occurrences }, { data: pending }, { data: settings }] =
+  const [{ data: instructors }, { data: occurrences }, { data: pending }, { data: settings },
+         { data: quietPct }, { data: quietDays }, { data: fullPct }] =
     await Promise.all([
       supabase.from("instructors")
         .select("id, display_name").eq("status", "active").order("display_name"),
       supabase.from("class_occurrences")
-        .select("id, name, starts_at, ends_at, instructor_id, capacity, booked_count, staffing, status, rooms(name)")
+        .select("id, name, starts_at, ends_at, instructor_id, capacity, booked_count, waitlist_count, staffing, status, rooms(name)")
         .gte("starts_at", from.toISOString())
         .lt("starts_at", to.toISOString())
         .neq("status", "cancelled")
@@ -51,6 +52,13 @@ export default async function Schedule() {
         .select("occurrence_id").eq("status", "pending"),
       supabase.from("studio_settings")
         .select("unstaffed_deadline_hours").eq("studio_id", ctx.studioId).maybeSingle(),
+      // The Morning Brief already decides what "underfilled" means — §11's
+      // class_underfilled, below `underfilled_pct` of capacity within
+      // `underfilled_window_days`. The calendar reads the same rows rather than
+      // inventing a second threshold that would agree with it exactly once.
+      supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
+      supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
+      supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "overfilled_pct" }),
     ]);
 
   const deadlineHours = settings?.unstaffed_deadline_hours ?? 48;
@@ -78,6 +86,7 @@ export default async function Schedule() {
     staffing: (o.staffing ?? "assigned") as CalEvent["staffing"],
     bookedCount: o.booked_count,
     capacity: o.capacity,
+    waitlistCount: o.waitlist_count ?? 0,
     room: o.rooms?.name ?? null,
     pendingApplications: appCount.get(o.id) ?? 0,
     hoursAway: (new Date(o.starts_at).getTime() - Date.now()) / 3_600_000,
@@ -102,7 +111,10 @@ export default async function Schedule() {
         </Empty>
       ) : (
         <ScheduleCalendar events={events} resources={resources}
-                          timeZone={ctx.timeZone} deadlineHours={deadlineHours} />
+                          timeZone={ctx.timeZone} deadlineHours={deadlineHours}
+                          quietPct={Number(quietPct ?? 0.4)}
+                          quietWindowDays={Number(quietDays ?? 7)}
+                          fullPct={Number(fullPct ?? 0.95)} />
       )}
     </AppShell>
   );
