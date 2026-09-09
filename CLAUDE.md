@@ -201,7 +201,13 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 
 **Push does not exist and Decision 18 does not pretend otherwise.** `push_subscriptions` has existed since migration 001 with nothing writing it; there is no service worker subscription, no VAPID keys and no transport. Escalation is email plus two in-app surfaces. **Gap:** same-day cover on a phone that is not open wants push, and push needs a subscription write path, a service worker and a second `send_via_*`.
 
-**Not yet pushed:** migrations 032, 033 and 034 are applied and verified locally, but `supabase db push` has not been run - so **the Resend key is still readable by any signed-in user on hosted**. Push, then re-run the advisor query above.
+**Everything through 056 is applied on hosted**, confirmed with `supabase migration list --linked`: all fifty-five entries show `local == remote`, none local-only and none orphaned. The advisor query has been run against hosted for the Decision 18 migrations, which is what the rule above asks for after anything that creates a function:
+
+- **anon** reaches exactly the seven pre-login surfaces and nothing else.
+- **`notification_api_key`, `send_via_resend`, `render_notification`, `queue_notification`, `deliver_notification` and `send_due_notifications` are all `false / false`** — reachable by neither `anon` nor `authenticated`. Migration 033 did close the Resend key on hosted, and this file claimed otherwise for several sessions after it stopped being true.
+- The Decision 18 surface on hosted matches local exactly: ten guarded functions callable by `authenticated`, `queue_instructor_assigned` and `sweep_cover_escalations` callable by neither.
+
+**A stale warning is worse than no warning.** This paragraph said the Resend key was still exposed in production long after it had been closed, which is the kind of note that gets skimmed past once it is known to be wrong — and the next real one with it. When a migration is pushed, correct the record in the same breath.
 
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
@@ -229,7 +235,7 @@ supabase db query --linked "select p.proname, has_function_privilege('anon',p.oi
 
 **Ask about `authenticated` too, not only `anon`.** Migration 033 exists because this query used to ask about `anon` alone: `anon` is the role we remember to fear, and `authenticated` is every member of every studio, including a walk-in who signed up thirty seconds ago. A function with no guard inside it is as exposed to one as to the other.
 
-The only names of ours that belong in that output are the seven pre-login surfaces: `studio_by_slug(text)`, `studio_invite_preview(text)`, `accept_studio_invite(text,text,text)`, `member_invite_preview(text)`, `claim_member_account(text,text)`, `stripe_webhook(text,text)` and `stripe_platform_webhook(text,text)`. The last is the only one that WRITES, and the only one with no session behind it — see the rule below. As of migration 014 that query returns exactly those three on hosted, with no filtering needed.
+The only names of ours that belong in that output are the seven pre-login surfaces: `studio_by_slug(text)`, `studio_invite_preview(text)`, `accept_studio_invite(text,text,text)`, `member_invite_preview(text)`, `claim_member_account(text,text)`, `stripe_webhook(text,text)` and `stripe_platform_webhook(text,text)`. The last is the only one that WRITES, and the only one with no session behind it — see the rule below. As of migration 014 that query returns exactly those seven on hosted, with no filtering needed — re-verified against hosted at migration 056. ("Three" for several revisions, written when there were three and never updated as four more were added; the list beside it was right and the count was not.)
 
 Note what migration 013 found: the query has to enumerate what is *actually there* on hosted, not what this repo creates. `rls_auto_enable()` is installed by the platform, exists on no local stack, and sat anon-callable through migration 011 because 011 only checked its own list.
 
