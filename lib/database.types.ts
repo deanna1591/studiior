@@ -5312,6 +5312,10 @@ export type Database = {
         Args: { p_member_id: string; p_template: string }
         Returns: boolean
       }
+      occurrence_seats_taken: {
+        Args: { p_occurrence_id: string }
+        Returns: number
+      }
       provision_studio: {
         Args: {
           p_country: string
@@ -5416,6 +5420,10 @@ export type Database = {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number
       }
+      reconcile_booked_counts: {
+        Args: { p_dry_run?: boolean; p_studio_id?: string }
+        Returns: Json
+      }
       reconcile_notification_sends: { Args: never; Returns: Json }
       record_document: {
         Args: {
@@ -5498,6 +5506,27 @@ export type Database = {
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_morning_briefs: { Args: never; Returns: Json }
       say_count: { Args: { n: number }; Returns: string }
+      schedule_range: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: {
+          end_minutes: number
+          ends_at: string
+          local_date: string
+          local_end: string
+          local_start: string
+          occ_booked: number
+          occ_capacity: number
+          occ_id: string
+          occ_instructor_id: string
+          occ_name: string
+          occ_staffing: string
+          occ_status: string
+          occ_waitlist: number
+          room_name: string
+          start_minutes: number
+          starts_at: string
+        }[]
+      }
       send_due_notifications: { Args: never; Returns: Json }
       send_message: {
         Args: { p_message_id: string }
@@ -5725,6 +5754,7 @@ export type Database = {
         }[]
       }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
+      studio_today: { Args: { p_studio_id: string }; Returns: string }
       studio_week_start: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
@@ -5750,6 +5780,7 @@ export type Database = {
         Returns: Json
       }
       sweep_availability_reminders: { Args: never; Returns: Json }
+      sweep_booked_count_reconcile: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }

@@ -7,31 +7,41 @@ import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { moveClass } from "./actions";
+import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 
-const DnDCalendar = withDragAndDrop<CalEvent, Resource>(Calendar as never);
+// Typed on the WALL shape, because that is what the grid is handed: a CalEvent
+// carries instants and gains its two Dates in lib/tz's projection.
+const DnDCalendar = withDragAndDrop<WallEvent, Resource>(Calendar as never);
 
 const localizer = dateFnsLocalizer({
   format, parse, startOfWeek, getDay, locales: { "en-GB": enGB },
 });
 
+// 24-hour, like every other time in the product. react-big-calendar's default
+// is the locale's, which gave "3:30 PM" beside a roster reading "15:30".
+const formats = {
+  timeGutterFormat: "HH:mm",
+  eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+    `${format(start, "HH:mm")}–${format(end, "HH:mm")}`,
+  selectRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+    `${format(start, "HH:mm")}–${format(end, "HH:mm")}`,
+  dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+    `${format(start, "d MMM")} – ${format(end, "d MMM yyyy")}`,
+  dayHeaderFormat: "EEEE d MMMM yyyy",
+};
+
 /** The left-hand column. A sentinel rather than null: a resource needs an id. */
 export const UNASSIGNED = "unassigned";
-
-/** A wall-clock hour on the day being shown. */
-function dayAt(d: Date, hour: number) {
-  const x = new Date(d);
-  x.setHours(hour, 0, 0, 0);
-  return x;
-}
 
 export type Resource = { resourceId: string; resourceTitle: string };
 export type CalEvent = {
   id: string;
   title: string;
-  start: Date;
-  end: Date;
+  /** The real instants, ISO. NOT what the grid lays out — see lib/tz.ts. */
+  startsAt: string;
+  endsAt: string;
   resourceId: string;
   staffing: "assigned" | "open" | "pending_approval";
   bookedCount: number;
@@ -43,9 +53,13 @@ export type CalEvent = {
   pendingApplications: number;
 };
 
+/** A CalEvent with the two Dates the grid lays out, in studio wall time. */
+type WallEvent = CalEvent & { start: Date; end: Date };
+
 export default function ScheduleCalendar({
   events: initial, resources, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct,
+  anchor, today, view, minHour, maxHour,
 }: {
   events: CalEvent[];
   resources: Resource[];
@@ -55,16 +69,37 @@ export default function ScheduleCalendar({
   quietPct: number;
   quietWindowDays: number;
   fullPct: number;
+  /** The studio-local day being shown, and the studio's own today. */
+  anchor: string;
+  today: string;
+  view: "day" | "week";
+  /** Derived from what is actually on the schedule, in studio time. */
+  minHour: number;
+  maxHour: number;
 }) {
   const [events, setEvents] = useState(initial);
-  const [view, setView] = useState<View>(Views.DAY);
-  const [date, setDate] = useState(new Date());
+  // The date and the view are URL state, not component state. They decide which
+  // days are FETCHED, and holding them here is what made every month outside a
+  // fixed 35-day window render as an empty grid.
   const [notice, setNotice] = useState<string | null>(null);
   const [blockedBy, setBlockedBy] = useState<
     { occurrenceId: string; name: string; at: string; who: string | null; room: string | null } | null
   >(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
+  const go = useCallback((d: string, v: "day" | "week") => {
+    router.push(`/schedule?d=${d}&view=${v}`);
+  }, [router]);
+
+  // THE ONE PLACE THE ZONE IS APPLIED. react-big-calendar lays out Dates by
+  // their browser-local fields, so it is handed Dates whose local fields have
+  // been set to the studio's wall clock. Nothing below this line is a real
+  // instant; `apply()` converts back before anything is saved.
+  const wallEvents: WallEvent[] = useMemo(() => events.map((e) => ({
+    ...e,
+    start: toStudioWall(new Date(e.startsAt), timeZone),
+    end: toStudioWall(new Date(e.endsAt), timeZone),
+  })), [events, timeZone]);
 
   // The roster is built and knows about photos, pinned notes and check-in
   // state; the calendar links to it rather than growing a second one. A drag
@@ -91,20 +126,31 @@ export default function ScheduleCalendar({
       // where it is until we know.
       if (confirm) {
         setEvents(events.map((e) =>
-          e.id === ev.id ? { ...e, start, end, resourceId: target } : e));
+          e.id === ev.id
+            ? { ...e, startsAt: fromStudioWall(start, timeZone).toISOString(),
+                endsAt: fromStudioWall(end, timeZone).toISOString(), resourceId: target }
+            : e));
       }
+
+      // Back to real instants. The grid handed us studio wall time; the
+      // database has never wanted anything but the instant.
+      const realStart = fromStudioWall(start, timeZone);
+      const realEnd = fromStudioWall(end, timeZone);
 
       const res = await moveClass({
         occurrenceId: ev.id,
-        startsAt: start.toISOString(),
-        endsAt: end.toISOString(),
+        startsAt: realStart.toISOString(),
+        endsAt: realEnd.toISOString(),
         instructorId: target === UNASSIGNED ? null : target,
         confirm,
       });
 
       if (res.ok) {
         setEvents(events.map((e) =>
-          e.id === ev.id ? { ...e, start, end, resourceId: target } : e));
+          e.id === ev.id
+            ? { ...e, startsAt: realStart.toISOString(),
+                endsAt: realEnd.toISOString(), resourceId: target }
+            : e));
         const bits: string[] = [];
         if (res.warnings.includes("outside_availability")) {
           // Decision 9: permitted, and said out loud.
@@ -134,7 +180,7 @@ export default function ScheduleCalendar({
       setBlockedBy(res.blockedBy ?? null);
       setEvents(before);
     },
-    [events],
+    [events, timeZone],
   );
 
   const onDrop = useCallback(
@@ -172,7 +218,7 @@ export default function ScheduleCalendar({
     return "ok" as const;
   }, [quietPct, quietWindowDays, fullPct]);
 
-  const eventPropGetter = useCallback((e: CalEvent) => {
+  const eventPropGetter = useCallback((e: WallEvent) => {
     const unstaffed = e.staffing !== "assigned";
     const waiting = e.staffing === "pending_approval";
     // The single worst state in the timetable: people are coming, the deadline
@@ -214,9 +260,9 @@ export default function ScheduleCalendar({
   // not do that.
   const loadByResource = useMemo(() => {
     const m = new Map<string, { classes: number; booked: number; seats: number }>();
-    const key = date.toDateString();
-    for (const e of events) {
-      if (view === Views.DAY && e.start.toDateString() !== key) continue;
+    for (const e of wallEvents) {
+      // Compared as studio-local day keys, never as browser Date days.
+      if (view === "day" && studioDateKey(new Date(e.startsAt), timeZone) !== anchor) continue;
       const cur = m.get(e.resourceId) ?? { classes: 0, booked: 0, seats: 0 };
       cur.classes += 1;
       cur.booked += e.bookedCount;
@@ -224,10 +270,10 @@ export default function ScheduleCalendar({
       m.set(e.resourceId, cur);
     }
     return m;
-  }, [events, date, view]);
+  }, [wallEvents, anchor, view, timeZone]);
 
   const components = useMemo(() => ({
-    event: ({ event }: { event: CalEvent }) => {
+    event: ({ event }: { event: WallEvent }) => {
       const f = fullness(event);
       const unstaffed = event.staffing !== "assigned";
       return (
@@ -313,23 +359,34 @@ export default function ScheduleCalendar({
       <div style={{ height: "72vh" }}>
         <DnDCalendar
           localizer={localizer}
-          events={events}
-          date={date}
-          onNavigate={setDate}
-          view={view}
-          onView={setView}
+          formats={formats}
+          events={wallEvents}
+          // The grid is TOLD which day it is on; it does not decide. Both come
+          // from the URL, which is also what the range was fetched for.
+          date={wallAt(anchor, 12)}
+          onNavigate={(d: Date) => {
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+              + `-${String(d.getDate()).padStart(2, "0")}`;
+            go(key, view);
+          }}
+          view={view === "week" ? Views.WEEK : Views.DAY}
+          onView={(v: View) => go(anchor, v === Views.WEEK ? "week" : "day")}
           views={[Views.DAY, Views.WEEK]}
           step={15}
           timeslots={4}
           // A studio does not run at 3am, and twenty-four rows of empty night
           // is most of what the first render showed. Bounded to the working
           // day, and opened on the morning rather than on midnight.
-          min={dayAt(date, 6)}
-          max={dayAt(date, 22)}
-          scrollToTime={dayAt(date, 7)}
+          // From what is actually on the schedule, in studio time. 06:00-22:00
+          // was a guess about somebody else's studio, and it hid every class
+          // outside it — including, for a Manila studio rendered in a European
+          // browser, all of them.
+          min={wallAt(anchor, minHour)}
+          max={wallAt(anchor, maxHour)}
+          scrollToTime={wallAt(anchor, minHour)}
           // Resources only make sense in a day view; a week already spends its
           // horizontal axis on days, so the instructor columns come back on Day.
-          resources={view === Views.DAY ? resources : undefined}
+          resources={view === "day" ? resources : undefined}
           resourceIdAccessor="resourceId"
           resourceTitleAccessor="resourceTitle"
           onEventDrop={onDrop}
@@ -339,7 +396,7 @@ export default function ScheduleCalendar({
           eventPropGetter={eventPropGetter}
           components={components}
           onSelectEvent={openRoster}
-          tooltipAccessor={(e: CalEvent) =>
+          tooltipAccessor={(e: WallEvent) =>
             `${e.title} — ${e.room ?? "no room"} — ${e.bookedCount}/${e.capacity} booked`
             + (e.waitlistCount > 0 ? ` — ${e.waitlistCount} waiting` : "")
             + (e.staffing !== "assigned" ? " — nobody assigned" : "")

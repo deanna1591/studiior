@@ -507,3 +507,100 @@ insert into studio_settings (studio_id) values ('0ccc0ccc-0000-0000-0000-0000000
 select expect_num('a new studio starts on sixty days, not twelve months',
   (select occurrence_horizon_days from studio_settings
     where studio_id = '0ccc0ccc-0000-0000-0000-000000000003')::bigint, 60);
+
+-- =============================================================================
+-- 9. THE CALENDAR'S RANGE, IN TWO TIMEZONES, IN ONE RUN
+-- =============================================================================
+-- The staff calendar rendered an empty grid for every day. Two of the three
+-- causes are day-boundary maths, and neither could be caught by a fixture whose
+-- studio, server and browser all share a zone. This suite already has one
+-- studio in Europe/Prague and one in Asia/Manila; both are asked here.
+--
+-- A 07:00 Manila class is stored at 23:00 UTC the PREVIOUS day. Anything that
+-- compares the stored instant against a date — rather than converting first —
+-- loses it, which for a Manila studio is every morning class it runs.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, name, capacity, instructor_id,
+   starts_at, ends_at, status, staffing)
+values
+  -- Manila: 07:00 and 17:00 on Wednesday 18 November, exactly as reported.
+  ('0ccc0ccc-0000-0000-0000-00000000ff01','0ccc0ccc-0000-0000-0000-000000000002',
+   '0ccc0ccc-0000-0000-0000-00000000000d','0ccc0ccc-0000-0000-0000-00000000cc02',
+   '0ccc0ccc-0000-0000-0000-00000000ee03','MNL MORNING',10,'0ccc0ccc-0000-0000-0000-00000000d102',
+   (date '2026-11-18' + time '07:00') at time zone 'Asia/Manila',
+   (date '2026-11-18' + time '07:50') at time zone 'Asia/Manila','scheduled','assigned'),
+  ('0ccc0ccc-0000-0000-0000-00000000ff02','0ccc0ccc-0000-0000-0000-000000000002',
+   '0ccc0ccc-0000-0000-0000-00000000000d','0ccc0ccc-0000-0000-0000-00000000cc02',
+   '0ccc0ccc-0000-0000-0000-00000000ee03','MNL EVENING',10,'0ccc0ccc-0000-0000-0000-00000000d102',
+   (date '2026-11-18' + time '17:00') at time zone 'Asia/Manila',
+   (date '2026-11-18' + time '17:50') at time zone 'Asia/Manila','scheduled','assigned'),
+  -- Manila, late the night BEFORE: 23:30 on the 17th, which is 15:30 UTC on the
+  -- 17th. It must not leak into the 18th.
+  ('0ccc0ccc-0000-0000-0000-00000000ff03','0ccc0ccc-0000-0000-0000-000000000002',
+   '0ccc0ccc-0000-0000-0000-00000000000d','0ccc0ccc-0000-0000-0000-00000000cc02',
+   '0ccc0ccc-0000-0000-0000-00000000ee03','MNL LATE NIGHT',10,null,
+   (date '2026-11-17' + time '23:30') at time zone 'Asia/Manila',
+   (date '2026-11-18' + time '00:20') at time zone 'Asia/Manila','scheduled','open'),
+  -- Prague, 07:00 on the same date: 06:00 UTC, the other side of the boundary.
+  ('0ccc0ccc-0000-0000-0000-00000000ff04','0ccc0ccc-0000-0000-0000-000000000001',
+   '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01',
+   '0ccc0ccc-0000-0000-0000-00000000ee01','PRG MORNING',10,'0ccc0ccc-0000-0000-0000-00000000d101',
+   (date '2026-11-18' + time '07:00') at time zone 'Europe/Prague',
+   (date '2026-11-18' + time '07:50') at time zone 'Europe/Prague','scheduled','assigned');
+
+select expect_text('a 07:00 Manila class is stored the previous day in UTC',
+  (select to_char(starts_at at time zone 'UTC','YYYY-MM-DD HH24:MI')
+     from class_occurrences where id = '0ccc0ccc-0000-0000-0000-00000000ff01'),
+  '2026-11-17 23:00');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a2',false);
+select set_config('t.mnl', (select count(*)::text from schedule_range(
+  '0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-18', date '2026-11-18')), false);
+select expect_text('Manila''s 18 November returns both of that day''s classes',
+  current_setting('t.mnl'), '2');
+select expect_text('...at the times the studio actually runs them',
+  (select string_agg(local_start, ',' order by local_start) from schedule_range(
+     '0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-18', date '2026-11-18')),
+  '07:00,17:00');
+select expect_text('...and the 23:30 the night before stays on the 17th',
+  (select string_agg(occ_name, ',') from schedule_range(
+     '0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-17', date '2026-11-17')),
+  'MNL LATE NIGHT');
+select expect_num('...so a day range never double-counts a boundary class',
+  (select count(*) from schedule_range(
+     '0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-17', date '2026-11-18'))::bigint, 3);
+select expect_num('the visible hours can be derived from the rows themselves',
+  (select max(end_minutes) from schedule_range(
+     '0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-18', date '2026-11-18'))::bigint,
+  17 * 60 + 50);
+
+-- The same date, the other studio, the other side of UTC. Same call, same run.
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select expect_text('Prague''s 18 November returns Prague''s class',
+  (select string_agg(occ_name || ' ' || local_start, ',') from schedule_range(
+     '0ccc0ccc-0000-0000-0000-000000000001', date '2026-11-18', date '2026-11-18')
+   where occ_name like 'PRG%'), 'PRG MORNING 07:00');
+select expect_num('...and none of Manila''s',
+  (select count(*) from schedule_range(
+     '0ccc0ccc-0000-0000-0000-000000000001', date '2026-11-18', date '2026-11-18')
+    where occ_name like 'MNL%')::bigint, 0);
+
+-- studio_today is the studio's day, not the server's.
+select expect_text('the studio''s today is asked of the studio',
+  studio_today('0ccc0ccc-0000-0000-0000-000000000002')::text,
+  (now() at time zone 'Asia/Manila')::date::text);
+
+-- Guards.
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select expect_raises('another studio''s owner cannot read this one''s timetable',
+  $q$select * from schedule_range('0ccc0ccc-0000-0000-0000-000000000002',
+       date '2026-11-18', date '2026-11-18')$q$, 'PT403');
+select expect_raises('a range that ends before it starts is refused',
+  $q$select * from schedule_range('0ccc0ccc-0000-0000-0000-000000000001',
+       date '2026-11-18', date '2026-11-01')$q$, 'PT400');
+select expect_raises('and a year in one call is a mistake, not a request',
+  $q$select * from schedule_range('0ccc0ccc-0000-0000-0000-000000000001',
+       date '2026-01-01', date '2026-12-31')$q$, 'PT422');
