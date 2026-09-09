@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink } from "@/components/ui";
+import ArchiveControls from "@/app/staff/archive-form";
 import InstructorForm from "../form";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function EditInstructor({ params }: { params: { id: string 
       <InstructorForm mode="edit" draft={{
         id: i.id, display_name: i.display_name, bio: i.bio, avatar_url: i.avatar_url,
         color: i.color, certifications: certs, status: i.status, hasLogin: i.staff_id != null }} />
+      <ArchiveControls kind="instructor" id={i.id} archived={i.status !== "active"} />
     </AppShell>
   );
 }

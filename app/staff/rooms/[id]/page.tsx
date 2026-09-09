@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink } from "@/components/ui";
+import ArchiveControls from "@/app/staff/archive-form";
 import RoomForm from "../form";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function EditRoom({ params }: { params: { id: string } }) {
     <AppShell {...shell} title={room.name} actions={<NavLink href="/rooms">Back to rooms</NavLink>}>
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">{`Holds ${room.capacity} · ${room.status}`}</p>
       <RoomForm mode="edit" draft={room} />
+      <ArchiveControls kind="room" id={room.id} archived={room.status !== "active"} />
     </AppShell>
   );
 }

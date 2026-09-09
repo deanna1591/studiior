@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { AppShell, Empty, Rows } from "@/components/ui";
+import { AppShell, Empty, Rows, SectionLabel } from "@/components/ui";
 
 type ShellProps = React.ComponentProps<typeof AppShell>;
 
 /** The three setup lists differ only in their rows, so the frame is shared. */
 export function SetupShell({
-  shell, title, blurb, newHref, newLabel, empty, count, children,
+  shell, title, blurb, newHref, newLabel, empty, count, children, archived,
 }: {
   shell: Omit<ShellProps, "title" | "children">;
   title: string;
@@ -15,6 +15,10 @@ export function SetupShell({
   empty: string;
   count: number;
   children: React.ReactNode;
+  /** Archived rows, kept in their own section below the live ones. Mixed into
+      the list they read as broken records rather than retired ones, and the
+      whole point of archiving is that the record survives. */
+  archived?: React.ReactNode;
 }) {
   return (
     <AppShell
@@ -41,6 +45,7 @@ export function SetupShell({
       ) : (
         <Rows>{children}</Rows>
       )}
+      {archived}
     </AppShell>
   );
 }
@@ -63,5 +68,30 @@ export function SetupRow({
       </div>
       {right && <div className="num shrink-0 text-[13px] text-ink-2">{right}</div>}
     </Link>
+  );
+}
+
+/**
+ * The archived half of a setup list.
+ *
+ * Below the live records and behind its own heading, not greyed out among
+ * them: an archived class type is a retired record, and mixed into the list it
+ * reads as a broken one. Rendered only when there is something in it, so a
+ * studio that has never archived anything never sees the word.
+ */
+export function ArchivedSection({ noun, children, count }: {
+  noun: string; children: React.ReactNode; count: number;
+}) {
+  if (count === 0) return null;
+  return (
+    <section className="mt-8">
+      <SectionLabel>Archived</SectionLabel>
+      <p className="mb-3 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">
+        Hidden from members. {count} {noun}{count === 1 ? "" : "s"} kept because
+        past classes still refer to {count === 1 ? "it" : "them"}. Open one to
+        restore it.
+      </p>
+      <Rows>{children}</Rows>
+    </section>
   );
 }

@@ -60,14 +60,6 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
                  className="h-9 w-20 rounded border border-line-2" />
         </Field>
       </div>
-      {mode === "edit" && (
-        <Field label="Status">
-          <select name="status" defaultValue={draft.status} className={inputClass}>
-            <option value="active">Active</option>
-            <option value="archived">Archived — not offered for new classes</option>
-          </select>
-        </Field>
-      )}
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Add class type" : "Save changes"} />
         <Link href="/class-types" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>

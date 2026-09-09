@@ -36,14 +36,6 @@ export default function RoomForm({ draft, mode }: { draft: RoomDraft; mode: "cre
         <input name="color" type="color" defaultValue={draft.color ?? "#8FBC8F"}
                className="h-9 w-20 rounded border border-line-2" />
       </Field>
-      {mode === "edit" && (
-        <Field label="Status">
-          <select name="status" defaultValue={draft.status} className={inputClass}>
-            <option value="active">Active</option>
-            <option value="archived">Archived — not offered for new classes</option>
-          </select>
-        </Field>
-      )}
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Add room" : "Save changes"} />
         <Link href="/rooms" className="text-sm text-ink-2 underline underline-offset-4">Cancel</Link>

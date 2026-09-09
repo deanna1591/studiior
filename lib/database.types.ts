@@ -831,6 +831,7 @@ export type Database = {
           name: string
           room_id: string | null
           series_id: string | null
+          series_slot_at: string | null
           staffing: Database["public"]["Enums"]["staffing_state"]
           starts_at: string
           status: Database["public"]["Enums"]["occurrence_status"]
@@ -857,6 +858,7 @@ export type Database = {
           name: string
           room_id?: string | null
           series_id?: string | null
+          series_slot_at?: string | null
           staffing?: Database["public"]["Enums"]["staffing_state"]
           starts_at: string
           status?: Database["public"]["Enums"]["occurrence_status"]
@@ -883,6 +885,7 @@ export type Database = {
           name?: string
           room_id?: string | null
           series_id?: string | null
+          series_slot_at?: string | null
           staffing?: Database["public"]["Enums"]["staffing_state"]
           starts_at?: string
           status?: Database["public"]["Enums"]["occurrence_status"]
@@ -2048,6 +2051,90 @@ export type Database = {
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_documents: {
+        Row: {
+          created_at: string
+          filename: string
+          id: string
+          kind: string
+          member_id: string
+          mime_type: string | null
+          note: string | null
+          signed_at: string | null
+          size_bytes: number | null
+          storage_path: string
+          studio_id: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          filename: string
+          id?: string
+          kind?: string
+          member_id: string
+          mime_type?: string | null
+          note?: string | null
+          signed_at?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          studio_id: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          filename?: string
+          id?: string
+          kind?: string
+          member_id?: string
+          mime_type?: string | null
+          note?: string | null
+          signed_at?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          studio_id?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_documents_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4201,6 +4288,7 @@ export type Database = {
           morning_brief_send_at: string
           no_show_consumes_credit: boolean
           no_show_fee_cents: number
+          occurrence_horizon_months: number
           onboarding_completed_at: string | null
           payment_grace_days: number
           reminder_hours_before: number
@@ -4237,6 +4325,7 @@ export type Database = {
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
+          occurrence_horizon_months?: number
           onboarding_completed_at?: string | null
           payment_grace_days?: number
           reminder_hours_before?: number
@@ -4273,6 +4362,7 @@ export type Database = {
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
+          occurrence_horizon_months?: number
           onboarding_completed_at?: string | null
           payment_grace_days?: number
           reminder_hours_before?: number
@@ -4717,6 +4807,11 @@ export type Database = {
         Args: { p_application_id: string }
         Returns: Json
       }
+      archive_impact: { Args: { p_id: string; p_kind: string }; Returns: Json }
+      archive_record: {
+        Args: { p_confirm?: boolean; p_id: string; p_kind: string }
+        Returns: Json
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_role_in: {
@@ -4724,6 +4819,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["staff_role"]
       }
       auth_staff_studios: { Args: never; Returns: string[] }
+      backfill_all_timelines: { Args: never; Returns: Json }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
         Args: {
@@ -4820,13 +4916,34 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
       }
+      generate_all_occurrences: { Args: never; Returns: Json }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       generate_morning_brief: {
         Args: { p_for_date?: string; p_studio_id: string }
+        Returns: Json
+      }
+      generate_occurrences: {
+        Args: { p_horizon_months?: number; p_series_id: string }
         Returns: Json
       }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
@@ -4905,6 +5022,7 @@ export type Database = {
           seconds_left: number
         }[]
       }
+      member_goal_progress: { Args: { p_goal_id: string }; Returns: Json }
       member_health: { Args: { p_member_id: string }; Returns: Json }
       member_invite_preview: {
         Args: { p_token: string }
@@ -5029,11 +5147,25 @@ export type Database = {
         Args: { p_studio_id: string }
         Returns: number
       }
+      rebuild_timeline_rows: { Args: { p_member_id: string }; Returns: number }
       recompute_member_stats: {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number
       }
       reconcile_notification_sends: { Args: never; Returns: Json }
+      record_document: {
+        Args: {
+          p_filename: string
+          p_kind: string
+          p_member_id: string
+          p_mime?: string
+          p_note?: string
+          p_signed_at?: string
+          p_size?: number
+          p_storage_path: string
+        }
+        Returns: Json
+      }
       record_manual_payment: {
         Args: {
           p_amount_cents: number
@@ -5089,6 +5221,9 @@ export type Database = {
         Args: { p_accept: boolean; p_offer_id: string }
         Returns: Json
       }
+      restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
+      rrule_part: { Args: { p_key: string; p_rrule: string }; Returns: string }
+      rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_morning_briefs: { Args: never; Returns: Json }
       say_count: { Args: { n: number }; Returns: string }
       send_due_notifications: { Args: never; Returns: Json }

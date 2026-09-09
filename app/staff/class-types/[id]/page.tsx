@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink } from "@/components/ui";
+import ArchiveControls from "@/app/staff/archive-form";
 import ClassTypeForm from "../form";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function EditClassType({ params }: { params: { id: string }
     <AppShell {...shell} title={t.name} actions={<NavLink href="/class-types">Back to class types</NavLink>}>
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">{`${t.duration_minutes} min · holds ${t.default_capacity} · ${t.status}`}</p>
       <ClassTypeForm mode="edit" draft={t} />
+      <ArchiveControls kind="class_type" id={t.id} archived={t.status !== "active"} />
     </AppShell>
   );
 }

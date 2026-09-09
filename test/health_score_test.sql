@@ -36,6 +36,14 @@ end $$;
 
 -- --- Fixture: a studio, an owner, and a full set of demo cohorts -----------
 
+create or replace function expect_true(label text, actual boolean)
+returns void language plpgsql as $$
+begin
+  if actual then raise notice 'PASS  %  (got true)', label;
+  else raise exception 'FAIL  %  expected true, got %', label, coalesce(actual::text,'null');
+  end if;
+end $$;
+
 insert into auth.users (id) values ('66666666-0000-0000-0000-0000000000a1');
 insert into profiles (id, email) values ('66666666-0000-0000-0000-0000000000a1','ops@example.com');
 insert into platform_admins (user_id, email, note)
@@ -446,8 +454,12 @@ select expect_num('no challenge progress was generated',
   (select count(*) from challenge_progress_events where studio_id = current_setting('h.sid')::uuid), 0);
 select expect_num('no achievements were awarded',
   (select count(*) from member_achievements where studio_id = current_setting('h.sid')::uuid), 0);
-select expect_num('no timeline events were written',
-  (select count(*) from timeline_events where studio_id = current_setting('h.sid')::uuid), 0);
+-- As in the importer suite: the three above reach a person and must not fire
+-- for generated history; a timeline event reaches nobody and IS the history.
+-- Migration 059 gave the timeline its first writer, so this now reads what the
+-- demo data actually contains.
+select expect_true('demo attendance lands on the members'' journeys',
+  (select count(*) > 0 from timeline_events where studio_id = current_setting('h.sid')::uuid));
 
 -- But the check-in trigger did do its own job.
 select expect_num('every demo member has a computed band',

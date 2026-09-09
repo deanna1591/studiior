@@ -2,13 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
-import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
+import { AppShell, Empty, NavLink, Rows } from "@/components/ui";
 import { HealthBand, bandOf } from "@/components/health-band";
 import { MessageLink } from "@/components/message-link";
 import InviteToApp from "@/components/invite-to-app";
 import { formatMoney } from "@/lib/plans";
 import { dayMonthParts, fmtTime } from "@/lib/time";
 import { TimelineList } from "./timeline";
+import NotesPanel from "./records/notes";
+import GoalsPanel from "./records/goals";
+import DocumentsPanel, { PhotoUpload } from "./records/documents";
 import { AttendancePattern } from "./attendance";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +46,7 @@ export default async function MemberDetail({
 
   const { data: m } = await supabase
     .from("members")
-    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id")
+    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url")
     .eq("id", params.id)
     .maybeSingle();
   if (!m) notFound();
@@ -53,6 +56,7 @@ export default async function MemberDetail({
   const [
     { data: memberships }, { data: ledger }, { data: visits },
     { data: timeline }, { data: notes }, { data: goals }, { data: tags },
+    { data: docs },
   ] = await Promise.all([
     supabase.from("memberships")
       .select("id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, membership_plans(name, type)")
@@ -74,6 +78,11 @@ export default async function MemberDetail({
       .eq("member_id", params.id).order("status").order("target_date", { nullsFirst: false }),
     supabase.from("member_tag_assignments")
       .select("tag_id, member_tags(name)").eq("member_id", params.id),
+    // The medical narrowing lives in the policy, so an instructor or a front
+    // desk simply receives fewer rows here rather than this screen filtering.
+    supabase.from("member_documents")
+      .select("id, kind, filename, storage_path, size_bytes, signed_at, created_at")
+      .eq("member_id", params.id).order("created_at", { ascending: false }),
   ]);
 
   // Payments are the one thing on this screen decided here rather than by the
@@ -96,11 +105,29 @@ export default async function MemberDetail({
 
   const journey = (timeline ?? []).filter((e) => manager || e.type !== "payment");
 
+  // Goal progress is computed, never read off member_goals.current_value —
+  // that column has never been written and every goal read "0 of 12".
+  const goalRows = await Promise.all((goals ?? []).map(async (g) => {
+    const { data } = await supabase.rpc("member_goal_progress", { p_goal_id: g.id });
+    const p = (data ?? {}) as { done?: number; met?: boolean };
+    return { ...g, done: p.done ?? 0, met: p.met ?? false };
+  }));
+
+  // Signed on render and short-lived. A URL stored in the column would outlive
+  // its signature; the column holds the object PATH.
+  const docRows = await Promise.all((docs ?? []).map(async (d) => {
+    const { data } = await supabase.storage.from("member-documents")
+      .createSignedUrl(d.storage_path, 300);
+    return { ...d, url: data?.signedUrl ?? null };
+  }));
+  const photo = m.avatar_url
+    ? (await supabase.storage.from("member-avatars")
+        .createSignedUrl(m.avatar_url, 300)).data?.signedUrl ?? null
+    : null;
+
   const live = (memberships ?? []).find(
     (x) => !["cancelled", "expired"].includes(x.status));
   const past = (memberships ?? []).filter((x) => x.id !== live?.id);
-  const openGoals = (goals ?? []).filter((g) => g.status !== "completed");
-  const doneGoals = (goals ?? []).filter((g) => g.status === "completed");
 
   const d = (iso: string) => {
     const { day, month } = dayMonthParts(iso, ctx.timeZone);
@@ -136,6 +163,18 @@ export default async function MemberDetail({
           is on {m.first_name}&rsquo;s journey below.
         </p>
       )}
+      {/* The photograph, beside the person it belongs to. avatar_url has
+          existed since migration 035 and this screen never rendered it — and
+          only the member could upload one, which is no use for the walk-in
+          signing up at the desk. */}
+      <div className="mb-4">
+        {isDeskUp(ctx.role)
+          ? <PhotoUpload memberId={m.id} name={`${m.first_name} ${m.last_name}`} url={photo} />
+          : photo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt="" aria-hidden className="h-16 w-16 rounded-full object-cover" />
+          )}
+      </div>
       <p className="mb-1 text-[13px] leading-[20px] text-ink-2">
         {m.email}
         {m.phone && <> · {m.phone}</>}
@@ -178,11 +217,11 @@ export default async function MemberDetail({
         )}
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ---------- the narrative ---------- */}
-        <div className="space-y-8">
-          <section>
-            <SectionLabel>Attendance</SectionLabel>
+        <div className="space-y-5">
+          <section className="s-card p-5">
+            <h2 className="s-head mb-3">Attendance</h2>
             <p className="mb-3 text-[13px] leading-[20px] text-ink-2">
               <span className="num text-ink">{m.lifetime_visits}</span> visit
               {m.lifetime_visits === 1 ? "" : "s"} in all
@@ -197,8 +236,8 @@ export default async function MemberDetail({
             )}
           </section>
 
-          <section>
-            <SectionLabel>Journey</SectionLabel>
+          <section className="s-card p-5">
+            <h2 className="s-head mb-3">Journey</h2>
             {journey.length === 0 ? (
               <Empty>Nothing recorded yet. Their first visit will start this off.</Empty>
             ) : (
@@ -215,9 +254,9 @@ export default async function MemberDetail({
           </section>
 
           {manager && (
-            <section>
-              <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                <SectionLabel>Payments</SectionLabel>
+            <section className="s-card p-5">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="s-head">Payments</h2>
                 <NavLink href={`/members/${params.id}/payment`}>Record a payment</NavLink>
               </div>
               {(payments ?? []).length === 0 ? (
@@ -269,8 +308,8 @@ export default async function MemberDetail({
 
         {/* ---------- the facts ---------- */}
         <div className="space-y-8">
-          <section>
-            <SectionLabel>Membership</SectionLabel>
+          <section className="s-card p-5">
+            <h2 className="s-head mb-3">Membership</h2>
             {!live ? (
               <Empty quiet>
                 Nothing active.{" "}
@@ -302,8 +341,8 @@ export default async function MemberDetail({
             )}
           </section>
 
-          <section>
-            <SectionLabel>Credits</SectionLabel>
+          <section className="s-card p-5">
+            <h2 className="s-head mb-3">Credits</h2>
             {(ledger ?? []).length === 0 ? (
               <Empty quiet>No credit movements yet.</Empty>
             ) : (
@@ -332,80 +371,16 @@ export default async function MemberDetail({
             </p>
           </section>
 
-          <section>
-            <SectionLabel>Notes</SectionLabel>
-            {(notes ?? []).length === 0 ? (
-              <Empty quiet>
-                No notes yet. Injuries, preferences and anything the next person on the desk should know.
-              </Empty>
-            ) : (
-              <div className="space-y-2">
-                {(notes ?? []).map((n) => (
-                  <div key={n.id}
-                       className={`border-l-[3px] bg-surface px-3 py-2 ${n.active ? "" : "opacity-60"}`}
-                       style={{ borderLeftColor: n.pinned ? "var(--coral)" : "var(--line-2)" }}>
-                    <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-ink-3">
-                      <span className="capitalize">{n.category}</span>
-                      {n.pinned && <span className="text-ink">Shows on the roster</span>}
-                      {n.managers_only && (
-                        <span className="rounded-sm bg-line px-1.5 py-0.5 text-ink-2">Managers only</span>
-                      )}
-                      {!n.active && <span>Resolved</span>}
-                    </div>
-                    <p className="text-[13px] leading-[19px] text-ink">{n.body}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!manager && (
-              <p className="mt-2 text-[11px] leading-4 text-ink-3">
-                Managers-only notes are not listed here and are not sent to your browser.
-              </p>
-            )}
-          </section>
+          {/* Notes, goals and documents are now WRITTEN here rather than
+              listed. All three tables have existed since migration 001 (or, for
+              documents, only in Chapter 6's scope) with nothing in the product
+              putting a row in them. */}
+          <NotesPanel memberId={m.id} notes={notes ?? []} canSeeManagerOnly={manager} />
 
-          <section>
-            <SectionLabel>Goals</SectionLabel>
-            {openGoals.length === 0 && doneGoals.length === 0 ? (
-              <Empty quiet>No goals set. One is usually enough to give a conversation somewhere to go.</Empty>
-            ) : (
-              <div className="space-y-3">
-                {openGoals.map((g) => {
-                  const pct = g.target_value
-                    ? Math.min(100, Math.round((g.current_value / g.target_value) * 100))
-                    : null;
-                  return (
-                    <div key={g.id}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-[13px] leading-[18px] text-ink">{g.title}</span>
-                        {g.target_value != null && (
-                          <span className="num shrink-0 text-[12px] text-ink-3">
-                            {g.current_value}/{g.target_value}
-                          </span>
-                        )}
-                      </div>
-                      {pct !== null && (
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-line">
-                          <div className="h-full bg-lime" style={{ width: `${pct}%` }} />
-                        </div>
-                      )}
-                      {g.target_date && (
-                        <div className="mt-1 text-[11px] leading-4 text-ink-3">by {d(g.target_date)}</div>
-                      )}
-                    </div>
-                  );
-                })}
-                {doneGoals.map((g) => (
-                  <div key={g.id} className="flex items-baseline justify-between gap-3">
-                    <span className="text-[13px] leading-[18px] text-ink-3 line-through">{g.title}</span>
-                    <span className="shrink-0 text-[11px] leading-4 text-ink-3">
-                      {g.completed_at ? <>met {d(g.completed_at)}</> : "met"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <GoalsPanel memberId={m.id} goals={goalRows} />
+
+          <DocumentsPanel memberId={m.id} docs={docRows}
+                          waiverSignedAt={m.waiver_signed_at} canDelete={manager} />
         </div>
       </div>
     </AppShell>

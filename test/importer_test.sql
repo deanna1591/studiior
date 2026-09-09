@@ -35,6 +35,14 @@ begin
   end if;
 end $$;
 
+create or replace function expect_true(label text, actual boolean)
+returns void language plpgsql as $$
+begin
+  if actual then raise notice 'PASS  %  (got true)', label;
+  else raise exception 'FAIL  %  expected true, got %', label, coalesce(actual::text,'null');
+  end if;
+end $$;
+
 -- --- Fixtures --------------------------------------------------------------
 
 insert into auth.users (id) values
@@ -265,8 +273,20 @@ select expect_num('no challenge progress',
   (select count(*) from challenge_progress_events where studio_id='55555555-0000-0000-0000-000000000001'), 0);
 select expect_num('no achievements',
   (select count(*) from member_achievements where studio_id='55555555-0000-0000-0000-000000000001'), 0);
-select expect_num('no timeline events',
-  (select count(*) from timeline_events where studio_id='55555555-0000-0000-0000-000000000001'), 0);
+-- Timeline events DO get written now, and that is the correct answer rather
+-- than a regression. The three above are things that reach a person — an email,
+-- challenge progress, an awarded badge — and importing history must not send
+-- thirty people a streak they did not earn today. A timeline event reaches
+-- nobody: it is the member's history, which is precisely what was imported, and
+-- migration 021 derives `attended` from imported check-ins deliberately, with
+-- its own "Imported from your previous system" description. This assertion read
+-- 0 only because nothing in the product wrote the timeline at all.
+select expect_true('imported attendance DOES land on the member''s journey',
+  (select count(*) > 0 from timeline_events where studio_id='55555555-0000-0000-0000-000000000001'));
+select expect_true('...and says the class is not known, rather than inventing one',
+  (select bool_or(description like 'Imported from your previous system%')
+     from timeline_events
+    where studio_id='55555555-0000-0000-0000-000000000001' and type='attended'));
 
 -- The §8 window would have refused every one of these on the normal path.
 do $$

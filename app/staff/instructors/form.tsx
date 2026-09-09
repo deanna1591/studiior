@@ -49,14 +49,6 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
         <input name="color" type="color" defaultValue={draft.color ?? "#CD853F"}
                className="h-9 w-20 rounded border border-line-2" />
       </Field>
-      {mode === "edit" && (
-        <Field label="Status">
-          <select name="status" defaultValue={draft.status} className={inputClass}>
-            <option value="active">Active</option>
-            <option value="archived">Archived — not offered when scheduling</option>
-          </select>
-        </Field>
-      )}
       <p className="rounded border border-line bg-paper px-3 py-2 text-xs leading-relaxed text-ink-2">
         {draft.hasLogin
           ? "This instructor has a staff login and can sign in to see their own schedule."
