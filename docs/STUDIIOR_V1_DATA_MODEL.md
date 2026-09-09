@@ -315,6 +315,8 @@ create index on class_occurrences (studio_id, instructor_id, starts_at);
 
 **Generation.** A nightly job materialises occurrences for a rolling 12-month horizon per series, plus immediately on series create/edit. Editing a series offers *this occurrence only* / *this and future* / *entire series*; the first sets `is_exception = true` on that row and leaves it untouched by regeneration.
 
+**Built in migration 057, and it needed one column this section did not anticipate.** `is_exception` is not sufficient on its own: an occurrence moved to another day leaves no row in its original slot, so a generator keyed on `(series_id, starts_at)` refills it and the member gets two classes. `class_occurrences.series_slot_at` records which recurrence a row materialises and survives the move, so the row keeps holding its origin; the unique index on `(series_id, series_slot_at)` is what makes regeneration idempotent. The horizon is `studio_settings.occurrence_horizon_months`, default 12. *This and future* / *entire series* editing is still not built — the trigger generates and never deletes or moves what already exists, because those modes have to decide what happens to the bookings on every future occurrence.
+
 ### Instructor availability — PATCH, Decision 9
 
 ```sql
