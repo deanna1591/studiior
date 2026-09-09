@@ -54,6 +54,9 @@ export function railItems(
       { href: "/class-types", label: "Class types" },
       { href: "/instructors", label: "Instructors" },
       { href: "/imports", label: "Import" },
+      // How far ahead the timetable runs, and the instructor timing settings.
+      // Every one of them was a column with a default and nowhere to change it.
+      { href: "/settings", label: "Settings" },
     );
   }
   // Studio identity is the owner's, per Decision 8's precedent for

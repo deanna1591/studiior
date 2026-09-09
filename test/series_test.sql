@@ -62,9 +62,12 @@ insert into profiles (id, email, full_name) values
 insert into studios (id, name, slug, timezone, currency, status) values
   ('5e215e21-0000-0000-0000-000000000001','Series Studio','ser-test','Europe/Prague','CZK','active'),
   ('5e215e21-0000-0000-0000-000000000002','Other Studio','ser-other','Europe/Prague','CZK','active');
-insert into studio_settings (studio_id) values
-  ('5e215e21-0000-0000-0000-000000000001'),
-  ('5e215e21-0000-0000-0000-000000000002');
+-- Pinned at 365 days. Migration 068 moved the default from twelve months to
+-- sixty days; this suite is about what an EDIT does to a materialised year, so
+-- it states the horizon it needs rather than inheriting whatever ships.
+insert into studio_settings (studio_id, occurrence_horizon_days) values
+  ('5e215e21-0000-0000-0000-000000000001', 365),
+  ('5e215e21-0000-0000-0000-000000000002', 365);
 insert into locations (id, studio_id, name, is_primary) values
   ('5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-000000000001','Main',true),
   ('5e215e21-0000-0000-0000-00000000000d','5e215e21-0000-0000-0000-000000000002','Main',true);

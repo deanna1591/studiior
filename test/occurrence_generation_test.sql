@@ -56,9 +56,13 @@ insert into profiles (id, email, full_name) values
 insert into studios (id, name, slug, timezone, currency, status) values
   ('0ccc0ccc-0000-0000-0000-000000000001','Prague Studio','occ-prague','Europe/Prague','CZK','active'),
   ('0ccc0ccc-0000-0000-0000-000000000002','Manila Studio','occ-manila','Asia/Manila','PHP','active');
-insert into studio_settings (studio_id) values
-  ('0ccc0ccc-0000-0000-0000-000000000001'),
-  ('0ccc0ccc-0000-0000-0000-000000000002');
+-- Pinned at 365 days, not left on the default: migration 068 moved that default
+-- from twelve months to sixty days, and an assertion about "the horizon" should
+-- be reading the studio's setting rather than agreeing with whatever the column
+-- currently ships with.
+insert into studio_settings (studio_id, occurrence_horizon_days) values
+  ('0ccc0ccc-0000-0000-0000-000000000001', 365),
+  ('0ccc0ccc-0000-0000-0000-000000000002', 365);
 insert into locations (id, studio_id, name, is_primary) values
   ('0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-000000000001','Main',true),
   ('0ccc0ccc-0000-0000-0000-00000000000d','0ccc0ccc-0000-0000-0000-000000000002','Main',true);
@@ -101,12 +105,12 @@ select expect_num('and nothing lands in the past',
     where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
       and (starts_at at time zone 'Europe/Prague')::date
           < (now() at time zone 'Europe/Prague')::date)::bigint, 0);
-select expect_text('the horizon is twelve months to the day',
+select expect_text('the horizon is the studio''s own number of days, to the day',
   (select max((starts_at at time zone 'Europe/Prague')::date)
      from class_occurrences where series_id = '0ccc0ccc-0000-0000-0000-00000000f001')::text,
   (select max(d)::date::text from generate_series(
      (now() at time zone 'Europe/Prague')::date,
-     ((now() at time zone 'Europe/Prague')::date + interval '12 months')::date,
+     (now() at time zone 'Europe/Prague')::date + 365,
      interval '1 day') d
    where extract(dow from d) = 2));
 
@@ -307,14 +311,14 @@ select expect_num('the run made every week except the ones that clashed',
 -- 6. The horizon is a studio setting, and the rule is parsed not guessed
 -- =============================================================================
 reset role;
-update studio_settings set occurrence_horizon_months = 1
+update studio_settings set occurrence_horizon_days = 30
  where studio_id = '0ccc0ccc-0000-0000-0000-000000000002';
 delete from class_occurrences where series_id = '0ccc0ccc-0000-0000-0000-00000000f002';
 set role authenticated;
 select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a2',false);
 select set_config('t.short',
   (select generate_occurrences('0ccc0ccc-0000-0000-0000-00000000f002')::text), false);
-select expect_true('a one-month horizon materialises about four weeks',
+select expect_true('a thirty-day horizon materialises about four weeks',
   (current_setting('t.short')::jsonb ->> 'created')::int between 4 and 5);
 
 -- Loudly, rather than generating something weekly and wrong. The REFUSAL LANDS
@@ -336,3 +340,170 @@ select expect_raises('an owner of another studio cannot materialise this one',
   $q$select generate_occurrences('0ccc0ccc-0000-0000-0000-00000000f001')$q$, 'PT403');
 select expect_raises('and an unknown series is refused',
   $q$select generate_occurrences('0ccc0ccc-0000-0000-0000-0000000000ff')$q$, 'PT404');
+
+-- =============================================================================
+-- 7. Shortening the horizon, which used to do nothing at all
+-- =============================================================================
+-- Migration 068. Before it, `generate_occurrences()` only ever inserted, so a
+-- studio could shorten the setting, run the nightly job and still be carrying a
+-- year of classes nobody had agreed to teach. Proved on real data before the
+-- fix: set to two months, ran the job, furthest class unchanged at 2027-09-09.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+update studio_settings set occurrence_horizon_days = 365
+ where studio_id = '0ccc0ccc-0000-0000-0000-000000000001';
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select generate_occurrences('0ccc0ccc-0000-0000-0000-00000000f001');
+
+select set_config('t.h0', (select count(*)::text from class_occurrences
+  where series_id = '0ccc0ccc-0000-0000-0000-00000000f001' and status = 'scheduled'), false);
+select expect_true('a year-long horizon is carrying a year of classes',
+  current_setting('t.h0')::int > 45);
+
+-- The preview writes nothing.
+select set_config('t.prev', (select set_occurrence_horizon(
+  '0ccc0ccc-0000-0000-0000-000000000001', 60, false)::text), false);
+select expect_true('shortening asks first',
+  (current_setting('t.prev')::jsonb ->> 'requires_confirmation')::boolean);
+select expect_true('...and says how many classes it would remove',
+  (current_setting('t.prev')::jsonb ->> 'will_delete')::int > 30);
+select expect_num('...having removed none of them yet',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+      and status = 'scheduled')::bigint, current_setting('t.h0')::bigint);
+select expect_num('...and left the setting alone',
+  (select occurrence_horizon_days from studio_settings
+    where studio_id = '0ccc0ccc-0000-0000-0000-000000000001')::bigint, 365);
+
+select set_config('t.app', (select set_occurrence_horizon(
+  '0ccc0ccc-0000-0000-0000-000000000001', 60, true)::text), false);
+select expect_true('applying it reports ok', (current_setting('t.app')::jsonb ->> 'ok')::boolean);
+select expect_num('the setting is what the studio asked for',
+  (select occurrence_horizon_days from studio_settings
+    where studio_id = '0ccc0ccc-0000-0000-0000-000000000001')::bigint, 60);
+select expect_num('nothing is scheduled past the new edge',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+      and status = 'scheduled'
+      and (starts_at at time zone 'Europe/Prague')::date
+          > (now() at time zone 'Europe/Prague')::date + 60)::bigint, 0);
+select expect_true('...and what is inside it is untouched',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+      and status = 'scheduled') between 7 and 10);
+
+-- DELETED, not cancelled. A cancelled row keeps its series_slot_at, and the
+-- unique index on (series_id, series_slot_at) would then make the hole
+-- permanent — the studio lengthens the horizon again and the generator skips
+-- every slot it had cancelled. Proved by lengthening it right back.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_num('the removed classes are gone, not sitting there cancelled',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+      and status = 'cancelled')::bigint, 0);
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select set_occurrence_horizon('0ccc0ccc-0000-0000-0000-000000000001', 365, true);
+select expect_num('...so lengthening it again refills the calendar completely',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+      and status = 'scheduled')::bigint, current_setting('t.h0')::bigint);
+
+-- =============================================================================
+-- 8. What a horizon may never delete
+-- =============================================================================
+-- A member booked on a class eight months out, a class somebody has moved, a
+-- class a human assigned, and a one-off nobody generated.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+insert into members (id, studio_id, first_name, last_name, email, status) values
+  ('0ccc0ccc-0000-0000-0000-0000000000c1','0ccc0ccc-0000-0000-0000-000000000001',
+   'Mona','Faraway','occ-mona@example.com','active');
+select set_config('t.far', (select id::text from class_occurrences
+  where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+    and starts_at > now() + interval '200 days' order by starts_at limit 1), false);
+insert into bookings (studio_id, occurrence_id, member_id, status)
+values ('0ccc0ccc-0000-0000-0000-000000000001', current_setting('t.far')::uuid,
+        '0ccc0ccc-0000-0000-0000-0000000000c1', 'booked');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select set_config('t.ref', (select set_occurrence_horizon(
+  '0ccc0ccc-0000-0000-0000-000000000001', 60, true)::text), false);
+select expect_text('a booking beyond the new edge refuses the whole change',
+  current_setting('t.ref')::jsonb ->> 'reason', 'members_booked_beyond_horizon');
+select expect_num('...naming the class rather than counting it',
+  jsonb_array_length(current_setting('t.ref')::jsonb -> 'blocked')::bigint, 1);
+select expect_true('...with a date somebody can act on',
+  (current_setting('t.ref')::jsonb -> 'blocked' -> 0 ->> 'local') is not null);
+select expect_num('...and CONFIRMED still means refused: nothing was deleted',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+      and status = 'scheduled')::bigint, current_setting('t.h0')::bigint);
+select expect_num('...and the setting did not move either',
+  (select occurrence_horizon_days from studio_settings
+    where studio_id = '0ccc0ccc-0000-0000-0000-000000000001')::bigint, 365);
+
+-- Clear the booking; keep a moved class and a manually assigned one.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+delete from bookings where occurrence_id = current_setting('t.far')::uuid;
+update class_occurrences set is_exception = true where id = current_setting('t.far')::uuid;
+select set_config('t.far2', (select id::text from class_occurrences
+  where series_id = '0ccc0ccc-0000-0000-0000-00000000f001'
+    and starts_at > now() + interval '200 days'
+    and id <> current_setting('t.far')::uuid order by starts_at limit 1), false);
+update class_occurrences
+   set assigned_by = '0ccc0ccc-0000-0000-0000-0000000000a1'
+ where id = current_setting('t.far2')::uuid;
+-- A one-off, with no series at all: typed by a person for eight months out.
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, status, staffing)
+values ('0ccc0ccc-0000-0000-0000-00000000f0f1','0ccc0ccc-0000-0000-0000-000000000001',
+        '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01',
+        'Deliberate one-off', 10,
+        ((current_date + 250) + time '11:00') at time zone 'Europe/Prague',
+        ((current_date + 250) + time '11:50') at time zone 'Europe/Prague',
+        'scheduled','open');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select set_config('t.keep', (select set_occurrence_horizon(
+  '0ccc0ccc-0000-0000-0000-000000000001', 60, true)::text), false);
+select expect_true('it goes through once nobody is booked',
+  (current_setting('t.keep')::jsonb ->> 'ok')::boolean);
+select expect_num('a class somebody had moved is kept, and reported',
+  (current_setting('t.keep')::jsonb ->> 'kept_edited')::bigint, 1);
+select expect_num('...as is one a human assigned an instructor to',
+  (current_setting('t.keep')::jsonb ->> 'kept_manual')::bigint, 1);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_true('...and both are still there',
+  (select count(*) from class_occurrences
+    where id in (current_setting('t.far')::uuid, current_setting('t.far2')::uuid)) = 2);
+select expect_num('a one-off nobody generated is never swept away by a horizon',
+  (select count(*) from class_occurrences
+    where id = '0ccc0ccc-0000-0000-0000-00000000f0f1')::bigint, 1);
+
+-- Who may move it, and what it will accept.
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a2',false);
+select expect_raises('another studio''s owner cannot change this one''s horizon',
+  $q$select set_occurrence_horizon('0ccc0ccc-0000-0000-0000-000000000001', 90, true)$q$, 'PT403');
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select expect_raises('a horizon of three days is refused',
+  $q$select set_occurrence_horizon('0ccc0ccc-0000-0000-0000-000000000001', 3, true)$q$, 'PT422');
+select expect_raises('...and so is one of five years',
+  $q$select set_occurrence_horizon('0ccc0ccc-0000-0000-0000-000000000001', 1825, true)$q$, 'PT422');
+
+-- The default a new studio gets.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('0ccc0ccc-0000-0000-0000-000000000003','Fresh Studio','occ-fresh','Europe/Prague','CZK','active');
+insert into studio_settings (studio_id) values ('0ccc0ccc-0000-0000-0000-000000000003');
+select expect_num('a new studio starts on sixty days, not twelve months',
+  (select occurrence_horizon_days from studio_settings
+    where studio_id = '0ccc0ccc-0000-0000-0000-000000000003')::bigint, 60);

@@ -4456,7 +4456,7 @@ export type Database = {
           morning_brief_send_at: string
           no_show_consumes_credit: boolean
           no_show_fee_cents: number
-          occurrence_horizon_months: number
+          occurrence_horizon_days: number
           onboarding_completed_at: string | null
           payment_grace_days: number
           reminder_hours_before: number
@@ -4499,7 +4499,7 @@ export type Database = {
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
-          occurrence_horizon_months?: number
+          occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
           payment_grace_days?: number
           reminder_hours_before?: number
@@ -4542,7 +4542,7 @@ export type Database = {
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
-          occurrence_horizon_months?: number
+          occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
           payment_grace_days?: number
           reminder_hours_before?: number
@@ -5157,26 +5157,6 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
@@ -5193,26 +5173,22 @@ export type Database = {
         Args: { actual: boolean; label: string }
         Returns: undefined
       }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
       }
       generate_all_occurrences: { Args: never; Returns: Json }
+      generate_all_occurrences_for: {
+        Args: { p_studio_id: string }
+        Returns: Json
+      }
       generate_demo_data: { Args: { p_studio_id: string }; Returns: Json }
       generate_morning_brief: {
         Args: { p_for_date?: string; p_studio_id: string }
         Returns: Json
       }
       generate_occurrences: {
-        Args: {
-          p_from?: string
-          p_horizon_months?: number
-          p_series_id: string
-        }
+        Args: { p_from?: string; p_horizon_days?: number; p_series_id: string }
         Returns: Json
       }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
@@ -5267,7 +5243,6 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -5355,7 +5330,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: {
         Args: { p_confirm?: boolean; p_studio_id: string }
         Returns: Json
@@ -5641,7 +5615,10 @@ export type Database = {
         Args: { p_class_type_ids: string[]; p_instructor_id: string }
         Returns: number
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
+      set_occurrence_horizon: {
+        Args: { p_confirm?: boolean; p_days: number; p_studio_id: string }
+        Returns: Json
+      }
       staff_bootstrap: {
         Args: never
         Returns: {
