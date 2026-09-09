@@ -393,6 +393,30 @@ Dated exceptions are a separate list and a separate call, because they are a dif
 
 **Manager-up writes it, the instructor writes their own, and both write the same rows** — `availability_manager_all` and `availability_self` already say so. Decision 9's rule that assignment outside stated availability is permitted with a warning is untouched.
 
+### The instructor submits the month; the studio approves it
+
+**Extended in migrations 066 and 067.** Decision 18 built the editor and gave it to the studio. The instructor now gets the same editor for the month ahead, behind an approval step, because a pattern that decides who the engine will schedule must not change because somebody typed it about themselves.
+
+**Draft, submitted, approved, changes requested.** Approval is manager-up. A review that sends a pattern back must carry a reason — "changes requested" with no note is a refusal wearing a softer word. Staff can still enter a pattern directly, exactly as before: an instructor who sends their hours by message must not be blocked by a workflow.
+
+**Everything that existed on the day this shipped was already approved.** Every `instructor_availability` row was entered by staff, and **staff entry IS the approval**. `approval_status` therefore defaults to `'approved'`, so the migration invalidated nothing, and a manager submitting on somebody's behalf lands approved for the same reason.
+
+**A submitted month wins for its own days.** It does not replace the standing pattern and does not merge with it — either would silently rewrite what a studio entered. `instructor_available_at()` resolves: dated exception, then approved submission covering that day, then the standing weekly pattern, then "nothing stated at all, which means available". **A pattern awaiting approval counts as nothing**, including for the "has this person stated anything" test.
+
+**The monthly cycle is a per-studio setting.** Patterns for month M are due on `studio_settings.availability_due_day` of the month before, default the 20th. The reminder, the due date and the "who hasn't submitted" list all read that one column. Instructors with no login cannot be reminded and are listed for the studio to chase by hand.
+
+**Commitments gate none of it.** An instructor who offers fewer hours than they agreed to is still approved if staff approve it. The shortfall is a conversation, and `commitment_report()` is where it is had.
+
+### The week is confirmed in one action
+
+**Migration 067.** "Confirm all 11 classes", with the list visible above it, and per-class "ask for cover" beside each — which raises the cover flow above rather than inventing a second one. A class somebody has asked cover for is **answered, not unconfirmed**: chasing them about a class they have already said they cannot teach is the opposite of the point.
+
+**The timing is the feature, and every part of it is a per-studio column.** Ask on Thursday for the week ahead (`week_confirm_ask_dow`). Remind once on Saturday, only if something is unanswered (`week_confirm_remind_dow`). Escalate on Sunday (`week_confirm_escalate_dow`) and **only for classes inside the next three days** (`week_confirm_escalate_days`) — a Friday class unconfirmed on Sunday is not yet a problem, and reporting it as one is how a studio learns to ignore the alarm. Confirming after the reminder clears everything silently; there is no "you were late" state.
+
+**Staff get one line, not eleven alarms.** "3 instructors haven't confirmed this week", with who and which classes, composed once in `unconfirmed_summary()` so the email and the screen cannot phrase it differently. The escalation is one email per studio per day.
+
+**An unconfirmed class is NOT automatically an open shift.** Nothing here touches `staffing` or `instructor_id`. It is flagged for staff, who decide. Auto-opening a class because somebody was on holiday and missed a button would be a worse failure than the one it solves.
+
 ### The commitment MEASURES instructors; it does not schedule them
 
 New table `instructor_commitments`: instructor, start and end date, minimum and target classes per week, shift preference, status.

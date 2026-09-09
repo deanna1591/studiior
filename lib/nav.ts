@@ -18,7 +18,16 @@ export function railItems(
   ];
   // Decision 17: an instructor's whole reason to open the staff app is to see
   // what is going and say they will take it.
-  if (ctx.role === "instructor") items.push({ href: "/shifts", label: "Open shifts" });
+  // An instructor's own two jobs: confirm the week they are down for, and send
+  // next month's availability. Both are guarded in the database — the rail is
+  // convenience, and a manager reaching them by URL gets a real screen.
+  if (ctx.role === "instructor") {
+    items.push(
+      { href: "/my/week", label: "My week" },
+      { href: "/my/availability", label: "My availability" },
+      { href: "/shifts", label: "Open shifts" },
+    );
+  }
   if (isManagerUp(ctx.role)) {
     // Setup leaves the rail the moment the list is finished. A permanent link
     // to a one-time task is clutter for every day after the first.
@@ -31,6 +40,9 @@ export function railItems(
       // Decision 18. Staff always approve cover, so an unanswered request is
       // its own emergency and needs somewhere to live that is not a banner.
       { href: "/shifts/cover", label: "Cover" },
+      // Submissions to review, who has not sent one, and the week's
+      // unconfirmed line — one place rather than three.
+      { href: "/availability", label: "Availability" },
     );
     items.push(
       // The standing timetable, above the one-off setup lists: a studio's week

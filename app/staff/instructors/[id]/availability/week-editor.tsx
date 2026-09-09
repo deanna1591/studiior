@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, inputClass } from "@/components/ui";
 import { saveAvailability, type AvailState } from "./actions";
+import { submitAvailability, type MyState } from "@/app/staff/my/actions";
 
 export type Range = { from: string; to: string };
 export type Day = { day: number; ranges: Range[] };
@@ -26,19 +27,29 @@ const INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
  * who the scheduler says can teach.
  */
 export default function WeekEditor({
-  instructorId, initial, effectiveFrom, effectiveTo, canEdit,
+  instructorId, initial, effectiveFrom, effectiveTo, canEdit, submission,
 }: {
   instructorId: string;
   initial: Day[];
   effectiveFrom: string | null;
   effectiveTo: string | null;
   canEdit: boolean;
+  /**
+   * Present when this is a MONTH being submitted for approval rather than the
+   * studio's standing pattern. Same grid, same copy-to-days, different verb and
+   * a different action — one editor, because two would drift and copy-to-days
+   * is the control that makes either of them usable at all.
+   */
+  submission?: { periodStart: string; periodLabel: string; status: string; note: string | null };
 }) {
   const [days, setDays] = useState<Day[]>(() =>
     Array.from({ length: 7 }, (_, d) => initial.find((x) => x.day === d) ?? { day: d, ranges: [] }));
   const [copyFrom, setCopyFrom] = useState<number | null>(null);
   const [copyTo, setCopyTo] = useState<number[]>([]);
-  const [state, action] = useFormState<AvailState, FormData>(saveAvailability, null);
+  const [patternState, patternAction] = useFormState<AvailState, FormData>(saveAvailability, null);
+  const [subState, subAction] = useFormState<MyState, FormData>(submitAvailability, null);
+  const state: AvailState | MyState = submission ? subState : patternState;
+  const action = submission ? subAction : patternAction;
 
   const edit = (d: number, fn: (r: Range[]) => Range[]) =>
     setDays((prev) => prev.map((x) => (x.day === d ? { ...x, ranges: fn(x.ranges) } : x)));
@@ -56,6 +67,7 @@ export default function WeekEditor({
     <form action={action}>
       <input type="hidden" name="instructor_id" value={instructorId} />
       <input type="hidden" name="days" value={JSON.stringify(days)} />
+      {submission && <input type="hidden" name="period_start" value={submission.periodStart} />}
       {state && <Notice kind={state.ok ? "ok" : "error"}>{state.message}</Notice>}
 
       <ul className="space-y-1">
@@ -170,7 +182,21 @@ export default function WeekEditor({
         </div>
       )}
 
-      {canEdit && (
+      {canEdit && submission && (
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4">
+          {/* No date fields: the month IS the window, and offering a second way
+              to say when it applies is how the two disagree. */}
+          <button name="submit" value="1"
+                  className="rounded-lg bg-ink px-3.5 py-2 text-[13px] font-medium text-paper">
+            Send {submission.periodLabel} to the studio
+          </button>
+          <button name="submit" value="0"
+                  className="rounded-lg border border-line-2 px-3.5 py-2 text-[13px] text-ink-2">
+            Save as a draft
+          </button>
+        </div>
+      )}
+      {canEdit && !submission && (
         <div className="mt-5 flex flex-wrap items-end gap-4 border-t border-line pt-4">
           <label className="text-[13px] leading-[20px] text-ink-2">
             <span className="mb-1 block">In effect from</span>
@@ -185,7 +211,14 @@ export default function WeekEditor({
           <Save />
         </div>
       )}
-      {canEdit && (
+      {canEdit && submission && (
+        <p className="mt-2 max-w-[58ch] text-[12px] leading-[18px] text-ink-3">
+          A draft stays with you. Once you send it, the studio approves it or
+          comes back with a note — and it does not affect who gets scheduled
+          until they do.
+        </p>
+      )}
+      {canEdit && !submission && (
         <p className="mt-2 text-[12px] leading-[18px] text-ink-3">
           Left blank, this pattern is open-ended. It deliberately does not follow
           the commitment below: these dates decide who the scheduler may offer a

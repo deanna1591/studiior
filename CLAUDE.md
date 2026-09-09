@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Sixty-five migrations, applying clean from `supabase db reset`:
+Sixty-seven migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,8 @@ Sixty-five migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **067** weekly confirmation: one press for the whole week, per-class cover beside it, and an ask/remind/escalate cycle whose every day and window is a per-studio column
+- **066** an instructor submits their own month and staff approve it: `availability_submissions`, `approval_status` defaulting to approved so nothing existing is invalidated, and the monthly cycle keyed on `availability_due_day`
 - **065** the commitment stops scheduling anybody: assignment ranks by fewest classes that week and nothing else, the availability window stops being defaulted from the agreement, and `commitment_report()` gives the measurement the table exists for
 - **064** `class_series` finally has a form, and editing one stops being destructive: `update_series()` two-step, `rrule_last_date()` folding COUNT into a date, `series_rule_matches()`, `generate_occurrences()` gaining a `p_from`, and the setup checklist learning qualifications, availability and commitments
 - **063** a demo row a human edits becomes real, and the purge asks first: `tg_promote_edited_demo_row()` on the seven tables with an edit form, and `purge_demo_data(studio_id, confirm)` refusing until confirmed
@@ -93,7 +95,7 @@ Sixty-five migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Twenty-seven suites, **1,161 assertions**, all passing from a clean `db reset`:
+Twenty-eight suites, **1,227 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -122,6 +124,7 @@ Twenty-seven suites, **1,161 assertions**, all passing from a clean `db reset`:
 | `test/qualifications_test.sql` | 13 | an unmapped instructor is qualified for nothing, re-saving replaces rather than appends, another studio's class type cannot be mapped in, and an instructor reads their own and cannot decide it |
 | `test/member_records_test.sql` | 36 | a booking or check-in writes the timeline as it happens and rebuilding does not double it, the backfill covers every studio, a goal counts only visits since it was set, a waiver upload signs the member so the booking gate agrees, an instructor sees no documents at all and front desk sees everything except the medical one, and another studio's owner sees none of it |
 | `test/archive_test.sql` | 56 | an archived class type, room and instructor are invisible to a member and visible to staff, deleting a referenced record is refused and names what is in the way, archiving an instructor opens her future classes and emails the managers while her past classes keep her name, a room with classes in it is blocked rather than warned, and status cannot reach 'archived' by hand |
+| `test/instructor_self_service_test.sql` | 66 | a staff-entered pattern is already approved and still feeds the engine, a submitted one narrows nothing until somebody approves it, an instructor cannot approve their own, an approved month replaces the standing pattern for its days without deleting it, a pattern far under the agreed commitment is still approvable, two studios on different settings are asked and escalated on different days in ONE sweep, confirming the week confirms every class in it, asking for cover on one leaves the rest, escalation covers only the next three days, confirming late clears it silently, and nothing is ever released |
 | `test/series_test.sql` | 65 | retiming a series moves its classes instead of making a second copy of the year, a capacity change reaches the classes already on the calendar, six weeks of history keep the time they were taught at, a class somebody has dragged is left where it was put, dropping a day cancels it and putting it back restores it, dropping one somebody is booked on is refused even when confirmed, a COUNT series ends and does not slide forward every night, the series instructor does not overwrite a person's choice, and the checklist knows what "fill a month" needs |
 | `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
 
@@ -238,6 +241,30 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 **Rebuild a function from the latest migration FILE that defines it, never from the database you have been iterating on.** Twice in one session a copy taken with `pg_get_functiondef` contained an earlier, wrong draft of the very migration being written, because that database had already had it applied — once producing a function that called itself and died on stack depth, once silently reverting a fix made minutes earlier. And migration 017's text was equally wrong for `generate_demo_data`, because 057 already owned it: the right base is the newest file, not the oldest.
 
 **Detaching, not deleting, is the right trade for a real row on a demo parent.** A real class generated against a demo series keeps its bookings and loses its link to the series; a real class taught by a demo instructor becomes a Decision 17 open shift. The series is fiction, the class is not. This also unblocks migration 058's delete guards, which count references and would otherwise refuse to delete a demo instructor a real class still names.
+
+**An instructor submits their own month; staff approve it; only an approved pattern reaches the engine.** Same Calendly-style editor Decision 18 gave the studio, on the instructor's side, at `/my/availability`. Draft, submitted, approved, changes requested — and a review that sends it back must carry a reason, because "changes requested" with no note is a refusal wearing a softer word.
+
+**Everything that already existed was already approved, and the DEFAULT is what guarantees it.** `instructor_availability.approval_status` defaults to `'approved'`, so the ALTER rewrote nothing and Reform Collective's instructors kept working through the migration — checked: 31 rows, all approved, all still evaluating true. A manager calling `submit_availability()` also lands approved, for the same reason: staff entry IS the approval, and making a manager review their own typing is a queue nobody asked for.
+
+**A submitted month WINS FOR ITS OWN DAYS rather than replacing or merging with the standing pattern.** The alternative was truncating and splitting: a Jul–Oct pattern with a submitted September has to become two rows, and a studio that later deletes the submission does not get its pattern back. So `instructor_available_at()` gained one precedence level — dated exception, then approved submission covering that day, then the standing pattern, then "nothing stated means available" — which is the same shape the exception rule already had. Nothing is destroyed to make it work.
+
+**A pattern waiting for approval must narrow NOTHING.** Including the "has this person stated anything at all" test, which is the subtle half: an unapproved submission would otherwise flip somebody from "stated nothing, so available" to "stated something, and this class is outside it" before anyone said yes. Proved by reverting the filter — the suite fails on exactly that assertion.
+
+**The monthly cycle is a column, never a constant.** `studio_settings.availability_due_day`, default 20, capped at 28 so the date exists in February. The due date, the daily reminder and the "who hasn't submitted" list all read that one column, and the suite asserts two studios computing different due dates from the same code. The reminder test asserts the *invariant* rather than a day: whatever `availability_cycle()` publishes as `overdue`, the queue agrees with it — which is what makes the setting real and holds whatever date the suite runs on.
+
+**One press for the week, with the list visible.** `/my/week`: "Confirm all 11 classes" over the classes themselves, and per-class "ask for cover" beside each, which raises Decision 18's flow. A class somebody has asked cover for is ANSWERED, not unconfirmed — chasing them about a class they have already said they cannot teach is the opposite of what this is for. `confirm_week()` skips those and reports the count separately.
+
+**The timing is the feature, and all of it is per studio.** Ask on Thursday for the week ahead; remind ONCE on Saturday if nothing has been answered; escalate on Sunday and only for classes inside the next three days — `week_confirm_ask_dow`, `_remind_dow`, `_escalate_dow`, `_escalate_days`. A Friday class unconfirmed on Sunday is not yet a problem, and reporting it as one is how a studio learns to ignore the alarm. The suite runs two studios on different settings through ONE sweep: today is studio A's ask day and tomorrow is studio B's, and only A is asked.
+
+**An unconfirmed class is NOT an open shift.** Nothing in 067 touches `staffing` or `instructor_id`. Auto-opening a class because somebody was on holiday and missed a button is a worse failure than the one it solves — the class had an instructor and now it does not, and nobody decided that. The suite asserts it directly, and the staff screen says it in words.
+
+**Staff get one line.** "2 instructors have not confirmed 5 classes this week", with who and which classes, composed in `unconfirmed_summary()` rather than in a screen — so the escalation email, the page and anything later cannot each phrase it slightly differently. The escalation is ONE email to the studio, deduped per studio per day, never one per class. Confirming late clears the whole thing silently: the summary is derived from the classes, so there is no "you were late" state to dismiss.
+
+**`instructors.staff_id` is a `studio_staff` id, not an auth user id.** Both new migrations were written passing it straight to `queue_shift_notice()`, which takes the latter — caught by a foreign key in the test fixtures rather than by reading. `instructor_user_id()` is the join, and it returns null for an instructor with no login, which is the ordinary case: two of three seeded instructors have none, so the screens say "no login, so no reminder can reach them" instead of implying an email that was never sent.
+
+**`week_starts_on` has been a setting since migration 001 and `date_trunc('week')` always means Monday.** `studio_week_start()` exists so a studio whose week starts on Sunday is asked about the right seven days; the suite moves a studio's week to start today and asserts it.
+
+**Not built, and recorded rather than implied:** neither feature adds a Morning Brief insight. The brief's `generate_morning_brief()` would need replacing again, and both surfaces already have somewhere to live — the escalation is an email plus `/availability`, and the submissions list is that same screen. Adding `week_unconfirmed` and `availability_missing` to the brief is a later, separate change.
 
 **The commitment measures instructors; it does not schedule them.** `instructor_commitments` is a hiring expectation — 9–12 classes a week over an agreed three-month term — and a performance measure. It is not a scheduling input and must not reach booking, assignment eligibility, the availability window or anything a member sees. Migration 061 got this wrong in two places and 065 removes both.
 
@@ -661,6 +688,10 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/series_te
 ```
 
 ```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/instructor_self_service_test.sql
+```
+
+```bash
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboarding_test.sql
 ```
 
@@ -668,7 +699,7 @@ psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/onboardin
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/health_score_test.sql
 ```
 
-`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `5757` stripe, `cafe` manual payments, `b111` platform billing, `f00d` scheduling, `c0de` cover and commitments, `0ccc` occurrence generation, `0a11` archive and delete, `d0c5` notes goals and documents, `9ca1` qualifications, `a55e` assignment, `deed` demo purge, `5e21` series, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
+`db reset` before every test run. Testing against accumulated local state hides migrations that fail on a clean install. The suites use disjoint UUID spaces and email domains, so they can run in any order after one reset — **check which space is free before writing a new one**: `1111` seed and checkin and plans, `2222` brief, `3333` messages, `dddd` brief scheduler, `eeee` member app, `abab` member accounts, `1313` notifications, `5757` stripe, `cafe` manual payments, `b111` platform billing, `f00d` scheduling, `c0de` cover and commitments, `0ccc` occurrence generation, `0a11` archive and delete, `d0c5` notes goals and documents, `9ca1` qualifications, `a55e` assignment, `deed` demo purge, `5e21` series, `1f5e` instructor self-service, `4444` timeline, `5555` importer, `6666` health, `7777` plans, `8888` onboarding, `9999` checkin, `aaaa` rls. The brief suite was written into 7777, passed alone, and collided with plan management on `auth.users` the first time both ran on one reset — but each will refuse to run twice without a reset, because its own fixtures are already there.
 
 Migrations need timestamp filenames (`YYYYMMDDHHMMSS_name.sql`) or the CLI skips them silently, which looks exactly like a push that worked.
 

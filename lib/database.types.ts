@@ -252,6 +252,87 @@ export type Database = {
           },
         ]
       }
+      availability_submissions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          instructor_id: string
+          note: string | null
+          period_start: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          studio_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructor_id: string
+          note?: string | null
+          period_start: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          studio_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructor_id?: string
+          note?: string | null
+          period_start?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          studio_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_submissions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_submissions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_submissions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_submissions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_submissions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           booked_at: string
@@ -824,6 +905,7 @@ export type Database = {
           description: string | null
           ends_at: string
           id: string
+          instructor_confirmed_at: string | null
           instructor_id: string | null
           instructor_notes: string | null
           is_demo: boolean
@@ -852,6 +934,7 @@ export type Database = {
           description?: string | null
           ends_at: string
           id?: string
+          instructor_confirmed_at?: string | null
           instructor_id?: string | null
           instructor_notes?: string | null
           is_demo?: boolean
@@ -880,6 +963,7 @@ export type Database = {
           description?: string | null
           ends_at?: string
           id?: string
+          instructor_confirmed_at?: string | null
           instructor_id?: string | null
           instructor_notes?: string | null
           is_demo?: boolean
@@ -1693,6 +1777,7 @@ export type Database = {
       }
       instructor_availability: {
         Row: {
+          approval_status: string
           created_at: string
           created_by: string | null
           day_of_week: number | null
@@ -1706,9 +1791,11 @@ export type Database = {
           note: string | null
           starts_at_time: string | null
           studio_id: string
+          submission_id: string | null
           updated_at: string
         }
         Insert: {
+          approval_status?: string
           created_at?: string
           created_by?: string | null
           day_of_week?: number | null
@@ -1722,9 +1809,11 @@ export type Database = {
           note?: string | null
           starts_at_time?: string | null
           studio_id: string
+          submission_id?: string | null
           updated_at?: string
         }
         Update: {
+          approval_status?: string
           created_at?: string
           created_by?: string | null
           day_of_week?: number | null
@@ -1738,6 +1827,7 @@ export type Database = {
           note?: string | null
           starts_at_time?: string | null
           studio_id?: string
+          submission_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1767,6 +1857,13 @@ export type Database = {
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_availability_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "availability_submissions"
             referencedColumns: ["id"]
           },
         ]
@@ -4340,6 +4437,7 @@ export type Database = {
       }
       studio_settings: {
         Row: {
+          availability_due_day: number
           booking_cutoff_minutes: number
           booking_window_days: number
           cancellation_cutoff_minutes: number
@@ -4374,9 +4472,15 @@ export type Database = {
           waitlist_enabled: boolean
           waitlist_offer_window_minutes: number
           waiver_text: string | null
+          week_confirm_ask_dow: number
+          week_confirm_enabled: boolean
+          week_confirm_escalate_days: number
+          week_confirm_escalate_dow: number
+          week_confirm_remind_dow: number
           week_starts_on: number
         }
         Insert: {
+          availability_due_day?: number
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
@@ -4411,9 +4515,15 @@ export type Database = {
           waitlist_enabled?: boolean
           waitlist_offer_window_minutes?: number
           waiver_text?: string | null
+          week_confirm_ask_dow?: number
+          week_confirm_enabled?: boolean
+          week_confirm_escalate_days?: number
+          week_confirm_escalate_dow?: number
+          week_confirm_remind_dow?: number
           week_starts_on?: number
         }
         Update: {
+          availability_due_day?: number
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
@@ -4448,6 +4558,11 @@ export type Database = {
           waitlist_enabled?: boolean
           waitlist_offer_window_minutes?: number
           waiver_text?: string | null
+          week_confirm_ask_dow?: number
+          week_confirm_enabled?: boolean
+          week_confirm_escalate_days?: number
+          week_confirm_escalate_dow?: number
+          week_confirm_remind_dow?: number
           week_starts_on?: number
         }
         Relationships: [
@@ -4869,6 +4984,10 @@ export type Database = {
         Args: { p_note?: string; p_occurrence_id: string }
         Returns: Json
       }
+      approve_availability_submission: {
+        Args: { p_submission_id: string }
+        Returns: Json
+      }
       approve_cover_request: {
         Args: { p_instructor_id?: string; p_mode: string; p_request_id: string }
         Returns: Json
@@ -4907,6 +5026,14 @@ export type Database = {
         Returns: Database["public"]["Enums"]["staff_role"]
       }
       auth_staff_studios: { Args: never; Returns: string[] }
+      availability_cycle: {
+        Args: { p_period_start?: string; p_studio_id: string }
+        Returns: Json
+      }
+      availability_submission_week: {
+        Args: { p_instructor_id: string; p_period_start: string }
+        Returns: Json
+      }
       backfill_all_timelines: { Args: never; Returns: Json }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
@@ -4998,6 +5125,11 @@ export type Database = {
       confirm_dropin_payment: {
         Args: { p_booking_id: string; p_studio_id: string }
         Returns: boolean
+      }
+      confirm_occurrence: { Args: { p_occurrence_id: string }; Returns: Json }
+      confirm_week: {
+        Args: { p_instructor_id: string; p_week_start?: string }
+        Returns: Json
       }
       create_member_invite: {
         Args: { p_days?: number; p_member_id: string }
@@ -5119,6 +5251,10 @@ export type Database = {
         Args: { p_instructor_id: string; p_on: string }
         Returns: boolean
       }
+      instructor_week: {
+        Args: { p_instructor_id: string; p_week_start?: string }
+        Returns: Json
+      }
       instructor_weekly_load: {
         Args: { p_instructor_id: string; p_weeks?: number }
         Returns: {
@@ -5225,6 +5361,10 @@ export type Database = {
         Returns: Json
       }
       queue_all_credit_expiries: { Args: never; Returns: Json }
+      queue_availability_reminders: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
       queue_booking_notifications: {
         Args: { p_booking_id: string }
         Returns: number
@@ -5353,6 +5493,10 @@ export type Database = {
           text_body: string
           to_email: string
         }[]
+      }
+      request_availability_changes: {
+        Args: { p_note: string; p_submission_id: string }
+        Returns: Json
       }
       request_cover: {
         Args: { p_occurrence_id: string; p_reason?: string }
@@ -5604,6 +5748,10 @@ export type Database = {
         }[]
       }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
+      studio_week_start: {
+        Args: { p_date: string; p_studio_id: string }
+        Returns: string
+      }
       studios_due_for_brief: {
         Args: { p_now?: string }
         Returns: {
@@ -5611,13 +5759,32 @@ export type Database = {
           studio_id: string
         }[]
       }
+      submit_availability: {
+        Args: {
+          p_days: Json
+          p_instructor_id: string
+          p_period_start: string
+          p_submit?: boolean
+        }
+        Returns: Json
+      }
       swap_instructors: {
         Args: { p_occurrence_a: string; p_occurrence_b: string }
         Returns: Json
       }
+      sweep_availability_reminders: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
+      sweep_week_confirmations: { Args: never; Returns: Json }
+      unconfirmed_summary: {
+        Args: {
+          p_studio_id: string
+          p_week_start?: string
+          p_within_days?: number
+        }
+        Returns: Json
+      }
       update_series: {
         Args: {
           p_capacity: number
