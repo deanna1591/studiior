@@ -127,10 +127,29 @@ select expect_num('a day present with no ranges writes nothing and reads Unavail
     where instructor_id = 'c0dec0de-0000-0000-0000-00000000d101'
       and day_of_week in (0,6))::bigint, 0);
 
-select expect_text('effective_from defaulted from the commitment, not from today',
-  (select min(effective_from)::text from instructor_availability
-    where instructor_id = 'c0dec0de-0000-0000-0000-00000000d101' and day_of_week is not null),
-  (current_date - 30)::text);
+-- Migration 065 overturns this edge of Decision 18, and the assertion inverts
+-- with it. 061 filled a blank window from the live commitment so the two could
+-- not "drift apart"; the window is a HARD gate, so that let an agreement
+-- reaching its end date quietly make somebody unschedulable. The commitment
+-- measures instructors, it does not schedule them — blank means open-ended.
+select expect_true('a blank window is open-ended, NOT the commitment''s dates',
+  (select bool_and(effective_from is null and effective_to is null)
+     from instructor_availability
+    where instructor_id = 'c0dec0de-0000-0000-0000-00000000d101' and day_of_week is not null));
+-- And the other half: dates the studio actually typed are still honoured. A
+-- pair of literals, not a query compared against itself.
+select expect_num('an explicit window is written exactly as given',
+  set_instructor_availability('c0dec0de-0000-0000-0000-00000000d101',
+    $j$[{"day":3,"ranges":[{"from":"08:00","to":"10:00"}]}]$j$::jsonb,
+    date '2027-01-04', date '2027-03-29')::bigint, 1);
+select expect_text('...from',
+  (select effective_from::text from instructor_availability
+    where instructor_id = 'c0dec0de-0000-0000-0000-00000000d101' and day_of_week = 3),
+  '2027-01-04');
+select expect_text('...to',
+  (select effective_to::text from instructor_availability
+    where instructor_id = 'c0dec0de-0000-0000-0000-00000000d101' and day_of_week = 3),
+  '2027-03-29');
 
 -- Re-entering the week REPLACES it rather than adding to it. This is the whole
 -- reason the function takes a payload instead of a row.

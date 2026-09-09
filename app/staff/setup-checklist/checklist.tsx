@@ -20,7 +20,10 @@ const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
   // get an empty month back, with nothing on this list explaining why.
   { key: "qualifications", label: "Say who teaches what", hint: "Nobody is assumed to teach everything — an unmapped instructor can be assigned nothing at all.", href: "/instructors" },
   { key: "availability",   label: "Add instructor availability", hint: "Optional. Without it the scheduler will assign anyone to anything.", href: "/instructors" },
-  { key: "commitments",    label: "Set weekly targets",   hint: "Optional. Without them the scheduler shares classes out by who has fewest, and says so.", href: "/instructors" },
+  // Not a scheduling input: the engine shares classes out by who has fewest
+  // that week whether or not anybody has an agreement on file. This is the
+  // hiring expectation you review people against.
+  { key: "commitments",    label: "Record what you agreed with each instructor", hint: "Optional. Classes a week over an agreed term — what you review them against, not how classes are shared out.", href: "/instructors" },
   { key: "connect_stripe", label: "Take card payments online", hint: "Optional. Connect Stripe to sell online — you can take cash, transfers or a terminal without it.", href: "/settings/stripe" },
 ];
 

@@ -393,13 +393,25 @@ Dated exceptions are a separate list and a separate call, because they are a dif
 
 **Manager-up writes it, the instructor writes their own, and both write the same rows** — `availability_manager_all` and `availability_self` already say so. Decision 9's rule that assignment outside stated availability is permitted with a warning is untouched.
 
-### The commitment is a record, so the studio can see it being kept
+### The commitment MEASURES instructors; it does not schedule them
 
-New table `instructor_commitments`: instructor, start and end date, minimum and target classes per week, shift preference, status. It is what `effective_from` / `effective_to` default to, so the pattern and the agreement cannot drift apart.
+New table `instructor_commitments`: instructor, start and end date, minimum and target classes per week, shift preference, status.
 
-**An instructor persistently under their weekly minimum reaches the Morning Brief.** That is the entire point of recording it. A three-month commitment that quietly ran at six classes a week instead of nine is a conversation that has to happen in week three, not in month three when it is a grievance. "Persistently" is a studio threshold, not a single bad week — one week under is a holiday and everybody knows it.
+**This is the distinction, and it is absolute.** The commitment is a **hiring expectation** — what was agreed when somebody was taken on — and a **performance measure**: what they actually taught, against that agreement, over its term. It is **never a scheduling input.** It must not affect booking, assignment eligibility, the availability validity window, or anything a member sees.
 
-This is a scheduling record, not a compensation one. Decision 10 keeps anything that resolves to money owed out of V1, and counting classes against a commitment does not cross that line: nothing here computes a rate or a total.
+**Amended, because the first implementation got this wrong in two places.** Migration 061 ranked assignment candidates by deficit against `target_per_week`, and 061 also defaulted a blank `effective_from` / `effective_to` from the live commitment "so the pattern and the agreement cannot drift apart". Both are removed in migration 065.
+
+The ranking was wrong because *"furthest below their target" is a true number with a false meaning.* A studio running 35 classes a week across six instructors cannot give anybody twelve, so that phrase would have appeared on every line of every run summary, describing a gap the studio has no way to close and the engine no business trying to. Distribution is by **fewest classes assigned that week, full stop** — which is what the no-commitment fallback already did, so the fix deleted a branch rather than adding one. `commitment_fallback` and `no_commitment_for` go with it: with no other behaviour to fall back *from*, there is nothing to report.
+
+The defaulting was wrong because the validity window is a **hard gate** — the engine, the cover board's candidate list and `move_occurrence()` all refuse outside it. Filling it from the agreement meant a commitment reaching its end date silently made somebody unschedulable: the agreement deciding the roster by a back door. A blank window is now open-ended.
+
+**What the commitment IS for is reporting.** `commitment_report()` (migration 065) gives, per instructor over the commitment's own period: actual classes per week against the agreed minimum, weeks under and weeks at or over, the average, the trend of the recent weeks against the earlier ones, and a standing. It counts through `instructor_weekly_load()`, the same function the brief insight uses, so the two cannot disagree about what a week contained. Complete weeks only — the current week is a number still going up, and putting it in a performance measure makes everybody look short every Monday. This feeds the scorecard and any bonus conversation.
+
+**Standing is measured against the MINIMUM, not the target.** The target is recorded and reported and is deliberately not a pass mark, for the same reason it is not a ranking input: a studio with fewer classes than its roster needs cannot hand anybody their target, and should not be told its whole roster is failing.
+
+**An instructor persistently under their weekly minimum reaches the Morning Brief.** `commitment_shortfall` stays exactly as it is — a three-month commitment that quietly ran at six classes a week instead of nine is a conversation that has to happen in week three, not in month three when it is a grievance. "Persistently" is a studio threshold, not a single bad week — one week under is a holiday and everybody knows it. It is a **management signal, never a scheduling input**, and that sentence is the whole of this section restated.
+
+This is a performance record, not a compensation one. Decision 10 keeps anything that resolves to money owed out of V1, and counting classes against a commitment does not cross that line: nothing here computes a rate or a total.
 
 ### Cover is requested, never taken
 

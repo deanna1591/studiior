@@ -4972,6 +4972,25 @@ export type Database = {
         Args: { p_date: string; p_instructor_id: string }
         Returns: number
       }
+      commitment_report: {
+        Args: { p_studio_id: string }
+        Returns: {
+          average_per_week: number
+          earlier_average: number
+          ends_on: string
+          instructor_id: string
+          instructor_name: string
+          min_per_week: number
+          recent_average: number
+          standing: string
+          starts_on: string
+          target_per_week: number
+          trend: string
+          weeks_at_or_over: number
+          weeks_measured: number
+          weeks_under: number
+        }[]
+      }
       complete_stripe_connect: {
         Args: { p_account_id: string; p_state: string }
         Returns: string

@@ -187,8 +187,11 @@ export default function WeekEditor({
       )}
       {canEdit && (
         <p className="mt-2 text-[12px] leading-[18px] text-ink-3">
-          Left blank, these follow the commitment below. Availability never
-          unassigns anyone from a class they have already been given.
+          Left blank, this pattern is open-ended. It deliberately does not follow
+          the commitment below: these dates decide who the scheduler may offer a
+          class to, and an agreement reaching its end date must not quietly take
+          somebody off the roster. Availability never unassigns anyone from a
+          class they have already been given.
         </p>
       )}
     </form>

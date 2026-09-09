@@ -29,8 +29,8 @@ const iso = (d: Date) =>
  * Fill a date range with instructors.
  *
  * THE PREVIEW IS THE POINT. The engine already composes a sentence per class —
- * "2 of 4 classes that week, furthest below their target", "nobody is down to
- * teach this class type" — and this screen's whole job is to put those in front
+ * "3 classes that week, fewest of the candidates", "nobody is down to teach
+ * this class type" — and this screen's whole job is to put those in front
  * of somebody before anything is written. A studio that cannot see why
  * Christian got Tuesday and Bo did not will not trust the next run either.
  *
@@ -73,8 +73,10 @@ export default function FillPanel() {
       <p className="mb-3 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
         Assigns an instructor to every open class in the range: somebody down to
         teach that class type, inside the dates they gave you, free at the time,
-        and not already teaching. Whoever is furthest below their weekly target
-        goes first. Anything it cannot fill honestly is left as an open shift.
+        and not already teaching. Whoever has fewest classes that week goes
+        first — the agreed weekly minimum is how you review an instructor, not
+        how the studio staffs a Tuesday. Anything it cannot fill honestly is
+        left as an open shift.
       </p>
 
       <form action={doPreview} className="flex flex-wrap items-end gap-3">
@@ -125,16 +127,12 @@ function RunReport({
             </>}
       </p>
 
-      {/* The fallback, said rather than left to be inferred from the numbers. */}
-      {run.commitment_fallback && (
-        <p className="mt-2 rounded-xl px-3 py-2.5 text-[12.5px] leading-[19px]"
-           style={{ background: "var(--amber-tint)", color: "var(--ink)" }}>
-          No weekly commitment on file for {run.no_commitment_for.join(", ")}, so
-          this balanced by giving each class to whoever had fewest that week
-          rather than working toward a target. Set their commitment and the next
-          run will aim at it.
-        </p>
-      )}
+      {/* There is no fallback notice any more, and its absence is the point.
+          The engine has one rule — fewest classes that week — so there is no
+          second behaviour to fall back FROM. Commitments are a hiring
+          expectation the studio reviews people against, not an input here, and
+          a banner saying "set their commitment and the next run will aim at it"
+          promised something that must not happen. See Decision 18. */}
 
       {assigned.length > 0 && (
         <div className="mt-4">

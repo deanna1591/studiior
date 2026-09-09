@@ -72,6 +72,13 @@ export default function CommitmentForm({
               Morning Brief.
             </p>
           )}
+          {/* Said plainly, because a number beside a scheduler invites the
+              assumption that it drives one. It does not: classes are shared out
+              by who has fewest that week, whatever is agreed here. */}
+          <p className="mt-2.5 text-[12px] leading-[18px] text-ink-3">
+            This is what you review them against. It does not decide who gets a
+            class — the scheduler shares those out by who has fewest that week.
+          </p>
         </div>
       )}
 

@@ -12,7 +12,6 @@ export type FillLine = {
   outcome: "assigned" | "left_open";
   instructor?: string;
   why: string;
-  deficit?: number;
   booked?: number;
 };
 
@@ -23,8 +22,6 @@ export type FillRun = {
   to: string;
   assigned: number;
   left_open: number;
-  commitment_fallback: boolean;
-  no_commitment_for: string[];
   detail: FillLine[];
 };
 
