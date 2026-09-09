@@ -5157,22 +5157,6 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -5304,6 +5288,10 @@ export type Database = {
           p_room_id?: string
           p_starts_at?: string
         }
+        Returns: Json
+      }
+      next_class_day: {
+        Args: { p_from?: string; p_studio_id: string }
         Returns: Json
       }
       notification_api_key: { Args: never; Returns: string }

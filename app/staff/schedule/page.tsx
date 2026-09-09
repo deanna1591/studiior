@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
 import { shiftDateKey } from "@/lib/tz";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
+import JumpToDate from "./jump";
 import FillPanel from "./fill/panel";
 
 export const dynamic = "force-dynamic";
@@ -147,10 +149,29 @@ export default async function Schedule({
   const minHour = Math.max(0, Math.floor(earliest / 60) - 1);
   const maxHour = Math.min(24, Math.ceil(latest / 60) + 1);
 
+  // Only asked when there is nothing to show, so the ordinary render costs
+  // nothing. An empty calendar that cannot point at the timetable it is a view
+  // of is indistinguishable from a broken one.
+  type Elsewhere = { next: string | null; previous: string | null;
+                     classes_that_day: number; has_any: boolean };
+  let elsewhere: Elsewhere | null = null;
+  if (events.length === 0) {
+    const { data } = await supabase.rpc("next_class_day", {
+      p_studio_id: ctx.studioId, p_from: weekStart,
+    });
+    elsewhere = data as unknown as Elsewhere;
+  }
+
+  const fmtDay = (d: string) =>
+    new Intl.DateTimeFormat("en-GB", {
+      weekday: "long", day: "numeric", month: "long", timeZone: ctx.timeZone,
+    }).format(new Date(`${d}T12:00:00Z`));
+
   return (
     <AppShell {...shell} title="Schedule"
               actions={
                 <>
+                  <JumpToDate anchor={anchor} view={view} />
                   <NavLink href="/shifts/applications">Applications</NavLink>
                   <NavLink href="/classes/new">Add a class</NavLink>
                 </>
@@ -159,9 +180,35 @@ export default async function Schedule({
 
       {events.length === 0 && (
         <p className="mb-4 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
-          No classes on {view === "week" ? "this week" : "this day"} in{" "}
-          {ctx.timeZone.replace("_", " ")} — the studio&rsquo;s own clock, not
-          yours. Use the arrows to look at another {view === "week" ? "week" : "day"}.
+          Nothing on {view === "week" ? "this week" : "this day"} in{" "}
+          {ctx.timeZone.replace("_", " ")} — the studio&rsquo;s own clock, not yours.
+          {elsewhere?.next ? (
+            <>
+              {" "}Your next classes are on{" "}
+              <Link href={`/schedule?d=${elsewhere.next}&view=${view}`}
+                    className="text-lime-text underline underline-offset-4">
+                {fmtDay(elsewhere.next)}
+              </Link>
+              {elsewhere.classes_that_day > 0 && <> — {elsewhere.classes_that_day} of them</>}.
+            </>
+          ) : elsewhere?.previous ? (
+            <>
+              {" "}The last were on{" "}
+              <Link href={`/schedule?d=${elsewhere.previous}&view=${view}`}
+                    className="text-lime-text underline underline-offset-4">
+                {fmtDay(elsewhere.previous)}
+              </Link>
+              . Nothing is scheduled ahead of today.
+            </>
+          ) : elsewhere && !elsewhere.has_any ? (
+            <>
+              {" "}This studio has no classes on its timetable at all yet.{" "}
+              <Link href="/series" className="text-lime-text underline underline-offset-4">
+                Add a recurring class
+              </Link>{" "}
+              and a year of them appears.
+            </>
+          ) : null}
         </p>
       )}
 

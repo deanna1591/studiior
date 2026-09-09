@@ -604,3 +604,43 @@ select expect_raises('a range that ends before it starts is refused',
 select expect_raises('and a year in one call is a mistake, not a request',
   $q$select * from schedule_range('0ccc0ccc-0000-0000-0000-000000000001',
        date '2026-01-01', date '2026-12-31')$q$, 'PT422');
+
+-- =============================================================================
+-- 10. An empty day must be able to say where the classes ARE
+-- =============================================================================
+-- The Manila studio's 07:00 class on 18 November is stored at 23:00 UTC on the
+-- 17th. Asked from the 17th, the next day with classes is the EIGHTEENTH — the
+-- studio's day, not the instant's. Everything else here is compared against the
+-- data rather than against a literal, because this suite's other sections put
+-- occurrences on this studio too.
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a2',false);
+
+select expect_text('the next day with classes is the studio''s day, not the instant''s',
+  next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-17') ->> 'next',
+  '2026-11-18');
+select expect_num('...and it says how many are on it',
+  (next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2026-11-17')
+    ->> 'classes_that_day')::bigint,
+  (select count(*) from schedule_range('0ccc0ccc-0000-0000-0000-000000000002',
+     date '2026-11-18', date '2026-11-18')));
+select expect_text('an empty day points at the real next one, whatever is on the timetable',
+  next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2026-10-01') ->> 'next',
+  (select min((starts_at at time zone 'Asia/Manila')::date)::text
+     from class_occurrences
+    where studio_id = '0ccc0ccc-0000-0000-0000-000000000002' and status <> 'cancelled'
+      and (starts_at at time zone 'Asia/Manila')::date > date '2026-10-01'));
+select expect_text('past the end of the timetable it points backwards instead',
+  next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2030-01-01') ->> 'previous',
+  (select max((starts_at at time zone 'Asia/Manila')::date)::text
+     from class_occurrences
+    where studio_id = '0ccc0ccc-0000-0000-0000-000000000002' and status <> 'cancelled'));
+select expect_true('...and there is no next one to point at',
+  (next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2030-01-01') -> 'next') = 'null'::jsonb);
+select expect_true('...while still saying the studio HAS a timetable',
+  (next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2030-01-01') ->> 'has_any')::boolean);
+
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select expect_raises('another studio''s owner cannot ask where this one''s classes are',
+  $q$select next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2026-10-01')$q$, 'PT403');
+reset role;

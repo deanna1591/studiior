@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Seventy-one migrations, applying clean from `supabase db reset`:
+Seventy-two migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,7 @@ Seventy-one migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **072** `next_class_day()` — an empty calendar can finally say where the timetable actually is, plus a date picker, after "the calendar is empty" turned out to be a correct empty day nobody could navigate off
 - **071** converging hosted with the files after **two migrations were edited in place once already applied** — `schedule_range` was raising on every call in production, and `purge_demo_data` had never gained its confirmation step there
 - **070** `schedule_range()` and `studio_today()` — the calendar asks for a range of the STUDIO's days and the day boundary is resolved in the database, after it rendered an empty grid for every day
 - **069** `reconcile_booked_counts()` — the nightly recount `booked_count` was assumed to already have and never had, plus `occurrence_seats_taken()` as the one definition of what the cache is a cache of
@@ -99,7 +100,7 @@ Seventy-one migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Twenty-eight suites, **1,275 assertions**, all passing from a clean `db reset`:
+Twenty-eight suites, **1,282 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -245,6 +246,16 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 **Rebuild a function from the latest migration FILE that defines it, never from the database you have been iterating on.** Twice in one session a copy taken with `pg_get_functiondef` contained an earlier, wrong draft of the very migration being written, because that database had already had it applied — once producing a function that called itself and died on stack depth, once silently reverting a fix made minutes earlier. And migration 017's text was equally wrong for `generate_demo_data`, because 057 already owned it: the right base is the newest file, not the oldest.
 
 **Detaching, not deleting, is the right trade for a real row on a demo parent.** A real class generated against a demo series keeps its bookings and loses its link to the series; a real class taught by a demo instructor becomes a Decision 17 open shift. The series is fiction, the class is not. This also unblocks migration 058's delete guards, which count references and would otherwise refuse to delete a demo instructor a real class still names.
+
+**The calendar was empty a fourth time, and this time nothing was broken.** Reform Collective's `studio_today()` is 10 September; its timetable has **150 classes in November and 46 in December and nothing before**. So the calendar opened on a day that genuinely has no classes and was correct to draw an empty grid — and react-big-calendar's toolbar offers **Today, Back and Next and nothing else**, so the first class was fifty-two presses away. There was no date control anywhere on the screen.
+
+**Every reported detail was consistent with that, including the one that looked like proof of a bug.** The gutter at 06:00–20:00 was read as "still hardcoded"; it is what the derived hours produce **from no rows at all** — the fallback is `07:00`/`20:00`, giving 6 and 21, whose labels run 06:00 to 20:00. It is also, by coincidence, exactly what November's real data derives. **The gutter could not distinguish the two states and I used it as evidence that it could.** Checked properly and it proved nothing either way.
+
+**Reproduced locally by copying hosted's shape rather than by reasoning**: studio in Asia/Manila, today 10 September, 150 classes all in November, six instructors. `/schedule` drew an empty 10 September with a 06:00–20:00 gutter, and `?d=2026-11-02` drew all five of that day's classes at 07:00, 08:00, 09:00, 17:00 and 18:00 Manila in a Prague browser against a UTC server. The screen was right about everything it was asked.
+
+**An empty calendar that cannot point at the timetable it is a view of is indistinguishable from a broken one.** `next_class_day()` answers "where are they, then" in the studio's own days — forward first, backwards if the timetable has ended, and "none at all" as its own sentence — and the empty state links straight there: *"Your next classes are on Sunday 1 November — 5 of them."* A date input sits in the toolbar beside it. Both exist because the absence of them cost four rounds of looking for a fault in code that was working.
+
+**The fixture that reproduced it was itself wrong first, in the exact way this file already warns about.** `generate_series(date, date, interval '1 day')` yields **timestamptz**, so `(d + time) at time zone 'Asia/Manila'` converted the wrong way and the classes landed at 23:00, 00:00, 01:00. The calendar then displayed those instants correctly in Manila time and I nearly read the shifted hours as a rendering bug. `::date` the loop variable. The trap was recorded in CLAUDE.md and cost an hour anyway.
 
 **The calendar was STILL empty on hosted after all three of those were fixed, and the reason was that a migration had been edited in place.** `schedule_range()` in production raised on its own first statement — `42702 column reference "id" is ambiguous` on `select timezone from studios where id = p_studio_id` — because hosted carried the FIRST draft of migration 070, whose `RETURNS TABLE` begins `id uuid, name text`: OUT parameters that shadow the columns the body reads. That was hit locally, the names were changed to `occ_*` **in the migration file**, and `db reset` replayed from scratch and looked fixed. Hosted had already recorded `20260830800000` as applied and never replays it. **An applied migration is immutable — fix forward, never edit in place.** The rule was already in this file; this is what breaking it costs.
 
