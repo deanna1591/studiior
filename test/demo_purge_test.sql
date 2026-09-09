@@ -103,11 +103,86 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
 select set_config('t.before', (select demo_purge_census('deeddeed-0000-0000-0000-000000000001')::text), false);
 
 -- =============================================================================
+-- A record a human has edited stops being demo
+-- =============================================================================
+-- The likeliest explanation for the three instructors production lost that no
+-- cascade accounts for: a demo row typed over with a real person's name, still
+-- carrying the flag and still silently purgeable.
+select set_config('t.demo_instr', (select id::text from instructors
+  where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo
+  order by id limit 1), false);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
+update instructors set display_name = 'Jhon Hubert Z.'
+ where id = current_setting('t.demo_instr')::uuid;
+reset role;
+select expect_true('renaming a demo instructor makes them real',
+  (select not is_demo from instructors where id = current_setting('t.demo_instr')::uuid));
+
+-- Machine-maintained columns must NOT promote, or a demo studio becomes
+-- unpurgeable the first time the nightly health job runs.
+-- Deterministically a demo member who HOLDS A LIVE MEMBERSHIP, so promoting
+-- them also exercises the demo plan that membership sits on. An unordered
+-- LIMIT 1 picked a different member each run and the plan assertion below
+-- passed or failed on the draw.
+select set_config('t.demo_member', (select m.id::text from members m
+  where m.studio_id='deeddeed-0000-0000-0000-000000000001' and m.is_demo
+    and exists (select 1 from memberships ms
+                 where ms.member_id = m.id and ms.status not in ('cancelled','expired'))
+  order by m.id limit 1), false);
+set role authenticated;
+select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
+update members set health_band = 'drifting', lifetime_visits = lifetime_visits + 1
+ where id = current_setting('t.demo_member')::uuid;
+reset role;
+select expect_true('a health recompute does NOT promote a demo member',
+  (select is_demo from members where id = current_setting('t.demo_member')::uuid));
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
+update members set first_name = 'Genuinely'
+ where id = current_setting('t.demo_member')::uuid;
+reset role;
+select expect_true('...but renaming them does',
+  (select not is_demo from members where id = current_setting('t.demo_member')::uuid));
+
+-- No signed-in person means no person edited it. The claim is cleared
+-- EXPLICITLY: set_config(..., false) is session-scoped and `reset role` does
+-- not clear it, so auth.uid() survives a role change and "nobody" was still the
+-- admin.
+select set_config('request.jwt.claim.sub','',false);
+update instructors set bio = 'changed by a background job'
+ where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo
+   and id <> current_setting('t.demo_instr')::uuid;
+select expect_true('a write with nobody signed in does not promote anything',
+  (select count(*) > 0 from instructors
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo));
+select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
+
+-- =============================================================================
+-- The purge asks first
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
+select set_config('t.ask', (select purge_demo_data('deeddeed-0000-0000-0000-000000000001')::text), false);
+reset role;
+select expect_true('an unconfirmed purge refuses',
+  (current_setting('t.ask')::jsonb ->> 'requires_confirmation') = 'true');
+select expect_true('...and says what it would delete, by table',
+  (current_setting('t.ask')::jsonb -> 'will_delete' ->> 'members')::int > 0);
+select expect_true('...and what it expects to keep',
+  (current_setting('t.ask')::jsonb -> 'will_keep' ->> 'instructors')::int > 0);
+select expect_true('...and nothing has actually gone',
+  (select count(*) > 0 from members
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo));
+
+-- =============================================================================
 -- The purge
 -- =============================================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
-select set_config('t.purge', (select purge_demo_data('deeddeed-0000-0000-0000-000000000001')::text), false);
+select set_config('t.purge', (select purge_demo_data('deeddeed-0000-0000-0000-000000000001', true)::text), false);
 reset role;
 
 select expect_true('the purge removed demo members',
@@ -119,21 +194,35 @@ select expect_num('and no demo row of any kind is left',
  + (select count(*) from instructors where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo)
  + (select count(*) from rooms where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo)
  + (select count(*) from class_types where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo)
- + (select count(*) from membership_plans where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo))::bigint, 0);
+ )::bigint, 0);
+
+-- The one demo row that legitimately stays: a demo plan a REAL membership still
+-- sits on. Deleting it would destroy that membership, and nothing real goes.
+select expect_num('a demo plan a real member is still on is kept',
+  (select count(*) from membership_plans
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and is_demo)::bigint, 1);
+select expect_true('...and the purge names it rather than leaving it to be found',
+  jsonb_array_length(current_setting('t.purge')::jsonb -> 'plans_kept_for_real_members') = 1);
 
 -- --- EVERY real row survives ------------------------------------------------
-select expect_num('real instructors survive',
+-- Three now: the two created by hand, plus the demo one renamed above — which
+-- is the entire point.
+select expect_num('real instructors survive, including the edited one',
   (select count(*) from instructors
-    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 2);
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 3);
+select expect_num('the renamed instructor is still there by name',
+  (select count(*) from instructors
+    where studio_id='deeddeed-0000-0000-0000-000000000001'
+      and display_name = 'Jhon Hubert Z.')::bigint, 1);
 select expect_num('real availability survives',
   (select count(*) from instructor_availability
     where instructor_id='deeddeed-0000-0000-0000-00000000d101')::bigint, 5);
 select expect_num('real commitments survive',
   (select count(*) from instructor_commitments
     where studio_id='deeddeed-0000-0000-0000-000000000001')::bigint, 1);
-select expect_num('real members survive',
+select expect_num('real members survive, including the edited one',
   (select count(*) from members
-    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 1);
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 2);
 select expect_num('real class types survive',
   (select count(*) from class_types
     where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 1);
@@ -184,7 +273,7 @@ select expect_true('demo data regenerates cleanly after a purge',
   (current_setting('t.gen2')::jsonb ->> 'occurrences')::int > 0);
 select expect_num('...and the real rows are still there afterwards',
   (select count(*) from instructors
-    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 2);
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 3);
 select expect_num('...and the real class is still there too',
   (select count(*) from class_occurrences
     where id='deeddeed-0000-0000-0000-00000000f001')::bigint, 1);
@@ -193,11 +282,11 @@ select expect_num('...and the real class is still there too',
 set role authenticated;
 select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000a1',false);
 select expect_true('a second purge runs and still keeps the real rows',
-  (purge_demo_data('deeddeed-0000-0000-0000-000000000001') ->> 'real_rows_kept') is not null);
+  (purge_demo_data('deeddeed-0000-0000-0000-000000000001', true) ->> 'real_rows_kept') is not null);
 reset role;
 select expect_num('real instructors still there after two rounds',
   (select count(*) from instructors
-    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 2);
+    where studio_id='deeddeed-0000-0000-0000-000000000001' and not is_demo)::bigint, 3);
 select expect_num('real availability still there after two rounds',
   (select count(*) from instructor_availability
     where instructor_id='deeddeed-0000-0000-0000-00000000d101')::bigint, 5);
@@ -212,4 +301,6 @@ insert into profiles (id, email, full_name) values
 set role authenticated;
 select set_config('request.jwt.claim.sub','deeddeed-0000-0000-0000-0000000000b9',false);
 select expect_raises('a signed-in user who is not a platform admin cannot purge',
+  $q$select purge_demo_data('deeddeed-0000-0000-0000-000000000001', true)$q$, 'PT403');
+select expect_raises('...not even to preview it',
   $q$select purge_demo_data('deeddeed-0000-0000-0000-000000000001')$q$, 'PT403');

@@ -254,6 +254,12 @@ select expect_num('and the reason says so plainly',
 reset role;
 
 -- At day 14 the amendment hands over to signal 3, as specified.
+-- The JWT claim is cleared first. set_config(..., false) is session-scoped and
+-- `reset role` does not clear it, so auth.uid() survives — and since migration
+-- 063 a signed-in write to a non-system column promotes a demo row out of the
+-- demo set. Moving a fixture's clock is test setup, not a person editing a
+-- record, and it must not look like one.
+select set_config('request.jwt.claim.sub','',false);
 update members set joined_on = current_date - 20
  where id = '66666666-0000-0000-0000-0000000000fa';
 
@@ -484,7 +490,9 @@ select set_config('h.demo_before',
 set role authenticated;
 select set_config('request.jwt.claim.sub','66666666-0000-0000-0000-0000000000a1',false);
 select expect_num('purging clears every demo member in one call',
-  ((purge_demo_data(current_setting('h.sid')::uuid)) ->> 'members')::bigint,
+  -- Confirmed, since migration 063 the first call only reports what it would
+  -- do. A purge with no confirmation step is how production lost its data.
+  ((purge_demo_data(current_setting('h.sid')::uuid, true)) ->> 'members')::bigint,
   current_setting('h.demo_before')::bigint);
 reset role;
 
