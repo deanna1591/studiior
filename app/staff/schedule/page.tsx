@@ -1,6 +1,7 @@
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
+import FillPanel from "./fill/panel";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,10 @@ export default async function Schedule() {
                   <NavLink href="/classes/new">Add a class</NavLink>
                 </>
               }>
+      {/* The engine, with a way in. It existed with no caller at all, which is
+          the same shape as instructor_availability having had no writer. */}
+      {resources.length > 1 && <FillPanel />}
+
       {resources.length === 1 ? (
         <Empty>
           Add an instructor and your timetable will have columns to fill.{" "}
