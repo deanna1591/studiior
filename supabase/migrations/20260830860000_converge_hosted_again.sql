@@ -429,3 +429,19 @@ revoke execute on function flex_report(uuid, date, date)         from public, an
 grant  execute on function flex_report(uuid, date, date)         to authenticated;
 revoke execute on function sweep_flex_decisions()                from public, anon, authenticated;
 grant  execute on function sweep_flex_decisions()                to service_role;
+
+-- The sweep was never scheduled on hosted either — `cron.job` has no
+-- 'studiior-flex-decisions' row — because 075's cron block was appended after
+-- the migration had already applied. Re-issued verbatim, and idempotent.
+do $cron$
+begin
+  if not exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    raise notice 'pg_cron unavailable; flex decisions not scheduled';
+    return;
+  end if;
+  if exists (select 1 from cron.job where jobname = 'studiior-flex-decisions') then
+    perform cron.unschedule('studiior-flex-decisions');
+  end if;
+  perform cron.schedule('studiior-flex-decisions', '*/15 * * * *',
+                        'select sweep_flex_decisions()');
+end $cron$;
