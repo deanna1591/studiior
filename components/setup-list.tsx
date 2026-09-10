@@ -56,17 +56,32 @@ export function SetupShell({
 }
 
 export function SetupRow({
-  href, name, meta, right, archived,
+  href, name, meta, right, archived, state,
 }: {
   href: string; name: string; meta: string; right?: string; archived?: boolean;
+  /**
+   * ENDED IS NOT ARCHIVED and the row has to say which.
+   *
+   * An ended series ran its course or was stopped on a date; it stays on the
+   * working list because it is part of what the timetable recently was. An
+   * archived one was taken off the list deliberately and lives in its own
+   * section. Rendering both in grey with the same word would tell a studio that
+   * a series it never touched had been archived.
+   */
+  state?: "ended" | "archived";
 }) {
+  const mode = state ?? (archived ? "archived" : undefined);
   return (
     <Link href={href} className="flex items-center justify-between gap-4 px-3 py-2.5 hover:bg-paper">
       <div className="min-w-0">
-        <div className={`truncate text-[14px] leading-5 ${archived ? "text-ink-3" : "text-ink"}`}>
-          {name}
-          {archived && (
-            <span className="ml-2 text-[12px] leading-4 text-ink-3">Archived</span>
+        <div className={`truncate text-[14px] leading-5 ${mode ? "text-ink-3" : "text-ink"}`}>
+          <span className={mode === "ended" ? "line-through decoration-ink-3/60" : undefined}>
+            {name}
+          </span>
+          {mode && (
+            <span className="ml-2 text-[12px] leading-4 text-ink-3">
+              {mode === "ended" ? "Ended" : "Archived"}
+            </span>
           )}
         </div>
         <div className="text-[12px] leading-4 text-ink-3">{meta}</div>

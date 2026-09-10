@@ -12,6 +12,12 @@ export type GridSeries = {
   class_type_id: string | null;
   class_type_name: string | null;
   class_type_color: string | null;
+  /**
+   * Ended by STATUS rather than by date. A series stopped because its class type
+   * or its room was archived carries no end date at all, so `ends_on < today`
+   * cannot see it — and it would otherwise draw as though it were still running.
+   */
+  ended?: boolean;
 };
 
 const MIN_IN_DAY = 24 * 60;
@@ -44,7 +50,7 @@ export default function SeriesGrid({
   today: string;
 }) {
   // A series appears in EVERY day its rule names — one series, several cells.
-  type Block = GridSeries & { day: number; start: number; end: number };
+  type Block = GridSeries & { day: number; start: number; end: number; isEnded: boolean };
   const blocks: Block[] = [];
   const unplaceable: GridSeries[] = [];
 
@@ -56,9 +62,10 @@ export default function SeriesGrid({
     }
     const start = toMinutes(s.time_of_day);
     const end = Math.min(MIN_IN_DAY, start + s.duration_minutes);
+    const isEnded = (s.ended ?? false) || (s.ends_on !== null && s.ends_on < today);
     for (const code of rule.days) {
       const day = DAYS.findIndex((d) => d.code === code);
-      if (day >= 0) blocks.push({ ...s, day, start, end });
+      if (day >= 0) blocks.push({ ...s, day, start, end, isEnded });
     }
   }
 
@@ -74,11 +81,15 @@ export default function SeriesGrid({
   const ROW = 52; // px per hour
 
   const order = Array.from({ length: 7 }, (_, i) => (weekStartsOn + i) % 7);
-  const perDay = order.map((d) => blocks.filter((b) => b.day === d).length);
+  // Ended series are drawn but NOT counted. "15 classes a week" has to be the
+  // number the studio is actually running, or it is a worse answer than none.
+  const running = blocks.filter((b) => !b.isEnded);
+  const perDay = order.map((d) => running.filter((b) => b.day === d).length);
+  const endedCount = new Set(blocks.filter((b) => b.isEnded).map((b) => b.id)).size;
 
   // One swatch per class type actually on the grid.
   const key = new Map<string, { name: string; color: string }>();
-  for (const b of blocks) {
+  for (const b of running) {
     const id = b.class_type_id ?? "none";
     if (!key.has(id)) {
       key.set(id, {
@@ -98,11 +109,16 @@ export default function SeriesGrid({
           class, above the thing it would be adding it to. */}
       <div className="mb-4 flex flex-wrap items-baseline gap-x-6 gap-y-1">
         <p className="text-[13px] leading-[20px] text-ink-2">
-          <span className="num text-[17px] font-semibold text-ink">{blocks.length}</span>{" "}
-          {blocks.length === 1 ? "class" : "classes"} a week
-          {series.length > 0 && (
-            <> from <span className="num text-ink">{series.length}</span>{" "}
-              {series.length === 1 ? "series" : "series"}</>
+          <span className="num text-[17px] font-semibold text-ink">{running.length}</span>{" "}
+          {running.length === 1 ? "class" : "classes"} a week
+          {series.length - endedCount > 0 && (
+            <> from <span className="num text-ink">{series.length - endedCount}</span>{" "}
+              series</>
+          )}
+          {endedCount > 0 && (
+            <span className="text-ink-3">
+              {" "}· <span className="num">{endedCount}</span> ended, not counted
+            </span>
           )}
         </p>
         {key.size > 0 && (
@@ -156,7 +172,7 @@ export default function SeriesGrid({
                   <div key={h} className="border-b border-line" style={{ height: ROW }} />
                 ))}
                 {blocks.filter((b) => b.day === d).map((b) => {
-                  const ended = b.ends_on !== null && b.ends_on < today;
+                  const ended = b.isEnded;
                   const ending = !ended && b.ends_on !== null && b.ends_on <= soonKey;
                   const noRoom = b.room_name === null;
                   const colour = b.class_type_color ?? "var(--ink-3)";
@@ -176,15 +192,21 @@ export default function SeriesGrid({
                         // 14% tint measures 12.43:1 against the worst possible
                         // colour a studio could pick, which a filled block in an
                         // arbitrary hex could not promise.
-                        background: `color-mix(in srgb, ${colour} 14%, var(--surface))`,
-                        borderLeft: `3px solid ${colour}`,
-                        opacity: ended ? 0.5 : 1,
+                        // ENDED IS DRAWN GREY, NOT FADED. Opacity on text is a
+                        // contrast change, not a styling choice: at 0.5 the
+                        // label measured 2.27:1 on its own tint, against a 4.5
+                        // floor. Muting the TINT instead keeps the ink at full
+                        // strength and still reads as "not running any more".
+                        background: ended
+                          ? "color-mix(in srgb, var(--ink-3) 10%, var(--surface))"
+                          : `color-mix(in srgb, ${colour} 14%, var(--surface))`,
+                        borderLeft: `3px solid ${ended ? "var(--ink-3)" : colour}`,
                         outline: noRoom ? "1px dashed var(--coral)" : undefined,
                         outlineOffset: "-1px",
                       }}
                     >
                       <div className={`truncate text-[11.5px] font-medium leading-[14px] ${
-                        ended ? "text-ink-2 line-through" : "text-ink"}`}>
+                        ended ? "text-ink-2 line-through decoration-ink-3" : "text-ink"}`}>
                         {b.name}
                       </div>
                       <div className="num truncate text-[10.5px] leading-[13px] text-ink-2">

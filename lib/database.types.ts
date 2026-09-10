@@ -5089,6 +5089,10 @@ export type Database = {
         Args: { p_confirm?: boolean; p_id: string; p_kind: string }
         Returns: Json
       }
+      archive_series: {
+        Args: { p_confirm?: boolean; p_series_id: string }
+        Returns: Json
+      }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -5271,45 +5275,9 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
-        Returns: undefined
+      end_series: {
+        Args: { p_confirm?: boolean; p_ends_on?: string; p_series_id: string }
+        Returns: Json
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -5407,7 +5375,6 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -5514,7 +5481,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: {
         Args: { p_confirm?: boolean; p_studio_id: string }
         Returns: Json
@@ -5680,6 +5646,7 @@ export type Database = {
         Returns: Json
       }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
+      restore_series: { Args: { p_series_id: string }; Returns: Json }
       rrule_last_date: {
         Args: { p_rrule: string; p_starts_on: string }
         Returns: string
@@ -5747,6 +5714,8 @@ export type Database = {
         }
         Returns: number
       }
+      series_counts: { Args: { p_series_id: string }; Returns: Json }
+      series_impact: { Args: { p_series_id: string }; Returns: Json }
       series_rule_matches: {
         Args: {
           p_day: string
@@ -5844,7 +5813,6 @@ export type Database = {
         }
         Returns: Json
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -6091,7 +6059,7 @@ export type Database = {
         | "past_due"
         | "locked"
         | "cancelled"
-      series_status: "active" | "ended" | "cancelled"
+      series_status: "active" | "ended" | "cancelled" | "archived"
       staff_role: "owner" | "manager" | "instructor" | "front_desk"
       staffing_state: "assigned" | "open" | "pending_approval"
       theme_preset: "warm" | "clean" | "calm" | "bold"
@@ -6340,7 +6308,7 @@ export const Constants = {
         "locked",
         "cancelled",
       ],
-      series_status: ["active", "ended", "cancelled"],
+      series_status: ["active", "ended", "cancelled", "archived"],
       staff_role: ["owner", "manager", "instructor", "front_desk"],
       staffing_state: ["assigned", "open", "pending_approval"],
       theme_preset: ["warm", "clean", "calm", "bold"],

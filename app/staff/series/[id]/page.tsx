@@ -5,7 +5,9 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink, SectionLabel } from "@/components/ui";
 import { parseRrule } from "@/lib/rrule";
 import SeriesForm from "../form";
+import SeriesLifecycle from "../lifecycle";
 import { localDates, seriesOptions } from "../data";
+import { studioToday } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +61,8 @@ export default async function EditSeries({ params }: { params: { id: string } })
       <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">
         An edit here changes the classes this series has already put on the calendar, from
         the date you choose forward. It never rewrites the past, and it shows you exactly
-        what it will do before it does it. To stop the series, set it to end on a date.
+        what it will do before it does it. To stop it, archive it or give it an end date
+        at the bottom of this page.
       </p>
 
       <SeriesForm
@@ -78,6 +81,14 @@ export default async function EditSeries({ params }: { params: { id: string } })
           time_of_day: s.time_of_day, description: s.description,
           rule, unsupported,
         }}
+      />
+    
+      <SeriesLifecycle
+        id={s.id}
+        name={s.name}
+        archived={s.status === "archived"}
+        endsOn={s.ends_on}
+        today={studioToday(ctx.timeZone)}
       />
     </AppShell>
   );

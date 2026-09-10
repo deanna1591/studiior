@@ -568,6 +568,273 @@ select expect_true('...and ticks once every instructor has one',
   (studio_setup_state('5e215e21-0000-0000-0000-000000000001')
     -> 'availability' ->> 'done')::boolean);
 
+-- =============================================================================
+-- Migrations 077 and 078: archive, end, delete — and the cascade behind delete
+-- =============================================================================
+-- The delete guard's reason for existing, reproduced before it was written:
+-- deleting a series with history returned DELETE 1, no error, and took 35
+-- occurrences, 84 bookings and 63 check-ins with it. RLS has always allowed a
+-- manager that through PostgREST; only the button was missing.
+
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a1',false);
+set local role authenticated;
+
+-- --- Fixtures: three series in the three states that matter -----------------
+-- A: has run, and has bookings.            delete refused
+-- B: only future classes, nobody booked.   delete allowed
+-- C: future classes, one of them booked.   archive keeps that one
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id,
+                          capacity, duration_minutes, rrule, starts_on, time_of_day)
+values
+ ('5e215e21-0000-0000-0000-00000000fa01','5e215e21-0000-0000-0000-000000000001',
+  '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
+  'HISTORY BURN','5e215e21-0000-0000-0000-00000000ee01',10,50,
+  'FREQ=WEEKLY;BYDAY=MO', current_date - 60, '07:00'),
+ ('5e215e21-0000-0000-0000-00000000fa02','5e215e21-0000-0000-0000-000000000001',
+  '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
+  'TYPO SERIES','5e215e21-0000-0000-0000-00000000ee02',10,50,
+  'FREQ=WEEKLY;BYDAY=TU', current_date + 1, '11:00'),
+ ('5e215e21-0000-0000-0000-00000000fa03','5e215e21-0000-0000-0000-000000000001',
+  '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc02',
+  'REFORMER BURN 07:00','5e215e21-0000-0000-0000-00000000ee01',10,45,
+  'FREQ=WEEKLY;BYDAY=WE', current_date + 1, '19:00');
+
+-- A's history. Inserted directly, the way the seed builds history: the
+-- generator only ever makes the future.
+insert into class_occurrences (id, studio_id, location_id, series_id, class_type_id,
+                               name, room_id, capacity, starts_at, ends_at, status, series_slot_at)
+select ('5e215e21-0000-0000-0000-0000000fa1' || lpad(g::text,2,'0'))::uuid,
+       '5e215e21-0000-0000-0000-000000000001','5e215e21-0000-0000-0000-00000000000c',
+       '5e215e21-0000-0000-0000-00000000fa01','5e215e21-0000-0000-0000-00000000cc01',
+       'HISTORY BURN','5e215e21-0000-0000-0000-00000000ee01',10,
+       ((current_date - (g * 7))::date + time '07:00') at time zone 'Europe/Prague',
+       ((current_date - (g * 7))::date + time '07:50') at time zone 'Europe/Prague',
+       'completed',
+       ((current_date - (g * 7))::date + time '07:00') at time zone 'Europe/Prague'
+  from generate_series(1, 4) g;   -- ::date on the loop variable: generate_series
+                                  -- over dates yields timestamptz and converts
+                                  -- the wrong way. CLAUDE.md's own trap.
+
+insert into bookings (id, studio_id, occurrence_id, member_id, status)
+select ('5e215e21-0000-0000-0000-0000000fb1' || lpad(g::text,2,'0'))::uuid,
+       '5e215e21-0000-0000-0000-000000000001',
+       ('5e215e21-0000-0000-0000-0000000fa1' || lpad(g::text,2,'0'))::uuid,
+       '5e215e21-0000-0000-0000-00000000b101','attended'
+  from generate_series(1, 4) g;
+
+-- Migration 007's check-in window refuses a check-in on a class that ended days
+-- ago, which is right. checkin_window_enforced is the documented way off.
+update studio_settings set checkin_window_enforced = false
+ where studio_id = '5e215e21-0000-0000-0000-000000000001';
+insert into check_ins (id, studio_id, member_id, occurrence_id, booking_id, method)
+values ('5e215e21-0000-0000-0000-0000000fc101','5e215e21-0000-0000-0000-000000000001',
+        '5e215e21-0000-0000-0000-00000000b101','5e215e21-0000-0000-0000-0000000fa101',
+        '5e215e21-0000-0000-0000-0000000fb101','qr');
+update studio_settings set checkin_window_enforced = true
+ where studio_id = '5e215e21-0000-0000-0000-000000000001';
+
+-- One future class of C, booked.
+insert into bookings (id, studio_id, occurrence_id, member_id, status)
+select '5e215e21-0000-0000-0000-0000000fb2ff','5e215e21-0000-0000-0000-000000000001',
+       o.id,'5e215e21-0000-0000-0000-00000000b101','booked'
+  from class_occurrences o
+ where o.series_id = '5e215e21-0000-0000-0000-00000000fa03'
+   and o.starts_at > now()
+ order by o.starts_at limit 1;
+
+-- --- What series_impact says before anybody presses anything ----------------
+select expect_true('a series with history is not deletable',
+  not (series_impact('5e215e21-0000-0000-0000-00000000fa01') -> 'delete' ->> 'allowed')::boolean);
+select expect_true('...and the refusal names the classes that have run',
+  (series_impact('5e215e21-0000-0000-0000-00000000fa01') -> 'delete' ->> 'blocked_by')
+    like '%already run%');
+select expect_true('...and names the bookings',
+  (series_impact('5e215e21-0000-0000-0000-00000000fa01') -> 'delete' ->> 'blocked_by')
+    like '%booking%');
+select expect_true('...and offers archiving instead',
+  (series_impact('5e215e21-0000-0000-0000-00000000fa01') -> 'delete' ->> 'effect')
+    like '%Archive it instead%');
+select expect_true('a series with only future unbooked classes IS deletable',
+  (series_impact('5e215e21-0000-0000-0000-00000000fa02') -> 'delete' ->> 'allowed')::boolean);
+select expect_num('...and it says how many classes go with it',
+  (series_impact('5e215e21-0000-0000-0000-00000000fa02') -> 'delete' ->> 'removes')::bigint,
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa02'));
+
+-- The sentence the screen shows, in the shape it was asked for.
+select expect_true('the archive preview reads as a sentence with counts in it',
+  (series_impact('5e215e21-0000-0000-0000-00000000fa03') -> 'archive' ->> 'effect')
+    ~ '^Archiving REFORMER BURN 07:00 removes [0-9]+ future classes\. 1 has members booked and will be kept\.$');
+
+-- --- Delete, refused, and nothing lost --------------------------------------
+-- Counted BEFORE, so the assertion is "nothing was lost" rather than a number
+-- that happens to be right today. The reproduction this guard exists for showed
+-- 35 occurrences, 84 bookings and 63 check-ins going silently.
+create temporary table _keep as select
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa01') as occ,
+  (select count(*) from bookings b join class_occurrences o on o.id=b.occurrence_id
+     where o.series_id='5e215e21-0000-0000-0000-00000000fa01') as bk,
+  (select count(*) from check_ins c join class_occurrences o on o.id=c.occurrence_id
+     where o.series_id='5e215e21-0000-0000-0000-00000000fa01') as ci;
+select expect_true('the series under test really does have something to lose',
+  (select occ > 0 and bk > 0 and ci > 0 from _keep));
+select expect_raises('deleting a series with history is refused',
+  $$delete from class_series where id = '5e215e21-0000-0000-0000-00000000fa01'$$, 'PT409');
+select expect_num('...and not one class was lost',
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa01'),
+  (select occ from _keep));
+select expect_num('...and not one booking',
+  (select count(*) from bookings b join class_occurrences o on o.id=b.occurrence_id
+    where o.series_id='5e215e21-0000-0000-0000-00000000fa01'), (select bk from _keep));
+select expect_num('...and not one check-in',
+  (select count(*) from check_ins c join class_occurrences o on o.id=c.occurrence_id
+    where o.series_id='5e215e21-0000-0000-0000-00000000fa01'), (select ci from _keep));
+
+-- A booking on a class that has NOT run is still a person with a place.
+select expect_raises('a future booking alone blocks the delete',
+  $$delete from class_series where id = '5e215e21-0000-0000-0000-00000000fa03'$$, 'PT409');
+
+-- And a booking somebody cancelled is still a record of them.
+update bookings set status = 'cancelled' where id = '5e215e21-0000-0000-0000-0000000fb2ff';
+select expect_raises('a CANCELLED booking still blocks the delete',
+  $$delete from class_series where id = '5e215e21-0000-0000-0000-00000000fa03'$$, 'PT409');
+update bookings set status = 'booked' where id = '5e215e21-0000-0000-0000-0000000fb2ff';
+
+-- --- Delete, allowed --------------------------------------------------------
+select expect_true('the typo series has classes to lose',
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa02') > 0);
+delete from class_series where id = '5e215e21-0000-0000-0000-00000000fa02';
+select expect_num('a future, unbooked series deletes', 
+  (select count(*) from class_series where id='5e215e21-0000-0000-0000-00000000fa02'), 0);
+select expect_num('...and its classes go with it',
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa02'), 0);
+
+-- --- Archive ----------------------------------------------------------------
+select expect_true('archiving without confirming asks first',
+  (archive_series('5e215e21-0000-0000-0000-00000000fa03') ->> 'confirm_required')::boolean);
+select expect_text('...and changes nothing',
+  (select status::text from class_series where id='5e215e21-0000-0000-0000-00000000fa03'), 'active');
+
+create temporary table _pre as
+select id, starts_at, status from class_occurrences
+ where series_id = '5e215e21-0000-0000-0000-00000000fa03';
+
+create temporary table _arch as
+  select archive_series('5e215e21-0000-0000-0000-00000000fa03', true) as r;
+select expect_text('archiving sets the status',
+  (select status::text from class_series where id='5e215e21-0000-0000-0000-00000000fa03'), 'archived');
+select expect_num('the booked future class is KEPT',
+  (select count(*) from class_occurrences o
+    where o.series_id='5e215e21-0000-0000-0000-00000000fa03'
+      and exists (select 1 from bookings b where b.occurrence_id = o.id)), 1);
+select expect_num('every other future class is removed',
+  (select count(*) from class_occurrences o
+    where o.series_id='5e215e21-0000-0000-0000-00000000fa03'
+      and o.starts_at > now()
+      and not exists (select 1 from bookings b where b.occurrence_id = o.id)), 0);
+select expect_num('...and the result says how many it removed',
+  (select (r->>'removed_future')::bigint from _arch),
+  (select count(*) from _pre where starts_at > now() and status = 'scheduled') - 1);
+select expect_true('...and tells the studio the booked one will still run',
+  (select r->>'note' from _arch) like '%kept and will still run%');
+
+-- Past classes are the history and archiving must not touch them.
+select expect_num('archiving a series does not touch what has already run',
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa01'
+     and starts_at <= now()), 4);
+
+-- --- The checklist agrees with the choice -----------------------------------
+-- studio_setup_state() derives 'schedule' from whether any class_occurrences
+-- exist, not from series status, so archiving cannot un-tick a studio that
+-- still has a timetable — and a studio that archived everything and had nothing
+-- left really has no timetable, which is what it should then say.
+select expect_true('archiving a series does not un-tick the timetable',
+  (studio_setup_state('5e215e21-0000-0000-0000-000000000001')
+    -> 'schedule' ->> 'done')::boolean);
+
+-- --- An archived series makes no more classes -------------------------------
+select expect_num('the generator creates nothing for an archived series',
+  (generate_occurrences('5e215e21-0000-0000-0000-00000000fa03') ->> 'created')::bigint, 0);
+select expect_true('...and says which status stopped it',
+  (generate_occurrences('5e215e21-0000-0000-0000-00000000fa03') ->> 'reason') like '%archived%');
+
+-- --- The column cannot be set by hand ---------------------------------------
+-- The same UPDATE goes straight through PostgREST, so removing the option from
+-- a form is not the boundary.
+select expect_raises('status cannot reach archived by a plain update',
+  $$update class_series set status = 'archived'
+     where id = '5e215e21-0000-0000-0000-00000000fa01'$$, 'PT409');
+
+-- --- Restore ----------------------------------------------------------------
+create temporary table _res as
+  select restore_series('5e215e21-0000-0000-0000-00000000fa03') as r;
+select expect_true('restoring says cancelled classes are not resurrected',
+  (select r->>'note' from _res) like '%stay cancelled%');
+select expect_text('restoring puts it back',
+  (select status::text from class_series where id='5e215e21-0000-0000-0000-00000000fa03'), 'active');
+select expect_true('...and the calendar refills straight away',
+  (select count(*) from class_occurrences
+    where series_id='5e215e21-0000-0000-0000-00000000fa03' and starts_at > now()) > 1);
+select expect_num('...without duplicating the class somebody was booked on',
+  (select count(*) from bookings b join class_occurrences o on o.id = b.occurrence_id
+    where o.series_id = '5e215e21-0000-0000-0000-00000000fa03'), 1);
+
+-- --- Permissions ------------------------------------------------------------
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a2',false);
+select expect_raises('front desk cannot archive a series',
+  $$select archive_series('5e215e21-0000-0000-0000-00000000fa01', true)$$, 'PT403');
+select expect_raises('front desk cannot read the impact either',
+  $$select series_impact('5e215e21-0000-0000-0000-00000000fa01')$$, 'PT403');
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a3',false);
+select expect_raises('another studio owner cannot archive it',
+  $$select archive_series('5e215e21-0000-0000-0000-00000000fa01', true)$$, 'PT403');
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a1',false);
+
+-- --- End it on a date -------------------------------------------------------
+select expect_true('the series still runs into the future before it is ended',
+  (select count(*) from class_occurrences
+    where series_id = '5e215e21-0000-0000-0000-00000000fa01'
+      and starts_at > now() and status = 'scheduled') > 0);
+select end_series('5e215e21-0000-0000-0000-00000000fa01', null, true) is not null as ended;
+select expect_num('ending it stops the classes after the end date',
+  (select count(*) from class_occurrences
+    where series_id = '5e215e21-0000-0000-0000-00000000fa01'
+      and starts_at > (studio_today('5e215e21-0000-0000-0000-000000000001') + 1)::timestamptz
+      and status = 'scheduled'), 0);
+select expect_text('...and the end date is recorded',
+  (select ends_on::text from class_series where id='5e215e21-0000-0000-0000-00000000fa01'),
+  studio_today('5e215e21-0000-0000-0000-000000000001')::text);
+select expect_num('...while the four classes it already taught keep their place',
+  (select count(*) from class_occurrences
+    where series_id='5e215e21-0000-0000-0000-00000000fa01' and starts_at <= now()), 4);
+select expect_text('...and the series is still readable rather than gone',
+  (select name from class_series where id='5e215e21-0000-0000-0000-00000000fa01'), 'HISTORY BURN');
+
+-- --- The demo purge must not be caught by the new guard ----------------------
+-- A demo series HAS history, so a guard that counted it would refuse the purge.
+-- purge_demo_data() detaches every real child first (migration 062) and its
+-- census is the real protection; the guard steps aside for is_demo rows only.
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id,
+                          capacity, duration_minutes, rrule, starts_on, time_of_day, is_demo)
+values ('5e215e21-0000-0000-0000-00000000fd01','5e215e21-0000-0000-0000-000000000001',
+        '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
+        'DEMO SERIES','5e215e21-0000-0000-0000-00000000ee02',10,50,
+        'FREQ=WEEKLY;BYDAY=FR', current_date - 30, '06:00', true);
+insert into class_occurrences (id, studio_id, location_id, series_id, class_type_id,
+                               name, room_id, capacity, starts_at, ends_at, status, is_demo)
+values ('5e215e21-0000-0000-0000-0000000fd101','5e215e21-0000-0000-0000-000000000001',
+        '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000fd01',
+        '5e215e21-0000-0000-0000-00000000cc01','DEMO SERIES',
+        '5e215e21-0000-0000-0000-00000000ee02',10,
+        now() - interval '7 days', now() - interval '7 days' + interval '50 min',
+        'completed', true);
+insert into bookings (id, studio_id, occurrence_id, member_id, status, is_demo)
+values ('5e215e21-0000-0000-0000-0000000fd201','5e215e21-0000-0000-0000-000000000001',
+        '5e215e21-0000-0000-0000-0000000fd101','5e215e21-0000-0000-0000-00000000b101',
+        'attended', true);
+delete from class_series where id = '5e215e21-0000-0000-0000-00000000fd01';
+select expect_num('the purge path is not blocked by the new guard',
+  (select count(*) from class_series where id='5e215e21-0000-0000-0000-00000000fd01'), 0);
+
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'series suite finished' as done;

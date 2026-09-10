@@ -1,0 +1,42 @@
+-- =============================================================================
+-- 077  series_status gains 'archived'. On its own, because it has to be.
+-- =============================================================================
+-- `class_series.status` is the enum `series_status` (active | ended | cancelled)
+-- while class_types, rooms and instructors carry plain text — which is why
+-- adding archive for series needed a decision the other three did not.
+--
+-- THE CHOICE, AND WHY: add the value rather than reuse 'ended'.
+--
+--   'ended' ALREADY HAS A WRITER. `archive_record()` sets a series to 'ended'
+--   when its class type or its room is archived (migration 058). If archiving a
+--   series also wrote 'ended', then restoring one would be indistinguishable
+--   from resurrecting a series the studio never archived — the restore would
+--   have no way to know what it was undoing.
+--
+--   THE SCREEN NEEDS BOTH. An ended series stays on the working list, greyed and
+--   filterable, because it is part of what the timetable recently was. An
+--   archived one moves into its own section and comes back only if somebody asks
+--   for it. One value cannot be in two places.
+--
+--   THE ENUM FAMILY ALREADY DOES THIS. `member_status` and `challenge_status`
+--   both carry 'archived' beside their other terminal states.
+--
+-- WHAT AGREES WITH IT ALREADY, checked rather than assumed:
+--   generate_occurrences()      refuses any series whose status <> 'active'
+--   generate_all_occurrences()  selects `where cs.status = 'active'`
+--   studio_setup_state()        counts class_occurrences, not series, so a
+--                               studio that archives a series keeps its tick for
+--                               as long as it still has classes on the calendar
+-- So both the generator and the checklist stop at 'archived' with no change.
+--
+-- WHY THIS MIGRATION IS ALONE: a new enum value cannot be USED in the
+-- transaction that adds it. Migration 036 exists for the same reason and this
+-- was re-proved on this project's actual server, PostgreSQL 17.6:
+--
+--   begin; alter type series_status add value 'probe'; select 'probe'::series_status;
+--   ERROR:  unsafe use of new value "probe" of enum type series_status
+--
+-- Everything that uses it is migration 078.
+-- =============================================================================
+
+alter type series_status add value if not exists 'archived';
