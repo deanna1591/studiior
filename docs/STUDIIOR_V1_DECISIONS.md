@@ -467,3 +467,45 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 **Reading someone's availability is a permission, not a convenience.** The three functions that read it are `SECURITY DEFINER`, so the grant to `authenticated` is the whole of their access control unless they check for themselves — and they did not. An ordinary member of an unrelated studio could read any instructor's full weekly pattern by id while the table's own policy correctly returned nothing. Migration 056 applies the write path's rule to the reads: manager-up of that instructor's studio, or the instructor themselves. An id that does not exist is refused identically, so the error cannot be used to enumerate instructors.
 
 **Where:** Business Rules §3.3 and §5; Data Model §5; Permissions §4 and §6; migrations 053, 054, 055 and 056. **Status:** settled. **Extends:** Decisions 9 and 17. **Reuses:** Decision 2 for members, Decision 17 for open shifts.
+
+
+---
+
+## 21 — Flex classes
+
+**Optional per studio, off by default, and invisible to members.**
+
+A class is **guaranteed** — it runs regardless of headcount, which is every class in the product today — or **flex**: it runs only if it reaches a minimum by a deadline, and otherwise cancels. A studio that never turns it on sees no change anywhere, and no member sees anything either way.
+
+**Reform Collective's Phase 2** runs flex slots beside core ones so the coach is already on site. Threshold 1, deadline 20:00 the night before. One booking runs as a semi-private at no extra charge.
+
+### Configured per SERIES
+
+Not per class type and not per time band: Phase 2 has a 07:00 flex slot beside an 08:00 core one on the same days, and SCULPT appears in both. Neither alternative can express that; the series is the thing that knows.
+
+`class_series.flex` and `minimum_bookings`, inherited by the occurrences the generator makes. **The minimum is an integer, not a boolean** — a studio with twelve reformers may want three, Reform Collective wants one.
+
+The deadline is per studio, in two shapes: a fixed local time the night before (Reform Collective's), or a number of hours ahead. Both are studio-local, and the night-before form is computed from the class's **local date** rather than by subtracting an interval, which would drift an hour across a clock change.
+
+**Staff can flip a single occurrence to guaranteed.** "This one runs whatever happens" is a real decision on a quiet week, and the sweep then leaves it alone.
+
+### Members see nothing
+
+No "unconfirmed", no "needs one more". Telling somebody a class might not run is telling them not to bother booking it, which is the opposite of what a class one short needs. `flex` lives on `class_occurrences`, which the member app selects by name — the column is simply never asked for.
+
+If it cancels, **Business Rules §3.2 applies**: credits back regardless of timing, fees waived, everybody booked told. At threshold 1 with nobody booked there is nobody to tell, which is the common case.
+
+### The deadline
+
+A pg_cron sweep every fifteen minutes, per studio, in studio-local time. Fifteen and not sixty for the same reason as the Morning Brief: the deadline is a local time and studios span zones, and a coach finding out at 20:59 whether to come in tomorrow is what this exists to prevent.
+
+**Idempotency is the occurrence's own state, not the `job_runs` claim.** A decided class is confirmed or cancelled and is never pending again. That matters because the hours-before mode has a decision point at every hour of the day, and a once-a-day claim would answer only the first of them; `job_runs` records the pass and counts attempts rather than gating it.
+
+- Confirming is **silent** — nothing changes from the member's view, because nothing about the class was ever different.
+- Cancelling goes through `cancel_occurrence()`, the §3.2 path.
+- **The instructor is told either way.** A coach needs to know whether to come in, and that is the whole point of a deadline.
+- **Once confirmed it runs.** `flex_confirmed_at` is a latch: a cancellation afterwards drops the headcount below the minimum and changes nothing.
+
+### Reporting
+
+`flex_report()` gives flex fill against core fill, per series. **Fill is measured on the classes that RAN** — a cancelled class has no fill rate, and averaging its zero in would make flex look emptier than it is and argue against the very slots that are working. A flex slot filling as well as the core one beside it has earned core status; that is the number this is for.

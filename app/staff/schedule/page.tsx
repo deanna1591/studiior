@@ -109,6 +109,7 @@ export default async function Schedule({
     local_date: string; start_minutes: number; end_minutes: number;
     occ_instructor_id: string | null; room_name: string | null;
     occ_capacity: number; occ_booked: number; occ_waitlist: number; occ_staffing: string;
+    occ_flex: boolean; occ_confirmed: boolean;
   }[];
 
   const appCount = new Map<string, number>();
@@ -139,6 +140,10 @@ export default async function Schedule({
     room: o.room_name,
     pendingApplications: appCount.get(o.occ_id) ?? 0,
     hoursAway: (new Date(o.starts_at).getTime() - now) / 3_600_000,
+    // Decision 21. Only meaningful BEFORE the decision: once confirmed a flex
+    // class is an ordinary class and drawing it differently would be marking a
+    // distinction that has stopped existing.
+    flexPending: o.occ_flex && !o.occ_confirmed,
   }));
 
   // THE VISIBLE HOURS COME FROM WHAT IS ON THE SCHEDULE, not from a constant.
@@ -171,6 +176,7 @@ export default async function Schedule({
               actions={
                 <>
                   <JumpToDate anchor={anchor} view={view} />
+                  <NavLink href="/schedule/flex">Flex</NavLink>
                   <NavLink href="/shifts/applications">Applications</NavLink>
                   <NavLink href="/classes/new">Add a class</NavLink>
                 </>

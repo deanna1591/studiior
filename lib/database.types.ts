@@ -904,6 +904,8 @@ export type Database = {
           created_at: string
           description: string | null
           ends_at: string
+          flex: boolean
+          flex_confirmed_at: string | null
           id: string
           instructor_confirmed_at: string | null
           instructor_id: string | null
@@ -911,6 +913,7 @@ export type Database = {
           is_demo: boolean
           is_exception: boolean
           location_id: string
+          minimum_bookings: number | null
           name: string
           room_id: string | null
           series_id: string | null
@@ -933,6 +936,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           ends_at: string
+          flex?: boolean
+          flex_confirmed_at?: string | null
           id?: string
           instructor_confirmed_at?: string | null
           instructor_id?: string | null
@@ -940,6 +945,7 @@ export type Database = {
           is_demo?: boolean
           is_exception?: boolean
           location_id: string
+          minimum_bookings?: number | null
           name: string
           room_id?: string | null
           series_id?: string | null
@@ -962,6 +968,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           ends_at?: string
+          flex?: boolean
+          flex_confirmed_at?: string | null
           id?: string
           instructor_confirmed_at?: string | null
           instructor_id?: string | null
@@ -969,6 +977,7 @@ export type Database = {
           is_demo?: boolean
           is_exception?: boolean
           location_id?: string
+          minimum_bookings?: number | null
           name?: string
           room_id?: string | null
           series_id?: string | null
@@ -1058,10 +1067,12 @@ export type Database = {
           difficulty: string | null
           duration_minutes: number
           ends_on: string | null
+          flex: boolean
           id: string
           instructor_id: string | null
           is_demo: boolean
           location_id: string
+          minimum_bookings: number | null
           name: string
           room_id: string | null
           rrule: string
@@ -1081,10 +1092,12 @@ export type Database = {
           difficulty?: string | null
           duration_minutes: number
           ends_on?: string | null
+          flex?: boolean
           id?: string
           instructor_id?: string | null
           is_demo?: boolean
           location_id: string
+          minimum_bookings?: number | null
           name: string
           room_id?: string | null
           rrule: string
@@ -1104,10 +1117,12 @@ export type Database = {
           difficulty?: string | null
           duration_minutes?: number
           ends_on?: string | null
+          flex?: boolean
           id?: string
           instructor_id?: string | null
           is_demo?: boolean
           location_id?: string
+          minimum_bookings?: number | null
           name?: string
           room_id?: string | null
           rrule?: string
@@ -4510,6 +4525,10 @@ export type Database = {
           cover_escalation_hours: number
           created_at: string
           dropin_payment_window_minutes: number
+          flex_deadline_hours: number
+          flex_deadline_mode: string
+          flex_deadline_time: string
+          flex_enabled: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -4553,6 +4572,10 @@ export type Database = {
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
+          flex_deadline_hours?: number
+          flex_deadline_mode?: string
+          flex_deadline_time?: string
+          flex_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -4596,6 +4619,10 @@ export type Database = {
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
+          flex_deadline_hours?: number
+          flex_deadline_mode?: string
+          flex_deadline_time?: string
+          flex_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -5244,6 +5271,26 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
@@ -5260,9 +5307,31 @@ export type Database = {
         Args: { actual: boolean; label: string }
         Returns: undefined
       }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
+      }
+      flex_pending: {
+        Args: { p_studio_id: string }
+        Returns: {
+          booked: number
+          due_at: string
+          local_when: string
+          minimum: number
+          occ_id: string
+          occ_name: string
+          past_due: boolean
+          short_by: number
+          starts_at: string
+        }[]
+      }
+      flex_report: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: Json
       }
       generate_all_occurrences: { Args: never; Returns: Json }
       generate_all_occurrences_for: {
@@ -5338,6 +5407,7 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -5444,6 +5514,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: {
         Args: { p_confirm?: boolean; p_studio_id: string }
         Returns: Json
@@ -5627,6 +5698,8 @@ export type Database = {
           local_start: string
           occ_booked: number
           occ_capacity: number
+          occ_confirmed: boolean
+          occ_flex: boolean
           occ_id: string
           occ_instructor_id: string
           occ_name: string
@@ -5755,10 +5828,23 @@ export type Database = {
         Args: { p_class_type_ids: string[]; p_instructor_id: string }
         Returns: number
       }
+      set_occurrence_guaranteed: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
+      }
       set_occurrence_horizon: {
         Args: { p_confirm?: boolean; p_days: number; p_studio_id: string }
         Returns: Json
       }
+      set_series_flex: {
+        Args: {
+          p_flex: boolean
+          p_minimum_bookings?: number
+          p_series_id: string
+        }
+        Returns: Json
+      }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -5897,6 +5983,7 @@ export type Database = {
       sweep_availability_reminders: { Args: never; Returns: Json }
       sweep_booked_count_reconcile: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
+      sweep_flex_decisions: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }

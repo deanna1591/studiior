@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Seventy-four migrations, applying clean from `supabase db reset`:
+Seventy-five migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,7 @@ Seventy-four migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **075** Decision 21, flex classes: `flex` and `minimum_bookings` on series and occurrences, a per-studio deadline in two shapes, `sweep_flex_decisions()` every fifteen minutes, `flex_pending()`, `flex_report()`, and `flex_confirmed_at` as a latch
 - **074** studio closures: `studio_closures`, `studio_closed_at()` as the one predicate, `cancel_occurrence()` — the first caller `queue_occurrence_cancelled()` has ever had — `close_studio()` two-step, `reopen_studio()` which is not an undo, and a brief insight for a class sitting on a day the studio is shut
 - **073** the member invite is finally SENT: `invite_member()`, `invite_members_bulk()` and `member_invite_status()`, a `member_invite` template that does not claim there is an app to download, and the two always-send lists learning it
 - **072** `next_class_day()` — an empty calendar can finally say where the timetable actually is, plus a date picker, after "the calendar is empty" turned out to be a correct empty day nobody could navigate off
@@ -102,7 +103,7 @@ Seventy-four migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Twenty-eight suites, **1,324 assertions**, all passing from a clean `db reset`:
+Twenty-nine suites, **1,363 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -132,6 +133,7 @@ Twenty-eight suites, **1,324 assertions**, all passing from a clean `db reset`:
 | `test/member_records_test.sql` | 36 | a booking or check-in writes the timeline as it happens and rebuilding does not double it, the backfill covers every studio, a goal counts only visits since it was set, a waiver upload signs the member so the booking gate agrees, an instructor sees no documents at all and front desk sees everything except the medical one, and another studio's owner sees none of it |
 | `test/archive_test.sql` | 56 | an archived class type, room and instructor are invisible to a member and visible to staff, deleting a referenced record is refused and names what is in the way, archiving an instructor opens her future classes and emails the managers while her past classes keep her name, a room with classes in it is blocked rather than warned, and status cannot reach 'archived' by hand |
 | `test/instructor_self_service_test.sql` | 66 | a staff-entered pattern is already approved and still feeds the engine, a submitted one narrows nothing until somebody approves it, an instructor cannot approve their own, an approved month replaces the standing pattern for its days without deleting it, a pattern far under the agreed commitment is still approvable, two studios on different settings are asked and escalated on different days in ONE sweep, confirming the week confirms every class in it, asking for cover on one leaves the rest, escalation covers only the next three days, confirming late clears it silently, and nothing is ever released |
+| `test/flex_test.sql` | 39 | a studio with flex off sees nothing even when its own rows carry the flag, turning a series flex reaches the classes it has already made, a class at its threshold confirms silently and one below it cancels through §3.2 with credits back and nobody marked late, zero bookings cancels and tells only the coach, an occurrence flipped to guaranteed survives the sweep, a confirmed class stays confirmed when somebody drops out, and two studios on different deadline modes are decided in ONE run |
 | `test/series_test.sql` | 65 | retiming a series moves its classes instead of making a second copy of the year, a capacity change reaches the classes already on the calendar, six weeks of history keep the time they were taught at, a class somebody has dragged is left where it was put, dropping a day cancels it and putting it back restores it, dropping one somebody is booked on is refused even when confirmed, a COUNT series ends and does not slide forward every night, the series instructor does not overwrite a person's choice, and the checklist knows what "fill a month" needs |
 | `test/importer_test.sql` | 58 | dry run changes nothing, commit is atomic, rollback is exact and refuses when it cannot be clean, no notifications or challenge progress from imported attendance, §5 including a caller who is staff of another studio |
 
@@ -206,6 +208,26 @@ The member PWA is built at `{slug}.studiior.app` — five screens on a bottom ta
 It is branded as the studio, including the browser tab, the bookmark and the name iOS uses on a home screen — `app/member/layout.tsx` titles it from `studio_by_slug()`. The word "Studiior" appears nowhere a member can see. `brand_color` is deliberately unused: an arbitrary hex with unverified contrast driving text or fills would silently break every ratio the palette was measured for, so identity is carried by the logo and the name.
 
 **No studio has a class photograph, and the redesign leans on them.** `class_types.image_url` exists (migration 035) and is null on every seeded class type, so the hero and the Coming-up row fall through to the derived accent gradient in every screenshot and demo. That is the honest fallback and it is built to look deliberate, but it is the same trap the terracotta accent was in: the photographic half of this design is invisible until a studio uploads something. Seeding a fake photograph would be worse than the gradient. Recorded, not fixed.
+
+**Decision 21, flex classes: optional per studio, off by default, invisible to members.** A class is guaranteed — runs regardless of headcount, which is every class today — or flex: runs only if it reaches a minimum by a deadline. A studio that never turns it on sees no change anywhere.
+
+**Per SERIES, because neither alternative can express what Reform Collective runs.** Phase 2 has a 07:00 flex slot beside an 08:00 core one on the same days, and SCULPT appears in both. Per class type cannot say it; per time band cannot either.
+
+**A minimum is an integer, not a boolean.** A studio with twelve reformers may want three; Reform Collective wants one, and one booking runs as a semi-private.
+
+**`set_series_flex()` reaches the classes already made.** `update_series()` takes every field as a parameter and adding two more would change its signature, so flex got its own writer — and it matters that it touches existing occurrences: a studio that flips a series to flex and finds nothing changes for sixty days has been given a setting that does nothing. Pending, future, still-scheduled only.
+
+**Members see nothing, and the mechanism is that nobody asks.** `flex` is on `class_occurrences`, which the member app selects **by name** — the column is simply never in the list. No "unconfirmed", no "needs one more": telling somebody a class might not run is telling them not to bother booking it, which is the opposite of what a class one short needs.
+
+**The night-before deadline is computed from the class's LOCAL date**, stepping back a day and pinning the time, then interpreting that back in the zone — never by subtracting an interval, which drifts an hour across a clock change. The same trap `generate_occurrences()` was written around.
+
+**Idempotency is the occurrence's own state, not the `job_runs` claim.** A decided class is confirmed or cancelled and `flex_pending()` never returns it again. That is what makes a fifteen-minute sweep safe, and it has to be: the hours-before mode has a decision point at every hour of the day, and a once-a-day claim would answer only the first of them. `job_runs` records the pass and counts attempts rather than gating it.
+
+**`flex_confirmed_at` is a latch and the suite proves it.** A member drops out after the deadline, the headcount falls below the minimum, and the class still runs — because the coach has already been told to come in. Removing the latch makes that class cancel, which is exactly the assertion that fails.
+
+**Fill is measured on the classes that RAN.** A cancelled class has no fill rate, and averaging its zero into the flex figure would make flex look emptier than it is and argue against the very slots that are working. A flex slot filling as well as the core one beside it has earned core status; that is the number `flex_report()` exists for.
+
+**A teeth check found a hollow assertion, not a bug.** "A studio with flex off has nothing pending" passed with the `flex_enabled` gate removed — because that studio had no flex rows at all. It now has a series flagged flex whose studio switch is off, so the switch is the only thing standing between it and the sweep. Reverting the gate then returns 60 pending classes.
 
 **Studio closures are an instructor's dated exception one level up, and the two halves are different problems.** Ahead of the closure the GENERATOR must not make the classes — materialising a fortnight of Christmas classes so they can be cancelled again is a fortnight of emails nobody needed. Behind it, what is already on the calendar has to be cancelled properly.
 

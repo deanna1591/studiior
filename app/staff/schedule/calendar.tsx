@@ -51,6 +51,8 @@ export type CalEvent = {
   hoursAway: number;
   room: string | null;
   pendingApplications: number;
+  /** Decision 21: flex and not yet decided. False once confirmed. */
+  flexPending: boolean;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -262,6 +264,11 @@ export default function ScheduleCalendar({
         // the palette's loud slots are spent on staffing.
         boxShadow: f === "full" || f === "nearly_full"
           ? "inset 0 0 0 1.5px var(--lime-text)" : undefined,
+        // A flex class awaiting its deadline reads as provisional: a dashed
+        // edge, which is the same vocabulary the no-room block uses for "this
+        // is not settled yet".
+        outline: e.flexPending ? "1px dashed var(--ink-3)" : undefined,
+        outlineOffset: "-2px",
         opacity: f === "quiet" ? 0.92 : 1,
         color: "var(--ink)",
         borderRadius: 8,
@@ -325,7 +332,8 @@ export default function ScheduleCalendar({
                 </span>
               )}
               {event.waitlistCount === 0 && f === "full" && <span>Full</span>}
-              {event.waitlistCount === 0 && f === "quiet" && <span>Quiet</span>}
+              {event.waitlistCount === 0 && f === "quiet" && !event.flexPending && <span>Quiet</span>}
+              {event.flexPending && <span title="Runs only if it reaches its minimum">Flex</span>}
             </span>
           </div>
         </div>
@@ -434,6 +442,7 @@ export default function ScheduleCalendar({
             `${e.title} — ${e.room ?? "no room"} — ${e.bookedCount}/${e.capacity} booked`
             + (e.waitlistCount > 0 ? ` — ${e.waitlistCount} waiting` : "")
             + (e.staffing !== "assigned" ? " — nobody assigned" : "")
+            + (e.flexPending ? " — flex, undecided" : "")
             + " — click to open the roster"}
         />
         </div>
@@ -442,7 +451,8 @@ export default function ScheduleCalendar({
         Times shown in {timeZone}. Click a class to open its roster. Drag to move
         one between times or instructors; drag its edge to change how long it
         runs. A ring means full, a plain block means quiet with the class close
-        enough to do something about, and amber means nobody is teaching it.
+        enough to do something about, amber means nobody is teaching it, and a
+        dashed edge means a flex class still waiting on its deadline.
       </p>
     </div>
   );
