@@ -712,5 +712,70 @@ select expect_num('adding a room reduces the setup count without anybody ticking
       and (item ->> 'dismissed')::boolean is not true));
 reset role;
 
+
+\echo ''
+\echo '=== 8. A TITLE IS A NOUN FOR SOME TYPES AND A PHRASE FOR OTHERS (093) ==='
+-- "Deanna Sallao paid for Paid." A payment row titles itself with its STATUS
+-- and puts what was bought in `description`, with the amount in `metadata`.
+-- The reader used to select the title and drop both, so the one row carrying a
+-- plan name and a sum of money rendered as the word "Paid".
+reset role;
+insert into payments (studio_id, member_id, amount_cents, currency, status, description, paid_at)
+values ('da58da58-0000-0000-0000-00000000000b','da58da58-0000-0000-0000-0000000000d0',
+        1050000,'CZK','succeeded','Unlimited Monthly', now() - interval '1 hour');
+insert into payments (studio_id, member_id, amount_cents, currency, status, description, created_at)
+values ('da58da58-0000-0000-0000-00000000000b','da58da58-0000-0000-0000-0000000000d0',
+        280000,'CZK','failed','Monthly membership', now() - interval '2 hours');
+select rebuild_timeline_rows('da58da58-0000-0000-0000-0000000000d0');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','da58da58-0000-0000-0000-0000000000b1',false);
+select set_config('da58.act', dashboard_activity('da58da58-0000-0000-0000-00000000000b', 20)::text, false);
+
+select expect_text('a payment carries the plan it was for, not just its status',
+  (select i ->> 'description' from jsonb_array_elements(current_setting('da58.act')::jsonb -> 'items') i
+    where i ->> 'type' = 'payment' and i ->> 'payment_status' = 'succeeded' limit 1),
+  'Unlimited Monthly');
+select expect_num('and the amount, which was sitting unread in the metadata',
+  (select (i ->> 'amount_cents')::bigint from jsonb_array_elements(current_setting('da58.act')::jsonb -> 'items') i
+    where i ->> 'type' = 'payment' and i ->> 'payment_status' = 'succeeded' limit 1), 1050000);
+select expect_text('and its currency, so the screen never guesses one',
+  (select i ->> 'currency' from jsonb_array_elements(current_setting('da58.act')::jsonb -> 'items') i
+    where i ->> 'type' = 'payment' and i ->> 'payment_status' = 'succeeded' limit 1), 'CZK');
+-- A FAILED payment must not read as "paid". The status is what tells the two
+-- apart, and dropping it is how "paid for Payment failed" would happen next.
+select expect_text('a failed payment is distinguishable from a successful one',
+  (select i ->> 'payment_status' from jsonb_array_elements(current_setting('da58.act')::jsonb -> 'items') i
+    where i ->> 'type' = 'payment' and (i ->> 'amount_cents')::bigint = 280000 limit 1), 'failed');
+select expect_num('a visit has no amount, and does not pretend to',
+  (select count(*) from jsonb_array_elements(current_setting('da58.act')::jsonb -> 'items') i
+    where i ->> 'type' = 'attended' and i ->> 'amount_cents' is not null), 0);
+
+\echo ''
+\echo '--- an empty month is not an empty timetable ---'
+-- Reform Collective: September correct and empty, eleven series, 72 classes
+-- from 9 November, and the block offered to set up a recurring class.
+select set_config('da58.m_far', dashboard_month('da58da58-0000-0000-0000-00000000000b', '2028-06-01')::text, false);
+select expect_text('a month with nothing on says so',
+  current_setting('da58.m_far')::jsonb ->> 'state', 'empty');
+select expect_true('and points at the timetable rather than offering to create one',
+  (current_setting('da58.m_far')::jsonb -> 'next' ->> 'has_any')::boolean);
+select expect_true('naming a real day with classes on it',
+  (current_setting('da58.m_far')::jsonb -> 'next' ->> 'next') is not null
+  or (current_setting('da58.m_far')::jsonb -> 'next' ->> 'previous') is not null);
+
+-- A month that HAS classes carries no pointer: there is nothing to point at.
+select expect_true('a month with classes on it carries no pointer',
+  jsonb_typeof(dashboard_month('da58da58-0000-0000-0000-00000000000b') -> 'next') = 'null');
+
+-- The studio that genuinely has nothing anywhere still gets the create path.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','da58da58-0000-0000-0000-0000000000a1',false);
+select expect_true('a studio with no classes at all is told to set one up, not sent nowhere',
+  (dashboard_month('da58da58-0000-0000-0000-00000000000a') -> 'next' ->> 'has_any')::boolean is not true
+  and length(dashboard_month('da58da58-0000-0000-0000-00000000000a') ->> 'empty_hint') > 40);
+reset role;
+
 \echo ''
 \echo '=== dashboard suite complete ==='

@@ -28,6 +28,10 @@ export default function MonthSnapshot({
   const dowNames = Array.from({ length: 7 }, (_, i) =>
     ["S", "M", "T", "W", "T", "F", "S"][(weekStartsOn + i) % 7]);
   const max = Math.max(1, ...m.days.map((d) => d.classes));
+  const fmtDay = (iso: string) =>
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "UTC", weekday: "long", day: "numeric", month: "long",
+    }).format(new Date(`${iso}T00:00:00Z`));
 
   return (
     <Block
@@ -41,9 +45,55 @@ export default function MonthSnapshot({
       error={error}
     >
       {m.state === "empty" ? (
-        <BlockEmpty cta={{ href: "/series", label: "Set up a recurring class" }}>
-          {m.empty_hint}
-        </BlockEmpty>
+        /* AN EMPTY MONTH IS NOT AN EMPTY TIMETABLE. Reform Collective has
+           eleven series and 72 classes from 9 November; September being quiet
+           is correct, and offering to "set up a recurring class" over the top
+           of it is the calendar's own bug in a new place — a correct empty
+           view that cannot point at the timetable it is a view OF is
+           indistinguishable from a broken one. */
+        m.next?.has_any && (m.next.next ?? m.next.previous) ? (
+          /* next_class_day() answers FORWARD FIRST and backwards if the
+             timetable has ended — a studio whose generator stopped is exactly
+             the case migration 057 was written for, and it must not be told to
+             set one up when it has a year of history behind it. */
+          (() => {
+            const ahead = m.next.next != null;
+            const day = (m.next.next ?? m.next.previous)!;
+            const n = m.next.classes_that_day;
+            return (
+              <div className="rounded-lg border border-dashed border-line-2 px-4 py-5">
+                <p className="max-w-[52ch] text-[13px] leading-[19px] text-ink-2">
+                  Nothing on in {label}. Your classes{" "}
+                  {ahead ? "start on " : "ran up to "}
+                  <span className="text-ink">{fmtDay(day)}</span>
+                  {n ? (
+                    <> — <span className="num">{n}</span>{" "}
+                      {n === 1 ? "class" : "classes"} that day</>
+                  ) : null}
+                  {ahead ? "." : ", and nothing is scheduled after it."}
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-4">
+                  <Link
+                    href={`/schedule?d=${day}`}
+                    className="text-[12px] font-medium leading-4 text-lime-text underline underline-offset-4 hover:text-lime-text2"
+                  >
+                    {ahead ? "Go to the first of them" : "Go to the last of them"}
+                  </Link>
+                  <Link
+                    href={`/?month=${day.slice(0, 7)}-01`}
+                    className="text-[12px] leading-4 text-ink-3 underline underline-offset-4 hover:text-ink"
+                  >
+                    Show that month here
+                  </Link>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <BlockEmpty cta={{ href: "/series", label: "Set up a recurring class" }}>
+            {m.empty_hint}
+          </BlockEmpty>
+        )
       ) : (
         <>
           <div className="grid grid-cols-7 gap-1">

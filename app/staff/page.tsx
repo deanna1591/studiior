@@ -45,7 +45,7 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: { rev?: string };
+  searchParams: { rev?: string; month?: string };
 }) {
   const screen = await staffScreen("/");
   if (screen.gate) return screen.gate;
@@ -60,7 +60,13 @@ export default async function Dashboard({
   const [brief, data, todays] = await Promise.all([
     manager ? todaysBrief(supabase, ctx.studioId, ctx.timeZone) : Promise.resolve(null),
     manager
-      ? dashboardData(supabase, ctx.studioId, ctx.timeZone, { revenueDays: days })
+      ? dashboardData(supabase, ctx.studioId, ctx.timeZone, {
+          revenueDays: days,
+          // Only a real date reaches the database; anything else falls back to
+          // the current month rather than raising on a cast.
+          month: /^\d{4}-\d{2}-\d{2}$/.test(searchParams.month ?? "")
+            ? searchParams.month : null,
+        })
       : Promise.resolve(null),
     // The STUDIO's day, not the server's. A Manila studio's today is a
     // different date from the server's for most of the world's hours, and a
@@ -76,7 +82,9 @@ export default async function Dashboard({
   const dayLabel = relativeDayName(`${today}T12:00:00Z`, ctx.timeZone)
     ?? fmtDayLong(`${today}T12:00:00Z`, ctx.timeZone);
 
-  const revHref = (d: number) => (d === 30 ? "/" : `/?rev=${d}`);
+  const keepMonth = searchParams.month ? `&month=${searchParams.month}` : "";
+  const revHref = (d: number) =>
+    d === 30 && !keepMonth ? "/" : `/?rev=${d}${keepMonth}`;
 
   // Quick Add offers only what THIS role may actually do. The Bible's list is
   // nine items; four of them (challenge, workshop, promotion, announcement)
@@ -101,7 +109,7 @@ export default async function Dashboard({
 
   return (
     <AppShell {...shell} title="Dashboard">
-      <TopBar breadcrumb="Dashboard" quickAdd={quickAdd} search={searchStudio} />
+      <TopBar quickAdd={quickAdd} search={searchStudio} />
 
       {/* 4.2 — the narrative first. An owner who reads one sentence and closes
           the tab should still know what today looks like.

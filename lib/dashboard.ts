@@ -204,7 +204,11 @@ export type HealthBlock = {
 export type ActivityBlock = {
   state: "ok" | "empty";
   items: { id: string; type: string; title: string; description: string | null;
-           occurred_at: string; member_id: string; member_name: string; href: string }[];
+           occurred_at: string; member_id: string; member_name: string; href: string;
+           /** From the timeline row's own metadata — migration 021 has always
+            *  written these and this reader used to discard them. */
+           amount_cents: number | null; currency: string | null;
+           payment_status: string | null }[];
   empty_hint: string;
 };
 
@@ -220,6 +224,10 @@ export type MonthBlock = {
   days: { date: string; classes: number; booked: number; capacity: number;
           closed: boolean; closure_reason: string | null; is_today: boolean }[];
   week_starts_on: number;
+  /** Present only when the month is empty: where the timetable actually is.
+   *  From next_class_day(), the same answer the schedule's empty day gives. */
+  next: { next: string | null; previous: string | null; has_any: boolean;
+          classes_that_day: number | null } | null;
   total_classes: number; empty_hint: string;
 };
 

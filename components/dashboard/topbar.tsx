@@ -36,7 +36,10 @@ export type SearchItem = {
 export default function TopBar({
   breadcrumb, quickAdd, search,
 }: {
-  breadcrumb: string;
+  /** Optional, and omitted on the dashboard: `/` is the root, so its
+   *  breadcrumb is the page title, and AppShell already sets that as the h1.
+   *  Two DASHBOARDs stacked is the same word twice in two type sizes. */
+  breadcrumb?: string;
   quickAdd: { label: string; href: string; sub: string }[];
   search: (q: string) => Promise<SearchItem[]>;
 }) {
@@ -84,13 +87,15 @@ export default function TopBar({
     <>
       <div className="topbar -mx-5 mb-6 px-5 py-2.5 md:-mx-8 md:px-8">
         <div className="flex items-center gap-3">
-          {/* --ink-2, NOT --ink-3. This bar is translucent, so its ground is
-              whatever scrolls under it — measured at 4.43 with the amber money
-              banner behind it, which is under the floor. CLAUDE.md's rule for
-              the member app's page wash applies here for the same reason:
-              --ink-3 is 4.59 on pure white and any tint at all puts it below
-              4.5. --ink-2 measures 6.9 on the worst ground this bar can have. */}
-          <span className="section-label shrink-0 text-ink-2">{breadcrumb}</span>
+          {/* --ink-2, NOT --ink-3, wherever this does appear. The bar is
+              translucent, so its ground is whatever scrolls under it —
+              measured at 4.43 with the amber money banner behind it, under the
+              floor. CLAUDE.md's rule for the member app's page wash applies
+              here for the same reason: --ink-3 is 4.59 on pure white and any
+              tint at all puts it below 4.5. */}
+          {breadcrumb && (
+            <span className="section-label shrink-0 text-ink-2">{breadcrumb}</span>
+          )}
 
           <button
             onClick={() => setOpen(true)}
