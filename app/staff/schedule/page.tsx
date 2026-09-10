@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
-import { shiftDateKey, studioToday } from "@/lib/tz";
+import { shiftDateKey, studioDateKey, studioToday } from "@/lib/tz";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
 import JumpToDate from "./jump";
 import FillPanel from "./fill/panel";
@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function Schedule({
   searchParams,
-}: { searchParams: { d?: string; view?: string } }) {
+}: { searchParams: { d?: string; view?: string; all?: string } }) {
   const screen = await staffScreen("/schedule");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -118,15 +118,6 @@ export default async function Schedule({
     appCount.set(a.occurrence_id, (appCount.get(a.occurrence_id) ?? 0) + 1);
   }
 
-  // Unassigned first, deliberately: an open shift is the thing most likely to
-  // need doing something about, so it is the column you read before the others.
-  const resources: Resource[] = [
-    { resourceId: UNASSIGNED, resourceTitle: "Unassigned" },
-    ...(instructors ?? []).map((i) => ({
-      resourceId: i.id, resourceTitle: i.display_name,
-    })),
-  ];
-
   const now = Date.now();
   const events: CalEvent[] = occurrences.map((o) => ({
     id: o.occ_id,
@@ -177,6 +168,40 @@ export default async function Schedule({
       weekday: "long", day: "numeric", month: "long", timeZone: ctx.timeZone,
     }).format(new Date(`${d}T12:00:00Z`));
 
+  // Unassigned first, deliberately: an open shift is the thing most likely to
+  // need doing something about, so it is the column you read before the others.
+  const everyone: Resource[] = [
+    { resourceId: UNASSIGNED, resourceTitle: "Unassigned" },
+    ...(instructors ?? []).map((i) => ({
+      resourceId: i.id, resourceTitle: i.display_name,
+    })),
+  ];
+
+  // ONLY THE PEOPLE ACTUALLY TEACHING, unless asked otherwise.
+  //
+  // A column per instructor does not scale and was never tested past three. Six
+  // instructors is seven columns; twelve is thirteen, and on a quiet day every
+  // one of them reads "Free all day" — thirteen columns saying nothing, with the
+  // grid cut mid-column at the right edge. The day's own classes decide which
+  // columns exist.
+  //
+  // `?all=1` puts everyone back, and it has to exist: dragging a class onto
+  // somebody who is not teaching yet is how a class gets assigned, and a column
+  // that is not there cannot be dropped on.
+  const showAll = searchParams.all === "1";
+  // THE ANCHOR DAY ONLY. The fetch deliberately spans a day either side, so
+  // counting every event in `events` puts a column up for somebody who teaches
+  // tomorrow and shows it empty — the same "column saying nothing" in a new
+  // place. Measured: three columns for a day with two classes.
+  const busy = new Set(
+    events
+      .filter((e) => studioDateKey(new Date(e.startsAt), ctx.timeZone) === anchor)
+      .map((e) => e.resourceId),
+  );
+  const shown: Resource[] = showAll ? everyone : everyone.filter((r) => busy.has(r.resourceId));
+  const hiddenCount = everyone.length - shown.length;
+
+
   return (
     <AppShell {...shell} title="Schedule"
               actions={
@@ -187,12 +212,22 @@ export default async function Schedule({
                   <NavLink href="/classes/new">Add a class</NavLink>
                 </>
               }>
-      {resources.length > 1 && <FillPanel />}
+      {everyone.length > 1 && <FillPanel />}
 
       {events.length === 0 && (
         <p className="mb-4 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
           Nothing on {view === "week" ? "this week" : "this day"} in{" "}
           {ctx.timeZone.replace("_", " ")} — the studio&rsquo;s own clock, not yours.
+          {view === "day" && everyone.length > 1 && (
+            <>
+              {" "}Nobody is teaching on this day.{" "}
+              <Link href={`/schedule?d=${anchor}&view=day&all=1`}
+                    className="text-lime-text underline underline-offset-4">
+                Show all {everyone.length - 1} instructors
+              </Link>{" "}
+              to put somebody on.
+            </>
+          )}
           {elsewhere?.next ? (
             <>
               {" "}Your next classes are on{" "}
@@ -223,14 +258,50 @@ export default async function Schedule({
         </p>
       )}
 
-      {resources.length === 1 ? (
+      {/* WHO IS SHOWING, and how to see the rest. A day view whose columns are
+          only the people teaching is unreadable in a different way if it never
+          says so: an owner would think the others had been removed. */}
+      {view === "day" && everyone.length > 1 && shown.length > 0 && (
+        <p className="mb-3 text-[12.5px] leading-[18px] text-ink-2">
+          {showAll ? (
+            <>
+              Showing all <span className="num">{everyone.length - 1}</span> instructors.{" "}
+              <Link href={`/schedule?d=${anchor}&view=day`}
+                    className="text-lime-text underline underline-offset-4">
+                Show only who is teaching
+              </Link>
+            </>
+          ) : hiddenCount > 0 ? (
+            <>
+              Showing the{" "}
+              <span className="num">{shown.filter((r) => r.resourceId !== UNASSIGNED).length}</span>{" "}
+              {shown.filter((r) => r.resourceId !== UNASSIGNED).length === 1
+                ? "instructor" : "instructors"} teaching on this day.{" "}
+              <Link href={`/schedule?d=${anchor}&view=day&all=1`}
+                    className="text-lime-text underline underline-offset-4">
+                Show all {everyone.length - 1}
+              </Link>{" "}
+              <span className="text-ink-3">— needed to assign a class to somebody free.</span>
+            </>
+          ) : (
+            <>Every instructor is teaching on this day.</>
+          )}
+        </p>
+      )}
+
+      {everyone.length === 1 ? (
         <Empty>
           Add an instructor and your timetable will have columns to fill.{" "}
           <NavLink href="/instructors">Add one</NavLink>
         </Empty>
+      ) : view === "day" && shown.length === 0 ? (
+        // SAID ONCE, in the message above. An empty grid with no columns is
+        // worse than no grid, and a second block repeating the same sentence is
+        // how a screen starts shouting.
+        null
       ) : (
         <ScheduleCalendar
-          events={events} resources={resources}
+          events={events} resources={shown}
           timeZone={ctx.timeZone} deadlineHours={deadlineHours}
           quietPct={Number(quietPct ?? 0.4)}
           quietWindowDays={Number(quietDays ?? 7)}

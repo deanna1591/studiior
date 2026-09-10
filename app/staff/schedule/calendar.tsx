@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Views, dateFnsLocalizer, type View } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
@@ -371,6 +371,31 @@ export default function ScheduleCalendar({
     },
   }), [fullness, loadByResource]);
 
+  // WHEN THE GRID IS WIDER THAN THE PANE, SAY SO.
+  //
+  // The columns keep a readable floor and the view scrolls, which is right — but
+  // a grid cut mid-column at the right edge with only a scrollbar underneath
+  // reads as "this studio has four instructors and a blank one". The fade and
+  // the count are the two things that turn a cut edge into an obvious "there is
+  // more this way".
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [edge, setEdge] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
+  useEffect(() => {
+    const scroller = wrapRef.current?.querySelector<HTMLElement>(".rbc-time-view");
+    if (!scroller) return;
+    const read = () => {
+      const max = scroller.scrollWidth - scroller.clientWidth;
+      setEdge({ left: scroller.scrollLeft > 2, right: scroller.scrollLeft < max - 2 });
+    };
+    read();
+    scroller.addEventListener("scroll", read, { passive: true });
+    // The pane resizes with the rail drawer and the window; a fade that only
+    // measured once would sit there after the reason for it had gone.
+    const ro = new ResizeObserver(read);
+    ro.observe(scroller);
+    return () => { scroller.removeEventListener("scroll", read); ro.disconnect(); };
+  }, [resources, events, view]);
+
   return (
     <div>
       {notice && (
@@ -407,8 +432,31 @@ export default function ScheduleCalendar({
             </span>
           </div>
         )}
-        <div style={{ height: "100%", opacity: isPending ? 0.45 : 1,
+        <div ref={wrapRef} className="relative"
+             style={{ height: "100%", opacity: isPending ? 0.45 : 1,
                       transition: "opacity 120ms ease" }}>
+        {/* Painted OVER the grid's own edge, inside the rounded corner, and
+            never over the time gutter on the left. pointer-events none so it
+            cannot swallow a drag. */}
+        {edge.right && (
+          <>
+            <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12"
+                 style={{ background: "linear-gradient(to right, transparent, var(--surface))",
+                          borderTopRightRadius: 14, borderBottomRightRadius: 14 }} />
+            {/* Vertically centred on the right edge, not at the top: at the top
+                it sat level with the Day/Week toggle and read as part of the
+                toolbar. Here it is unmistakably attached to the grid's edge. */}
+            <div className="pointer-events-none absolute right-2 top-1/2 z-20 -translate-y-1/2
+                            rounded-full px-2.5 py-1 text-[11.5px] leading-4 text-ink"
+                 style={{ background: "var(--surface)", boxShadow: "0 1px 8px rgba(0,0,0,.18)" }}>
+              more <span aria-hidden>→</span>
+            </div>
+          </>
+        )}
+        {edge.left && (
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-14 z-10 w-10"
+               style={{ background: "linear-gradient(to left, transparent, var(--surface))" }} />
+        )}
         <DnDCalendar
           localizer={localizer}
           formats={formats}

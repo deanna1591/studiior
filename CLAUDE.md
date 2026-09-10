@@ -486,7 +486,27 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 
 **Verified across three zones at once**: server UTC, browser Europe/Prague, studio Asia/Manila. The grid opened on **Manila's** today (the 10th, while the server's was the 9th) with its classes at 00:00 and 15:30 Manila, the gutter starting at midnight because the data said so. 20 October — outside the old window entirely — now renders.
 
-**The instructor columns were not wrong.** `instructors_staff_read` is studio-scoped and the resource query returns exactly the studio's active instructors, checked directly; all resources render. The two lists reported are contiguous alphabetical runs of one list, which is horizontal clipping at seven columns rather than a wrong query — not reproduced here with three instructors, so the fix is defensive: a floor on column width and the view scrolls sideways instead of squeezing names until they read as the wrong people.
+**The instructor columns were not wrong, and the defensive fix for them was.** `instructors_staff_read` is studio-scoped and the resource query returns exactly the studio's active instructors; the two lists reported were contiguous alphabetical runs of one list, i.e. horizontal clipping. The fix — a floor on column width and sideways scrolling — was written without ever being run at more than three columns, and its own comment claimed "the header and the body scrolling together so a column never separates from its own classes". That was never measured and was not true.
+
+**AT SIX INSTRUCTORS EVERY HEADER SAT 33px LEFT OF THE COLUMN IT LABELLED.** Measured in the rendered DOM rather than eyeballed: the body gutter sizes itself to its `06:00` labels at **44px**, the header gutter holds nothing and collapsed to **11px**, and every column after them inherited the difference. The rightmost body column ran off the end of the header row with nothing above it — the reported "fifth column with an empty header". Nothing was missing: all seven headers were present with text, the rows were misaligned. Both gutters are now pinned to one width and the drift is 1px, which is a border.
+
+**A grid cut mid-column with only a scrollbar under it reads as "this studio has four instructors and a blank one".** When the columns are wider than the pane the right edge now fades into the surface and a `more →` pill sits on it, measured on scroll and on resize rather than assumed once — the pane changes width with the rail drawer. Centred vertically on purpose: at the top it sat level with the Day/Week toggle and read as part of the toolbar.
+
+**The real answer was that a column per instructor is the wrong default.** Six instructors is seven columns; twelve is thirteen, and on a quiet day every one reads "Free all day" — thirteen columns saying nothing. The day's own classes now decide which columns exist. `?all=1` puts everyone back and **has to exist**: dragging a class onto somebody who is not teaching yet is how it gets assigned, and a column that is not there cannot be dropped on. The screen says which it is showing, always.
+
+**`busy` was first computed from every event in hand, and that was wrong for the same reason the columns were.** The fetch deliberately spans a day either side, so an instructor teaching tomorrow got a column today and it stood empty — the same complaint in a new place. It is scoped to the anchor day in STUDIO time. Caught by driving the screen: three columns on a day with two classes.
+
+**Verified at three, six and twelve instructors, by reading the DOM:**
+
+| instructors | default columns | with `?all=1` | overflows | header drift |
+|---|---|---|---|---|
+| 3 | 2 | 4 | no | 1px |
+| 6 | 2 | 7 | yes, signalled | 1px |
+| 12 | 2 | 13 | yes, signalled | 1px |
+
+A day with no classes renders **no grid at all** and says so once, with the link to show everyone.
+
+**There is no automated guard on any of this**, and that is worth saying plainly: this project's suites are SQL and there is no JS test runner, so a column-width regression is caught by somebody driving the screen or not at all. That is exactly how the first version shipped untested at six columns.
 
 **Times are 24-hour on the calendar now**, like every other time in the product. react-big-calendar defaults to the locale's, which put "3:30 PM" beside a roster reading "15:30".
 

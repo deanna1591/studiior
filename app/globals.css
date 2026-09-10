@@ -485,11 +485,22 @@ body {
 .rbc-calendar .rbc-current-time-indicator { background-color: var(--coral); height: 2px; }
 
 /* A studio with six instructors is seven columns counting Unassigned, and at
-   that width react-big-calendar squeezes them until the names are unreadable —
-   which reads as "the wrong instructors are showing" rather than as "this needs
-   scrolling". Each column keeps a floor and the view scrolls sideways instead,
-   with the header and the body scrolling together so a column never separates
-   from its own classes. */
+   that width react-big-calendar squeezes them until the names are unreadable.
+   Each column keeps a floor and the view scrolls sideways instead.
+
+   THE HEADER AND THE BODY HAVE SEPARATE GUTTERS, and pinning them to the same
+   width is what makes a column line up with its own name. Measured at six
+   instructors: the body gutter sized itself to its "06:00" labels at 44px while
+   the header gutter, which holds nothing, collapsed to 11px — so every header
+   sat 33px to the LEFT of the column it labelled, and the rightmost column ran
+   off the end of the header row with nothing above it. That is the "column with
+   an empty header": not a missing header, a misaligned row. The previous version
+   of this comment claimed the two scrolled together; it was never measured. */
+.rbc-calendar .rbc-time-header-gutter,
+.rbc-calendar .rbc-time-gutter {
+  width: 56px; min-width: 56px; max-width: 56px; flex: 0 0 56px;
+  box-sizing: border-box;
+}
 .rbc-calendar .rbc-time-view { overflow-x: auto; }
 .rbc-calendar .rbc-time-header-content,
 .rbc-calendar .rbc-time-content { min-width: max-content; }
