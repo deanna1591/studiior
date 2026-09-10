@@ -14,6 +14,26 @@
 \set ON_ERROR_STOP on
 set client_min_messages = notice;
 
+create or replace function expect_true(label text, actual boolean)
+returns void language plpgsql as $$
+begin
+  if actual then raise notice 'PASS  %  (got true)', label;
+  else raise exception 'FAIL  %  expected true, got %', label, coalesce(actual::text,'null');
+  end if;
+end $$;
+
+create or replace function expect_raises(label text, stmt text, want_sqlstate text)
+returns void language plpgsql as $$
+begin
+  execute stmt;
+  raise exception 'FAIL  %  expected % but nothing was raised', label, want_sqlstate;
+exception when others then
+  if sqlstate = want_sqlstate then raise notice 'PASS  %  (got %)', label, sqlstate;
+  elsif sqlstate = 'P0001' and sqlerrm like 'FAIL%' then raise;
+  else raise exception 'FAIL  %  expected %, got % (%)', label, want_sqlstate, sqlstate, sqlerrm;
+  end if;
+end $$;
+
 create or replace function expect_num(label text, actual bigint, want bigint)
 returns void language plpgsql as $$
 begin
@@ -448,3 +468,154 @@ end $$;
 reset role;
 
 select 'ALL MEMBER ACCOUNT TESTS PASSED' as result;
+
+-- =============================================================================
+-- Migration 073: the invite is actually SENT
+-- =============================================================================
+-- member_invites and claim_member_account() have existed since 027 and nothing
+-- ever emailed one — the link was printed for an operator to paste into their
+-- own mail client, which works for one member and collapses at thirty.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+insert into members (id, studio_id, first_name, last_name, email, status) values
+  ('abababab-0000-0000-0000-00000000ee01','abababab-0000-0000-0000-000000000001',
+   'Ivan','Invitee','abab-ivan@example.com','active'),
+  -- NOT NULL, so "no email" is a blank one: an importer or a hand-typed row.
+  ('abababab-0000-0000-0000-00000000ee02','abababab-0000-0000-0000-000000000001',
+   'Nora','Noaddress','   ','active');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000a1',false);
+
+select set_config('t.inv1', (select invite_member('abababab-0000-0000-0000-00000000ee01')::text), false);
+select expect_text('inviting a member queues a notification',
+  (current_setting('t.inv1')::jsonb ->> 'queued'), 'true');
+-- Counted as postgres: a1 is FRONT DESK, who may send an invite under
+-- Permissions §5 and may not read the notification queue, which is manager-up.
+-- The zero this returned first was RLS working.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_num('...exactly one',
+  (select count(*) from notifications
+    where member_id = 'abababab-0000-0000-0000-00000000ee01'
+      and template_key = 'member_invite')::bigint, 1);
+select expect_true('...with a claim link on the studio''s own subdomain',
+  (current_setting('t.inv1')::jsonb ->> 'claim_url') like 'https://accounts-test.%/claim/%');
+
+-- Pressing the button twice on ONE invite must not send twice.
+set role authenticated;
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000a1',false);
+select set_config('t.again', (select invite_member('abababab-0000-0000-0000-00000000ee01')::text), false);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+-- A RESEND must actually send. The first press and the resend are different
+-- links, so they are different emails: two rows, not one swallowed by a dedupe
+-- key keyed on the member. Without this the suite passed with resend silently
+-- doing nothing, which is what reverting the key proved.
+select expect_num('resending sends a second email, with the new link',
+  (select count(*) from notifications
+    where member_id = 'abababab-0000-0000-0000-00000000ee01'
+      and template_key = 'member_invite')::bigint, 2);
+select expect_num('...and the newest one carries the newest link',
+  (select count(*) from notifications
+    where member_id = 'abababab-0000-0000-0000-00000000ee01'
+      and payload ->> 'claim_url' = (current_setting('t.again')::jsonb ->> 'claim_url'))::bigint, 1);
+select expect_num('a second press does not send a second email for the same link',
+  (select count(*) from notifications
+    where member_id = 'abababab-0000-0000-0000-00000000ee01'
+      and template_key = 'member_invite'
+      and payload ->> 'claim_url' = (current_setting('t.inv1')::jsonb ->> 'claim_url'))::bigint, 1);
+
+-- RESENDING supersedes: the previous token stops working.
+select expect_num('only one live invite exists at a time',
+  (select count(*) from member_invites
+    where member_id = 'abababab-0000-0000-0000-00000000ee01' and accepted_at is null)::bigint, 1);
+select expect_true('...and it is NOT the first token any more',
+  (current_setting('t.again')::jsonb ->> 'claim_url')
+    is distinct from (current_setting('t.inv1')::jsonb ->> 'claim_url'));
+select set_config('t.tok1',
+  (select split_part(current_setting('t.inv1')::jsonb ->> 'claim_url', '/claim/', 2)), false);
+select set_config('t.tok2',
+  (select split_part(current_setting('t.again')::jsonb ->> 'claim_url', '/claim/', 2)), false);
+set role anon;
+-- A superseded invite is DELETED, not marked invalid, so the preview returns no
+-- row at all — which the claim page already treats as "we do not recognise this
+-- link". Asserted as "not valid" rather than "valid = false", or the test would
+-- be asserting an implementation detail it does not care about.
+select expect_true('the superseded link is dead',
+  coalesce((select valid from member_invite_preview(current_setting('t.tok1'))), false) = false);
+select expect_true('...and the newest one works',
+  coalesce((select valid from member_invite_preview(current_setting('t.tok2'))), false));
+
+-- THE EMAIL IS FROM THE STUDIO. Migration 034's rule, and the reason
+-- accent_color exists: a member's mail must never wear Studiior's brand.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+update studios set accent_color = '#B85C38' where id = 'abababab-0000-0000-0000-000000000001';
+select set_config('t.mail', (select (render_notification(id)).html_body from notifications
+  where member_id='abababab-0000-0000-0000-00000000ee01' and template_key='member_invite'
+  order by created_at limit 1), false);
+select set_config('t.mailsub', (select (render_notification(id)).subject from notifications
+  where member_id='abababab-0000-0000-0000-00000000ee01' and template_key='member_invite'
+  order by created_at limit 1), false);
+select expect_true('the subject names the studio, not Studiior',
+  current_setting('t.mailsub') like '%' || (select name from studios where id='abababab-0000-0000-0000-000000000001') || '%'
+  and current_setting('t.mailsub') not like '%Studiior%');
+select expect_true('the body carries the studio''s accent',
+  position('B85C38' in current_setting('t.mail')) > 0);
+select expect_num('...and never Studiior''s lime',
+  (position('BEF738' in current_setting('t.mail')))::bigint, 0);
+
+-- THE COPY IS HONEST: a PWA, not a download.
+select expect_num('the email does not tell anybody to download an app',
+  (position('download our app' in lower(current_setting('t.mail')))
+   + position('download the app' in lower(current_setting('t.mail'))))::bigint, 0);
+select expect_true('...it says there is nothing to download and how to add it to a home screen',
+  current_setting('t.mail') like '%nothing to download%'
+  and lower(current_setting('t.mail')) like '%home screen%');
+select expect_num('and it offers no email-settings link, which that reader cannot use yet',
+  (select count(*) from (select 1 where current_setting('t.mail') like '%Choose which%emails%') z)::bigint, 0);
+
+-- A MEMBER WITH NO EMAIL IS TOLD SO, not failed silently.
+set role authenticated;
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000a1',false);
+select set_config('t.noem', (select invite_member('abababab-0000-0000-0000-00000000ee02')::text), false);
+select expect_text('a member with no email cannot be invited',
+  current_setting('t.noem')::jsonb ->> 'reason', 'no_email');
+select expect_true('...and is named, with what to do about it',
+  (current_setting('t.noem')::jsonb ->> 'member') = 'Nora Noaddress'
+  and (current_setting('t.noem')::jsonb ->> 'hint') is not null);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_num('...and nothing was queued for them',
+  (select count(*) from notifications
+    where member_id = 'abababab-0000-0000-0000-00000000ee02')::bigint, 0);
+
+-- A CLAIMED INVITE CANNOT BE REUSED.
+set role anon;
+select claim_member_account(current_setting('t.tok2'), 'a-good-password-1', 'Ivan Invitee');
+select expect_true('once claimed, the link is spent',
+  coalesce((select valid from member_invite_preview(current_setting('t.tok2'))), false) = false);
+-- A refused claim returns a reason code rather than raising, the same shape as
+-- book_class(): the caller is a signup form and a stack trace is not an answer.
+select expect_text('...and claiming again is refused, by name',
+  (select failure_reason from claim_member_account(
+     current_setting('t.tok2'), 'another-password-2', 'Ivan Invitee')), 'token_used');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000a1',false);
+select expect_text('a member who already has an account is not invited again',
+  (invite_member('abababab-0000-0000-0000-00000000ee01') ->> 'reason'), 'already_claimed');
+
+-- The status list, which is how staff know who has never been asked.
+select set_config('t.st', (select state from member_invite_status('abababab-0000-0000-0000-000000000001')
+  where m_id = 'abababab-0000-0000-0000-00000000ee01'), false);
+select expect_text('the status list knows who has claimed', current_setting('t.st'), 'claimed');
+select expect_text('...and who has no address to be asked at',
+  (select state from member_invite_status('abababab-0000-0000-0000-000000000001')
+    where m_id = 'abababab-0000-0000-0000-00000000ee02'), 'no_email');
+
+-- Permissions §5: front desk may invite; an instructor may not.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select 'invite tests done' as done;

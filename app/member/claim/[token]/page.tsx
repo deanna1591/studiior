@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { currentSlug } from "@/lib/tenant";
 import type { Database } from "@/lib/database.types";
 import ClaimForm from "./form";
+import InstallHelp from "./install";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,9 @@ export default async function Claim({ params }: { params: { token: string } }) {
         your classes, your history and your check-in code.
       </p>
       <ClaimForm token={params.token} email={inv.email ?? ""} slug={slug ?? ""} />
+      {/* The half the email could not do: which steps to show depends on the
+          phone reading them, and only the browser knows. */}
+      <InstallHelp studioName={inv.studio_name ?? "the studio"} />
     </main>
   );
 }

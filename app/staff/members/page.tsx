@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { dayMonthParts } from "@/lib/time";
-import { AppShell, Empty, Pill, PillRow, Rows } from "@/components/ui";
+import { AppShell, Empty, NavLink, Pill, PillRow, Rows } from "@/components/ui";
 import { HealthBand, HealthChip, bandOf, isLoud, type Band } from "@/components/health-band";
 import { MessageLink } from "@/components/message-link";
 
@@ -87,9 +87,13 @@ export default async function Members({
       {...shell}
       title="Members"
       actions={
-        <span className="num text-[13px] text-ink-3">
-          {all.length} <span className="font-sans">active</span>
-        </span>
+        <>
+          <span className="num text-[13px] text-ink-3">
+            {all.length} <span className="font-sans">active</span>
+          </span>
+          <NavLink href="/members/invites">Invites</NavLink>
+          <NavLink href="/members/new">Add a member</NavLink>
+        </>
       }
       filters={
         <PillRow>

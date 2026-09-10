@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
-import { AppShell, Empty, NavLink, Rows } from "@/components/ui";
+import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
+import { InviteOne } from "../invites/panel";
 import { HealthBand, bandOf } from "@/components/health-band";
 import { MessageLink } from "@/components/message-link";
 import InviteToApp from "@/components/invite-to-app";
@@ -150,6 +151,23 @@ export default async function MemberDetail({
         </>
       }
     >
+      {/* An account, or the way to offer one. Not buried in a section: for a
+          member who has never been invited this is the single most useful thing
+          on the screen, and until now the only way to send one was for an
+          operator to copy a link out of a database. */}
+      {isDeskUp(ctx.role) && !m.user_id && (
+        <section className="mb-6 rounded-xl border border-line bg-surface px-3.5 py-3">
+          <SectionLabel>App account</SectionLabel>
+          <p className="mb-2.5 mt-1 max-w-[58ch] text-[13px] leading-[19px] text-ink-2">
+            {m.email
+              ? <>{m.first_name} cannot sign in yet. An invite emails them a link to set a
+                  password — from {ctx.studioName}, with nothing to download.</>
+              : <>{m.first_name} has no email address, so there is nowhere to send an
+                  invite. Add one to their record first.</>}
+          </p>
+          {m.email && <InviteOne memberId={params.id} />}
+        </section>
+      )}
       {searchParams.recorded && (
         <p className="mb-4 border-l-[3px] px-3 py-2 text-[13px] leading-[18px] text-ink"
            style={{ borderLeftColor: "var(--lime-text)", background: "var(--lime-tint)" }}>

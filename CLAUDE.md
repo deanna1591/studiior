@@ -26,7 +26,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Seventy-two migrations, applying clean from `supabase db reset`:
+Seventy-three migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -48,6 +48,7 @@ Seventy-two migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **073** the member invite is finally SENT: `invite_member()`, `invite_members_bulk()` and `member_invite_status()`, a `member_invite` template that does not claim there is an app to download, and the two always-send lists learning it
 - **072** `next_class_day()` — an empty calendar can finally say where the timetable actually is, plus a date picker, after "the calendar is empty" turned out to be a correct empty day nobody could navigate off
 - **071** converging hosted with the files after **two migrations were edited in place once already applied** — `schedule_range` was raising on every call in production, and `purge_demo_data` had never gained its confirmation step there
 - **070** `schedule_range()` and `studio_today()` — the calendar asks for a range of the STUDIO's days and the day boundary is resolved in the database, after it rendered an empty grid for every day
@@ -100,7 +101,7 @@ Seventy-two migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Twenty-eight suites, **1,282 assertions**, all passing from a clean `db reset`:
+Twenty-eight suites, **1,306 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -112,7 +113,7 @@ Twenty-eight suites, **1,282 assertions**, all passing from a clean `db reset`:
 | `test/onboarding_test.sql` | 71 | platform-admin boundary, invite single-use and expiry, atomic acceptance, derived checklist, the stranded-user guards |
 | `test/health_score_test.sql` | 59 | Decision 14's five signals in priority order, every band including `new` and `insufficient_history`, reasons carrying real numbers |
 | `test/notifications_test.sql` | 55 | preferences suppress at queue time, a duplicate dedupe key is refused, a missing API key fails the row and not the cron, a second worker run cannot re-send a claimed one, no internal is executable by `authenticated` or `anon`, and a rendered email carries a reply-to, a folded room and a neutral accent |
-| `test/member_accounts_test.sql` | 40 | an unverified email cannot claim an existing member, a used or expired token fails, one login holds two memberships without either seeing the other, a lead books drop-in only |
+| `test/member_accounts_test.sql` | 65 | an unverified email cannot claim an existing member, a used or expired token fails, one login holds two memberships without either seeing the other, a lead books drop-in only; and migration 073's invites — inviting queues exactly one notification, a resend sends a second email and kills the first link, a claimed invite cannot be reused, the mail carries the studio's name and accent and never Studiior's lime, and a member with a blank email is refused by name rather than failing silently |
 | `test/member_app_test.sql` | 32 | history joins to real classes while someone else's past class stays hidden, the code rotates and only the desk resolves it, cancelling returns or consumes the credit and always frees the seat |
 | `test/brief_schedule_test.sql` | 32 | a studio past its send time is picked up and one that is not is skipped, a second run the same day is a no-op, a half-finished run retries, and an authenticated caller with no JWT is still refused |
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
@@ -204,6 +205,22 @@ The member PWA is built at `{slug}.studiior.app` — five screens on a bottom ta
 It is branded as the studio, including the browser tab, the bookmark and the name iOS uses on a home screen — `app/member/layout.tsx` titles it from `studio_by_slug()`. The word "Studiior" appears nowhere a member can see. `brand_color` is deliberately unused: an arbitrary hex with unverified contrast driving text or fills would silently break every ratio the palette was measured for, so identity is carried by the logo and the name.
 
 **No studio has a class photograph, and the redesign leans on them.** `class_types.image_url` exists (migration 035) and is null on every seeded class type, so the hero and the Coming-up row fall through to the derived accent gradient in every screenshot and demo. That is the honest fallback and it is built to look deliberate, but it is the same trap the terracotta accent was in: the photographic half of this design is invisible until a studio uploads something. Seeding a fake photograph would be worse than the gradient. Recorded, not fixed.
+
+**There was no way to add a member.** `/members` listed them and `/members/[id]` showed one; every member in every environment arrived through the importer or the demo generator. `/members/new` is the walk-in at the counter: name, preferred name, email, phone, date of birth, emergency contact, address, marketing consent. **Front desk, not manager-up** — Permissions §5 gives create to Owner, Manager AND Front Desk, and `members_desk_write` already implemented it; the person at the desk is exactly who does this.
+
+**Consent is a positive act, so the box is unticked and stays unticked.** A pre-ticked marketing box opts a walk-in into mail they never agreed to, and the copy beside it says their class emails and receipts arrive either way — because the fear that stops people ticking it is that saying no means hearing nothing.
+
+**The invite existed and was never sent.** `member_invites` and `claim_member_account()` have been there since migration 027, and `create_member_invite()` returned a raw token to whoever called it so the screen could print a link for an operator to paste into their own mail client. That works for one member and collapses at thirty — which is precisely the moment after an import. `invite_member()` wraps the existing minter and queues the email, so there is no path that creates an invite nobody is told about; `invite_members_bulk()` does everyone without an account; `member_invite_status()` answers who has claimed, who has been asked, and **who has never been asked** — a group that could not previously be known to exist.
+
+**The copy had to be true, and "download our app" would not have been.** There is no app. The member app is a PWA at `{slug}.studiior.app`, so the email links there and says there is nothing to download, and that adding it to the home screen is what makes it open like one. **Which home-screen steps to give depends on the phone reading them** — iOS only offers Add to Home Screen from Safari's share sheet and refuses it in Chrome, Android installs from the browser menu — and an email cannot know. `/claim/[token]` detects it on the client, renders "your phone" until it does, and shows nothing at all to somebody already reading from the home screen.
+
+**An invite gets no email-settings link.** `render_notification()`'s always-send footer says "we always send this one — it's about your booking or your membership" and offers the preferences screen; neither is true of an invite, and the reader has no account to reach that screen with. `member_invite` gets its own footer line: *"You are getting this because Reform Collective set up your account."* A control that does nothing is worse than no control.
+
+**The raw token sits in `notifications.payload` until sent, and that is stated rather than left to be noticed.** Only its hash is on `member_invites`; the email needs the token itself. Who can read that row: manager-up of the same studio, who can mint an invite for that member anyway, and the member — who has no account yet and whose token is dead by the time they do. It expires in fourteen days and a resend supersedes it.
+
+**The dedupe key is the TOKEN, not the member.** Pressing the button twice on one invite must not send twice; a resend is a different link and must. Keying on the member satisfies the first and silently breaks the second — and the suite passed with resend doing nothing until reverting the key exposed that the assertion for it was missing. The test now asserts two emails and two links.
+
+**Front desk can send an invite and cannot read the notification queue.** The first version of the test counted rows as the front-desk session and got zero, which was RLS working: §5 gives them create, `notifications_manager` is manager-up. Counted as postgres.
 
 **`/series` has two views, and the grid is the one that answers the question a studio is actually asking.** A weekly timetable — days as columns, hours as rows, each series drawn in each of its own days. A list of thirteen rows shows thirteen rows; the same thirteen in a grid make Reform Collective's **10:00–16:00 weekday hole impossible to miss**, and that hole is why somebody opens this screen. Rows span the hours in use plus one either side, deliberately including the empty middle — cropping to the busy band is what hides the gap.
 

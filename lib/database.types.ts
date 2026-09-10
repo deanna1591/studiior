@@ -5222,6 +5222,14 @@ export type Database = {
           week_start: string
         }[]
       }
+      invite_member: {
+        Args: { p_days?: number; p_member_id: string }
+        Returns: Json
+      }
+      invite_members_bulk: {
+        Args: { p_days?: number; p_member_ids?: string[]; p_studio_id: string }
+        Returns: Json
+      }
       is_desk_up: { Args: { target: string }; Returns: boolean }
       is_manager_up: { Args: { target: string }; Returns: boolean }
       is_owner: { Args: { target: string }; Returns: boolean }
@@ -5273,6 +5281,17 @@ export type Database = {
           studio_name: string
           studio_slug: string
           valid: boolean
+        }[]
+      }
+      member_invite_status: {
+        Args: { p_studio_id: string }
+        Returns: {
+          expires_at: string
+          full_name: string
+          invited_at: string
+          m_email: string
+          m_id: string
+          state: string
         }[]
       }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
