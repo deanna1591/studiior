@@ -5,7 +5,7 @@ type ShellProps = React.ComponentProps<typeof AppShell>;
 
 /** The three setup lists differ only in their rows, so the frame is shared. */
 export function SetupShell({
-  shell, title, blurb, newHref, newLabel, empty, count, children, archived,
+  shell, title, blurb, newHref, newLabel, empty, count, children, archived, tabs,
 }: {
   shell: Omit<ShellProps, "title" | "children">;
   title: string;
@@ -14,6 +14,8 @@ export function SetupShell({
   newLabel: string;
   empty: string;
   count: number;
+  /** Optional view switcher, sitting beside the primary action. */
+  tabs?: React.ReactNode;
   children: React.ReactNode;
   /** Archived rows, kept in their own section below the live ones. Mixed into
       the list they read as broken records rather than retired ones, and the
@@ -25,12 +27,15 @@ export function SetupShell({
       {...shell}
       title={title}
       actions={
+        <>
+        {tabs}
         <Link
           href={newHref}
           className="inline-flex items-center rounded bg-ink px-3.5 py-2 text-[13px] font-medium leading-[18px] text-paper hover:bg-ink-2"
         >
           {newLabel}
         </Link>
+        </>
       }
     >
       {blurb && <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">{blurb}</p>}

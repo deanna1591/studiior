@@ -205,6 +205,22 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 
 **No studio has a class photograph, and the redesign leans on them.** `class_types.image_url` exists (migration 035) and is null on every seeded class type, so the hero and the Coming-up row fall through to the derived accent gradient in every screenshot and demo. That is the honest fallback and it is built to look deliberate, but it is the same trap the terracotta accent was in: the photographic half of this design is invisible until a studio uploads something. Seeding a fake photograph would be worse than the gradient. Recorded, not fixed.
 
+**`/series` has two views, and the grid is the one that answers the question a studio is actually asking.** A weekly timetable — days as columns, hours as rows, each series drawn in each of its own days. A list of thirteen rows shows thirteen rows; the same thirteen in a grid make Reform Collective's **10:00–16:00 weekday hole impossible to miss**, and that hole is why somebody opens this screen. Rows span the hours in use plus one either side, deliberately including the empty middle — cropping to the busy band is what hides the gap.
+
+**It is the STANDING timetable and must not become a second calendar.** No instructors, no bookings, no dates. It answers "what does our week look like"; `/schedule` answers "what is actually happening", and the moment this grid grows a date the two start disagreeing. The blurb says so and links across.
+
+**`class_types.color` has existed since migration 001 and nothing had ever read it.** Four colours on the seed, unused in every screen — the same shape as `login_image_url` and `class_types.image_url` before them. The grid colours by class type, with a key above it.
+
+**A studio's own hex cannot be trusted behind text, so it never goes there.** The colour tints the block at **14%** and sets a 3px left stripe; the label is `--ink` on that tint. Measured across the extremes a studio could pick — including pure black — the worst is **12.43:1**, where a filled block in an arbitrary hex could promise nothing. Same rule as the member app's accent stripe. Key swatches carry a hairline, because a pale colour on a pale page is a shape that vanishes and a key that vanishes is not one.
+
+**The three states a studio needs to notice are the three the grid marks.** No room is a dashed coral outline and the words "no room" — there is no other signal, and a series with nowhere to happen is the one that will not materialise. Ended is half-opacity with the name struck through. Ending within thirty days carries its end date. All three verified in the rendered DOM rather than by reading the markup.
+
+**The weekly total counts classes, not series.** "15 classes a week from 13 series" — because one series on Monday, Wednesday and Friday is three classes and one row, and a studio deciding whether to add a midday class wants the first number. Each day column carries its own count under its name.
+
+**A rule the grid cannot lay out is named rather than dropped.** Only `FREQ=WEEKLY` has a place in a week; anything else is listed under the grid with a link to it, because a series silently missing from the timetable is worse than one the screen admits it cannot draw.
+
+**The view is remembered in a cookie, not localStorage.** The server has to know which tab to render or the page arrives as a list every time and flips after hydration — a flash on every visit for a preference that never changes.
+
 **`class_series` had a schema for sixty-three migrations and no form, so the only rows in it anywhere were the demo generator's.** A studio could not create a recurring class through the product at all — the same shape as `instructor_availability` before Decision 18 and `timeline_events` before 059. Recurring classes are now at `/series`: list, create, edit.
 
 **Editing a series did not fail to work — it DOUBLED the timetable, and that had to be found before anything was built.** 057's trigger only ever generates. Proved on a real series before writing a line: 52 occurrences at 07:00, change `time_of_day` to 08:00, **104 occurrences at 07:00 AND 08:00**, a year of the same class taught twice a week. And the quiet half beside it: change `capacity` from 8 to 20 and every materialised class stays on 8, which looks exactly like nothing having happened. So "the form's job is just to write the row correctly" is true of CREATE and false of EDIT; a form that wrote the row would have handed every studio a duplicated year through a button.
