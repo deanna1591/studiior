@@ -6,6 +6,7 @@ import { AppShell, Denied, NavLink, SectionLabel } from "@/components/ui";
 import { parseRrule } from "@/lib/rrule";
 import SeriesForm from "../form";
 import SeriesLifecycle from "../lifecycle";
+import SeriesGuarantee from "../guarantee";
 import { localDates, seriesOptions } from "../data";
 import { studioToday } from "@/lib/tz";
 
@@ -25,7 +26,7 @@ export default async function EditSeries({ params }: { params: { id: string } })
 
   const { data: s } = await supabase
     .from("class_series")
-    .select("id, name, class_type_id, room_id, instructor_id, capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day, description, status")
+    .select("id, name, class_type_id, room_id, instructor_id, capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day, description, status, guarantee_tier, minimum_bookings, core_min_bookings")
     .eq("id", params.id).maybeSingle();
   if (!s) notFound();
 
@@ -35,12 +36,15 @@ export default async function EditSeries({ params }: { params: { id: string } })
 
   // How much of the calendar this series is actually holding, so "twelve months
   // of classes" is a number on the screen rather than a claim in a sentence.
-  const [{ count: future }, { count: booked }] = await Promise.all([
+  const [{ count: future }, { count: booked }, { data: cfg }] = await Promise.all([
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("series_id", s.id).eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("series_id", s.id).eq("status", "scheduled").gt("booked_count", 0)
       .gte("starts_at", new Date().toISOString()),
+    supabase.from("studio_settings")
+      .select("guarantees_enabled, flex_enabled")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
   return (
@@ -83,6 +87,14 @@ export default async function EditSeries({ params }: { params: { id: string } })
         }}
       />
     
+      <SeriesGuarantee
+        id={s.id}
+        tier={(s.guarantee_tier ?? "core") as "core" | "flex" | "always"}
+        minBookings={s.guarantee_tier === "flex" ? s.minimum_bookings : s.core_min_bookings}
+        coreEnabled={cfg?.guarantees_enabled ?? false}
+        flexEnabled={cfg?.flex_enabled ?? false}
+      />
+
       <SeriesLifecycle
         id={s.id}
         name={s.name}

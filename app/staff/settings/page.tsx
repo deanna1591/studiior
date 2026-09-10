@@ -4,6 +4,7 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, SectionLabel } from "@/components/ui";
 import HorizonPanel from "./horizon";
 import TimingPanel from "./timing";
+import GuaranteesPanel from "./guarantees";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,9 @@ export default async function Settings() {
 
   const [{ data: settings }, { count: scheduled }, { data: last }] = await Promise.all([
     supabase.from("studio_settings")
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days")
+      // One string literal, not a concatenation: supabase-js infers the row type
+      // from the literal, and joining it across lines gives back GenericStringError.
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
@@ -55,6 +58,29 @@ export default async function Settings() {
             current={settings?.occurrence_horizon_days ?? 60}
             scheduled={scheduled ?? 0}
             furthest={furthest}
+          />
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <SectionLabel>Guarantees — when a class runs, and what it owes</SectionLabel>
+        <div className="mt-3">
+          <GuaranteesPanel
+            currency={ctx.currency ?? "CZK"}
+            s={{
+              guarantees_enabled: settings?.guarantees_enabled ?? false,
+              flex_enabled: settings?.flex_enabled ?? false,
+              core_min_bookings: settings?.core_min_bookings ?? 1,
+              core_cutoff_hours: settings?.core_cutoff_hours ?? 12,
+              core_unmet_pay_pct: settings?.core_unmet_pay_pct ?? 50,
+              flex_min_bookings: settings?.flex_min_bookings ?? 1,
+              flex_deadline_mode: settings?.flex_deadline_mode ?? "previous_day_at",
+              flex_deadline_time: settings?.flex_deadline_time ?? "20:00",
+              flex_deadline_hours: settings?.flex_deadline_hours ?? 12,
+              flex_unmet_pay_cents: settings?.flex_unmet_pay_cents ?? 0,
+              flex_standby_pay_cents: settings?.flex_standby_pay_cents ?? 0,
+              adjacency_minutes: settings?.adjacency_minutes ?? 90,
+            }}
           />
         </div>
       </section>

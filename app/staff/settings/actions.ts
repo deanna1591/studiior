@@ -88,3 +88,81 @@ export async function saveTiming(_prev: PlainState, fd: FormData): Promise<Plain
   revalidatePath("/settings"); revalidatePath("/availability");
   return { ok: true, message: "Saved." };
 }
+
+/**
+ * Decision 22's switches and the per-tier settings they gate.
+ *
+ * Eleven columns that had a default and nowhere to change it — the same shape as
+ * the occurrence horizon, which is why one studio was carrying 1,421 open
+ * classes nobody had agreed to teach. Off by default, so a studio that never
+ * opens this panel sees no change anywhere.
+ */
+export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = (k: string) => String(fd.get(k) ?? "") === "on";
+  const int = (k: string) => Number(String(fd.get(k) ?? ""));
+  // Money is entered in whole units and stored in cents. Never floats, and
+  // rounded once here rather than in three places downstream.
+  const cents = (k: string) => Math.round(Number(String(fd.get(k) ?? "")) * 100);
+
+  const guarantees = on("guarantees_enabled");
+  const flex = on("flex_enabled");
+  const coreMin = int("core_min_bookings");
+  const coreCut = int("core_cutoff_hours");
+  const corePct = int("core_unmet_pay_pct");
+  const flexMin = int("flex_min_bookings");
+  const mode = String(fd.get("flex_deadline_mode") ?? "previous_day_at");
+  const flexTime = String(fd.get("flex_deadline_time") ?? "20:00");
+  const flexHours = int("flex_deadline_hours");
+  const unmet = cents("flex_unmet_pay");
+  const standby = cents("flex_standby_pay");
+  const adjacency = int("adjacency_minutes");
+
+  const bad =
+    !Number.isFinite(coreMin) || coreMin < 0 ? "A core minimum cannot be negative."
+    : !Number.isFinite(coreCut) || coreCut < 0 ? "A cutoff cannot be negative."
+    : !Number.isFinite(corePct) || corePct < 0 || corePct > 100
+      ? "The holding rate is a percentage between 0 and 100."
+    : !Number.isFinite(flexMin) || flexMin < 0 ? "A flex minimum cannot be negative."
+    : mode === "hours_before" && (!Number.isFinite(flexHours) || flexHours < 0)
+      ? "A flex cutoff in hours cannot be negative."
+    : mode === "previous_day_at" && !/^\d{2}:\d{2}/.test(flexTime)
+      ? "Pick the time of day the flex cutoff falls."
+    : !Number.isFinite(unmet) || unmet < 0 ? "Unmet pay cannot be negative."
+    : !Number.isFinite(standby) || standby < 0 ? "Standby pay cannot be negative."
+    : !Number.isFinite(adjacency) || adjacency < 0 || adjacency > 1440
+      ? "Adjacency is a gap in minutes, up to a day."
+    : null;
+  if (bad) return { ok: false, message: bad };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({
+      guarantees_enabled: guarantees,
+      flex_enabled: flex,
+      core_min_bookings: Math.floor(coreMin),
+      core_cutoff_hours: Math.floor(coreCut),
+      core_unmet_pay_pct: Math.floor(corePct),
+      flex_min_bookings: Math.floor(flexMin),
+      flex_deadline_mode: mode,
+      flex_deadline_time: `${flexTime.slice(0, 5)}:00`,
+      flex_deadline_hours: Math.floor(Number.isFinite(flexHours) ? flexHours : 12),
+      flex_unmet_pay_cents: unmet,
+      flex_standby_pay_cents: standby,
+      adjacency_minutes: Math.floor(adjacency),
+    })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) {
+    return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  }
+  revalidatePath("/settings"); revalidatePath("/schedule"); revalidatePath("/series");
+  return {
+    ok: true,
+    message: !guarantees && !flex
+      ? "Saved. Both switches are off, so no class is evaluated and nothing is owed for one not running."
+      : "Saved.",
+  };
+}

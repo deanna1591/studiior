@@ -174,3 +174,45 @@ export async function deleteSeries(_prev: LifecycleState, fd: FormData): Promise
   refresh();
   redirect("/series");
 }
+
+/**
+ * The guarantee tier, per series.
+ *
+ * Its own writer, deliberately: `update_series()` takes every field as a
+ * parameter and adding two more would change its signature, and migration 080's
+ * `set_series_guarantee()` also reaches the classes already on the calendar — a
+ * studio that changes a tier and finds nothing different for sixty days has been
+ * given a setting that does nothing.
+ */
+export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promise<LifecycleState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const tier = String(fd.get("tier") ?? "core") as "core" | "flex" | "always";
+  const raw = String(fd.get("min_bookings") ?? "").trim();
+  const min = raw === "" ? null : Number(raw);
+  if (min !== null && (!Number.isFinite(min) || min < 0)) {
+    return { ok: false, message: "A minimum cannot be negative." };
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_series_guarantee", {
+    p_series_id: String(fd.get("id") ?? ""),
+    p_tier: tier,
+    p_min_bookings: min === null ? undefined : Math.floor(min),
+    p_core_cutoff_hours: undefined,
+  });
+  if (error) return { ok: false, message: say(error.message) };
+
+  refresh();
+  const n = (data as unknown as { occurrences_updated?: number })?.occurrences_updated ?? 0;
+  return {
+    ok: true,
+    message:
+      (tier === "always"
+        ? "Set to always. It runs whatever the numbers are and is never cancelled for them."
+        : tier === "flex"
+        ? "Set to flex. It runs only if it reaches its minimum by the cutoff."
+        : "Set to core. It runs if it reaches its minimum, and pays a holding rate if it does not.")
+      + (n ? ` ${n} class${n === 1 ? "" : "es"} already on the calendar updated.` : ""),
+  };
+}

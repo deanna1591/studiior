@@ -742,6 +742,57 @@ select expect_raises('...nor close a period',
 select expect_true('...but does read the tier and cutoff of a class in their own studio',
   (select tier is not null from occurrence_guarantee('9a179a17-0000-0000-0000-00000000a001')));
 
+-- =============================================================================
+-- 19. THE WRITER ITSELF (migration 088)
+-- =============================================================================
+-- set_series_guarantee() raised on every call from migration 081 until 088:
+-- 081 renamed flex_confirmed_at to committed_at and re-issued four functions,
+-- missing the one 080 had just created against the old name. Nothing caught it
+-- because `guarantee_tier` had no control anywhere, so its only writer was never
+-- called — and this suite set tiers by inserting rows with the column already
+-- populated, which exercises the read path and not the write.
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+set role authenticated;
+
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id,
+                          capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day)
+values ('9a179a17-0000-0000-0000-00000000f1a1','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        'TIER ME','9a179a17-0000-0000-0000-00000000ee01',6,50,
+        'FREQ=WEEKLY;BYDAY=MO', current_date + 20, current_date + 60, '15:00');
+
+select expect_text('a series starts on the core tier',
+  (select guarantee_tier::text from class_series where id='9a179a17-0000-0000-0000-00000000f1a1'), 'core');
+select expect_true('setting it to flex answers ok',
+  ((set_series_guarantee('9a179a17-0000-0000-0000-00000000f1a1','flex',4)) ->> 'ok')::boolean);
+select expect_text('...and the series is flex',
+  (select guarantee_tier::text from class_series where id='9a179a17-0000-0000-0000-00000000f1a1'), 'flex');
+select expect_true('...with the boolean kept in step, because that is what Decision 21 readers use',
+  (select flex from class_series where id='9a179a17-0000-0000-0000-00000000f1a1'));
+select expect_num('...and the minimum recorded',
+  (select minimum_bookings from class_series where id='9a179a17-0000-0000-0000-00000000f1a1')::bigint, 4);
+
+-- IT REACHES THE CLASSES ALREADY ON THE CALENDAR. A studio that changes a tier
+-- and finds nothing different for sixty days has been given a setting that does
+-- nothing, which is the whole reason this has its own writer.
+select expect_true('the classes already made are moved onto the new tier',
+  (select count(*) > 0 from class_occurrences
+    where series_id='9a179a17-0000-0000-0000-00000000f1a1' and guarantee_tier = 'flex'));
+select expect_num('...and none is left on the old one',
+  (select count(*) from class_occurrences
+    where series_id='9a179a17-0000-0000-0000-00000000f1a1'
+      and starts_at > now() and status='scheduled' and guarantee_tier <> 'flex'), 0);
+
+select expect_true('and back to always',
+  ((set_series_guarantee('9a179a17-0000-0000-0000-00000000f1a1','always')) ->> 'ok')::boolean);
+select expect_text('...which clears the flex boolean too',
+  (select guarantee_tier::text || ':' || flex::text
+     from class_series where id='9a179a17-0000-0000-0000-00000000f1a1'), 'always:false');
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a6',false);
+select expect_raises('a member cannot set a tier',
+  $$select set_series_guarantee('9a179a17-0000-0000-0000-00000000f1a1','core',1)$$, 'PT403');
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'guarantee and pay suite finished' as done;
