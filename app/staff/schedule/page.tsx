@@ -49,11 +49,25 @@ export default async function Schedule({
   const today = studioToday(ctx.timeZone);
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.d ?? "") ? searchParams.d! : today;
 
-  // A day either side of what is shown, so a class that runs past midnight and
-  // the arrows both have something to land on.
+  // WHICH DAY A WEEK STARTS ON IS THE STUDIO'S, AND BOTH SIDES MUST AGREE.
+  // This hardcoded Monday while react-big-calendar rendered Sunday-first — its
+  // localizer is handed date-fns' bare startOfWeek, which defaults to Sunday
+  // when no locale reaches it. With an anchor on a Sunday the server then
+  // fetched the Monday-based week BEHIND it while the grid drew the
+  // Sunday-based week starting at it: two days of overlap, five columns empty,
+  // and a refresh could not help because nothing was stale — it was simply the
+  // wrong week. `week_starts_on` has been a setting since migration 001 and
+  // neither side was reading it.
+  // From the staff context, which every screen already fetches — not a
+  // second round trip in front of the range this decides.
+  const weekStartsOn = ctx.weekStartsOn;
   const [y, m, d] = anchor.split("-").map(Number);
   const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  const weekStart = view === "week" ? shiftDateKey(anchor, -((dow + 6) % 7)) : anchor;
+  // A day either side of what is shown, so a class that runs past midnight and
+  // the arrows both have something to land on.
+  const weekStart = view === "week"
+    ? shiftDateKey(anchor, -(((dow - weekStartsOn) + 7) % 7))
+    : anchor;
   const from = shiftDateKey(weekStart, -1);
   const to = shiftDateKey(weekStart, view === "week" ? 7 : 1);
 
@@ -77,7 +91,8 @@ export default async function Schedule({
       supabase.from("shift_applications")
         .select("occurrence_id").eq("status", "pending"),
       supabase.from("studio_settings")
-        .select("unstaffed_deadline_hours").eq("studio_id", ctx.studioId).maybeSingle(),
+        .select("unstaffed_deadline_hours, week_starts_on")
+        .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "overfilled_pct" }),
@@ -313,7 +328,7 @@ export default async function Schedule({
           quietPct={Number(quietPct ?? 0.4)}
           quietWindowDays={Number(quietDays ?? 7)}
           fullPct={Number(fullPct ?? 0.95)}
-          anchor={anchor} today={today} view={view}
+          anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
         />
       )}

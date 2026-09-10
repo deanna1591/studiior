@@ -5837,6 +5837,50 @@ export type Database = {
         }
       }
       evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_null: {
+        Args: { actual: string; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -5974,6 +6018,7 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: boolean
       }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -6064,6 +6109,7 @@ export type Database = {
         }
         Returns: Json
       }
+      narrative_covers_days: { Args: { p_facts: Json }; Returns: number }
       narrative_numbers: { Args: { p_text: string }; Returns: string[] }
       narrative_offending_number: {
         Args: { p_allowed: string[]; p_text: string }
@@ -6152,6 +6198,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: {
         Args: { p_confirm?: boolean; p_studio_id: string }
         Returns: Json
@@ -6532,6 +6579,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -6549,6 +6597,7 @@ export type Database = {
           studio_name: string
           studio_status: string
           studio_timezone: string
+          studio_week_starts_on: number
           user_id: string
         }[]
       }

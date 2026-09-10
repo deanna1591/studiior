@@ -16,9 +16,28 @@ import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 // carries instants and gains its two Dates in lib/tz's projection.
 const DnDCalendar = withDragAndDrop<WallEvent, Resource>(Calendar as never);
 
-const localizer = dateFnsLocalizer({
-  format, parse, startOfWeek, getDay, locales: { "en-GB": enGB },
-});
+/**
+ * WHICH DAY THE WEEK STARTS ON IS THE STUDIO'S.
+ *
+ * This used to be one module-level localizer handed date-fns' bare
+ * `startOfWeek`, which defaults to SUNDAY when no locale reaches it — and
+ * react-big-calendar passes none unless the Calendar carries a `culture`. So
+ * the grid drew Sunday-first while the page fetched a Monday-based week, and
+ * `studio_settings.week_starts_on` — a column since migration 001 — decided
+ * nothing at all. An anchor landing on a Sunday then had the server fetch the
+ * week BEHIND the one on screen: two days of overlap and five empty columns,
+ * with a refresh unable to help because nothing was stale.
+ *
+ * Built per studio and memoised, because a new localizer object on every
+ * render remounts react-big-calendar's internals.
+ */
+function makeLocalizer(weekStartsOn: number) {
+  const w = ((weekStartsOn % 7) + 7) % 7 as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  return dateFnsLocalizer({
+    format, parse, getDay, locales: { "en-GB": enGB },
+    startOfWeek: (date: Date) => startOfWeek(date, { weekStartsOn: w }),
+  });
+}
 
 // 24-hour, like every other time in the product. react-big-calendar's default
 // is the locale's, which gave "3:30 PM" beside a roster reading "15:30".
@@ -64,7 +83,7 @@ type WallEvent = CalEvent & { start: Date; end: Date };
 export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct,
-  anchor, today, view, minHour, maxHour,
+  anchor, today, view, minHour, maxHour, weekStartsOn,
 }: {
   events: CalEvent[];
   resources: Resource[];
@@ -81,14 +100,38 @@ export default function ScheduleCalendar({
   anchor: string;
   today: string;
   view: "day" | "week";
+  /** 0 = Sunday .. 6 = Saturday, the studio's own. The grid and the query
+   *  behind it must not disagree about which seven days a week is. */
+  weekStartsOn: number;
   /** Derived from what is actually on the schedule, in studio time. */
   minHour: number;
   maxHour: number;
 }) {
-  const [events, setEvents] = useState(initial);
   // The date and the view are URL state, not component state. They decide which
   // days are FETCHED, and holding them here is what made every month outside a
   // fixed 35-day window render as an empty grid.
+  //
+  // EVENTS ARE STATE ONLY SO A DRAG CAN MOVE ONE BEFORE THE SERVER ANSWERS,
+  // AND THAT COST A WEEK OF THE CALENDAR. `useState(initial)` reads its
+  // argument on the first render of a component INSTANCE and never again;
+  // navigating to another week is a router.push, which re-renders this
+  // component rather than remounting it. So the grid moved to the new week
+  // while `events` still held the old one, and the only classes that survived
+  // were the ones in the overlap — the day-either-side padding, which is the
+  // Sunday and Monday at the end of the previous fetch. A browser refresh
+  // "fixed" it because a fresh mount is the one thing that re-reads `initial`.
+  //
+  // Reset during render rather than in an effect: React re-runs the component
+  // immediately and never commits the stale output, so there is no frame
+  // showing last week's classes under this week's dates. An effect would show
+  // that frame every time.
+  const localizer = useMemo(() => makeLocalizer(weekStartsOn), [weekStartsOn]);
+  const [events, setEvents] = useState(initial);
+  const [lastServed, setLastServed] = useState(initial);
+  if (initial !== lastServed) {
+    setLastServed(initial);
+    setEvents(initial);
+  }
   const [notice, setNotice] = useState<string | null>(null);
   const [blockedBy, setBlockedBy] = useState<
     { occurrenceId: string; name: string; at: string; who: string | null; room: string | null } | null

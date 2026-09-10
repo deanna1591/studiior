@@ -13,6 +13,10 @@ export type StaffContext = {
   studioName: string;
   locationName: string | null;
   timeZone: string;
+  /** 0 = Sunday .. 6 = Saturday. The studio's own, from staff_bootstrap()
+   *  — the calendar and the query behind it must not disagree about which
+   *  seven days a week is. */
+  weekStartsOn: number;
   currency: string;
   onboardingComplete: boolean;
   studioStatus: string;
@@ -94,6 +98,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     studioName: row.studio_name,
     locationName: row.location_name ?? null,
     timeZone: row.studio_timezone,
+    weekStartsOn: row.studio_week_starts_on ?? 1,
     currency: row.studio_currency,
     studioStatus: row.studio_status,
     onboardingComplete: row.onboarding_complete === true,

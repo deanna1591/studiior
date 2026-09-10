@@ -456,6 +456,54 @@ select expect_text('...their studio, so nothing else has to ask',
   (select (studio_name is not null and studio_timezone is not null)::text from staff_bootstrap()), 'true');
 select expect_text('...and whether onboarding is done',
   (select (onboarding_complete is not null)::text from staff_bootstrap()), 'true');
+
+-- Migration 094. WHICH DAY A WEEK STARTS ON IS THE STUDIO'S, and it rides
+-- here because the calendar has to know it BEFORE it can ask which seven days
+-- to fetch — a separate read would be a serial round trip in front of the
+-- range it decides. /schedule computed a Monday week on the server while
+-- react-big-calendar drew a Sunday one, so an anchor on a Sunday fetched the
+-- week behind the one on screen: two days of overlap and five empty columns.
+select expect_text('the bootstrap carries which day the studio''s week starts on',
+  (select (studio_week_starts_on is not null)::text from staff_bootstrap()), 'true');
+select expect_num('and it is the studio''s own setting, not a constant',
+  (select studio_week_starts_on::bigint from staff_bootstrap()),
+  (select week_starts_on::bigint from studio_settings
+    where studio_id = (select studio_id from studio_staff
+                        where user_id = '88888888-0000-0000-0000-0000000000a2' limit 1)));
+reset role;
+
+-- Moved, and the bootstrap moves with it. A default that happens to match the
+-- setting proves nothing about whether the setting is being read.
+update studio_settings set week_starts_on = 0
+ where studio_id = (select studio_id from studio_staff
+                     where user_id = '88888888-0000-0000-0000-0000000000a2' limit 1);
+set role authenticated;
+select set_config('request.jwt.claim.sub','88888888-0000-0000-0000-0000000000a2',false);
+select expect_num('a studio whose week starts on Sunday is told so',
+  (select studio_week_starts_on::bigint from staff_bootstrap()), 0);
+-- The arithmetic the schedule page mirrors in TypeScript, asserted against the
+-- SQL twin that has existed since migration 067. A Wednesday under a Sunday
+-- week belongs to the Sunday three days earlier.
+select expect_text('and studio_week_start agrees with it',
+  studio_week_start((select studio_id from studio_staff
+                      where user_id = '88888888-0000-0000-0000-0000000000a2' limit 1),
+                    date '2026-09-16')::text, '2026-09-13');
+reset role;
+update studio_settings set week_starts_on = 1
+ where studio_id = (select studio_id from studio_staff
+                     where user_id = '88888888-0000-0000-0000-0000000000a2' limit 1);
+set role authenticated;
+select set_config('request.jwt.claim.sub','88888888-0000-0000-0000-0000000000a2',false);
+select expect_text('back on Monday, the same Wednesday belongs to a different week',
+  studio_week_start((select studio_id from studio_staff
+                      where user_id = '88888888-0000-0000-0000-0000000000a2' limit 1),
+                    date '2026-09-16')::text, '2026-09-14');
+-- The Sunday that broke it: under a Monday week it belongs to the week BEHIND
+-- it, which is exactly what the page must fetch and the grid must draw.
+select expect_text('and a Sunday belongs to the week behind it, not the one it opens',
+  studio_week_start((select studio_id from studio_staff
+                      where user_id = '88888888-0000-0000-0000-0000000000a2' limit 1),
+                    date '2026-09-20')::text, '2026-09-14');
 reset role;
 
 -- Staff of nowhere. getStaffContext() must return null here rather than

@@ -27,7 +27,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Ninety-three migrations, applying clean from `supabase db reset`:
+Ninety-four migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -49,6 +49,7 @@ Ninety-three migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **094** `staff_bootstrap()` carries `studio_week_starts_on`, because the calendar has to know which day a week starts on BEFORE it can ask which seven days to fetch. A `returns table` cannot gain a column through `create or replace`, so this drops first — and a drop discards the ACL, which the migration revokes and then asserts
 - **093** three things the dashboard got wrong on REAL data, fixed forward because 091 and 092 are applied on hosted: the activity feed read a payment's status as though it were the thing bought, the month's empty state offered to create a timetable to a studio that has one starting later, and the page title appeared twice
 - **092** the AI layer, and the boundary drawn mechanically rather than promised: `dashboard_facts()` publishes the exact set of numbers a narrative may contain, `narrative_offending_number()` refuses any answer containing one outside it, and the deterministic sentence is written BEFORE the call so a refusal, a timeout, a missing key or an outage degrades to prose that is already correct
 - **091** Bible Ch. 4's dashboard, every figure computed in SQL: `dashboard_kpis`, `dashboard_revenue`, `dashboard_heatmap`, `dashboard_health`, `dashboard_activity`, `dashboard_tasks`, `dashboard_month`, `dashboard_absent_cards`, and `studio_day_bounds()` as the range form of `studio_today()`. Every block distinguishes "this has never happened" from "it did not happen today"
@@ -122,7 +123,7 @@ Ninety-three migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Thirty-one suites, **1,651 assertions**, all passing from a clean `db reset`:
+Thirty-one suites, **1,657 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -535,6 +536,20 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 A day with no classes renders **no grid at all** and says so once, with the link to show everyone.
 
 **There is no automated guard on any of this**, and that is worth saying plainly: this project's suites are SQL and there is no JS test runner, so a column-width regression is caught by somebody driving the screen or not at all. That is exactly how the first version shipped untested at six columns.
+
+**THE WEEK RENDERED TWO DAYS AND THE REST APPEARED ON A REFRESH — TWO SEPARATE BUGS WITH ONE SYMPTOM.** Reported as a partial render on navigation, and diagnosed by logging the range the server fetched against the dates the client actually held, at three zones in one pass: server UTC, browser Europe/Prague, studio Asia/Manila.
+
+**Neither was a hydration mismatch**, which was the reasonable first guess and is what two earlier faults on this screen were. There was no hydration warning in the console because the server and the client never disagreed about a render — they disagreed about *which week*, and about *when state is read*.
+
+**1. `useState(initial)` READS ITS ARGUMENT ONCE PER COMPONENT INSTANCE.** Navigating is a `router.push`, which RE-RENDERS this component rather than remounting it, so the grid moved to the new week while `events` still held the old one. Measured: after pressing Next, the server had sent 20–28 September and the component was rendering from 13–21. The only classes that survived were the overlap — and because the fetch deliberately spans a day either side, that overlap is the **Sunday and Monday** at the end of the previous week's range. Three events where thirteen belonged. A browser refresh "fixed" it because a fresh mount is the one thing that re-reads `initial`. Events are state ONLY so a drag can move a class before the server answers, and that convenience cost a week of the calendar. Reset happens **during render**, not in an effect — React re-runs the component immediately and never commits the stale output, where an effect would show that frame every time.
+
+**2. THE SERVER COMPUTED MONDAY-BASED WEEKS AND THE CALENDAR DREW SUNDAY-BASED ONES.** `dateFnsLocalizer` was handed date-fns' bare `startOfWeek`, which defaults to Sunday when no locale reaches it — and react-big-calendar passes none unless the Calendar carries a `culture`. So with an anchor on a Sunday the page fetched the Monday week BEHIND the one on screen: **two days of overlap, five empty columns, and a refresh could not help because nothing was stale — it was simply the wrong week.** Proved on a direct load, where stale state is impossible: `?d=2026-09-20&view=week` fetched 13–21 and drew 20–26, rendering 3 of 13.
+
+**`week_starts_on` has been a column since migration 001 and NEITHER SIDE WAS READING IT.** The studio said Monday and the grid drew Sunday. Both sides read it now, and the page's TypeScript is the exact mirror of `studio_week_start()`, which has existed since migration 067 and which the page could not call without putting a serial round trip in front of the range it decides — which is why migration 094 puts the setting on the bootstrap instead, beside `studio_timezone`, the same kind of fact.
+
+**Verified at three zones, both settings, direct and by navigation:** Monday studio renders `14 Mon … 20 Sun` with 13 events; three consecutive Next presses and a Back give 13 every time; the Sunday anchor that rendered 3 renders 13; and with the studio moved to `week_starts_on = 0` the grid becomes `13 Sun … 19 Sat`, still 13. A class inserted into the displayed week appears after navigating away and back — 13 → 14 with no browser refresh, which is the same path `router.refresh()` uses after a drag or a create, and which was silently broken by the same fault.
+
+**There is no automated guard on either fix.** This project's suites are SQL and there is no JS test runner: the bootstrap column, the week arithmetic and both settings are asserted in `test/onboarding_test.sql` and teeth-checked, but the staleness and the localizer are React and react-big-calendar behaviour, verified only by driving the browser and reading the DOM.
 
 **Times are 24-hour on the calendar now**, like every other time in the product. react-big-calendar defaults to the locale's, which put "3:30 PM" beside a roster reading "15:30".
 
