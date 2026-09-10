@@ -835,6 +835,94 @@ delete from class_series where id = '5e215e21-0000-0000-0000-00000000fd01';
 select expect_num('the purge path is not blocked by the new guard',
   (select count(*) from class_series where id='5e215e21-0000-0000-0000-00000000fd01'), 0);
 
+-- =============================================================================
+-- Migration 087: the edit reports WHAT IT DID, not what it predicted
+-- =============================================================================
+-- REFORMER FLOW was retimed on Reform Collective, the series row changed, the
+-- nineteen classes did not, and the studio was told it had worked. `v_moves` was
+-- incremented only in the preview loop and returned as `moved`, so an apply that
+-- moved nothing still answered with the prediction.
+
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a1',false);
+set local role authenticated;
+
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id,
+                          capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day)
+values ('5e215e21-0000-0000-0000-00000000fb01','5e215e21-0000-0000-0000-000000000001',
+        '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
+        'RETIME ME','5e215e21-0000-0000-0000-00000000ee01',8,50,
+        'FREQ=WEEKLY;BYDAY=MO', current_date + 30, current_date + 90, '19:00');
+
+select expect_true('the series materialised at 19:00',
+  (select count(*) > 0 from class_occurrences
+    where series_id='5e215e21-0000-0000-0000-00000000fb01'
+      and (starts_at at time zone 'Europe/Prague')::time = time '19:00'));
+
+-- A one-off holding the same room at 18:00 on every one of those days, so every
+-- move the apply loop attempts is refused by occ_room_no_overlap. This is the
+-- shape that used to be invisible: the preview counts the moves, the apply
+-- cannot make them, and the old return said they had been made.
+insert into class_occurrences (studio_id, location_id, class_type_id, name, room_id,
+                               capacity, starts_at, ends_at)
+select '5e215e21-0000-0000-0000-000000000001','5e215e21-0000-0000-0000-00000000000c',
+       '5e215e21-0000-0000-0000-00000000cc01','Blocker','5e215e21-0000-0000-0000-00000000ee01', 8,
+       ((o.starts_at at time zone 'Europe/Prague')::date + time '18:00') at time zone 'Europe/Prague',
+       ((o.starts_at at time zone 'Europe/Prague')::date + time '18:50') at time zone 'Europe/Prague'
+  from class_occurrences o where o.series_id = '5e215e21-0000-0000-0000-00000000fb01';
+
+create temporary table _retime as select update_series(
+  '5e215e21-0000-0000-0000-00000000fb01','RETIME ME',
+  '5e215e21-0000-0000-0000-00000000cc01','5e215e21-0000-0000-0000-00000000ee01', null, 8, 50,
+  'FREQ=WEEKLY;BYDAY=MO', (current_date + 30)::date, (current_date + 90)::date,
+  '18:00', null, null, true) as r;
+
+select expect_true('the preview still predicts the moves it would make',
+  (select (r->'predicted'->>'moved')::int > 0 from _retime));
+select expect_num('...but the result reports that none were made',
+  (select (r->>'moved')::bigint from _retime), 0);
+select expect_num('...and says how many classes are still not where the series says',
+  (select (r->>'still_out_of_step')::bigint from _retime),
+  (select (r->'predicted'->>'moved')::bigint from _retime));
+select expect_true('...and names each refusal',
+  (select jsonb_array_length(r->'conflicts') > 0 from _retime));
+select expect_num('the classes really are still at 19:00',
+  (select count(*) from class_occurrences
+    where series_id='5e215e21-0000-0000-0000-00000000fb01' and status='scheduled'
+      and (starts_at at time zone 'Europe/Prague')::time = time '19:00'),
+  (select (r->'predicted'->>'moved')::bigint from _retime));
+
+-- The same question asked of the calendar rather than of a counter, which is
+-- what any screen can call at any time — including on a series edited weeks ago.
+select expect_num('series_calendar_drift finds exactly those classes',
+  (select count(*) from series_calendar_drift('5e215e21-0000-0000-0000-00000000fb01')),
+  (select (r->>'still_out_of_step')::bigint from _retime));
+select expect_true('...and says where each one should be',
+  (select should_be like '%18:00%' from
+     series_calendar_drift('5e215e21-0000-0000-0000-00000000fb01') limit 1));
+
+-- AND THE EDIT NOW LEAVES A TRAIL. update_series() wrote no audit row at all,
+-- which is why the real incident could not be reconstructed from the database.
+select expect_true('the edit is audited, with predicted beside applied',
+  (select (after->'predicted'->>'move')::int > 0 and (after->'applied'->>'move')::int = 0
+     from audit_logs where action='series.updated'
+      and entity_id='5e215e21-0000-0000-0000-00000000fb01'
+    order by created_at desc limit 1));
+
+-- Clear the blockers and re-run: now it really moves, and says so.
+delete from class_occurrences where name = 'Blocker'
+   and studio_id = '5e215e21-0000-0000-0000-000000000001';
+create temporary table _retime2 as select update_series(
+  '5e215e21-0000-0000-0000-00000000fb01','RETIME ME',
+  '5e215e21-0000-0000-0000-00000000cc01','5e215e21-0000-0000-0000-00000000ee01', null, 8, 50,
+  'FREQ=WEEKLY;BYDAY=MO', (current_date + 30)::date, (current_date + 90)::date,
+  '18:00', null, null, true) as r;
+select expect_true('with the room free the classes move',
+  (select (r->>'moved')::int > 0 from _retime2));
+select expect_num('...and nothing is left out of step',
+  (select (r->>'still_out_of_step')::bigint from _retime2), 0);
+select expect_num('...and the calendar agrees',
+  (select count(*) from series_calendar_drift('5e215e21-0000-0000-0000-00000000fb01')), 0);
+
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'series suite finished' as done;

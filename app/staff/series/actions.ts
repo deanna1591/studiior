@@ -42,7 +42,15 @@ const say = (m: string) =>
 export type EditResult =
   | { ok: true; effective_from: string; moved: number; cancelled: number;
       restored: number; added: number; unchanged: number; left_as_edited: number;
-      members_emailed: number; conflicts: Conflict[] }
+      members_emailed: number; conflicts: Conflict[];
+      // What the preview PREDICTED, beside what the apply actually did. They
+      // used to be the same number: update_series() returned the preview's
+      // counters whatever the apply managed, so an edit that moved nothing
+      // still reported "19 moved" and the studio was told it had worked.
+      predicted: { moved: number; cancelled: number; restored: number };
+      // Asked of the calendar afterwards, not of any counter. Non-zero means
+      // the classes are not where the series says they should be.
+      still_out_of_step: number }
   | { ok: false; requires_confirmation: true; effective_from: string;
       will_move: number; will_cancel: number; will_restore: number; will_add: number;
       unchanged: number; left_as_edited: number; members_emailed: number; horizon_to: string }

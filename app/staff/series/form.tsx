@@ -382,6 +382,29 @@ function Outcome({
         From {result.effective_from}.{" "}
         {lines.length === 0 ? "Nothing on the calendar changes." : `${lines.join(", ")}.`}
       </p>
+      {/* THE POST-CONDITION, and it outranks every count above it. Those describe
+          what each step believed it was doing; this is what the calendar says
+          afterwards. A studio that edits a series and sees it unchanged has no
+          other way to tell that from success. */}
+      {result.ok && result.still_out_of_step > 0 && (
+        <section className="mt-4 rounded border border-coral bg-coral-tint px-3.5 py-3">
+          <p className="text-[13px] leading-[19px] text-ink">
+            <strong>The calendar does not match this series.</strong>{" "}
+            <span className="num">{result.still_out_of_step}</span>{" "}
+            {result.still_out_of_step === 1 ? "class is" : "classes are"} still at the old
+            time or day{applied ? "" : " and would stay there"}.
+            {result.predicted.moved > result.moved && (
+              <>
+                {" "}This edit expected to move{" "}
+                <span className="num">{result.predicted.moved}</span> and moved{" "}
+                <span className="num">{result.moved}</span>.
+              </>
+            )}{" "}
+            Nothing below overrides this line.
+          </p>
+        </section>
+      )}
+
       {result.ok && result.conflicts.length > 0 && (
         <>
           <p className="mt-3 text-[13px] leading-[19px] text-ink">

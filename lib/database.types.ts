@@ -5453,6 +5453,10 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: Json
       }
+      award_conversion_bonus_run: {
+        Args: { p_membership_id: string }
+        Returns: Json
+      }
       backfill_all_timelines: { Args: never; Returns: Json }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
@@ -5596,6 +5600,10 @@ export type Database = {
         Returns: string
       }
       compute_class_pay: { Args: { p_occurrence_id: string }; Returns: Json }
+      compute_class_pay_run: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
+      }
       confirm_dropin_payment: {
         Args: { p_booking_id: string; p_studio_id: string }
         Returns: boolean
@@ -5789,6 +5797,10 @@ export type Database = {
       is_owner: { Args: { target: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_service_context: { Args: never; Returns: boolean }
+      is_this_instructor: {
+        Args: { p_instructor_id: string }
+        Returns: boolean
+      }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -5826,6 +5838,14 @@ export type Database = {
         }[]
       }
       member_first_class: {
+        Args: { p_member_id: string }
+        Returns: {
+          attended_at: string
+          instructor_id: string
+          occurrence_id: string
+        }[]
+      }
+      member_first_class_run: {
         Args: { p_member_id: string }
         Returns: {
           attended_at: string
@@ -5910,7 +5930,20 @@ export type Database = {
           tier: Database["public"]["Enums"]["guarantee_tier"]
         }[]
       }
+      occurrence_guarantee_run: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          cutoff_at: string
+          cutoff_shape: string
+          minimum: number
+          tier: Database["public"]["Enums"]["guarantee_tier"]
+        }[]
+      }
       occurrence_is_adjacent: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
+      occurrence_is_adjacent_run: {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
@@ -6175,6 +6208,15 @@ export type Database = {
           p_to: string
         }
         Returns: number
+      }
+      series_calendar_drift: {
+        Args: { p_series_id: string }
+        Returns: {
+          local_when: string
+          occurrence_id: string
+          reason: string
+          should_be: string
+        }[]
       }
       series_counts: { Args: { p_series_id: string }; Returns: Json }
       series_impact: { Args: { p_series_id: string }; Returns: Json }
