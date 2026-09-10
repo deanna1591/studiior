@@ -64,8 +64,13 @@ export default async function Book({
 
   const weekStartDay = dayStart(new Date(), ctx.timeZone, gridFromOffset);
   const weekEndDay = addDays(weekStartDay, gridLength);
+  // Studio-local day keys for the closure lookup: a closure is written as a
+  // date on a wall calendar, so it is compared as one.
+  const weekStartKey = zonedDateKey(weekStartDay.toISOString(), ctx.timeZone);
+  const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
 
-  const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine }] =
+  const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
+         { data: closures }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -86,6 +91,12 @@ export default async function Book({
         .select("id, status, occurrence_id, waitlist_position")
         .eq("member_id", ctx.memberId)
         .in("status", ["booked", "waitlisted"]),
+      // In the same batch: "we are closed" is a different fact from "nothing is
+      // on", and a member has to be able to tell. `closures_member_read` makes
+      // the row readable — there is nothing on it a member may not see.
+      supabase.from("studio_closures")
+        .select("starts_on, ends_on, starts_at_time, ends_at_time, reason")
+        .lte("starts_on", weekEndKey).gte("ends_on", weekStartKey)
     ]);
 
   const byOcc = new Map((mine ?? []).map((b) => [b.occurrence_id, b]));
@@ -112,6 +123,8 @@ export default async function Book({
   const busy = new Set((week ?? []).map((o: { starts_at: string }) => zonedDateKey(o.starts_at, ctx.timeZone)));
   const todayKey = zonedDateKey(new Date().toISOString(), ctx.timeZone);
   const selectedKey = zonedDateKey(from.toISOString(), ctx.timeZone);
+  const closedToday = (closures ?? []).find(
+    (c) => c.starts_on <= selectedKey && c.ends_on >= selectedKey) ?? null;
 
   // Which month the selected day falls in, so a leading or trailing cell in
   // the grid can be dimmed rather than pretending to belong here.
@@ -235,10 +248,22 @@ export default async function Book({
       {shown.length === 0 ? (
         <div className="m-card p-6 text-center">
           <p className="m-body text-ink">
-            {typeFilter || instFilter ? "Nothing matching on this day." : "No classes on this day."}
+            {/* "We're closed for Christmas" is a different thing from an empty
+                day, and a member has to be able to tell which one they are
+                looking at. The reason is the studio's own words. */}
+            {closedToday
+              ? closedToday.starts_at_time
+                ? `Closed ${closedToday.starts_at_time.slice(0, 5)}–${closedToday.ends_at_time?.slice(0, 5)} — ${closedToday.reason}`
+                : closedToday.reason
+              : typeFilter || instFilter ? "Nothing matching on this day." : "No classes on this day."}
           </p>
           <p className="m-sub mt-1 text-ink-2">
-            {typeFilter || instFilter
+            {closedToday
+              ? <>The studio is closed{closedToday.ends_on !== closedToday.starts_on && <> until {closedToday.ends_on}</>}.{" "}
+                  <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">
+                    Look at another day
+                  </Link></>
+              : typeFilter || instFilter
               ? <Link href={qs({ type: undefined, instructor: undefined })} className="text-lime-text underline underline-offset-4">Show everything</Link>
               : <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">Try tomorrow</Link>}
           </p>

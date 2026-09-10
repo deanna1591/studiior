@@ -69,6 +69,18 @@ export default async function Settings() {
         </div>
       </section>
 
+      <section className="mb-10">
+        <SectionLabel>Closures</SectionLabel>
+        <p className="mt-2 max-w-[58ch] text-[13px] leading-[20px] text-ink-2">
+          Days you are shut — Christmas, a refit, a burst pipe. Nothing is
+          generated for them and the member app says you are closed rather than
+          showing an empty day.{" "}
+          <Link href="/settings/closures" className="text-lime-text underline underline-offset-4">
+            Manage closures
+          </Link>
+        </p>
+      </section>
+
       <section>
         <SectionLabel>Elsewhere</SectionLabel>
         <p className="mt-2 max-w-[58ch] text-[13px] leading-[20px] text-ink-2">

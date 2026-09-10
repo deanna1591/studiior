@@ -644,3 +644,158 @@ select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1'
 select expect_raises('another studio''s owner cannot ask where this one''s classes are',
   $q$select next_class_day('0ccc0ccc-0000-0000-0000-000000000002', date '2026-10-01')$q$, 'PT403');
 reset role;
+
+-- =============================================================================
+-- 11. STUDIO CLOSURES, in two timezones, in one run
+-- =============================================================================
+-- Migration 074. Prague closes a whole day; Manila closes an afternoon on the
+-- same date. Both are asked in one pass, because a closure is a studio-local
+-- date and a fixture where both studios share a zone would prove nothing.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+
+-- A weekday series in each studio, running well past the closure dates.
+insert into class_series
+  (id, studio_id, location_id, class_type_id, room_id, name, capacity,
+   duration_minutes, rrule, starts_on, time_of_day)
+values
+  ('0ccc0ccc-0000-0000-0000-00000000c001','0ccc0ccc-0000-0000-0000-000000000001',
+   '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01',
+   '0ccc0ccc-0000-0000-0000-00000000ee02','PRG Daily', 10, 50,
+   'FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA', current_date, '11:00'),
+  ('0ccc0ccc-0000-0000-0000-00000000c002','0ccc0ccc-0000-0000-0000-000000000002',
+   '0ccc0ccc-0000-0000-0000-00000000000d','0ccc0ccc-0000-0000-0000-00000000cc02',
+   '0ccc0ccc-0000-0000-0000-00000000ee03','MNL Morning', 10, 50,
+   'FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA', current_date, '08:00');
+insert into class_series
+  (id, studio_id, location_id, class_type_id, room_id, name, capacity,
+   duration_minutes, rrule, starts_on, time_of_day)
+values
+  ('0ccc0ccc-0000-0000-0000-00000000c003','0ccc0ccc-0000-0000-0000-000000000002',
+   '0ccc0ccc-0000-0000-0000-00000000000d','0ccc0ccc-0000-0000-0000-00000000cc02',
+   '0ccc0ccc-0000-0000-0000-00000000ee03','MNL Afternoon', 10, 50,
+   'FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA', current_date, '15:00');
+
+select set_config('t.cd', (current_date + 20)::text, false);
+
+-- ---- the generator skips a closed period --------------------------------
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+-- Scoped to the series under test: this suite's earlier sections put other
+-- Prague series on the calendar, so a whole-day count is a count of them too.
+select expect_num('before closing, Prague has a class that day',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000c001' and status = 'scheduled'
+      and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.cd')::date)::bigint, 1);
+
+select close_studio('0ccc0ccc-0000-0000-0000-000000000001',
+  current_setting('t.cd')::date, current_setting('t.cd')::date,
+  'Refit', null, null, true);
+select expect_num('closing takes the class off the calendar',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000c001' and status = 'scheduled'
+      and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.cd')::date)::bigint, 0);
+select expect_num('...and the generator does not put it back',
+  (generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c001') ->> 'created')::bigint, 0);
+select expect_true('...and says it skipped it because the studio is shut',
+  (generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c001') ->> 'closed')::int > 0);
+select expect_num('the day either side is untouched',
+  (select count(*) from class_occurrences
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000c001' and status = 'scheduled'
+      and (starts_at at time zone 'Europe/Prague')::date
+          = current_setting('t.cd')::date + 1)::bigint, 1);
+
+-- ---- one studio's closure is not the other's ----------------------------
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a2',false);
+select expect_num('Manila is open on the day Prague is shut',
+  (select count(*) from class_occurrences
+    where series_id in ('0ccc0ccc-0000-0000-0000-00000000c002','0ccc0ccc-0000-0000-0000-00000000c003')
+      and status = 'scheduled'
+      and (starts_at at time zone 'Asia/Manila')::date = current_setting('t.cd')::date)::bigint, 2);
+
+-- ---- a PARTIAL day only takes the classes inside its hours --------------
+select close_studio('0ccc0ccc-0000-0000-0000-000000000002',
+  current_setting('t.cd')::date, current_setting('t.cd')::date,
+  'Afternoon deep clean', time '14:00', time '18:00', true);
+select expect_num('a partial closure leaves the morning class alone',
+  (select count(*) from class_occurrences
+    where series_id in ('0ccc0ccc-0000-0000-0000-00000000c002','0ccc0ccc-0000-0000-0000-00000000c003')
+      and status = 'scheduled'
+      and (starts_at at time zone 'Asia/Manila')::date = current_setting('t.cd')::date)::bigint, 1);
+select expect_text('...and the one left is the morning one',
+  (select name from class_occurrences
+    where series_id in ('0ccc0ccc-0000-0000-0000-00000000c002','0ccc0ccc-0000-0000-0000-00000000c003')
+      and status = 'scheduled'
+      and (starts_at at time zone 'Asia/Manila')::date = current_setting('t.cd')::date), 'MNL Morning');
+select expect_num('...and regenerating does not bring the afternoon back',
+  (generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c003') ->> 'created')::bigint, 0);
+select expect_num('...while the morning series still generates',
+  (generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c002') ->> 'closed')::bigint, 0);
+
+-- The predicate itself, in the studio's own clock.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_true('15:00 Manila is inside a 14:00-18:00 Manila closure',
+  studio_closed_at('0ccc0ccc-0000-0000-0000-000000000002',
+    (current_setting('t.cd')::date + time '15:00') at time zone 'Asia/Manila',
+    (current_setting('t.cd')::date + time '15:50') at time zone 'Asia/Manila'));
+select expect_true('08:00 Manila is not',
+  not studio_closed_at('0ccc0ccc-0000-0000-0000-000000000002',
+    (current_setting('t.cd')::date + time '08:00') at time zone 'Asia/Manila',
+    (current_setting('t.cd')::date + time '08:50') at time zone 'Asia/Manila'));
+-- The same INSTANT as Manila's 15:00 is 09:00 in Prague, which Prague's own
+-- whole-day closure covers and Manila's afternoon one has nothing to say about.
+select expect_true('a closure is read in the studio it belongs to, not in UTC',
+  studio_closed_at('0ccc0ccc-0000-0000-0000-000000000001',
+    (current_setting('t.cd')::date + time '11:00') at time zone 'Europe/Prague',
+    (current_setting('t.cd')::date + time '11:50') at time zone 'Europe/Prague'));
+
+-- ---- reopening regenerates, and resurrects nothing ----------------------
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select set_config('t.cl', (select id::text from studio_closures
+  where studio_id='0ccc0ccc-0000-0000-0000-000000000001'), false);
+select set_config('t.re', (select reopen_studio(current_setting('t.cl')::uuid)::text), false);
+select expect_true('reopening reports what stays cancelled rather than hiding it',
+  (current_setting('t.re')::jsonb ->> 'still_cancelled')::int > 0);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_num('the cancelled class is STILL cancelled — members were told it was off',
+  (select count(*) from class_occurrences
+    where studio_id='0ccc0ccc-0000-0000-0000-000000000001'
+      and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.cd')::date
+      and status = 'cancelled')::bigint, 1);
+select expect_num('...and nothing new was created in its slot',
+  (select count(*) from class_occurrences
+    where studio_id='0ccc0ccc-0000-0000-0000-000000000001'
+      and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.cd')::date
+      and status = 'scheduled')::bigint, 0);
+
+-- A closure BEYOND what has been generated is the case where reopening really
+-- does bring classes back: there was never a row to cancel.
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select set_config('t.far', (current_setting('t.cd')::date + 200)::text, false);
+select close_studio('0ccc0ccc-0000-0000-0000-000000000001',
+  current_setting('t.far')::date, current_setting('t.far')::date, 'Far future', null, null, true);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+update studio_settings set occurrence_horizon_days = 400
+ where studio_id = '0ccc0ccc-0000-0000-0000-000000000001';
+select generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c001');
+select expect_num('a closure ahead of the horizon means the class is never made',
+  (select count(*) from class_occurrences
+    where series_id='0ccc0ccc-0000-0000-0000-00000000c001'
+      and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.far')::date)::bigint, 0);
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);
+select set_config('t.re2', (select reopen_studio((select id from studio_closures
+  where studio_id='0ccc0ccc-0000-0000-0000-000000000001'
+    and starts_on = current_setting('t.far')::date))::text), false);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+select expect_num('...and reopening makes it, because there was nothing to resurrect',
+  (select count(*) from class_occurrences
+    where series_id='0ccc0ccc-0000-0000-0000-00000000c001'
+      and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.far')::date
+      and status = 'scheduled')::bigint, 1);

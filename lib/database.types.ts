@@ -4384,6 +4384,67 @@ export type Database = {
           },
         ]
       }
+      studio_closures: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ends_at_time: string | null
+          ends_on: string
+          id: string
+          reason: string
+          starts_at_time: string | null
+          starts_on: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ends_at_time?: string | null
+          ends_on: string
+          id?: string
+          reason: string
+          starts_at_time?: string | null
+          starts_on: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ends_at_time?: string | null
+          ends_on?: string
+          id?: string
+          reason?: string
+          starts_at_time?: string | null
+          starts_on?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_closures_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_closures_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_closures_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       studio_invites: {
         Row: {
           accepted_at: string | null
@@ -5070,6 +5131,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_occurrence: {
+        Args: { p_occurrence_id: string; p_reason?: string }
+        Returns: Json
+      }
       checkin_code_for: {
         Args: { p_bucket: number; p_member_id: string }
         Returns: string
@@ -5098,6 +5163,28 @@ export type Database = {
       clear_availability_exception: {
         Args: { p_date: string; p_instructor_id: string }
         Returns: number
+      }
+      close_studio: {
+        Args: {
+          p_confirm?: boolean
+          p_ends_at_time?: string
+          p_ends_on: string
+          p_reason: string
+          p_starts_at_time?: string
+          p_starts_on: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      closure_impact: {
+        Args: {
+          p_ends_at_time?: string
+          p_ends_on: string
+          p_starts_at_time?: string
+          p_starts_on: string
+          p_studio_id: string
+        }
+        Returns: Json
       }
       commitment_report: {
         Args: { p_studio_id: string }
@@ -5156,6 +5243,22 @@ export type Database = {
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -5483,6 +5586,7 @@ export type Database = {
           to_email: string
         }[]
       }
+      reopen_studio: { Args: { p_closure_id: string }; Returns: Json }
       request_availability_changes: {
         Args: { p_note: string; p_submission_id: string }
         Returns: Json
@@ -5737,6 +5841,10 @@ export type Database = {
           theme_preset: Database["public"]["Enums"]["theme_preset"]
           timezone: string
         }[]
+      }
+      studio_closed_at: {
+        Args: { p_ends_at: string; p_starts_at: string; p_studio_id: string }
+        Returns: boolean
       }
       studio_invite_preview: {
         Args: { p_token: string }
