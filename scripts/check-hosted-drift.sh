@@ -25,11 +25,31 @@
 
 set -uo pipefail
 
+TMPDIR_SELF=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_SELF"' EXIT
+PARSE_ERR="$TMPDIR_SELF/parse.err"
+CLI_ERR="$TMPDIR_SELF/cli.err"
+READ_NOTE=""
+
 LOCAL_DB="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+PARSER="$(dirname "$0")/parse-db-rows.py"
+
+# One query for both sides. The last row is an INTEGRITY ROW — the row count and
+# a checksum of the rows themselves — so a value the CLI's table renderer wrapped
+# or truncated is caught by the parser instead of being reported as drift. Every
+# time displayed by this tool is a definition hash and nothing else; there is no
+# clock in here.
 FN_SQL="
-select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||md5(pg_get_functiondef(p.oid)) as h
-  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
- where n.nspname='public' and p.prokind='f' order by 1;"
+with f as (
+  select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||md5(pg_get_functiondef(p.oid)) as v
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'
+)
+select v as h from (
+  select v, 0 as k from f
+  union all
+  select '#guard|'||count(*)||'|'||md5(coalesce(string_agg(v, chr(10) order by v), '')), 1 from f
+) t order by k, h;"
 
 # rls_auto_enable is installed by the Supabase platform and exists on hosted
 # only. The expect_*/login/sig helpers are created by the TEST SUITES, so a
@@ -48,15 +68,40 @@ read_unpushed() {
   local out
   out=$(supabase migration list --linked 2>/dev/null) || return 0
   UNPUSHED=$(printf '%s' "$out" | python3 -c '
-import sys, json
+import sys, json, re
 raw = sys.stdin.read(); i = raw.find("{")
-if i < 0: sys.exit(1)
-try: d = json.loads(raw[i:])
-except Exception: sys.exit(1)
-print(" ".join(m["local"] for m in d.get("migrations", [])
-                if m.get("local") and not m.get("remote")))
+if i >= 0:
+    try:
+        d = json.loads(raw[i:])
+        print(" ".join(m["local"] for m in d.get("migrations", [])
+                       if m.get("local") and not m.get("remote")))
+        raise SystemExit(0)
+    except SystemExit: raise
+    except Exception: pass
+# Table form: a local version in the first column and an empty remote column.
+out = []
+for line in raw.splitlines():
+    m = re.match(r"^\s*[|\u2502]\s*(\d{14})\s*[|\u2502]\s*([^|\u2502]*)[|\u2502]", line)
+    if m and not m.group(2).strip():
+        out.append(m.group(1))
+print(" ".join(out))
 ') || return 0
   UNPUSHED_KNOWN=1
+}
+
+# The label for whichever route actually answered, printed with the counts so
+# nobody has to guess how the numbers were obtained.
+HOSTED_VIA=""
+
+parse() {  # $1 = raw text, $2 = what produced it
+  printf '%s' "$1" | python3 "$PARSER" 2>"$PARSE_ERR" | sort
+  local st=("${PIPESTATUS[@]}")
+  if [ "${st[1]}" -ne 0 ]; then
+    die "Could not read $2.
+$(cat "$PARSE_ERR")"
+  fi
+  # The parser reports the row count and shape on stderr; keep it for the header.
+  READ_NOTE=$(tr -d '\n' < "$PARSE_ERR")
 }
 
 read_local() {
@@ -65,53 +110,71 @@ read_local() {
     die "Could not read the LOCAL database. Is \`supabase start\` running?
 $out"
   fi
-  printf '%s\n' "$out" | sed '/^$/d' | sort
+  parse "$out" "the LOCAL database"
 }
 
+# THREE ROUTES, tried in order, because the CLI's output format is not something
+# this tool may depend on: it prints a box TABLE in an ordinary terminal, JSON
+# under --output-format json, and JSON again under some sandboxes and wrappers.
+# The parser reads all three; these routes exist so that a machine where the CLI
+# will not cooperate at all still has a way through.
 read_hosted() {
-  local out rc
-  # stdout and stderr kept APART: the CLI puts "Initialising login role..." on
-  # stderr and JSON on stdout, and merging them is what made the first version
-  # unparseable in the first place.
-  out=$(supabase db query --linked "$FN_SQL" 2>/tmp/.drift.err); rc=$?
+  local url raw rc
+
+  # 1. psql straight at the hosted database. No CLI, no formatting, nothing to
+  #    parse — the same route the local side uses. -w so a missing password
+  #    fails instead of hanging on a prompt nobody is there to answer.
+  url="${STUDIIOR_HOSTED_DB_URL:-${SUPABASE_DB_URL:-}}"
+  if [ -n "$url" ]; then
+    HOSTED_VIA="psql direct"
+    if ! raw=$(PGCONNECT_TIMEOUT=15 psql "$url" -w -tAc "$FN_SQL" 2>&1); then
+      die "Could not read the HOSTED database over psql.
+$raw
+Nothing has been compared — fix the connection rather than reading a diff."
+    fi
+    parse "$raw" "the HOSTED database (psql)"
+    return
+  fi
+
+  # 2 and 3. The CLI, asking for JSON when this version has the flag, and taking
+  #    whatever it gives when it does not. stdout and stderr are kept APART:
+  #    "Initialising login role..." goes to stderr and merging the two is what
+  #    made the first version of this script unparseable.
+  local -a flags=(--linked)
+  if supabase db query --help 2>&1 | grep -q -- '--output-format'; then
+    flags+=(--output-format json)
+    HOSTED_VIA="supabase db query --output-format json"
+  else
+    HOSTED_VIA="supabase db query"
+  fi
+
+  raw=$(supabase db query "${flags[@]}" "$FN_SQL" 2>"$CLI_ERR"); rc=$?
   if [ $rc -ne 0 ]; then
     die "Could not read the HOSTED database (supabase db query exited $rc).
-$(cat /tmp/.drift.err)
+$(cat "$CLI_ERR")
 Nothing has been compared — fix the connection rather than reading a diff."
   fi
-  printf '%s' "$out" | python3 -c '
-import sys, json
-raw = sys.stdin.read()
-# Find the JSON object rather than splitting on a log line that may not be there.
-i = raw.find("{")
-if i < 0:
-    sys.stderr.write("hosted returned no JSON. First 300 bytes:\n" + raw[:300] + "\n")
-    sys.exit(3)
-try:
-    d = json.loads(raw[i:])
-except json.JSONDecodeError as e:
-    sys.stderr.write("hosted output is not valid JSON (%s). First 300 bytes:\n%s\n" % (e, raw[:300]))
-    sys.exit(3)
-rows = d.get("rows")
-if rows is None:
-    sys.stderr.write("hosted JSON has no rows key. Keys: %s\n" % list(d))
-    sys.exit(3)
-for r in rows:
-    # By key when the alias came through, otherwise the single value in the row —
-    # sharing one SQL string between psql and the CLI once dropped the alias and
-    # this failed with KeyError rather than comparing anything wrong, which is
-    # the behaviour wanted, but there is no reason to be brittle about it.
-    if "h" in r:
-        print(r["h"])
-    elif len(r) == 1:
-        print(next(iter(r.values())))
-    else:
-        sys.stderr.write("unexpected hosted row shape: %s\n" % list(r))
-        sys.exit(3)
-' | sort
-  local pipe=("${PIPESTATUS[@]}")
-  [ "${pipe[1]:-0}" -eq 0 ] || die "Could not parse the hosted result.
-Nothing has been compared."
+
+  # If the preferred route came back unreadable, try the other one before giving
+  # up. Either shape is fine; only an unverifiable one is not.
+  if ! printf '%s' "$raw" | python3 "$PARSER" >/dev/null 2>"$PARSE_ERR"; then
+    local alt
+    if [ "${#flags[@]}" -gt 1 ]; then alt=""; else alt="--output-format json"; fi
+    if [ -n "$alt" ] || [ "${#flags[@]}" -gt 1 ]; then
+      local raw2
+      if [ -n "$alt" ]; then
+        raw2=$(supabase db query --linked $alt "$FN_SQL" 2>/dev/null)
+      else
+        raw2=$(supabase db query --linked "$FN_SQL" 2>/dev/null)
+      fi
+      if printf '%s' "$raw2" | python3 "$PARSER" >/dev/null 2>/dev/null; then
+        HOSTED_VIA="$HOSTED_VIA (fell back to the other output format)"
+        parse "$raw2" "the HOSTED database"
+        return
+      fi
+    fi
+  fi
+  parse "$raw" "the HOSTED database"
 }
 
 compare() {  # $1 = left file, $2 = right file, $3 = left label, $4 = right label
@@ -180,6 +243,85 @@ That is a failed read, not a divergence. Nothing has been compared."
 
 if [ "${1:-}" != "--self-test" ]; then read_unpushed; fi
 
+if [ "${1:-}" = "--self-test-formats" ] || [ "${1:-}" = "--self-test" ]; then
+  # PROVES THE READING, on a machine that gets a TABLE as well as one that gets
+  # JSON. The local database stands in for hosted — this is about the shape of
+  # the output, not about which database produced it — and psql renders the very
+  # same query in each of the shapes the CLI is known to print.
+  t=$(mktemp -d)
+  psql "$LOCAL_DB" -tAc "$FN_SQL" 2>/dev/null | python3 "$PARSER" 2>/dev/null | sort > "$t/want"
+  [ -s "$t/want" ] || { echo "SELF-TEST FAILED: could not read the local database"; exit 2; }
+  echo "baseline: $(wc -l < "$t/want" | tr -d ' ') functions read from bare psql output"
+
+  fmt_case() {  # $1 = label, $2... = psql -P settings
+    local label="$1"; shift
+    local args=() setting
+    for setting in "$@"; do args+=(-P "$setting"); done
+    psql "$LOCAL_DB" "${args[@]}" -c "$FN_SQL" 2>/dev/null > "$t/raw"
+    if ! python3 "$PARSER" < "$t/raw" 2>/dev/null | sort > "$t/got"; then
+      echo "  FAIL  $label — the parser refused output it should have read"; return 1
+    fi
+    if cmp -s "$t/want" "$t/got"; then
+      echo "  ok    $label — $(wc -l < "$t/got" | tr -d ' ') functions, identical to the baseline"
+    else
+      echo "  FAIL  $label — parsed a DIFFERENT set than the baseline"; return 1
+    fi
+  }
+
+  fails=0
+  echo "--- shapes that must be read correctly"
+  fmt_case "unicode box table (what the CLI prints in a terminal)" \
+           "linestyle=unicode" "border=2" || fails=1
+  fmt_case "ASCII table"      "linestyle=ascii" "border=2" || fails=1
+  fmt_case "psql default aligned table" "border=1" || fails=1
+  # JSON, built from the baseline, in the shape --output-format json produces.
+  python3 -c '
+import json, sys
+rows = [{"h": l.rstrip("\n")} for l in open(sys.argv[1])]
+print(json.dumps({"rows": rows}))' "$t/want" > "$t/raw"
+  # the integrity row has to travel with it, exactly as the database sends it
+  psql "$LOCAL_DB" -tAc "$FN_SQL" 2>/dev/null | grep '^#guard|' > "$t/guard"
+  python3 -c '
+import json, sys
+rows = [{"h": l.rstrip("\n")} for l in open(sys.argv[1])] + [{"h": open(sys.argv[2]).read().strip()}]
+print(json.dumps({"rows": rows}))' "$t/want" "$t/guard" > "$t/raw"
+  if python3 "$PARSER" < "$t/raw" 2>/dev/null | sort | cmp -s - "$t/want"; then
+    echo "  ok    JSON (--output-format json, and sandbox wrappers)"
+  else
+    echo "  FAIL  JSON"; fails=1
+  fi
+
+  echo "--- shapes that must be REFUSED rather than reported as drift"
+  # A renderer that wraps long cells: the classic way a table mangles a value.
+  psql "$LOCAL_DB" -P format=wrapped -P columns=60 -P border=2 -c "$FN_SQL" 2>/dev/null > "$t/raw"
+  if python3 "$PARSER" < "$t/raw" >/dev/null 2>"$t/err"; then
+    echo "  FAIL  wrapped table was accepted — mangled values would be reported as drift"; fails=1
+  else
+    echo "  ok    wrapped table refused: $(head -1 "$t/err")"
+  fi
+  # A truncated read: the transport dropped the tail.
+  psql "$LOCAL_DB" -P linestyle=unicode -P border=2 -c "$FN_SQL" 2>/dev/null | head -20 > "$t/raw"
+  if python3 "$PARSER" < "$t/raw" >/dev/null 2>"$t/err"; then
+    echo "  FAIL  truncated output was accepted"; fails=1
+  else
+    echo "  ok    truncated output refused: $(head -1 "$t/err")"
+  fi
+  # One character changed inside one row: the checksum has to notice.
+  psql "$LOCAL_DB" -tAc "$FN_SQL" 2>/dev/null | sed '2s/[0-9a-f]$/0/' > "$t/raw"
+  if python3 "$PARSER" < "$t/raw" >/dev/null 2>"$t/err"; then
+    echo "  FAIL  a corrupted row was accepted"; fails=1
+  else
+    echo "  ok    corrupted row refused: $(head -1 "$t/err")"
+  fi
+
+  rm -rf "$t"
+  if [ "$fails" -ne 0 ]; then echo; echo "FORMAT SELF-TEST FAILED"; exit 2; fi
+  echo; echo "FORMAT SELF-TEST PASSED: table, ASCII, JSON and bare all read alike;"
+  echo "wrapped, truncated and corrupted output are refused."
+  [ "${1:-}" = "--self-test-formats" ] && exit 0
+  echo
+fi
+
 if [ "${1:-}" = "--self-test" ]; then
   # Proves the COMPARISON, without touching production: local against a copy of
   # itself must be silent, and one altered function must be the only thing it
@@ -207,6 +349,7 @@ fi
 T=$(mktemp -d)
 read_local  > "$T/local"
 read_hosted > "$T/hosted"
+printf 'hosted read via: %s — %s\n' "$HOSTED_VIA" "$READ_NOTE"
 compare "$T/local" "$T/hosted" local hosted
 rc=$?
 rm -rf "$T"
