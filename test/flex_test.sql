@@ -1,3 +1,8 @@
+-- NOTE (Decision 22, migration 081): sweep_flex_decisions() became
+-- sweep_commitments() and flex_confirmed_at became committed_at. This suite
+-- asserts Decision 21's behaviour and every assertion below is UNCHANGED —
+-- flex still evaluates at its own wall-clock cutoff, still confirms silently,
+-- and still cancels through §3.2. Only the names moved.
 -- =============================================================================
 -- Decision 21 — flex classes
 -- Migration 075. UUID space f1e0, checked free.
@@ -209,12 +214,12 @@ update studio_settings set flex_deadline_mode = 'hours_before', flex_deadline_ho
 
 select set_config('t.credits_before', (select count(*)::text from credit_ledger
   where studio_id = 'f1e0f1e0-0000-0000-0000-000000000001' and reason = 'cancellation_refund'), false);
-select set_config('t.sweep', (select sweep_flex_decisions()::text), false);
+select set_config('t.sweep', (select sweep_commitments()::text), false);
 
 select expect_true('the sweep sees both flex studios and not the third',
   (current_setting('t.sweep')::jsonb ->> 'studios')::int = 2);
 select expect_text('a class at its threshold is CONFIRMED',
-  (select case when flex_confirmed_at is not null then 'confirmed' else 'pending' end
+  (select case when committed_at is not null then 'confirmed' else 'pending' end
      from class_occurrences where id = current_setting('t.tom')::uuid), 'confirmed');
 select expect_text('...and nothing about it changed for a member',
   (select status::text from class_occurrences where id = current_setting('t.tom')::uuid), 'scheduled');
@@ -241,13 +246,25 @@ select expect_num('...telling no members, because there are none',
     where n.template_key = 'class_cancelled'
       and n.member_id is not null
       and n.dedupe_key like '%' || current_setting('t.day3') || '%')::bigint, 0);
-select expect_num('the coach is told either way',
+-- CHANGED BY DECISION 22, deliberately, and this assertion now asserts the
+-- inverse of what it used to. Decision 21 sent one message per class, so this
+-- counted seven. Decision 22 batches per evaluation run: ONE digest per
+-- instructor listing everything that was decided, because five pings about five
+-- classes is how a studio teaches its instructors to stop reading them.
+select expect_num('the coach is told once, not once per class',
+  (select count(*) from notifications
+    where template_key = 'commitment_digest'
+      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')::bigint, 1);
+select expect_num('...and no per-class ping is sent any more',
   (select count(*) from notifications
     where template_key in ('flex_confirmed','flex_cancelled')
-      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')::bigint,
-  (select count(*) from class_occurrences
-    where series_id = 'f1e0f1e0-0000-0000-0000-00000000f001'
-      and (flex_confirmed_at is not null or status = 'cancelled'))::bigint);
+      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')::bigint, 0);
+select expect_true('...and the one digest names every class it decided',
+  (select (payload ->> 'lines') like '%RUNNING%'
+      and (payload ->> 'lines') like '%NOT ON%'
+     from notifications
+    where template_key = 'commitment_digest'
+      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001' limit 1));
 
 -- =============================================================================
 -- 4. A SINGLE OCCURRENCE FLIPPED TO GUARANTEED SURVIVES THE SWEEP
@@ -270,11 +287,11 @@ select expect_num('a guaranteed occurrence is not pending a decision',
 
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
-select sweep_flex_decisions();
+select sweep_commitments();
 select expect_text('...and the sweep leaves it alone, with nobody booked on it',
   (select status::text from class_occurrences where id = current_setting('t.day5')::uuid), 'scheduled');
 select expect_true('...and it was never confirmed, because it never had to be',
-  (select flex_confirmed_at is null from class_occurrences
+  (select committed_at is null from class_occurrences
     where id = current_setting('t.day5')::uuid));
 
 -- =============================================================================
@@ -283,7 +300,7 @@ select expect_true('...and it was never confirmed, because it never had to be',
 -- The coach has been told to come in. Dropping below the minimum afterwards
 -- changes nothing, or the deadline would mean nothing.
 select expect_text('tomorrow''s class is confirmed',
-  (select case when flex_confirmed_at is not null then 'yes' else 'no' end
+  (select case when committed_at is not null then 'yes' else 'no' end
      from class_occurrences where id = current_setting('t.tom')::uuid), 'yes');
 select set_config('t.b1', (select id::text from bookings
   where occurrence_id = current_setting('t.tom')::uuid limit 1), false);
@@ -292,11 +309,11 @@ select expect_num('a member drops out, putting it below its minimum',
   (select count(*) from bookings
     where occurrence_id = current_setting('t.tom')::uuid
       and status in ('booked','attended','no_show','pending_payment'))::bigint, 1);
-select sweep_flex_decisions();
+select sweep_commitments();
 select expect_text('...and the class still runs',
   (select status::text from class_occurrences where id = current_setting('t.tom')::uuid), 'scheduled');
 select expect_true('...still confirmed',
-  (select flex_confirmed_at is not null from class_occurrences
+  (select committed_at is not null from class_occurrences
     where id = current_setting('t.tom')::uuid));
 
 -- =============================================================================
@@ -325,16 +342,16 @@ select expect_true('...while classes further out are not yet due',
 
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
-select set_config('t.sw2', (select sweep_flex_decisions()::text), false);
+select set_config('t.sw2', (select sweep_commitments()::text), false);
 select expect_num('the sweep decides B''s due class and leaves the rest',
   (select count(*) from class_occurrences
     where series_id = 'f1e0f1e0-0000-0000-0000-00000000f002'
-      and status = 'scheduled' and flex_confirmed_at is null and starts_at > now()
+      and status = 'scheduled' and committed_at is null and starts_at > now()
       and starts_at <= now() + interval '12 hours')::bigint, 0);
 select expect_true('...and B''s later classes are still pending',
   (select count(*) from class_occurrences
     where series_id = 'f1e0f1e0-0000-0000-0000-00000000f002'
-      and status = 'scheduled' and flex_confirmed_at is null
+      and status = 'scheduled' and committed_at is null
       and starts_at > now() + interval '12 hours') > 0);
 select expect_num('the third studio was never touched',
   (select count(*) from class_occurrences
@@ -342,7 +359,7 @@ select expect_num('the third studio was never touched',
 select expect_num('...and nothing of its was confirmed either, flagged or not',
   (select count(*) from class_occurrences
     where studio_id = 'f1e0f1e0-0000-0000-0000-000000000003'
-      and flex_confirmed_at is not null)::bigint, 0);
+      and committed_at is not null)::bigint, 0);
 
 -- =============================================================================
 -- 7. Guards, and the reporting number a studio actually wants
@@ -360,7 +377,7 @@ set role authenticated;
 -- session is refused by the ACL before it ever reaches the is_service_context()
 -- guard inside. Two locks, and the outer one answers first.
 select expect_raises('the sweep is a background job, not something a session runs',
-  $$select sweep_flex_decisions()$$, '42501');
+  $$select sweep_commitments()$$, '42501');
 
 select set_config('request.jwt.claim.sub','f1e0f1e0-0000-0000-0000-0000000000a1',false);
 select set_config('t.rep', (select flex_report('f1e0f1e0-0000-0000-0000-000000000001',

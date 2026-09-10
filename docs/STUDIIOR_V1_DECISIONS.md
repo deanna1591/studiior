@@ -108,6 +108,8 @@ In: classes taught, weekly teaching streaks, personal targets, badges, instructo
 
 Out: anything that resolves to money owed — per-class rates, bonus thresholds, accrual, payout, payroll export. Remains Wave 3.
 
+> **AMENDED BY DECISION 22.** The paragraph above is no longer true, and it is left standing rather than rewritten so the change is visible. Per-class rates, bonus thresholds and a period statement are now IN V1. Decision 22 explains why: guarantee tiers create an obligation the studio owes whether or not the class runs, and an obligation nobody computes is one that gets settled from memory. **Everything else in Decision 10 stands unchanged** — recognition is still not compensation, My Stats is still descriptive, and a public staff leaderboard is still a studio setting, default off. Payout is still out: Studiior computes what is owed and never moves the money.
+
 **Boundary test.** If a feature's output is a number an instructor could reasonably expect to be paid, it's compensation and out of scope. Classes taught this month is recognition. Classes taught multiplied by anything is compensation.
 
 **Leaderboard caution.** Ranking instructors publicly by classes taught rewards whoever has the most open calendar, which in a small studio correlates with having the fewest other commitments rather than teaching quality. Ship personal metrics first; treat a public staff leaderboard as a studio setting, default off.
@@ -304,7 +306,7 @@ Raised in brainstorming, confirmed out:
 | Automate membership continuity promotions | Marketing Automation |
 | Share milestones to social | Community-adjacent |
 | Refer friends | Referral engine, not in the seven modules |
-| Instructor incentive/payroll tracking | Wave 3 (Decision 10) |
+| Instructor incentive/payroll tracking | **In V1 as of Decision 22.** Per-class rates, guarantee tiers, a conversion bonus and a period statement. Payout itself stays out — Studiior computes what is owed and never moves the money. |
 | Multi-location | Ch. 7, though schema is ready (Decision 8) |
 | API access | Ch. 7 |
 | Community feed | **Conflicts with the Bible.** Ch. 10 puts a feed, reactions, announcements and friend connections in launch scope. Excluded here to fit six months. Needs an explicit call. |
@@ -468,6 +470,62 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 **Where:** Business Rules §3.3 and §5; Data Model §5; Permissions §4 and §6; migrations 053, 054, 055 and 056. **Status:** settled. **Extends:** Decisions 9 and 17. **Reuses:** Decision 2 for members, Decision 17 for open shifts.
 
+
+---
+
+## 22 — Guarantee tiers, cutoff evaluation and instructor pay, overturning part of Decision 10
+
+Optional per studio, off by default. A studio that never sets a tier sees no change anywhere.
+
+**This overturns part of Decision 10**, which put anything resolving to money owed in Wave 3 and drew the boundary at *"classes taught multiplied by anything is compensation."* That test is exactly why the overturn is necessary rather than convenient: a guarantee tier creates an obligation the studio owes **whether or not the class runs**, and an obligation nobody computes is one that gets settled from memory. Decision 10 has been amended in place rather than quietly contradicted.
+
+### Three tiers, extending Decision 21 rather than sitting beside it
+
+`core` runs at or above its minimum and, if it does not, does not run and the instructor is paid a holding percentage. `flex` is Decision 21's existing behaviour exactly — runs at its minimum, no pay and no obligation if unmet. `always` runs unconditionally.
+
+**Core is the default, and that is what makes "sees no change" true.** At `core_min_bookings` 1 a class with one booking commits and pays in full, which is what happens today. The `flex` boolean stays as the compatibility surface underneath the tier and is still read: a resolver that looked only at the new column would silently demote every Decision 21 row to core, turning a class that cancels for want of one booking into a class somebody is paid a holding rate for.
+
+**Two switches, not one.** `flex_enabled` governs flex and `guarantees_enabled` governs core. A studio already running flex keeps working without opting into anything and — the half that matters more — does not silently acquire core evaluation on every other class it runs.
+
+### Two cutoff shapes, deliberately not collapsed
+
+Core measures backwards from the class, because it mirrors the cancellation window and the headcount is effectively final by then. Flex is a wall-clock time the evening before, so an instructor can plan a whole day at once. Both existed in Decision 21; each tier now has its own.
+
+**`always` commits at the class's start time.** It has no minimum, but it needs a terminal transition, because that is where pay is written and locked — otherwise it would be the only tier nobody is ever paid for. Nothing in this codebase moves a class to `completed`; only the demo generator and the seed ever write that value.
+
+### Committed is terminal
+
+A later cancellation never un-commits and never changes what is owed. `booked_at_cutoff` is snapshotted at that moment and pay is calculated from it, never from attendance, so a no-show does not reduce what an instructor is owed for a class they turned up and taught.
+
+**`not_running` is not a new status.** It is `cancelled` with `cancellation_cause = 'unmet_minimum'`. A fourth `occurrence_status` would mean teaching thirty-odd places that filter on `cancelled` about a second way for a class to be off.
+
+**Members are never notified of `not_running`.** By definition there are fewer than the minimum and usually none at all; §3.2 tells whoever is actually booked. Instructor notifications are batched — one digest per evaluation run, deduped on the SET of classes decided, so a retry sends nothing and a genuinely later batch still sends.
+
+### Why a cancellation was ordered matters, and lives in the data
+
+`studio_fault` pays base, `force_majeure` pays nothing, `closure` pays nothing **by default with a per-closure override**: a Christmas closure announced in October is not something anyone should be paid for, and a brownout on the day is. The override is stamped on the occurrence rather than resolved at pay time, because reopening a period deletes the closure row and leaves the cancelled classes cancelled.
+
+### Pay
+
+Rates are **versioned with an effective date** and a version is immutable; changing a rate means adding the next one. The amount is written **once**, at the terminal transition, with the version used stored on the record — never recomputed on read. A **closed period is immutable** and corrections are adjustment lines in the next open one.
+
+`full_house_bonus` is its own field rather than a steeper final rung, and keys off the class's actual capacity, which varies by room. `private`, `duo` and `trio` rates **replace** the base-plus-ladder calculation entirely and trigger on a **marked class type**, never on headcount: a group class with two people booked is an underfilled group class, not a duo.
+
+`pay_model` is an enum carrying one value. Adding one to a payroll system that already has closed periods and live records is the expensive version.
+
+### Conversion bonus
+
+Attributed to the instructor of the member's **first ever class**, not their most recent — last-class attribution rewards whoever was teaching on the day a card went through, which is close to random. One per member ever, enforced by a unique index. Fired from the membership insert, which is where `activate_purchase()` puts both Stripe and manual payments, because hooking a Stripe checkout would pay nothing at a studio taking cash. A refund claws it back as an adjustment in the next open period.
+
+### Two questions the brief asked, answered
+
+**Peak allowance.** Credits and infractions are already correct on the studio-release path. The seam is a typed `bookings.release_reason` written by a trigger — so it catches every writer, not just `cancel_booking()` — and stamped only when still null, which is the idempotency allowance restoration will need. When allowance arrives it is added inside that trigger for `studio_released` only, and history is repaired by backfilling on the same value.
+
+**Substitutions.** Whoever is `instructor_id` at the cutoff is on the pay record, and the record carries its own copy so a later swap cannot rewrite who was paid. If the swap is not recorded before the cutoff, the notification has gone to the wrong person and the pay record names them; neither can be undone by an edit, so the correction is an **adjustment pair in the next open period** — negative to one, positive to the other, both referencing the occurrence.
+
+**Multi-instructor classes are out of scope.** One `instructor_id`, one pay record. No array, no join table, no "primary" flag for a later feature to reinterpret.
+
+**Where:** migrations 079–085. **Status:** settled.
 
 ---
 

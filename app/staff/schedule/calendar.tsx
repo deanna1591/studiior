@@ -53,6 +53,8 @@ export type CalEvent = {
   pendingApplications: number;
   /** Decision 21: flex and not yet decided. False once confirmed. */
   flexPending: boolean;
+  tier: string | null;
+  standalone: boolean;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -333,6 +335,14 @@ export default function ScheduleCalendar({
               )}
               {event.waitlistCount === 0 && f === "full" && <span>Full</span>}
               {event.waitlistCount === 0 && f === "quiet" && !event.flexPending && <span>Quiet</span>}
+              {/* A flex slot with nothing else of this instructor's near it.
+                  Worth seeing while you are still deciding where to put it:
+                  it is a trip for one class that may not run. */}
+              {event.standalone && (
+                <span style={{ color: "var(--amber-deep)" }} title="Nothing else of this instructor's within 90 minutes">
+                  On its own
+                </span>
+              )}
               {event.flexPending && <span title="Runs only if it reaches its minimum">Flex</span>}
             </span>
           </div>

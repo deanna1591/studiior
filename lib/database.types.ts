@@ -351,6 +351,9 @@ export type Database = {
           overridden_rules: string[] | null
           override_reason: string | null
           payment_source: Database["public"]["Enums"]["payment_source"] | null
+          release_reason:
+            | Database["public"]["Enums"]["booking_release_reason"]
+            | null
           source: Database["public"]["Enums"]["booking_source"]
           status: Database["public"]["Enums"]["booking_status"]
           studio_id: string
@@ -374,6 +377,9 @@ export type Database = {
           overridden_rules?: string[] | null
           override_reason?: string | null
           payment_source?: Database["public"]["Enums"]["payment_source"] | null
+          release_reason?:
+            | Database["public"]["Enums"]["booking_release_reason"]
+            | null
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id: string
@@ -397,6 +403,9 @@ export type Database = {
           overridden_rules?: string[] | null
           override_reason?: string | null
           payment_source?: Database["public"]["Enums"]["payment_source"] | null
+          release_reason?:
+            | Database["public"]["Enums"]["booking_release_reason"]
+            | null
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string
@@ -896,16 +905,23 @@ export type Database = {
       class_occurrences: {
         Row: {
           assigned_by: string | null
+          booked_at_cutoff: number | null
           booked_count: number
+          cancellation_cause:
+            | Database["public"]["Enums"]["cancellation_cause"]
+            | null
+          cancellation_pays: boolean | null
           cancellation_reason: string | null
           cancelled_at: string | null
           capacity: number
           class_type_id: string | null
+          committed_at: string | null
+          core_min_bookings: number | null
           created_at: string
           description: string | null
           ends_at: string
           flex: boolean
-          flex_confirmed_at: string | null
+          guarantee_tier: Database["public"]["Enums"]["guarantee_tier"] | null
           id: string
           instructor_confirmed_at: string | null
           instructor_id: string | null
@@ -928,16 +944,23 @@ export type Database = {
         }
         Insert: {
           assigned_by?: string | null
+          booked_at_cutoff?: number | null
           booked_count?: number
+          cancellation_cause?:
+            | Database["public"]["Enums"]["cancellation_cause"]
+            | null
+          cancellation_pays?: boolean | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           capacity: number
           class_type_id?: string | null
+          committed_at?: string | null
+          core_min_bookings?: number | null
           created_at?: string
           description?: string | null
           ends_at: string
           flex?: boolean
-          flex_confirmed_at?: string | null
+          guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
           instructor_confirmed_at?: string | null
           instructor_id?: string | null
@@ -960,16 +983,23 @@ export type Database = {
         }
         Update: {
           assigned_by?: string | null
+          booked_at_cutoff?: number | null
           booked_count?: number
+          cancellation_cause?:
+            | Database["public"]["Enums"]["cancellation_cause"]
+            | null
+          cancellation_pays?: boolean | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           capacity?: number
           class_type_id?: string | null
+          committed_at?: string | null
+          core_min_bookings?: number | null
           created_at?: string
           description?: string | null
           ends_at?: string
           flex?: boolean
-          flex_confirmed_at?: string | null
+          guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
           instructor_confirmed_at?: string | null
           instructor_id?: string | null
@@ -1061,6 +1091,8 @@ export type Database = {
           booking_window_days: number | null
           capacity: number
           class_type_id: string | null
+          core_cutoff_hours: number | null
+          core_min_bookings: number | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -1068,6 +1100,7 @@ export type Database = {
           duration_minutes: number
           ends_on: string | null
           flex: boolean
+          guarantee_tier: Database["public"]["Enums"]["guarantee_tier"]
           id: string
           instructor_id: string | null
           is_demo: boolean
@@ -1086,6 +1119,8 @@ export type Database = {
           booking_window_days?: number | null
           capacity: number
           class_type_id?: string | null
+          core_cutoff_hours?: number | null
+          core_min_bookings?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1093,6 +1128,7 @@ export type Database = {
           duration_minutes: number
           ends_on?: string | null
           flex?: boolean
+          guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"]
           id?: string
           instructor_id?: string | null
           is_demo?: boolean
@@ -1111,6 +1147,8 @@ export type Database = {
           booking_window_days?: number | null
           capacity?: number
           class_type_id?: string | null
+          core_cutoff_hours?: number | null
+          core_min_bookings?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1118,6 +1156,7 @@ export type Database = {
           duration_minutes?: number
           ends_on?: string | null
           flex?: boolean
+          guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"]
           id?: string
           instructor_id?: string | null
           is_demo?: boolean
@@ -1196,6 +1235,7 @@ export type Database = {
           image_url: string | null
           is_demo: boolean
           name: string
+          session_kind: Database["public"]["Enums"]["session_kind"]
           status: string
           studio_id: string
           updated_at: string
@@ -1211,6 +1251,7 @@ export type Database = {
           image_url?: string | null
           is_demo?: boolean
           name: string
+          session_kind?: Database["public"]["Enums"]["session_kind"]
           status?: string
           studio_id: string
           updated_at?: string
@@ -1226,6 +1267,7 @@ export type Database = {
           image_url?: string | null
           is_demo?: boolean
           name?: string
+          session_kind?: Database["public"]["Enums"]["session_kind"]
           status?: string
           studio_id?: string
           updated_at?: string
@@ -2013,6 +2055,188 @@ export type Database = {
           },
           {
             foreignKeyName: "instructor_commitments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_pay_records: {
+        Row: {
+          amount_cents: number
+          basis: Json | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          instructor_id: string
+          is_demo: boolean
+          note: string | null
+          occurrence_id: string | null
+          period_id: string
+          rate_version_id: string | null
+          source_id: string | null
+          studio_id: string
+          type: Database["public"]["Enums"]["pay_record_type"]
+        }
+        Insert: {
+          amount_cents: number
+          basis?: Json | null
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          id?: string
+          instructor_id: string
+          is_demo?: boolean
+          note?: string | null
+          occurrence_id?: string | null
+          period_id: string
+          rate_version_id?: string | null
+          source_id?: string | null
+          studio_id: string
+          type: Database["public"]["Enums"]["pay_record_type"]
+        }
+        Update: {
+          amount_cents?: number
+          basis?: Json | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          instructor_id?: string
+          is_demo?: boolean
+          note?: string | null
+          occurrence_id?: string | null
+          period_id?: string
+          rate_version_id?: string | null
+          source_id?: string | null
+          studio_id?: string
+          type?: Database["public"]["Enums"]["pay_record_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_pay_records_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_records_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_records_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "pay_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_records_rate_version_id_fkey"
+            columns: ["rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "instructor_rate_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_records_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_records_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_rate_versions: {
+        Row: {
+          base_rate_cents: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          duo_rate_cents: number | null
+          effective_from: string
+          full_house_bonus_cents: number
+          id: string
+          instructor_id: string
+          is_demo: boolean
+          note: string | null
+          pay_model: Database["public"]["Enums"]["pay_model"]
+          pay_tier: string | null
+          per_head_rate_cents: number
+          per_head_threshold: number
+          private_rate_cents: number | null
+          studio_id: string
+          trio_rate_cents: number | null
+        }
+        Insert: {
+          base_rate_cents?: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          duo_rate_cents?: number | null
+          effective_from: string
+          full_house_bonus_cents?: number
+          id?: string
+          instructor_id: string
+          is_demo?: boolean
+          note?: string | null
+          pay_model?: Database["public"]["Enums"]["pay_model"]
+          pay_tier?: string | null
+          per_head_rate_cents?: number
+          per_head_threshold?: number
+          private_rate_cents?: number | null
+          studio_id: string
+          trio_rate_cents?: number | null
+        }
+        Update: {
+          base_rate_cents?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          duo_rate_cents?: number | null
+          effective_from?: string
+          full_house_bonus_cents?: number
+          id?: string
+          instructor_id?: string
+          is_demo?: boolean
+          note?: string | null
+          pay_model?: Database["public"]["Enums"]["pay_model"]
+          pay_tier?: string | null
+          per_head_rate_cents?: number
+          per_head_threshold?: number
+          private_rate_cents?: number | null
+          studio_id?: string
+          trio_rate_cents?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_rate_versions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_rate_versions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_rate_versions_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -2846,6 +3070,7 @@ export type Database = {
           booking_window_days: number | null
           cancellation_notice_days: number
           commitment_months: number
+          counts_for_conversion: boolean
           created_at: string
           credits: number | null
           credits_per_period: number | null
@@ -2878,6 +3103,7 @@ export type Database = {
           booking_window_days?: number | null
           cancellation_notice_days?: number
           commitment_months?: number
+          counts_for_conversion?: boolean
           created_at?: string
           credits?: number | null
           credits_per_period?: number | null
@@ -2910,6 +3136,7 @@ export type Database = {
           booking_window_days?: number | null
           cancellation_notice_days?: number
           commitment_months?: number
+          counts_for_conversion?: boolean
           created_at?: string
           credits?: number | null
           credits_per_period?: number | null
@@ -3480,6 +3707,57 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          ends_on: string
+          id: string
+          is_demo: boolean
+          starts_on: string
+          status: Database["public"]["Enums"]["pay_period_status"]
+          studio_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          ends_on: string
+          id?: string
+          is_demo?: boolean
+          starts_on: string
+          status?: Database["public"]["Enums"]["pay_period_status"]
+          studio_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          ends_on?: string
+          id?: string
+          is_demo?: boolean
+          starts_on?: string
+          status?: Database["public"]["Enums"]["pay_period_status"]
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_periods_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_periods_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
             referencedColumns: ["id"]
           },
         ]
@@ -4406,6 +4684,7 @@ export type Database = {
           ends_at_time: string | null
           ends_on: string
           id: string
+          pays_instructors: boolean
           reason: string
           starts_at_time: string | null
           starts_on: string
@@ -4418,6 +4697,7 @@ export type Database = {
           ends_at_time?: string | null
           ends_on: string
           id?: string
+          pays_instructors?: boolean
           reason: string
           starts_at_time?: string | null
           starts_on: string
@@ -4430,6 +4710,7 @@ export type Database = {
           ends_at_time?: string | null
           ends_on?: string
           id?: string
+          pays_instructors?: boolean
           reason?: string
           starts_at_time?: string | null
           starts_on?: string
@@ -4513,6 +4794,7 @@ export type Database = {
       }
       studio_settings: {
         Row: {
+          adjacency_minutes: number
           availability_due_day: number
           booking_cutoff_minutes: number
           booking_window_days: number
@@ -4522,6 +4804,13 @@ export type Database = {
           checkin_secret: string
           checkin_window_enforced: boolean
           commitment_shortfall_weeks: number
+          conversion_attribution: string
+          conversion_bonus_cents: number
+          conversion_bonus_enabled: boolean
+          conversion_window_days: number
+          core_cutoff_hours: number
+          core_min_bookings: number
+          core_unmet_pay_pct: number
           cover_escalation_hours: number
           created_at: string
           dropin_payment_window_minutes: number
@@ -4529,6 +4818,10 @@ export type Database = {
           flex_deadline_mode: string
           flex_deadline_time: string
           flex_enabled: boolean
+          flex_min_bookings: number
+          flex_standby_pay_cents: number
+          flex_unmet_pay_cents: number
+          guarantees_enabled: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -4538,6 +4831,8 @@ export type Database = {
           no_show_fee_cents: number
           occurrence_horizon_days: number
           onboarding_completed_at: string | null
+          pay_period_anchor: string | null
+          pay_period_days: number
           payment_grace_days: number
           reminder_hours_before: number
           require_waiver: boolean
@@ -4560,6 +4855,7 @@ export type Database = {
           week_starts_on: number
         }
         Insert: {
+          adjacency_minutes?: number
           availability_due_day?: number
           booking_cutoff_minutes?: number
           booking_window_days?: number
@@ -4569,6 +4865,13 @@ export type Database = {
           checkin_secret?: string
           checkin_window_enforced?: boolean
           commitment_shortfall_weeks?: number
+          conversion_attribution?: string
+          conversion_bonus_cents?: number
+          conversion_bonus_enabled?: boolean
+          conversion_window_days?: number
+          core_cutoff_hours?: number
+          core_min_bookings?: number
+          core_unmet_pay_pct?: number
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
@@ -4576,6 +4879,10 @@ export type Database = {
           flex_deadline_mode?: string
           flex_deadline_time?: string
           flex_enabled?: boolean
+          flex_min_bookings?: number
+          flex_standby_pay_cents?: number
+          flex_unmet_pay_cents?: number
+          guarantees_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -4585,6 +4892,8 @@ export type Database = {
           no_show_fee_cents?: number
           occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
+          pay_period_anchor?: string | null
+          pay_period_days?: number
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
@@ -4607,6 +4916,7 @@ export type Database = {
           week_starts_on?: number
         }
         Update: {
+          adjacency_minutes?: number
           availability_due_day?: number
           booking_cutoff_minutes?: number
           booking_window_days?: number
@@ -4616,6 +4926,13 @@ export type Database = {
           checkin_secret?: string
           checkin_window_enforced?: boolean
           commitment_shortfall_weeks?: number
+          conversion_attribution?: string
+          conversion_bonus_cents?: number
+          conversion_bonus_enabled?: boolean
+          conversion_window_days?: number
+          core_cutoff_hours?: number
+          core_min_bookings?: number
+          core_unmet_pay_pct?: number
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
@@ -4623,6 +4940,10 @@ export type Database = {
           flex_deadline_mode?: string
           flex_deadline_time?: string
           flex_enabled?: boolean
+          flex_min_bookings?: number
+          flex_standby_pay_cents?: number
+          flex_unmet_pay_cents?: number
+          guarantees_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -4632,6 +4953,8 @@ export type Database = {
           no_show_fee_cents?: number
           occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
+          pay_period_anchor?: string | null
+          pay_period_days?: number
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
@@ -5126,6 +5449,10 @@ export type Database = {
         Args: { p_instructor_id: string; p_period_start: string }
         Returns: Json
       }
+      award_conversion_bonus: {
+        Args: { p_membership_id: string }
+        Returns: Json
+      }
       backfill_all_timelines: { Args: never; Returns: Json }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
@@ -5163,7 +5490,11 @@ export type Database = {
         }
       }
       cancel_occurrence: {
-        Args: { p_occurrence_id: string; p_reason?: string }
+        Args: {
+          p_cause?: Database["public"]["Enums"]["cancellation_cause"]
+          p_occurrence_id: string
+          p_reason?: string
+        }
         Returns: Json
       }
       checkin_code_for: {
@@ -5191,15 +5522,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claw_back_conversion_bonus: {
+        Args: { p_member_id: string; p_reason: string }
+        Returns: Json
+      }
       clear_availability_exception: {
         Args: { p_date: string; p_instructor_id: string }
         Returns: number
       }
+      close_pay_period: { Args: { p_period_id: string }; Returns: Json }
       close_studio: {
         Args: {
           p_confirm?: boolean
           p_ends_at_time?: string
           p_ends_on: string
+          p_pays_instructors?: boolean
           p_reason: string
           p_starts_at_time?: string
           p_starts_on: string
@@ -5216,6 +5553,24 @@ export type Database = {
           p_studio_id: string
         }
         Returns: Json
+      }
+      commitment_pending: {
+        Args: { p_studio_id: string }
+        Returns: {
+          booked: number
+          cutoff_shape: string
+          due_at: string
+          instructor_id: string
+          is_adjacent: boolean
+          local_when: string
+          minimum: number
+          occ_id: string
+          occ_name: string
+          past_due: boolean
+          short_by: number
+          starts_at: string
+          tier: Database["public"]["Enums"]["guarantee_tier"]
+        }[]
       }
       commitment_report: {
         Args: { p_studio_id: string }
@@ -5240,6 +5595,7 @@ export type Database = {
         Args: { p_account_id: string; p_state: string }
         Returns: string
       }
+      compute_class_pay: { Args: { p_occurrence_id: string }; Returns: Json }
       confirm_dropin_payment: {
         Args: { p_booking_id: string; p_studio_id: string }
         Returns: boolean
@@ -5279,6 +5635,27 @@ export type Database = {
         Args: { p_confirm?: boolean; p_ends_on?: string; p_series_id: string }
         Returns: Json
       }
+      ensure_pay_period: {
+        Args: { p_on: string; p_studio_id: string }
+        Returns: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          ends_on: string
+          id: string
+          is_demo: boolean
+          starts_on: string
+          status: Database["public"]["Enums"]["pay_period_status"]
+          studio_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pay_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -5301,6 +5678,10 @@ export type Database = {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
       }
+      force_commit_occurrence: {
+        Args: { p_occurrence_id: string; p_reason: string }
+        Returns: Json
+      }
       generate_all_occurrences: { Args: never; Returns: Json }
       generate_all_occurrences_for: {
         Args: { p_studio_id: string }
@@ -5313,6 +5694,10 @@ export type Database = {
       }
       generate_occurrences: {
         Args: { p_from?: string; p_horizon_days?: number; p_series_id: string }
+        Returns: Json
+      }
+      guarantee_report: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
       }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
@@ -5345,6 +5730,35 @@ export type Database = {
       instructor_qualified: {
         Args: { p_class_type_id: string; p_instructor_id: string }
         Returns: boolean
+      }
+      instructor_rate_at: {
+        Args: { p_instructor_id: string; p_on: string }
+        Returns: {
+          base_rate_cents: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          duo_rate_cents: number | null
+          effective_from: string
+          full_house_bonus_cents: number
+          id: string
+          instructor_id: string
+          is_demo: boolean
+          note: string | null
+          pay_model: Database["public"]["Enums"]["pay_model"]
+          pay_tier: string | null
+          per_head_rate_cents: number
+          per_head_threshold: number
+          private_rate_cents: number | null
+          studio_id: string
+          trio_rate_cents: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "instructor_rate_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       instructor_valid_on: {
@@ -5411,6 +5825,14 @@ export type Database = {
           seconds_left: number
         }[]
       }
+      member_first_class: {
+        Args: { p_member_id: string }
+        Returns: {
+          attended_at: string
+          instructor_id: string
+          occurrence_id: string
+        }[]
+      }
       member_goal_progress: { Args: { p_goal_id: string }; Returns: Json }
       member_health: { Args: { p_member_id: string }; Returns: Json }
       member_invite_preview: {
@@ -5453,15 +5875,52 @@ export type Database = {
         Args: { p_from?: string; p_studio_id: string }
         Returns: Json
       }
+      next_open_pay_period: {
+        Args: { p_studio_id: string }
+        Returns: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          ends_on: string
+          id: string
+          is_demo: boolean
+          starts_on: string
+          status: Database["public"]["Enums"]["pay_period_status"]
+          studio_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pay_periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       notification_api_key: { Args: never; Returns: string }
       notification_setting: { Args: { p_key: string }; Returns: string }
       notification_wanted: {
         Args: { p_member_id: string; p_template: string }
         Returns: boolean
       }
+      occurrence_guarantee: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          cutoff_at: string
+          cutoff_shape: string
+          minimum: number
+          tier: Database["public"]["Enums"]["guarantee_tier"]
+        }[]
+      }
+      occurrence_is_adjacent: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
       occurrence_seats_taken: {
         Args: { p_occurrence_id: string }
         Returns: number
+      }
+      pay_statement: {
+        Args: { p_instructor_id: string; p_period_id: string }
+        Returns: Json
       }
       provision_studio: {
         Args: {
@@ -5572,6 +6031,7 @@ export type Database = {
         Returns: Json
       }
       reconcile_notification_sends: { Args: never; Returns: Json }
+      record_class_pay: { Args: { p_occurrence_id: string }; Returns: Json }
       record_document: {
         Args: {
           p_filename: string
@@ -5671,7 +6131,9 @@ export type Database = {
           occ_instructor_id: string
           occ_name: string
           occ_staffing: string
+          occ_standalone: boolean
           occ_status: string
+          occ_tier: string
           occ_waitlist: number
           room_name: string
           start_minutes: number
@@ -5797,6 +6259,22 @@ export type Database = {
         Args: { p_class_type_ids: string[]; p_instructor_id: string }
         Returns: number
       }
+      set_instructor_rate: {
+        Args: {
+          p_base_rate_cents?: number
+          p_duo_rate_cents?: number
+          p_effective_from: string
+          p_full_house_bonus_cents?: number
+          p_instructor_id: string
+          p_note?: string
+          p_pay_tier?: string
+          p_per_head_rate_cents?: number
+          p_per_head_threshold?: number
+          p_private_rate_cents?: number
+          p_trio_rate_cents?: number
+        }
+        Returns: Json
+      }
       set_occurrence_guaranteed: {
         Args: { p_occurrence_id: string }
         Returns: Json
@@ -5810,6 +6288,15 @@ export type Database = {
           p_flex: boolean
           p_minimum_bookings?: number
           p_series_id: string
+        }
+        Returns: Json
+      }
+      set_series_guarantee: {
+        Args: {
+          p_core_cutoff_hours?: number
+          p_min_bookings?: number
+          p_series_id: string
+          p_tier: Database["public"]["Enums"]["guarantee_tier"]
         }
         Returns: Json
       }
@@ -5950,8 +6437,8 @@ export type Database = {
       }
       sweep_availability_reminders: { Args: never; Returns: Json }
       sweep_booked_count_reconcile: { Args: never; Returns: Json }
+      sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
-      sweep_flex_decisions: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
@@ -5991,6 +6478,10 @@ export type Database = {
     }
     Enums: {
       billing_interval: "week" | "month" | "quarter" | "year"
+      booking_release_reason:
+        | "member_cancelled"
+        | "late_cancelled"
+        | "studio_released"
       booking_source: "member" | "staff" | "front_desk" | "import"
       booking_status:
         | "booked"
@@ -6000,6 +6491,11 @@ export type Database = {
         | "attended"
         | "no_show"
         | "pending_payment"
+      cancellation_cause:
+        | "unmet_minimum"
+        | "studio_fault"
+        | "force_majeure"
+        | "closure"
       challenge_audience: "member" | "instructor"
       challenge_status: "draft" | "scheduled" | "active" | "ended" | "archived"
       challenge_type: "class_count" | "streak" | "class_type_count"
@@ -6011,6 +6507,7 @@ export type Database = {
         | "expiry"
         | "freeze_adjustment"
         | "manual"
+      guarantee_tier: "core" | "flex" | "always"
       import_status:
         | "uploaded"
         | "validating"
@@ -6039,6 +6536,9 @@ export type Database = {
         | "failed"
         | "cancelled"
       occurrence_status: "scheduled" | "cancelled" | "completed"
+      pay_model: "per_class"
+      pay_period_status: "open" | "closed"
+      pay_record_type: "class" | "conversion" | "adjustment"
       payment_provider: "manual" | "stripe"
       payment_source:
         | "membership"
@@ -6060,6 +6560,7 @@ export type Database = {
         | "locked"
         | "cancelled"
       series_status: "active" | "ended" | "cancelled" | "archived"
+      session_kind: "group" | "private" | "duo" | "trio"
       staff_role: "owner" | "manager" | "instructor" | "front_desk"
       staffing_state: "assigned" | "open" | "pending_approval"
       theme_preset: "warm" | "clean" | "calm" | "bold"
@@ -6232,6 +6733,11 @@ export const Constants = {
   public: {
     Enums: {
       billing_interval: ["week", "month", "quarter", "year"],
+      booking_release_reason: [
+        "member_cancelled",
+        "late_cancelled",
+        "studio_released",
+      ],
       booking_source: ["member", "staff", "front_desk", "import"],
       booking_status: [
         "booked",
@@ -6241,6 +6747,12 @@ export const Constants = {
         "attended",
         "no_show",
         "pending_payment",
+      ],
+      cancellation_cause: [
+        "unmet_minimum",
+        "studio_fault",
+        "force_majeure",
+        "closure",
       ],
       challenge_audience: ["member", "instructor"],
       challenge_status: ["draft", "scheduled", "active", "ended", "archived"],
@@ -6254,6 +6766,7 @@ export const Constants = {
         "freeze_adjustment",
         "manual",
       ],
+      guarantee_tier: ["core", "flex", "always"],
       import_status: [
         "uploaded",
         "validating",
@@ -6285,6 +6798,9 @@ export const Constants = {
         "cancelled",
       ],
       occurrence_status: ["scheduled", "cancelled", "completed"],
+      pay_model: ["per_class"],
+      pay_period_status: ["open", "closed"],
+      pay_record_type: ["class", "conversion", "adjustment"],
       payment_provider: ["manual", "stripe"],
       payment_source: [
         "membership",
@@ -6309,6 +6825,7 @@ export const Constants = {
         "cancelled",
       ],
       series_status: ["active", "ended", "cancelled", "archived"],
+      session_kind: ["group", "private", "duo", "trio"],
       staff_role: ["owner", "manager", "instructor", "front_desk"],
       staffing_state: ["assigned", "open", "pending_approval"],
       theme_preset: ["warm", "clean", "calm", "bold"],

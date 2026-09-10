@@ -110,6 +110,7 @@ export default async function Schedule({
     occ_instructor_id: string | null; room_name: string | null;
     occ_capacity: number; occ_booked: number; occ_waitlist: number; occ_staffing: string;
     occ_flex: boolean; occ_confirmed: boolean;
+    occ_tier: string | null; occ_standalone: boolean | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -144,6 +145,11 @@ export default async function Schedule({
     // class is an ordinary class and drawing it differently would be marking a
     // distinction that has stopped existing.
     flexPending: o.occ_flex && !o.occ_confirmed,
+    tier: o.occ_tier ?? null,
+    // A flex slot with nothing else of that instructor's beside it: the one
+    // that costs a trip for a class that may not run, and the one a studio
+    // should look at twice before putting it there.
+    standalone: (o.occ_standalone ?? false) && !o.occ_confirmed,
   }));
 
   // THE VISIBLE HOURS COME FROM WHAT IS ON THE SCHEDULE, not from a constant.
