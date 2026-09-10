@@ -112,6 +112,15 @@ reset role;
 insert into studios (id, name, slug, timezone, currency, status) values
   ('9a179a17-0000-0000-0000-000000000003','Untouched','gp-untouched','Europe/Prague','CZK','active');
 insert into studio_settings (studio_id) values ('9a179a17-0000-0000-0000-000000000003');
+-- Its OWN owner. The first version of this asked studio 1's owner about studio
+-- 3's class, which migration 086's guard correctly refused — the fixture was
+-- reaching across a tenant boundary and the assertion had never noticed.
+insert into auth.users (id) values ('9a179a17-0000-0000-0000-0000000000a5');
+insert into profiles (id, email, full_name) values
+  ('9a179a17-0000-0000-0000-0000000000a5','gp-owner-c@example.com','Cyd Owner');
+insert into studio_staff (id, studio_id, user_id, email, role) values
+  ('9a179a17-0000-0000-0000-0000000055a5','9a179a17-0000-0000-0000-000000000003',
+   '9a179a17-0000-0000-0000-0000000000a5','gp-owner-c@example.com','owner');
 insert into locations (id, studio_id, name, is_primary) values
   ('9a179a17-0000-0000-0000-00000000000e','9a179a17-0000-0000-0000-000000000003','Main',true);
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
@@ -121,7 +130,7 @@ values ('9a179a17-0000-0000-0000-000000009f01','9a179a17-0000-0000-0000-00000000
         '9a179a17-0000-0000-0000-00000000000e','9a179a17-0000-0000-0000-00000000cc04',
         'Ordinary class', 6, now() - interval '1 hour', now() - interval '10 min');
 
-select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a5',false);
 set role authenticated;
 select expect_text('a studio with guarantees off has no cutoff to reach',
   (select cutoff_shape from occurrence_guarantee('9a179a17-0000-0000-0000-000000009f01')), 'none');
@@ -649,6 +658,89 @@ select expect_true('...naming the record it reverses',
 select expect_num('...and clawing back twice does not double it',
   (select count(*) from instructor_pay_records
     where type='adjustment' and source_id='9a179a17-0000-0000-0000-0000000b1001')::bigint, 1);
+
+-- =============================================================================
+-- 17. NOTHING ABOUT PAY IS REACHABLE BY A MEMBER (migration 086)
+-- =============================================================================
+-- Eight SECURITY DEFINER functions from 080-083 shipped with no check inside
+-- them. The grant surface was right and the guards were missing, which is the
+-- half of the question that only asking a real session can answer.
+--
+-- The direct reads returning 0 are what make each refusal below a real guard
+-- rather than RLS quietly doing the work — the same proof migration 056 used.
+insert into auth.users (id) values ('9a179a17-0000-0000-0000-0000000000a6');
+insert into profiles (id, email, full_name) values
+  ('9a179a17-0000-0000-0000-0000000000a6','gp-outsider@example.com','Otto Outsider');
+insert into members (id, studio_id, first_name, last_name, email, status, user_id) values
+  ('9a179a17-0000-0000-0000-0000000b2002','9a179a17-0000-0000-0000-000000000002',
+   'Otto','Outsider','gp-outsider@example.com','active','9a179a17-0000-0000-0000-0000000000a6');
+
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a6',false);
+set role authenticated;
+
+select expect_num('a member sees no rate versions at all',
+  (select count(*) from instructor_rate_versions)::bigint, 0);
+select expect_num('...no pay records',
+  (select count(*) from instructor_pay_records)::bigint, 0);
+select expect_num('...and no pay periods',
+  (select count(*) from pay_periods)::bigint, 0);
+
+select expect_raises('a member cannot read an instructor''s rate',
+  $$select instructor_rate_at('9a179a17-0000-0000-0000-00000000d101', current_date)$$, 'PT403');
+select expect_raises('...nor price another studio''s class',
+  $$select compute_class_pay('9a179a17-0000-0000-0000-00000000e006')$$, 'PT403');
+select expect_raises('...nor learn who taught a member first',
+  $$select * from member_first_class('9a179a17-0000-0000-0000-0000000b1001')$$, 'PT403');
+select expect_raises('...nor read a tier and cutoff',
+  $$select * from occurrence_guarantee('9a179a17-0000-0000-0000-00000000a001')$$, 'PT403');
+select expect_raises('...nor whether somebody''s slot stands alone',
+  $$select occurrence_is_adjacent('9a179a17-0000-0000-0000-00000000c102')$$, 'PT403');
+select expect_raises('...nor award a bonus',
+  $$select award_conversion_bonus('9a179a17-0000-0000-0000-00000000ab02')$$, 'PT403');
+select expect_raises('...nor ask whether a member ever converted',
+  $$select claw_back_conversion_bonus('9a179a17-0000-0000-0000-0000000b1001','x')$$, 'PT403');
+-- The two that WROTE are not merely guarded, they are ungranted: no client role
+-- may call them at all, which is a stronger statement than a check.
+select expect_raises('...and cannot create a pay period, having no grant to try',
+  $$select ensure_pay_period('9a179a17-0000-0000-0000-000000000001', current_date)$$, '42501');
+select expect_raises('...nor reach the next open one',
+  $$select next_open_pay_period('9a179a17-0000-0000-0000-000000000001')$$, '42501');
+
+-- =============================================================================
+-- 18. AN INSTRUCTOR READS THEIR OWN, AND NOBODY ELSE'S
+-- =============================================================================
+-- Captured as postgres FIRST. Asking the instructor to look up the other
+-- studio's period gives null and the guard never fires — a refusal for the
+-- wrong reason looks exactly like the right one.
+reset role;
+select set_config('t.other_period',
+  (select id::text from pay_periods where studio_id='9a179a17-0000-0000-0000-000000000002' limit 1), false);
+set role authenticated;
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a3',false);
+select expect_true('an instructor reads their own rate',
+  (select (instructor_rate_at('9a179a17-0000-0000-0000-00000000d101', current_date)).base_rate_cents > 0));
+select expect_raises('...and not the other studio''s instructor''s',
+  $$select instructor_rate_at('9a179a17-0000-0000-0000-00000000d102', current_date)$$, 'PT403');
+select expect_true('...reads their own pay records',
+  (select count(*) > 0 from instructor_pay_records
+    where instructor_id = '9a179a17-0000-0000-0000-00000000d101'));
+select expect_num('...and sees none of anybody else''s',
+  (select count(*) from instructor_pay_records
+    where instructor_id <> '9a179a17-0000-0000-0000-00000000d101')::bigint, 0);
+select expect_true('...reads their own statement',
+  ((pay_statement('9a179a17-0000-0000-0000-00000000d101',
+     (select period_id from instructor_pay_records
+       where instructor_id='9a179a17-0000-0000-0000-00000000d101' limit 1))) ->> 'ok')::boolean);
+select expect_raises('...and is refused somebody else''s',
+  format($$select pay_statement('9a179a17-0000-0000-0000-00000000d102', '%s')$$,
+         current_setting('t.other_period')), 'PT403');
+select expect_raises('...and cannot set a rate, their own included',
+  $$select set_instructor_rate('9a179a17-0000-0000-0000-00000000d101', current_date + 200, 999)$$, 'PT403');
+select expect_raises('...nor close a period',
+  $$select close_pay_period((select period_id from instructor_pay_records
+      where instructor_id='9a179a17-0000-0000-0000-00000000d101' limit 1))$$, 'PT403');
+select expect_true('...but does read the tier and cutoff of a class in their own studio',
+  (select tier is not null from occurrence_guarantee('9a179a17-0000-0000-0000-00000000a001')));
 
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
