@@ -94,3 +94,19 @@ export function shiftDateKey(dateKey: string, days: number): string {
   t.setUTCDate(t.getUTCDate() + days);
   return t.toISOString().slice(0, 10);
 }
+
+/**
+ * Today, in the studio's zone — without asking the database.
+ *
+ * `studio_today()` exists and returns exactly this; the page used to spend a
+ * whole serial round trip on it before it could even name the day it was about
+ * to fetch. Intl carries the same IANA rules Postgres does, so the two cannot
+ * disagree — checked against hosted, both say 2026-09-10 for Asia/Manila while
+ * the server's own date is the 9th. The SQL function stays for callers that are
+ * already in the database; nothing that has a timezone in hand should pay a hop
+ * for it.
+ */
+export function studioToday(tz: string, now: Date = new Date()): string {
+  const p = zonedParts(now, tz);
+  return `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
+}

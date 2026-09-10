@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
-import { shiftDateKey } from "@/lib/tz";
+import { shiftDateKey, studioToday } from "@/lib/tz";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
 import JumpToDate from "./jump";
 import FillPanel from "./fill/panel";
@@ -40,10 +40,13 @@ export default async function Schedule({
 
   const view = searchParams.view === "week" ? "week" : "day";
 
-  // The studio's today, not the server's. `now()::date` where this runs is a
-  // different day from Manila's for most of the world's hours.
-  const { data: todayData } = await supabase.rpc("studio_today", { p_studio_id: ctx.studioId });
-  const today = (todayData as unknown as string) ?? new Date().toISOString().slice(0, 10);
+  // The studio's today, not the server's — `now()` where this runs is a
+  // different day from Manila's for most of the world's hours. COMPUTED rather
+  // than fetched: this was a whole serial round trip that had to finish before
+  // the page could even name the day it was about to ask for. Intl carries the
+  // same IANA rules Postgres does; checked against hosted, both say 2026-09-10
+  // for Asia/Manila while the server's own date is the 9th.
+  const today = studioToday(ctx.timeZone);
   const anchor = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.d ?? "") ? searchParams.d! : today;
 
   // A day either side of what is shown, so a class that runs past midnight and
@@ -56,7 +59,8 @@ export default async function Schedule({
 
   const [{ data: instructors }, { data: rows, error: rangeError }, { data: pending },
          { data: settings },
-         { data: quietPct }, { data: quietDays }, { data: fullPct }] =
+         { data: quietPct }, { data: quietDays }, { data: fullPct },
+         { data: elsewhereData }] =
     await Promise.all([
       supabase.from("instructors")
         .select("id, display_name").eq("status", "active").order("display_name"),
@@ -71,6 +75,7 @@ export default async function Schedule({
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "overfilled_pct" }),
+      supabase.rpc("next_class_day", { p_studio_id: ctx.studioId, p_from: weekStart }),
     ]);
 
   // A FAILED QUERY MUST NOT LOOK LIKE AN EMPTY WEEK. `schedule_range()` raised
@@ -149,18 +154,12 @@ export default async function Schedule({
   const minHour = Math.max(0, Math.floor(earliest / 60) - 1);
   const maxHour = Math.min(24, Math.ceil(latest / 60) + 1);
 
-  // Only asked when there is nothing to show, so the ordinary render costs
-  // nothing. An empty calendar that cannot point at the timetable it is a view
-  // of is indistinguishable from a broken one.
+  // Fetched in the batch above rather than behind an `if`: it used to be a
+  // FOURTH serial hop that fired only when the day was empty, which is exactly
+  // the render that was already slowest to say anything useful.
   type Elsewhere = { next: string | null; previous: string | null;
                      classes_that_day: number; has_any: boolean };
-  let elsewhere: Elsewhere | null = null;
-  if (events.length === 0) {
-    const { data } = await supabase.rpc("next_class_day", {
-      p_studio_id: ctx.studioId, p_from: weekStart,
-    });
-    elsewhere = data as unknown as Elsewhere;
-  }
+  const elsewhere = elsewhereData as unknown as Elsewhere | null;
 
   const fmtDay = (d: string) =>
     new Intl.DateTimeFormat("en-GB", {

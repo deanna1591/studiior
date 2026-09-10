@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Views, dateFnsLocalizer, type View } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
@@ -85,11 +85,28 @@ export default function ScheduleCalendar({
   const [blockedBy, setBlockedBy] = useState<
     { occurrenceId: string; name: string; at: string; who: string | null; room: string | null } | null
   >(null);
-  const [, startTransition] = useTransition();
+  // isPending is the whole point of the transition. Without it `router.push`
+  // blocks on a server round trip with NOTHING on screen saying so — click
+  // Next, nothing moves, then everything swaps at once. Inside a transition
+  // React keeps the CURRENT grid mounted until the new one is ready, which is
+  // what stops a populated day ever flashing as an empty one.
+  const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const go = useCallback((d: string, v: "day" | "week") => {
-    router.push(`/schedule?d=${d}&view=${v}`);
+    startTransition(() => {
+      router.push(`/schedule?d=${d}&view=${v}`);
+    });
   }, [router]);
+
+  // Back and Next are one round trip away, so pay for them before they are
+  // pressed. Measured first: server work for a whole day is ~14 ms and a round
+  // trip from here is ~58 ms, so the wait is latency and nothing else — which
+  // is exactly the kind a prefetch removes and a faster query would not.
+  useEffect(() => {
+    const step = view === "week" ? 7 : 1;
+    router.prefetch(`/schedule?d=${shiftDateKey(anchor, -step)}&view=${view}`);
+    router.prefetch(`/schedule?d=${shiftDateKey(anchor, step)}&view=${view}`);
+  }, [router, anchor, view]);
 
   // THE ONE PLACE THE ZONE IS APPLIED. react-big-calendar lays out Dates by
   // their browser-local fields, so it is handed Dates whose local fields have
@@ -160,7 +177,9 @@ export default function ScheduleCalendar({
           bits.push("everyone booked can now cancel without penalty, because the time they agreed to has changed");
         }
         if (bits.length) setNotice(`Moved — ${bits.join(", and ")}.`);
-        startTransition(() => {});
+        // The move already updated `events` locally; this only asks the server
+        // for anything else that changed with it.
+        startTransition(() => { router.refresh(); });
         return;
       }
 
@@ -356,7 +375,22 @@ export default function ScheduleCalendar({
           )}
         </p>
       )}
-      <div style={{ height: "72vh" }}>
+      {/* The previous day's grid stays exactly where it is underneath. A day
+          with classes must never render as an empty grid while its data is in
+          flight — that confusion cost three rounds on this screen already. */}
+      <div style={{ height: "72vh", position: "relative" }}
+           aria-busy={isPending}>
+        {isPending && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-3"
+               role="status">
+            <span className="rounded-full px-3 py-1 text-[12px] leading-4 text-ink"
+                  style={{ background: "var(--surface)", boxShadow: "0 1px 6px rgba(0,0,0,.12)" }}>
+              Loading…
+            </span>
+          </div>
+        )}
+        <div style={{ height: "100%", opacity: isPending ? 0.45 : 1,
+                      transition: "opacity 120ms ease" }}>
         <DnDCalendar
           localizer={localizer}
           formats={formats}
@@ -402,6 +436,7 @@ export default function ScheduleCalendar({
             + (e.staffing !== "assigned" ? " — nobody assigned" : "")
             + " — click to open the roster"}
         />
+        </div>
       </div>
       <p className="mt-3 text-[12px] leading-4 text-ink-3">
         Times shown in {timeZone}. Click a class to open its roster. Drag to move
