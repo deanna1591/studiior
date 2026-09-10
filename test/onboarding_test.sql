@@ -186,8 +186,15 @@ select expect_text('a missing name is refused',
 -- Reading studio_invites is the operator's privilege, not anon's, so this
 -- fixture check drops out of RLS rather than pretending otherwise.
 reset role;
+-- SCOPED TO THIS SUITE'S OWN INVITE. An unfiltered count(*) here is a count of
+-- whatever ran first: the suites share one db reset, and the instructor portal
+-- suite accepts an invite of its own. Same shape as the notifications count
+-- scheduling_test.sql had to scope once cover_and_commitment started writing
+-- the same template key.
 select expect_num('neither attempt consumed the invite',
-  (select count(*) from studio_invites where accepted_at is not null), 0);
+  (select count(*) from studio_invites
+    where accepted_at is not null
+      and token_hash = encode(extensions.digest(current_setting('test.token'), 'sha256'), 'hex')), 0);
 set role anon;
 
 select expect_text('accepting succeeds',

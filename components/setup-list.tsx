@@ -5,11 +5,14 @@ type ShellProps = React.ComponentProps<typeof AppShell>;
 
 /** The three setup lists differ only in their rows, so the frame is shared. */
 export function SetupShell({
-  shell, title, blurb, newHref, newLabel, empty, count, children, archived, tabs,
+  shell, title, blurb, afterBlurb, newHref, newLabel, empty, count, children, archived, tabs,
 }: {
   shell: Omit<ShellProps, "title" | "children">;
   title: string;
   blurb?: string;
+  /** A link belonging with the blurb rather than with the page title — a
+   *  second destination this list leads to, not a second primary action. */
+  afterBlurb?: React.ReactNode;
   newHref: string;
   newLabel: string;
   empty: string;
@@ -38,7 +41,12 @@ export function SetupShell({
         </>
       }
     >
-      {blurb && <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">{blurb}</p>}
+      {blurb && (
+        <p className="mb-5 max-w-[54ch] text-[13px] leading-[20px] text-ink-2">
+          {blurb}
+          {afterBlurb && <> {afterBlurb}</>}
+        </p>
+      )}
       {count === 0 ? (
         <Empty>
           {empty}{" "}

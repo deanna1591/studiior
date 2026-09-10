@@ -4856,6 +4856,8 @@ export type Database = {
           email: string
           expires_at: string
           id: string
+          instructor_id: string | null
+          role: Database["public"]["Enums"]["staff_role"]
           studio_id: string
           token_hash: string
         }
@@ -4867,6 +4869,8 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
+          instructor_id?: string | null
+          role?: Database["public"]["Enums"]["staff_role"]
           studio_id: string
           token_hash: string
         }
@@ -4878,10 +4882,19 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
+          instructor_id?: string | null
+          role?: Database["public"]["Enums"]["staff_role"]
           studio_id?: string
           token_hash?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "studio_invites_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "studio_invites_studio_id_fkey"
             columns: ["studio_id"]
@@ -5617,6 +5630,10 @@ export type Database = {
         Returns: string
       }
       choose_pay_at_desk: { Args: { p_booking_id: string }; Returns: Json }
+      claim_instructor_account: {
+        Args: { p_full_name?: string; p_password: string; p_token: string }
+        Returns: Json
+      }
       claim_member_account: {
         Args: { p_full_name?: string; p_password: string; p_token: string }
         Returns: Database["public"]["CompositeTypes"]["member_claim"]
@@ -5841,30 +5858,6 @@ export type Database = {
         }
       }
       evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_null: {
-        Args: { actual: string; label: string }
-        Returns: undefined
-      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
@@ -5879,10 +5872,6 @@ export type Database = {
       }
       expect_true: {
         Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
         Returns: undefined
       }
       extend_trial: {
@@ -5956,6 +5945,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
+      instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
+      instructor_pay_summary: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
       instructor_qualified: {
         Args: { p_class_type_id: string; p_instructor_id: string }
         Returns: boolean
@@ -5989,21 +5984,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      instructor_recognition: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
+      instructor_roster: { Args: { p_occurrence_id: string }; Returns: Json }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       instructor_valid_on: {
         Args: { p_instructor_id: string; p_on: string }
         Returns: boolean
       }
-      instructor_week: {
-        Args: { p_instructor_id: string; p_week_start?: string }
-        Returns: Json
-      }
+      instructor_week:
+        | {
+            Args: { p_from: string; p_instructor_id: string; p_to: string }
+            Returns: Json
+          }
+        | {
+            Args: { p_instructor_id: string; p_week_start?: string }
+            Returns: Json
+          }
       instructor_weekly_load: {
         Args: { p_instructor_id: string; p_weeks?: number }
         Returns: {
           classes: number
           week_start: string
         }[]
+      }
+      invite_instructor: {
+        Args: { p_days?: number; p_email: string; p_instructor_id: string }
+        Returns: Json
       }
       invite_member: {
         Args: { p_days?: number; p_member_id: string }
@@ -6022,7 +6031,6 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: boolean
       }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -6121,6 +6129,7 @@ export type Database = {
         }
         Returns: Json
       }
+      my_instructor: { Args: never; Returns: Json }
       narrative_covers_days: { Args: { p_facts: Json }; Returns: number }
       narrative_numbers: { Args: { p_text: string }; Returns: string[] }
       narrative_offending_number: {
@@ -6214,7 +6223,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      psig: { Args: { body: string; secret?: string }; Returns: string }
       purge_demo_data: {
         Args: { p_confirm?: boolean; p_studio_id: string }
         Returns: Json
@@ -6595,7 +6603,6 @@ export type Database = {
         }
         Returns: Json
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {

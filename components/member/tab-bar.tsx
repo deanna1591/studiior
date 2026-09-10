@@ -35,13 +35,28 @@ const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: "/account", label: "Account", icon: "user" },
 ];
 
-export default function TabBar({ badges = {} }: { badges?: Partial<Record<string, number>> }) {
+export type Tab = { href: string; label: string; icon: IconName };
+
+/**
+ * `tabs` is a parameter so the instructor portal can hand it a different five
+ * without a second tab bar existing. Three surfaces with three visual systems
+ * is how this becomes unmaintainable; the bar, the icons, the float, the blur
+ * and the accent handling are all the same thing in both places.
+ */
+export default function TabBar({
+  badges = {}, tabs = TABS, rootHref = "/",
+}: {
+  badges?: Partial<Record<string, number>>;
+  tabs?: Tab[];
+  /** Which href means "the first tab", matched exactly rather than by prefix. */
+  rootHref?: string;
+}) {
   const pathname = usePathname();
   return (
     <nav className="m-tabbar-float z-30 mx-auto max-w-lg">
       <ul className="flex items-stretch px-1.5 py-1.5">
-        {TABS.map((t) => {
-          const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
+        {tabs.map((t) => {
+          const active = t.href === rootHref ? pathname === rootHref : pathname.startsWith(t.href);
           const badge = badges[t.href] ?? 0;
           return (
             <li key={t.href} className="flex-1">

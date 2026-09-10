@@ -1,5 +1,6 @@
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
+import Link from "next/link";
 import { AppShell, Denied } from "@/components/ui";
 import { SetupShell, SetupRow, ArchivedSection } from "@/components/setup-list";
 
@@ -36,6 +37,7 @@ export default async function InstructorsList() {
       shell={shell}
       title="Instructors"
       blurb="Who teaches. An instructor is a teaching record — they do not need a login, and adding one here does not invite them."
+      afterBlurb={<Link href="/instructors/access" className="text-[13px] text-lime-text underline underline-offset-4 hover:text-lime-text2">Who can sign in →</Link>}
       newHref="/instructors/new" newLabel="Add an instructor" count={live.length}
       empty="No instructors yet — a class can go on without one, but the roster reads better with a name on it."
       archived={

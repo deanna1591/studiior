@@ -10,6 +10,30 @@
 
 ---
 
+---
+
+# **⚠️ WHERE THIS DOCUMENT IS OUT OF DATE**
+
+**Read this before treating any chapter below as current.**
+
+The decision log (`docs/STUDIIOR_V1_DECISIONS.md`) is canonical for settled decisions and has overturned parts of this Bible repeatedly. A document that disagrees with the product is worse than no document, and this is the first thing every session reads.
+
+| Where | What the Bible says | What is true |
+|---|---|---|
+| **Volume 5 · Instructor Portal** | Thirteen items, no chapter | **Chapter 9 is now written.** Feedback, Progress and Messaging are excluded with reasons; Performance is reduced to personal recognition per Decision 10 and §12 note 20. |
+| **Ch. 10 · Community & Social** | A feed, reactions, announcements and friend connections in launch scope | **Excluded from V1.** Recorded in the decision log under "Excluded from V1", and the conflict is explicitly unresolved rather than settled — it is a scope cut to fit six months, not a judgement that the chapter is wrong. |
+| **Ch. 8 · Billing** | Stripe as the foundation | **Decision 16 inverts this.** Studiior is a booking platform, not a payment processor. A studio records cash, bank transfer or GCash; an online provider is an optional adapter on top. Stripe does not serve the Philippines at all, and a Stripe-shaped product would have excluded design partners whose only problem is booking. **Decision 23** adds the renewal half: a cash studio renews a membership by being paid, and `/due` shows who owes. |
+| **Instructor compensation** | Wave 3, per Decision 10 | **Decision 22 overturns it.** Guarantee tiers, cutoff evaluation, per-class rates, a conversion bonus and a period statement are in V1. Decision 10 is amended in place rather than reversed quietly; recognition is still not compensation, and payout stays out — Studiior computes what is owed and never moves money. |
+| **Ch. 4 · Dashboard** | Ten blocks including challenge participation and an AI revenue forecast | **All ten are built**, but two of the eight KPI cards are named-and-absent: challenge participation (challenges have no screens) and the forecast (needs three complete months of takings). The AI writes prose about numbers SQL computed and is refused if it invents one. |
+| **Ch. 4.8 · Member health** | Thriving / Drifting / At Risk / Critical | **Decision 14 settled five bands**: healthy, drifting, at_risk, new, insufficient_history. "Critical" is a severity, and these bands are defined by which signals fire — it would have to be invented at render time. |
+| **Ch. 4.15 · Floating AI assistant** | Available on every screen | **Not built, deliberately.** Phase 3 in this chapter's own MVP split, and an "ask me anything" box is the opposite of a dashboard whose argument is that it knew before you asked. |
+| **Ch. 4.12–4.14 · Community, Live Activity, Weather** | Listed | Not built. Community is excluded above; the other two are Phase 2/3 in this chapter's own split. |
+| **Volume 1 · the seven modules** | — | The seven modules (Scheduling & Booking · Member CRM · Memberships & Payments · Member App · AI Morning Brief · Challenges · Reports) are **this project's narrowing** of the Bible, not a quotation from it. **Challenges are in that list and have no screens**; the brief's `challenge_opportunity` insight is implemented and switched off because an insight without a working button is a bug. |
+| **Chapter numbering** | Volumes 1–13 at the top | The volumes are an **outline of what the Bible will contain, not content**. Only chapters 1, 4, 5, 6, 7, 8, 9, 10, 12, 16 and 19 are written. Chapters 9 and 20 were previously absent; 9 now exists. |
+
+**The rule this table exists to enforce:** when a decision overturns a chapter, amend the chapter in the same breath, the way Decision 10 was amended in place rather than deleted. A stale warning is worse than no warning — this project has already shipped a note claiming an API key was exposed in production long after it had been closed.
+
+---
 # **Volume 1: Vision & Strategy**
 
 ### **1\. Executive Summary**
@@ -358,6 +382,8 @@ Interactions
 ---
 
 # **Volume 5: Instructor Portal**
+
+> **Superseded by Chapter 9**, which is written from what is built and decided. Of the list below, Feedback, Progress and Messaging are EXCLUDED with reasons; Performance is reduced to personal recognition (Decision 10, §12 note 20); Injuries, Pregnancy Notes and First Timers are built as pinned notes and a derived flag rather than as three features.
 
 Schedule
 
@@ -6463,6 +6489,188 @@ Every dollar represents a member who has trusted the studio with their wellness 
 # **Next Chapter: Chapter 9 – Challenges, Gamification & Member Engagement Engine**
 
 This is the chapter where Studiior truly separates itself from every major competitor. We'll design the complete challenge platform, including challenge builders, XP systems, badges, streaks, rewards, leaderboards, missions, seasonal events, social engagement, and the psychology that keeps members motivated long after the excitement of joining has faded. I believe this will become Studiior's signature feature and one of its strongest competitive advantages.
+
+# **📖 STUDIIOR PRODUCT BIBLE**
+
+# **Chapter 9 — The Instructor Portal**
+
+**Version 1.0** · Written from what is built and decided, not from what was hoped for.
+
+> **Objective:** Give an instructor one place that answers the four questions they actually have — what am I teaching, who is coming, when can I not work, and what am I owed — on the phone they are holding, standing up, between classes.
+
+---
+
+# **Design Philosophy**
+
+## **It is a phone app, and that is the whole shape**
+
+An instructor is not at a desk. They are in a studio, standing, usually with four minutes before the next class. Everything that follows comes from that:
+
+- **Mobile-first, not a stripped-down desktop view.** The portal takes the member app's structure directly: a bottom tab bar, one page per tab, cards rather than tables, the studio's accent throughout, installable to a home screen with nothing to download.
+- **It reuses the member app's components and tokens**, deliberately. Three surfaces with three visual systems is how a product becomes unmaintainable, and the member app's treatment already carries a studio's accent correctly, at measured contrast, on four presets.
+- **It lives at `{slug}.studiior.app/instructor`** — the member domain's subtree. The subdomain already identifies the studio, which is the exact scope an instructor works in; the staff app is a rail and tables built for a desk and a mouse, and putting a phone app inside it would mean either a third design language or fighting the shell on every screen.
+
+## **Signing in lands them on their own screen**
+
+An instructor who signed in through the staff app used to arrive at the studio dashboard: revenue, churn, occupancy, a business that is not theirs, most of it then refused by the database anyway. They land on My Week.
+
+---
+
+# **9.1 The prerequisite: an instructor has to be able to sign in**
+
+**Three things, and confusing them has already cost a bug.**
+
+| | |
+|---|---|
+| `auth.users` | the login |
+| `studio_staff` | belonging to a studio, with a role |
+| `instructors` | the teaching record; `staff_id` → `studio_staff(id)` |
+
+**`instructors.staff_id` is a `studio_staff` id, not a user id.** Migration 054 passed it straight into `queue_shift_notice()`, which takes the latter, three times — caught by a foreign key in a test fixture rather than by anybody reading it.
+
+An instructor is a **teaching record**. It does not require a login and never has: a studio can put somebody on the timetable the day they are hired. The consequence, which went unnoticed for a long time, is that **an instructor with no staff row has no address anywhere in the schema** — so every instructor notification ever built (assignment, cover request, weekly confirmation, availability reminder, flex cancellation) was queued for nobody, and `approve_cover_request()` honestly reported them as unreachable.
+
+**The invite** (migration 097) is the same shape as the member invite from migrations 027 and 073:
+
+- Staff invite an instructor by email from **Instructors → Who can sign in**.
+- Inviting creates the `studio_staff` row immediately, with `user_id` null and status `invited`, and links `instructors.staff_id` to it. That is the moment notifications start having somewhere to go.
+- The instructor claims the account at a hashed, single-use, fourteen-day link, chooses a password, and lands in the portal.
+- **A resend supersedes**: the old link dies. Keying it on the person instead would make a resend silently do nothing, which migration 073 learned the hard way.
+- **An instructor with no email cannot be invited**, and is refused by name rather than queueing a notification with a null address.
+- One email is one account project-wide, so an instructor who already has a login — a member of the studio, or teaching at a second one — links it rather than minting a second.
+
+Staff see three states, and the third is the one that could not previously be known to exist: **signed in**, **invited**, and **never asked**.
+
+---
+
+# **9.2 My Week**
+
+The thing they open. Their classes, this week and next.
+
+Time, class, room, and how many are booked. Two further states decide whether they are working at all, and both are drawn plainly:
+
+- **A flex class still waiting on its deadline** reads as still waiting, with how many more it needs. Decision 21 keeps this from members on purpose — telling somebody a class might not run is telling them not to bother booking it — but the person who would have to turn up and teach it has every reason to know.
+- **A class that will not run says so, with the reason**, rather than quietly disappearing from the list.
+
+**Confirm my week** folds in here (Decision 18, migration 067): one press for every unconfirmed class. A class somebody has asked cover for is **answered**, not unconfirmed, and is left alone — chasing an instructor about a class they have already said they cannot teach is the opposite of what the feature is for.
+
+---
+
+# **9.3 The Roster**
+
+**The screen that makes an instructor good at their job**: knowing about the shoulder before the class rather than after.
+
+Who is coming, their photo, whether they have been before, and whatever the studio has pinned.
+
+- **A first-timer is flagged loudly.** A member's first ever class is the fact that decides how the next hour goes, and it is the single thing an instructor most needs to know.
+- **Pinned notes reach the roster.** That is the entire reason pinning exists.
+- **A birthday is flagged**, and nothing else about the date — never the year, never the age.
+- **One-tap check-in.** §8 gives an instructor check-in. It does **not** give them "correct a no-show" or "create a walk-in booking", so neither is drawn.
+
+**Ask for cover** sits on the roster, because the moment you realise you cannot teach something is usually the moment you are looking at it.
+
+---
+
+# **9.4 Open Shifts**
+
+Decision 17, folded in. Apply; staff approve. Approving one application auto-declines the rest for that class in the same transaction.
+
+An instructor can **withdraw a pending application** — nobody is counting on you before you have been approved. That is a different thing from releasing a class you have been given, and Decision 18 forbids that outright, however urgent.
+
+---
+
+# **9.5 When I'm Free**
+
+Decision 18. **Theirs to state and the studio's to approve.**
+
+The standing weekly pattern, and the months they have sent with what happened to each. A submission that was sent back always carries its reason — "changes requested" with no note is a refusal wearing a softer word.
+
+**A submitted month narrows nothing until somebody approves it**, including the "has this person stated anything at all" test. An unapproved submission would otherwise flip an instructor from *stated nothing, so available* to *stated something, and this class is outside it* before anyone said yes.
+
+---
+
+# **9.6 My Pay**
+
+Decision 22 built the pay records and the period statement and gave them no screen. **This is the screen instructors will open most.**
+
+What they are owed this period, what each class paid, and — the part that matters — **what a class that did not run paid**. That is the whole argument for guarantee tiers: a class cancelled for want of one booking that still paid a holding rate is the number an instructor most wants to see and least expects to find.
+
+**Theirs to read and never to change.** Every figure comes from `instructor_pay_records`, written once by a trigger at the terminal transition. Nothing on the screen computes pay and no control could alter one. If a figure looks wrong, the answer is a conversation with the studio, and the screen says so rather than offering a button that would disagree with the studio's books.
+
+---
+
+# **9.7 Me**
+
+Decision 10's recognition: classes taught, this month, and a weekly streak.
+
+**Not a leaderboard and not a comparison.** §12 note 20 is explicit that analytics for an instructor is a coaching tool rather than a ranking, and Decision 10 adds a personal count, not a table of everybody. The screen says so out loud, because a number about yourself with no context is exactly the sort of thing people assume is being compared.
+
+**The streak is weekly, not daily** (Decision 5). A studio's timetable does not run every day, and a daily streak would punish an instructor for the shape of the rota.
+
+---
+
+# **9.8 What an instructor deliberately cannot see or do**
+
+Stated on the screen itself, not merely omitted. A missing feature looks like an oversight; a stated boundary looks like a decision, which is what it is.
+
+| Not available | Why |
+|---|---|
+| **A member's email or phone** | §14. Contact details stay with the office. An instructor needs to teach the class, not to contact the room afterwards. |
+| **Member documents** | Manager-up since migration 059. Front desk see everything except the medical one; an instructor sees none at all. A waiver is a filing matter and a diagnosis is nobody's business at the door. |
+| **Managers-only notes** | The note author decides. RLS enforces it for direct reads, and `instructor_roster()` filters explicitly because it is `SECURITY DEFINER` and steps over RLS — migration 056's lesson. |
+| **Messaging members** | §12 gives messages to owner, manager and front desk, never instructors. If a member needs telling something, the studio tells them. |
+| **Member progress, history and CRM** | §5 note 5 allows a quick view — photo, preferred name, attendance summary, goals, pinned notes, first-timer and birthday. Not the full record. |
+| **Correcting a no-show, or a walk-in booking** | §8 gives both to front desk and up. An instructor checks people in and nothing else. |
+| **Releasing their own class** | Decision 18 supersedes part of Decision 17: staff always grant cover, however urgent. `withdraw_from_shift()` raises a cover request rather than clearing the instructor. A self-release button would be a button that lies. |
+| **Anything about the studio's business** | Takings, who owes money, the whole timetable, other instructors' pay. Refused by the database, so it is absent rather than hidden. |
+
+---
+
+# **9.9 What the Bible listed and this will not build**
+
+Volume 5 listed thirteen items with no chapter behind them. Three are excluded, in the same way Decision 13 excluded the community feed — named, with a reason, rather than left to be discovered as missing.
+
+| Item | Status |
+|---|---|
+| **Feedback** | **Excluded.** There is no feedback mechanism anywhere in the product: no survey, no rating, no schema. Building an instructor-facing view of data nothing collects would be a screen that renders its empty state for ever. |
+| **Progress** | **Excluded**, per §14 and §5 note 5. Member progress is CRM. An instructor gets the quick view — enough to teach the class well. |
+| **Messaging** | **Excluded**, per §12. Staff write to members; instructors do not. |
+| **Performance** | **Reduced to recognition.** Decision 10 gives a personal classes-taught count and a streak; §12 note 20 forbids cross-instructor comparison. There is no performance ranking and a public staff leaderboard, if ever built, is a studio setting defaulting to off. |
+| **Injuries · Pregnancy notes · First timers** | **Built, as pinned notes and the first-timer flag** on the roster, rather than as three separate features. A note pinned by the studio is what reaches an instructor; the flag is derived. |
+| **Attendance** | **Built** as one-tap check-in on the roster, §8. |
+| **Substitution requests** | **Built** as Ask for cover, Decision 18. |
+| **Payroll** | **Built** as My Pay, Decision 22 — read-only. Studiior computes what is owed and never moves money. |
+
+---
+
+# **9.10 How this relates to the decisions**
+
+- **Decision 9** — instructors submit availability; they do not schedule. The portal states availability and never assigns.
+- **Decision 17** — open shifts are applied for and approved. Applying is not taking.
+- **Decision 18** — availability is theirs to state and staff to approve; cover is always granted by staff; **self-release is impossible**.
+- **Decision 22** — pay is theirs to read and never to change.
+- **Decision 10** — recognition, not compensation-by-comparison. Decision 22 overturned the compensation half; the no-leaderboard half stands.
+
+---
+
+# **MVP Scope**
+
+### **Phase 1 (built)**
+Invite and sign-in · My Week · Roster with pinned notes, first-timer and check-in · Confirm my week · Ask for cover · Open shifts · Availability (view) · My Pay · Recognition
+
+### **Phase 2**
+The availability editor rebuilt phone-first (it is currently a link to the full site, because a week is saved as one payload and that form is real work) · push notifications, which need a service worker, VAPID keys and a subscription write path that do not exist · a roster search across the studio, per §5 note 5
+
+### **Phase 3**
+Instructor-facing occupancy for their own classes (§12 note 20, own classes only) · availability conflicts surfaced at submission time
+
+---
+
+## **📝 Product Decision**
+
+> An instructor portal earns its place by being the fastest way to answer four questions, not by being a smaller copy of the studio's software. Everything the studio needs to know and the instructor does not is absent by design, and says so.
+
+---
 
 # **📖 STUDIIOR PRODUCT BIBLE**
 
