@@ -31,6 +31,12 @@ export function railItems(
       { href: "/shifts", label: "Open shifts" },
     );
   }
+  // Who owes the studio money. Front desk, not manager-up: §9 reads their
+  // "Payments" as taking payment, and the desk is exactly who chases and
+  // records one. A studio taking cash opens this every Monday.
+  if (ctx.role === "front_desk" || isManagerUp(ctx.role)) {
+    items.push({ href: "/due", label: "Payments due" });
+  }
   if (isManagerUp(ctx.role)) {
     // Setup leaves the rail the moment the list is finished. A permanent link
     // to a one-time task is clutter for every day after the first.

@@ -473,6 +473,53 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 23 — A cash studio renews by being paid, and can see who owes it
+
+Extends Decision 16. A studio may take cash for ever; until now nothing in the product could tell it who had not paid this month, and a recurring membership sold as cash had no billing period at all.
+
+### The period is written at activation, from the plan's own interval
+
+`activate_purchase()` wrote status, price, credits and `auto_renew` and left `current_period_start`, `current_period_end` and `renews_on` null. A recurring membership with no period is one nothing can bill, renew or expire: §7.3's grace window is measured from `current_period_end`, the member screen cannot say when it renews, and `book_class()`'s past-due allowance — `now() < coalesce(ms.current_period_end, now()) + grace` — collapses to `now() < now() + grace`, **true for ever**.
+
+The interval is the plan's `billing_interval` × `billing_interval_count`, computed in the studio's local time and converted back so a boundary does not drift an hour across a clock change. A pack, a drop-in and a trial get no period, which is what makes the column mean something: a period present is a thing that renews.
+
+`starts_on` and `expires_on` move to the studio's day at the same time. They were `current_date` — the SERVER's — so for a Manila studio, sixteen hours out of every twenty-four, a pack sold in the morning expired a day before it should have.
+
+### Recording a payment against an active membership ADVANCES it
+
+The desk taking next month's cash **is** the renewal. Creating a second membership for it would leave the member holding two, with two periods and two allowances.
+
+**The period advances from `current_period_end`, never from today.** Paying four days early must not shorten the next month; paying four days late must not move the anniversary for ever. The billing day a member agreed to is the one they keep.
+
+A payment so late that one interval forward is still in the past leaves the membership past due, and says so. That is correct rather than awkward: a member two months behind owes two months, the desk records the second payment, and the list goes on showing them until they are square. Rolling to today instead would forgive the arrears and drift the billing day in the same stroke.
+
+A payment for a **different** plan is a plan change and still creates a membership. A pack is never a renewal. A frozen membership is not renewed by taking cash — §7.4 is its own decision.
+
+### A lapsed period becomes `past_due`, nightly
+
+`sweep_membership_periods()` at 03:20. **Scoped to memberships with no Stripe subscription**, which is the whole gap: a Connect subscription rolls its own period forward and says `past_due` through `invoice.payment_failed`, and sweeping those here would mark a member overdue for the minutes between a successful renewal and its webhook arriving. §7.3 is untouched and does the rest.
+
+### The list of who owes
+
+`memberships_due()` and `/due`, **front desk and up** — §9 reads their "Payments" as taking payment, and the desk is who chases and records one. Overdue first, with what they owe, how long it has been, and a button that takes the money from that row.
+
+What each owes is the membership's own `price_cents`, never the plan's. §7.1 snapshots the price at purchase precisely so an edit cannot reprice anybody already on it, and a chase list quoting today's price would undo that at the counter.
+
+Subscription-backed, frozen, cancelled and expired memberships are all absent. "No recurring plans at all" and "everybody is paid up" are separate states, because a screen that cannot tell them apart says "nobody owes you anything" to a studio whose memberships are all on Stripe — true, and useless.
+
+### Why Decision 16's own test did not catch the missing period
+
+It **does** use a recurring plan, and it compares the cash membership and the Stripe membership field for field. Both were null. The Stripe half is driven by a `checkout.session.completed`, whose object carries no `current_period_*`; those arrive in a later subscription event the test never sent. The assertion held because **neither side did the thing**.
+
+Two implementations agreeing proves nothing when both are wrong. It is "a guard that never fires looks exactly like a guard that passes" wearing an equality check, and the comparison now has to be comparing something.
+
+### Open, not decided here
+
+A member may hold two active recurring memberships on different plans, and both appear on the due list owing separately. Whether selling plan B should supersede plan A is a plan-change decision nobody has made; the list reports what the data says.
+
+**Where:** migration 095, `test/manual_payments_test.sql`, `/due`. **Status:** settled.
+
+---
 ## 22 — Guarantee tiers, cutoff evaluation and instructor pay, overturning part of Decision 10
 
 Optional per studio, off by default. A studio that never sets a tier sees no change anywhere.

@@ -5497,6 +5497,10 @@ export type Database = {
         }
         Returns: string
       }
+      advance_membership_period: {
+        Args: { p_membership_id: string }
+        Returns: Json
+      }
       anthropic_api_key: { Args: never; Returns: string }
       apply_for_shift: {
         Args: { p_note?: string; p_occurrence_id: string }
@@ -6094,6 +6098,14 @@ export type Database = {
           state: string
         }[]
       }
+      membership_frozen_now: {
+        Args: { p_membership_id: string }
+        Returns: boolean
+      }
+      memberships_due: {
+        Args: { p_studio_id: string; p_within_days?: number }
+        Returns: Json
+      }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
@@ -6179,6 +6191,10 @@ export type Database = {
       pay_statement: {
         Args: { p_instructor_id: string; p_period_id: string }
         Returns: Json
+      }
+      plan_period_end: {
+        Args: { p_from: string; p_plan_id: string }
+        Returns: string
       }
       provision_studio: {
         Args: {
@@ -6731,6 +6747,7 @@ export type Database = {
       sweep_booked_count_reconcile: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
+      sweep_membership_periods: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }

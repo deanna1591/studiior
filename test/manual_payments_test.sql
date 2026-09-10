@@ -29,6 +29,30 @@ begin
   end if;
 end $$;
 
+create or replace function expect_true(label text, actual boolean)
+returns void language plpgsql as $$
+begin
+  if actual then raise notice 'PASS  %  (got true)', label;
+  else raise exception 'FAIL  %  expected true, got %', label, coalesce(actual::text,'null'); end if;
+end $$;
+
+create or replace function expect_null(label text, actual text)
+returns void language plpgsql as $$
+begin
+  if actual is null then raise notice 'PASS  %  (got null)', label;
+  else raise exception 'FAIL  %  expected null, got %', label, actual; end if;
+end $$;
+
+create or replace function expect_raises(label text, stmt text, want_sqlstate text)
+returns void language plpgsql as $$
+begin
+  execute stmt; raise exception 'FAIL  %  expected % but nothing was raised', label, want_sqlstate;
+exception when others then
+  if sqlstate = want_sqlstate then raise notice 'PASS  %  (got %)', label, sqlstate;
+  elsif sqlstate = 'P0001' and sqlerrm like 'FAIL%' then raise;
+  else raise exception 'FAIL  %  expected %, got % (%)', label, want_sqlstate, sqlstate, sqlerrm; end if;
+end $$;
+
 -- --- Fixtures ----------------------------------------------------------------
 insert into auth.users (id) values
   ('cafecafe-0000-0000-0000-0000000000a1'),   -- owner
@@ -148,8 +172,19 @@ select expect_num('a pack bought by bank transfer grants its classes',
 select expect_num('...through the ledger, which is where the balance lives',
   (select coalesce(sum(delta),0) from credit_ledger
     where member_id = 'cafecafe-0000-0000-0000-00000000dd01' and reason = 'purchase'), 10);
-select expect_text('...and it expires when the plan says',
-  (select (expires_on = current_date + 90)::text from memberships
+-- FROM THE STUDIO'S DAY, NOT THE SERVER'S. This studio is in Manila and the
+-- server is on UTC, so for sixteen hours out of every twenty-four
+-- `current_date` here is YESTERDAY in the studio — and a pack sold at nine in
+-- the morning expired ninety days from the day before, one day short of what
+-- the member paid for. It read as correct because the assertion was written
+-- against the same wrong clock the function used. Migration 095.
+select expect_text('...and it expires when the plan says, counted from the studio''s own day',
+  (select (expires_on = studio_today('cafecafe-0000-0000-0000-000000000001') + 90)::text
+     from memberships
+    where id = (current_setting('t.pack')::jsonb ->> 'membership_id')::uuid), 'true');
+select expect_text('...and starts_on is the studio''s day too',
+  (select (starts_on = studio_today('cafecafe-0000-0000-0000-000000000001'))::text
+     from memberships
     where id = (current_setting('t.pack')::jsonb ->> 'membership_id')::uuid), 'true');
 reset role;
 
@@ -237,15 +272,37 @@ select expect_text('the same plan bought through Stripe at the other studio',
   'membership_created');
 
 -- Compare the two memberships field for field, ignoring only the things that
--- MUST differ: their ids, their studio, their member, and Stripe's own handles.
+-- MUST differ: their ids, their studio, their member, Stripe's own handles,
+-- and the period INSTANTS — which are two separate transactions' now() and
+-- differ by the milliseconds between them, exactly as created_at does. The
+-- period is asserted below on its own terms instead of being dropped.
 select expect_text('a cash membership and a Stripe membership are the same row',
   (select (
      (to_jsonb(a) - 'id' - 'studio_id' - 'member_id' - 'plan_id' - 'created_at'
-       - 'updated_at' - 'stripe_customer_id' - 'stripe_subscription_id')
+       - 'updated_at' - 'stripe_customer_id' - 'stripe_subscription_id'
+       - 'current_period_start' - 'current_period_end')
      =
      (to_jsonb(b) - 'id' - 'studio_id' - 'member_id' - 'plan_id' - 'created_at'
-       - 'updated_at' - 'stripe_customer_id' - 'stripe_subscription_id')
+       - 'updated_at' - 'stripe_customer_id' - 'stripe_subscription_id'
+       - 'current_period_start' - 'current_period_end')
    )::text
+     from memberships a, memberships b
+    where a.member_id = 'cafecafe-0000-0000-0000-00000000dd03'
+      and b.member_id = 'cafecafe-0000-0000-0000-00000000dd02'), 'true');
+
+-- THE TEETH THIS COMPARISON DID NOT HAVE. It passed for months while BOTH
+-- sides wrote a null period: the Stripe half is driven by a
+-- checkout.session.completed, whose object carries no current_period_*, and
+-- the cash half wrote none at all. Two implementations agreeing proves nothing
+-- when neither does the thing.
+select expect_text('...and they both actually have a period, rather than agreeing on nothing',
+  (select (a.current_period_end is not null and b.current_period_end is not null)::text
+     from memberships a, memberships b
+    where a.member_id = 'cafecafe-0000-0000-0000-00000000dd03'
+      and b.member_id = 'cafecafe-0000-0000-0000-00000000dd02'), 'true');
+select expect_text('...ending on the same day, whichever way the money arrived',
+  (select ((a.current_period_end at time zone 'Asia/Manila')::date
+         = (b.current_period_end at time zone 'Asia/Manila')::date)::text
      from memberships a, memberships b
     where a.member_id = 'cafecafe-0000-0000-0000-00000000dd03'
       and b.member_id = 'cafecafe-0000-0000-0000-00000000dd02'), 'true');
@@ -409,5 +466,295 @@ reset role;
 select expect_num('the desk settles it and the class is paid for',
   (select count(*) from payments where booking_id = current_setting('t.held')::uuid
      and status = 'succeeded' and provider = 'manual'), 1);
+
+
+-- =============================================================================
+-- Migration 095 — a recurring membership has a PERIOD, and a cash studio can
+-- see who owes it money
+-- =============================================================================
+-- activate_purchase() wrote status, price and credits and left the period
+-- null. A recurring membership with no period is one nothing can bill, renew
+-- or expire — and book_class()'s past-due allowance,
+--   now() < coalesce(ms.current_period_end, now()) + grace,
+-- collapses to `now() < now() + grace`, which is true for ever.
+-- =============================================================================
+
+-- A second studio's plan on a DIFFERENT interval, so the two are decided in
+-- one run and nothing can pass by assuming a month.
+insert into membership_plans (id, studio_id, name, type, price_cents, currency,
+                              billing_interval, billing_interval_count, credits_per_period, status)
+values ('cafecafe-0000-0000-0000-0000000000c9','cafecafe-0000-0000-0000-000000000002',
+        'Quarterly Unlimited','recurring', 660000, 'PHP', 'quarter', 1, null, 'active'),
+       ('cafecafe-0000-0000-0000-0000000000c8','cafecafe-0000-0000-0000-000000000001',
+        'Weekly Pass','recurring', 40000, 'PHP', 'week', 2, 4, 'active');
+
+insert into members (id, studio_id, first_name, last_name, email, joined_on, status, created_at) values
+  ('cafecafe-0000-0000-0000-00000000df01','cafecafe-0000-0000-0000-000000000001','Perpetua','Monthly','perpetua@example.com', current_date - 40,'active', now()),
+  ('cafecafe-0000-0000-0000-00000000df02','cafecafe-0000-0000-0000-000000000001','Fionn','Frozen','fionn@example.com', current_date - 40,'active', now()),
+  ('cafecafe-0000-0000-0000-00000000df03','cafecafe-0000-0000-0000-000000000001','Wanda','Weekly','wanda@example.com', current_date - 40,'active', now()),
+  ('cafecafe-0000-0000-0000-00000000df04','cafecafe-0000-0000-0000-000000000002','Quinn','Quarterly','quinn@example.com', current_date - 40,'active', now()),
+  ('cafecafe-0000-0000-0000-00000000df05','cafecafe-0000-0000-0000-000000000001','Paddy','Paidup','paddy@example.com', current_date - 40,'active', now());
+
+\echo ''
+\echo '--- activation writes a period from the PLAN''S OWN interval ---'
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select set_config('t.m1', (record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df01',
+  'plan', 250000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c1')
+  ->> 'membership_id'), false);
+select set_config('t.mw', (record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df03',
+  'plan', 40000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c8')
+  ->> 'membership_id'), false);
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a1',false);
+select set_config('t.mq', (record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000002','cafecafe-0000-0000-0000-00000000df04',
+  'plan', 660000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c9')
+  ->> 'membership_id'), false);
+reset role;
+
+select expect_true('a cash recurring membership has a period at all',
+  (select current_period_start is not null and current_period_end is not null
+     and renews_on is not null from memberships where id = current_setting('t.m1')::uuid));
+
+-- The interval is the plan's, not a constant. A month, a fortnight and a
+-- quarter, all decided in this one run.
+select expect_num('a monthly plan ends one month out',
+  (select ((current_period_end at time zone 'Asia/Manila')::date
+           - (current_period_start at time zone 'Asia/Manila')::date)::bigint
+     from memberships where id = current_setting('t.m1')::uuid),
+  (select ((current_date + interval '1 month')::date - current_date)::bigint));
+select expect_num('a two-week plan ends a fortnight out, not a month',
+  (select ((current_period_end at time zone 'Asia/Manila')::date
+           - (current_period_start at time zone 'Asia/Manila')::date)::bigint
+     from memberships where id = current_setting('t.mw')::uuid), 14);
+select expect_num('and the other studio''s quarterly plan runs three months',
+  (select ((current_period_end at time zone 'Asia/Manila')::date
+           - (current_period_start at time zone 'Asia/Manila')::date)::bigint
+     from memberships where id = current_setting('t.mq')::uuid),
+  (select ((current_date + interval '3 months')::date - current_date)::bigint));
+
+select expect_true('renews_on is the period end as one of the studio''s own dates',
+  (select renews_on = (current_period_end at time zone 'Asia/Manila')::date
+     from memberships where id = current_setting('t.m1')::uuid));
+-- Decision 12: a null credits_per_period is unlimited, so there is nothing to
+-- reset and no reset date to invent.
+select expect_null('an unlimited plan has no credit reset date',
+  (select credits_reset_at::text from memberships where id = current_setting('t.mq')::uuid));
+select expect_true('an allowance plan resets at the period boundary',
+  (select credits_reset_at = current_period_end
+     from memberships where id = current_setting('t.mw')::uuid));
+
+-- A PACK STILL HAS NO PERIOD. Giving one a renewal date would invent a
+-- renewal for something that does not renew.
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select set_config('t.mp', (record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df05',
+  'plan', 900000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c3')
+  ->> 'membership_id'), false);
+reset role;
+select expect_null('a class pack still has no period end',
+  (select current_period_end::text from memberships where id = current_setting('t.mp')::uuid));
+select expect_null('and no renewal date',
+  (select renews_on::text from memberships where id = current_setting('t.mp')::uuid));
+
+\echo ''
+\echo '--- a second payment ADVANCES the period, it does not sell a second membership ---'
+select set_config('t.end1',
+  (select current_period_end::text from memberships where id = current_setting('t.m1')::uuid), false);
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select set_config('t.ren', record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df01',
+  'plan', 250000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c1')::text, false);
+reset role;
+
+select expect_num('the member still holds exactly one membership on that plan',
+  (select count(*) from memberships
+    where member_id = 'cafecafe-0000-0000-0000-00000000df01'
+      and plan_id = 'cafecafe-0000-0000-0000-0000000000c1'), 1);
+select expect_text('and the payment renewed that one',
+  (current_setting('t.ren')::jsonb ->> 'membership_id'), current_setting('t.m1'));
+-- THE PERIOD ADVANCES FROM THE OLD END, NEVER FROM TODAY: the billing day a
+-- member agreed to is the one they keep, whether they pay early or late.
+-- As instants, not as text: jsonb renders a timestamptz in ISO-8601 and
+-- ::text does not, so the same moment compares unequal as a string.
+select expect_true('the new period starts where the old one ended',
+  (current_setting('t.ren')::jsonb -> 'renewed' ->> 'period_start')::timestamptz
+    = current_setting('t.end1')::timestamptz);
+select expect_num('and it is one more interval, not two',
+  (select ((current_period_end at time zone 'Asia/Manila')::date
+           - (current_period_start at time zone 'Asia/Manila')::date)::bigint
+     from memberships where id = current_setting('t.m1')::uuid),
+  (select ((current_date + interval '2 months')::date
+           - (current_date + interval '1 month')::date)::bigint));
+select expect_text('the desk is told it is paid up',
+  (current_setting('t.ren')::jsonb -> 'renewed' ->> 'still_owing'), 'false');
+select expect_num('and the renewal is on the record',
+  (select count(*) from membership_events
+    where membership_id = current_setting('t.m1')::uuid and type = 'renewed'), 1);
+-- Two payments, two rows, one membership. A studio reconciling the till needs
+-- both; a member needs one membership.
+select expect_num('both payments are recorded against it',
+  (select count(*) from payments where membership_id = current_setting('t.m1')::uuid), 2);
+
+-- A payment for a DIFFERENT plan is a plan change and still sells a membership.
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df01',
+  'plan', 40000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c8');
+reset role;
+select expect_num('a different plan is a change, and makes its own membership',
+  (select count(*) from memberships where member_id = 'cafecafe-0000-0000-0000-00000000df01'), 2);
+
+\echo ''
+\echo '--- a lapsed period becomes past_due, and §7.3 takes it from there ---'
+-- Fionn is frozen and overdue; Wanda has simply lapsed; Quinn is on Stripe.
+update memberships set current_period_end = now() - interval '4 days',
+       renews_on = (now() - interval '4 days')::date
+ where id = current_setting('t.mw')::uuid;
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select set_config('t.mf', (record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df02',
+  'plan', 250000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c1')
+  ->> 'membership_id'), false);
+reset role;
+update memberships set current_period_end = now() - interval '6 days',
+       renews_on = (now() - interval '6 days')::date,
+       freeze_start = current_date - 3, freeze_end = current_date + 25
+ where id = current_setting('t.mf')::uuid;
+update memberships set current_period_end = now() - interval '8 days',
+       renews_on = (now() - interval '8 days')::date,
+       stripe_subscription_id = 'sub_quarterly'
+ where id = current_setting('t.mq')::uuid;
+
+select expect_num('the sweep marks the lapsed one and only it',
+  (sweep_membership_periods() ->> 'marked_past_due')::bigint, 1);
+select expect_text('the lapsed membership is past due',
+  (select status::text from memberships where id = current_setting('t.mw')::uuid), 'past_due');
+-- §7.4: a frozen membership is paused, not in arrears. Its period end means
+-- nothing while the freeze runs.
+select expect_text('a frozen membership is left alone',
+  (select status::text from memberships where id = current_setting('t.mf')::uuid), 'active');
+-- Stripe rolls its own period through customer.subscription.updated; sweeping
+-- those here would mark a member past due for the minutes between a successful
+-- renewal and its webhook arriving.
+select expect_text('and a subscription-backed one is left to its webhook',
+  (select status::text from memberships where id = current_setting('t.mq')::uuid), 'active');
+select expect_num('the lapse is on the record',
+  (select count(*) from membership_events
+    where membership_id = current_setting('t.mw')::uuid and type = 'period_lapsed'), 1);
+
+\echo ''
+\echo '--- WHO OWES THE STUDIO MONEY ---'
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select set_config('t.due', memberships_due('cafecafe-0000-0000-0000-000000000001', 7)::text, false);
+
+select expect_text('the studio has people who owe it',
+  current_setting('t.due')::jsonb ->> 'state', 'ok');
+select expect_num('the lapsed member is on the list',
+  (select count(*) from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r
+    where (r ->> 'member_name') = 'Wanda Weekly'), 1);
+select expect_num('the frozen one is not',
+  (select count(*) from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r
+    where (r ->> 'member_name') = 'Fionn Frozen'), 0);
+select expect_num('nor is anybody who is paid up two months ahead',
+  (select count(*) from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r
+    where (r ->> 'member_name') = 'Perpetua Monthly'), 0);
+select expect_num('nor a class pack, which does not renew',
+  (select count(*) from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r
+    where (r ->> 'plan_name') = '10-Class Pack'), 0);
+select expect_num('every row on the list is overdue or due inside the window',
+  (select count(*) from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r
+    where (r ->> 'due_on')::date > current_date + 7), 0);
+select expect_num('it says how many days overdue, from the studio''s own date',
+  (select (r ->> 'days_overdue')::bigint from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r
+    where (r ->> 'member_name') = 'Wanda Weekly'), 4);
+-- §7.1: the price is the membership's snapshot, never the plan's. A chase list
+-- quoting a plan's new price would undo at the counter the one rule that stops
+-- an edit repricing everybody.
+-- AS POSTGRES, NOT AS THE DESK. plans_manager_write is manager-up, and a
+-- refused UPDATE does not raise — it changes nothing. Run as the front-desk
+-- session this update silently did nothing, the plan price stayed at 40000,
+-- and the assertion below passed against BOTH the right answer and the wrong
+-- one. Caught by reverting the fix and watching the test not notice.
+reset role;
+update membership_plans set price_cents = 999999 where id = 'cafecafe-0000-0000-0000-0000000000c8';
+select expect_num('the plan price really did move, or the next assertion proves nothing',
+  (select price_cents::bigint from membership_plans
+    where id = 'cafecafe-0000-0000-0000-0000000000c8'), 999999);
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select expect_num('what they owe is the price they agreed, not the plan''s price today',
+  (select (r ->> 'owed_cents')::bigint from jsonb_array_elements(
+     memberships_due('cafecafe-0000-0000-0000-000000000001', 7) -> 'rows') r
+    where (r ->> 'member_name') = 'Wanda Weekly'), 40000);
+select expect_true('and every row carries a way to take the money from it',
+  (select bool_and((r ->> 'record_href') like '/members/%/payment?plan=%')
+     from jsonb_array_elements(current_setting('t.due')::jsonb -> 'rows') r));
+reset role;
+
+-- The other studio in the same run: its own list, and none of studio one's.
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a1',false);
+select expect_num('the other studio sees none of the first studio''s debtors',
+  (select count(*) from jsonb_array_elements(
+     memberships_due('cafecafe-0000-0000-0000-000000000002', 7) -> 'rows') r
+    where (r ->> 'member_name') in ('Wanda Weekly','Fionn Frozen','Perpetua Monthly')), 0);
+reset role;
+
+-- A payment so late that one interval forward is STILL in the past leaves the
+-- membership owing, and says so. Rolling to today instead would forgive the
+-- arrears and drift the billing day in the same stroke.
+update memberships set current_period_end = now() - interval '10 weeks',
+       current_period_start = now() - interval '12 weeks', status = 'past_due'
+ where id = current_setting('t.mw')::uuid;
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select set_config('t.late', record_manual_payment(
+  'cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000df03',
+  'plan', 40000, 'cash', p_plan_id => 'cafecafe-0000-0000-0000-0000000000c8')::text, false);
+reset role;
+select expect_text('a payment against months of arrears says it is still owing',
+  (current_setting('t.late')::jsonb -> 'renewed' ->> 'still_owing'), 'true');
+select expect_text('and the membership stays past due rather than looking settled',
+  (select status::text from memberships where id = current_setting('t.mw')::uuid), 'past_due');
+select expect_true('and they are still on the list',
+  (select count(*) > 0 from jsonb_array_elements(
+     (select memberships_due('cafecafe-0000-0000-0000-000000000001', 7) from studios limit 1) -> 'rows') r
+    where (r ->> 'member_name') = 'Wanda Weekly'));
+
+\echo ''
+\echo '--- who may see it ---'
+-- A member is every signed-in person as far as the authenticated role knows.
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000d9',false);
+select expect_raises('a stranger cannot see who owes the studio money',
+  $$ select memberships_due('cafecafe-0000-0000-0000-000000000001', 7) $$, 'PT403');
+select expect_raises('nor renew somebody''s membership',
+  $$ select advance_membership_period(current_setting('t.m1')::uuid) $$, 'PT403');
+reset role;
+set role anon;
+select expect_raises('and anon reaches neither',
+  $$ select memberships_due('cafecafe-0000-0000-0000-000000000001', 7) $$, '42501');
+reset role;
+
+-- Only a recurring membership has a period to advance. A pack renewed by
+-- accident would silently gain a renewal date and start appearing on a chase
+-- list for money nobody owes.
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000a2',false);
+select expect_raises('a class pack cannot be renewed as though it had a period',
+  $$ select advance_membership_period(current_setting('t.mp')::uuid) $$, 'PT422');
+select expect_raises('nor can a frozen membership be renewed by taking cash',
+  $$ select advance_membership_period(current_setting('t.mf')::uuid) $$, 'PT409');
+reset role;
 
 select 'ALL MANUAL PAYMENT TESTS PASSED' as result;

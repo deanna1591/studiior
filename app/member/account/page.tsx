@@ -97,7 +97,18 @@ export default async function Membership() {
           </div>
 
           <div className="mt-4 border-t border-line pt-3">
-            {live.renews_on ? (
+            {/* A member whose membership has lapsed has to be told, because
+                §7.3 stops their booking once the studio's grace runs out and
+                finding that out at the door is the worst way to learn it. What
+                they are NOT told is anything about the studio's own affairs —
+                only their own. */}
+            {live.status === "past_due" ? (
+              <p className="m-sub text-ink">
+                Your membership was due for renewal
+                {live.renews_on && <> on {d(live.renews_on)}</>}. You can still
+                book for now — have a word with the studio next time you are in.
+              </p>
+            ) : live.renews_on ? (
               <p className="m-sub text-ink-2">
                 Renews {d(live.renews_on)}
                 {!live.auto_renew && " — and then stops, as you asked"}.

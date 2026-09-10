@@ -53,6 +53,8 @@ export default async function MemberDetail({
   if (!m) notFound();
 
   const manager = isManagerUp(ctx.role);
+  // §9 gives front desk payments, so the desk gets the button that takes one.
+  const desk = isDeskUp(ctx.role);
 
   const [
     { data: memberships }, { data: ledger }, { data: visits },
@@ -60,7 +62,7 @@ export default async function MemberDetail({
     { data: docs },
   ] = await Promise.all([
     supabase.from("memberships")
-      .select("id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, membership_plans(name, type)")
+      .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, membership_plans(name, type)")
       .eq("member_id", params.id).order("starts_on", { ascending: false }),
     supabase.from("credit_ledger")
       .select("id, delta, reason, balance_after, created_at")
@@ -349,6 +351,27 @@ export default async function MemberDetail({
                     : <><span className="num">{live.credits_remaining}</span> credit
                         {live.credits_remaining === 1 ? "" : "s"} left</>}
                 </div>
+                {/* MONEY OWED IS NOT A WORD IN A METADATA LINE. `past_due` was
+                    rendering as "past due" in --ink-3 between the price and the
+                    renewal date, which is where an eye slides past it. The desk
+                    needs the fact and the one button that fixes it. */}
+                {live.status === "past_due" && (
+                  <div className="mt-2.5 rounded-lg border-l-[3px] px-2.5 py-2"
+                       style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}>
+                    <p className="text-[13px] leading-[19px] text-ink">
+                      This membership is not paid up
+                      {live.renews_on && <> — it was due on {d(live.renews_on)}</>}.
+                    </p>
+                    {desk && (
+                      <Link
+                        href={`/members/${params.id}/payment?plan=${live.plan_id ?? ""}`}
+                        className="mt-1 inline-block text-[12px] font-medium leading-4 text-lime-text underline underline-offset-4 hover:text-lime-text2"
+                      >
+                        Record a payment
+                      </Link>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {past.length > 0 && (
