@@ -2,184 +2,231 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { todaysBrief } from "@/lib/brief";
+import { dashboardData, narrativeFor, revenueWindow, studioToday } from "@/lib/dashboard";
+import { searchStudio } from "@/app/staff/search-actions";
 import MorningBrief from "@/components/morning-brief";
-import { AppShell, Empty, Pill, PillRow, Rows, Segmented, SectionLabel } from "@/components/ui";
+import InsightsPanel from "@/components/dashboard/insights-panel";
+import TopBar from "@/components/dashboard/topbar";
+import KpiCards from "@/components/dashboard/kpi-cards";
+import RevenueWidget from "@/components/dashboard/revenue-widget";
+import Heatmap from "@/components/dashboard/heatmap";
+import HealthWidget from "@/components/dashboard/health-widget";
+import ActivityFeed from "@/components/dashboard/activity-feed";
+import Tasks from "@/components/dashboard/tasks";
+import MonthSnapshot from "@/components/dashboard/month-snapshot";
+import { Block, BlockEmpty } from "@/components/dashboard/block";
+import { AppShell, Empty, Rows } from "@/components/ui";
 import { ScheduleRow, type Occ } from "@/components/schedule-rows";
-import {
-  addDays, dayStart, fmtDayLong, relativeDayName, weekStart, zonedDateKey,
-} from "@/lib/time";
+import { addDays, dayStart, relativeDayName, fmtDayLong } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-export default async function Schedule({
+/**
+ * Bible Ch. 4 — the dashboard, against the five questions an owner should be
+ * able to answer in thirty seconds:
+ *
+ *   How is my studio doing today?  → the KPI row and the revenue block
+ *   What needs my attention?       → the brief, then "Needs you"
+ *   Who needs my attention?        → member health, and the insights that name
+ *                                    people
+ *   What am I missing?             → when the week fills
+ *   What should I do next?         → every one of the above ends in a link to
+ *                                    the screen where the thing gets done
+ *
+ * EVERY FIGURE COMES FROM MIGRATION 091. Nothing here computes one — a
+ * percentage worked out in TypeScript is a second definition of a number the
+ * database already has, and the two would agree exactly once.
+ *
+ * Manager-up for everything but today's classes. Permissions §12 note 21 keeps
+ * revenue and churn away from instructors and front desk, and it is the
+ * policies and the guards inside migration 091's functions that enforce it —
+ * this only decides what to ask for.
+ */
+export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: { view?: string; d?: string; room?: string; instructor?: string };
+  searchParams: { rev?: string };
 }) {
   const screen = await staffScreen("/");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
 
-  // Day is the default. A week is roughly ninety rows, which is a scroll, not
-  // a glance — the week is there when you want to plan, and the day is what
-  // you have open at the desk.
-  const view = searchParams.view === "week" ? "week" : "day";
-  const offset = Number(searchParams.d ?? 0) || 0;
+  const manager = isManagerUp(ctx.role);
+  const today = studioToday(ctx.timeZone);
+  const days = revenueWindow(searchParams.rev);
 
-  const from = view === "week"
-    ? weekStart(new Date(), ctx.timeZone, offset)
-    : dayStart(new Date(), ctx.timeZone, offset);
-  const to = addDays(from, view === "week" ? 7 : 1);
+  // Two hops for the whole screen. staffScreen() is the first; everything
+  // below is one batch that waits on nothing else in it.
+  const [brief, data, todays] = await Promise.all([
+    manager ? todaysBrief(supabase, ctx.studioId, ctx.timeZone) : Promise.resolve(null),
+    manager
+      ? dashboardData(supabase, ctx.studioId, ctx.timeZone, { revenueDays: days })
+      : Promise.resolve(null),
+    // The STUDIO's day, not the server's. A Manila studio's today is a
+    // different date from the server's for most of the world's hours, and a
+    // 07:00 Manila class is stored at 23:00 UTC the day before.
+    supabase
+      .from("class_occurrences")
+      .select("id, name, starts_at, capacity, booked_count, waitlist_count, status, room_id, instructor_id, instructors!instructor_id(display_name), rooms(name)")
+      .gte("starts_at", dayStart(new Date(), ctx.timeZone).toISOString())
+      .lt("starts_at", addDays(dayStart(new Date(), ctx.timeZone), 1).toISOString())
+      .order("starts_at"),
+  ]);
 
-  // The brief sits above the week: it is what the owner came to read, and the
-  // schedule is what they came to work from. Managers and owners only — §11's
-  // insights carry revenue and churn, which Permissions §12 note 21 keeps away
-  // from instructors and front desk.
-  const brief = isManagerUp(ctx.role)
-    ? await todaysBrief(supabase, ctx.studioId, ctx.timeZone)
-    : null;
+  const dayLabel = relativeDayName(`${today}T12:00:00Z`, ctx.timeZone)
+    ?? fmtDayLong(`${today}T12:00:00Z`, ctx.timeZone);
 
-  const [{ data: occurrences }, { data: rooms }] =
-    await Promise.all([
-      supabase
-        .from("class_occurrences")
-        .select("id, name, starts_at, capacity, booked_count, waitlist_count, status, room_id, instructor_id, instructors!instructor_id(display_name), rooms(name)")
-        .gte("starts_at", from.toISOString())
-        .lt("starts_at", to.toISOString())
-        .order("starts_at"),
-      supabase.from("rooms").select("id, name").eq("status", "active").order("name"),
-    ]);
+  const revHref = (d: number) => (d === 30 ? "/" : `/?rev=${d}`);
 
-  const roomFilter = searchParams.room ?? "";
-  const shown = (occurrences ?? []).filter((o) => !roomFilter || o.room_id === roomFilter);
-
-  const qs = (over: Record<string, string | number | undefined>) => {
-    const p = new URLSearchParams();
-    const merged = { view, d: offset, room: roomFilter || undefined, ...over };
-    for (const [k, v] of Object.entries(merged)) {
-      if (v !== undefined && v !== "" && !(k === "d" && v === 0) && !(k === "view" && v === "day")) {
-        p.set(k, String(v));
-      }
-    }
-    const s = p.toString();
-    return s ? `/?${s}` : "/";
-  };
-
-  // Grouped by day either way, so the week is the same rows under headings
-  // rather than a different component.
-  const byDay = new Map<string, Occ[]>();
-  for (const o of shown) {
-    const key = zonedDateKey(o.starts_at, ctx.timeZone);
-    if (!byDay.has(key)) byDay.set(key, []);
-    byDay.get(key)!.push(o as Occ);
-  }
-  const days = Array.from({ length: view === "week" ? 7 : 1 }, (_, i) => addDays(from, i));
-  const now = Date.now();
-
-  // "Dashboard" in both views. The day this screen is showing moves into a
-  // section label beside the rows, the way the week view already labels each of
-  // its days — the title used to be the only place the date appeared in day
-  // view, so it could not simply be dropped.
-  const heading = "Dashboard";
-  const dayLabel = relativeDayName(from.toISOString(), ctx.timeZone)
-    ?? fmtDayLong(from.toISOString(), ctx.timeZone);
+  // Quick Add offers only what THIS role may actually do. The Bible's list is
+  // nine items; four of them (challenge, workshop, promotion, announcement)
+  // have no screen in this product and are absent rather than offered, and the
+  // rest are filtered by Permissions — front desk creates members (§5) and
+  // nothing else, and an instructor creates nothing at all, so they get no
+  // button rather than a menu of refusals. Every entry here is a destination
+  // the caller will be let into.
+  const quickAdd = manager
+    ? [
+        { label: "Member", href: "/members/new", sub: "The walk-in at the counter" },
+        { label: "Class", href: "/schedule", sub: "Click an empty slot on the day view" },
+        { label: "Recurring class", href: "/series/new", sub: "A weekly slot that fills itself" },
+        { label: "Instructor", href: "/instructors/new", sub: "A teaching record, with or without a login" },
+        { label: "Plan", href: "/plans/new", sub: "Membership, pack or drop-in" },
+        { label: "Room", href: "/rooms/new", sub: "Somewhere for a class to happen" },
+        { label: "Import members", href: "/imports/new", sub: "From a CSV, with an undo" },
+      ]
+    : ctx.role === "front_desk"
+      ? [{ label: "Member", href: "/members/new", sub: "The walk-in at the counter" }]
+      : [];
 
   return (
-    <AppShell
-      {...shell}
-      title={heading}
-      actions={
-        isManagerUp(ctx.role) ? (
-          <Link
-            href="/classes/new"
-            className="inline-flex items-center rounded bg-ink px-3.5 py-2 text-[13px] font-medium leading-[18px] text-paper hover:bg-ink-2"
-          >
-            Add a class
-          </Link>
-        ) : null
-      }
-      filters={
-        <PillRow
-          right={
-            <div className="flex items-center gap-2">
-              <Link href={qs({ d: offset - 1 })} aria-label="Previous"
-                    className="num flex h-7 w-7 items-center justify-center rounded-full border border-line-2 bg-surface text-ink-2 hover:text-ink">‹</Link>
-              <Link href={qs({ d: 0 })}
-                    className="text-[12px] text-ink-3 underline underline-offset-4 hover:text-ink">
-                {view === "week" ? "This week" : "Today"}
-              </Link>
-              <Link href={qs({ d: offset + 1 })} aria-label="Next"
-                    className="num flex h-7 w-7 items-center justify-center rounded-full border border-line-2 bg-surface text-ink-2 hover:text-ink">›</Link>
-              <Segmented
-                options={[
-                  { href: qs({ view: "day", d: 0 }), label: "Day", active: view === "day" },
-                  { href: qs({ view: "week", d: 0 }), label: "Week", active: view === "week" },
-                ]}
-              />
-            </div>
-          }
-        >
-          <Pill href={qs({ room: undefined })} active={!roomFilter}>All rooms</Pill>
-          {(rooms ?? []).map((r) => (
-            <Pill key={r.id} href={qs({ room: r.id })} active={roomFilter === r.id}>
-              {r.name}
-            </Pill>
-          ))}
-        </PillRow>
-      }
-    >
-      {brief && (
+    <AppShell {...shell} title="Dashboard">
+      <TopBar breadcrumb="Dashboard" quickAdd={quickAdd} search={searchStudio} />
+
+      {/* 4.2 — the narrative first. An owner who reads one sentence and closes
+          the tab should still know what today looks like.
+          Generation is a cron job: opening this page must never be what makes
+          the brief exist, or a studio that does not log in never gets one and
+          the day it does log in it gets a brief written at noon. So a missing
+          brief is a real state and says so, rather than leaving a gap where
+          the most-read thing on the screen should be. */}
+      {manager && (brief ? (
         <MorningBrief
           summary={brief.summary}
-          insights={brief.insights}
+          insights={[]}
           money={brief.money}
           dateLabel={brief.dateLabel}
           handled={brief.handled}
         />
+      ) : (
+        <section className="mb-8 border-y border-line bg-surface px-3 py-3">
+          <h2 className="section-label text-ink-2">This morning</h2>
+          <p className="mt-1.5 max-w-[60ch] text-[13px] leading-[19px] text-ink-2">
+            Today&rsquo;s brief has not been written yet — it is composed for you
+            each morning, before you open this. Your figures below are live
+            either way.
+          </p>
+        </section>
+      ))}
+
+      {manager && data && (
+        <>
+          {/* 4.3 */}
+          <div className="mb-8">
+            <KpiCards
+              cards={data.kpis?.cards ?? []}
+              absent={data.absent}
+              error={data.kpisError}
+            />
+          </div>
+
+          {/* 4.4 and 4.5 */}
+          <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <RevenueWidget
+              r={data.revenue}
+              days={days}
+              narrative={narrativeFor(data.narratives.revenue, days)}
+              error={data.revenueError}
+              hrefFor={revHref}
+            />
+            <Heatmap
+              h={data.heatmap}
+              narrative={narrativeFor(data.narratives.attendance, 90)}
+              error={data.heatmapError}
+            />
+          </div>
+
+          {/* 4.6 and 4.7 */}
+          <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {/* The roster row is built for the full content width and is 28px
+                over inside a half-width column. Scrolls inside its own
+                container rather than pushing the page sideways — the same rule
+                the schedule grid follows. */}
+            <Block
+              title="Today's classes"
+              hint={dayLabel}
+              right={
+                <Link href="/schedule" className="text-[12px] leading-4 text-lime-text underline underline-offset-4 hover:text-lime-text2">
+                  Schedule
+                </Link>
+              }
+              error={todays.error?.message ?? null}
+            >
+              {(todays.data ?? []).length === 0 ? (
+                <BlockEmpty cta={{ href: "/series", label: "Set up your timetable" }}>
+                  Nothing is on today. Every class you run shows up here with how
+                  full it is and who is teaching it, so the morning is one glance.
+                </BlockEmpty>
+              ) : (
+                <div className="-mx-1 overflow-x-auto px-1">
+                  <div className="min-w-[560px]">
+                    <Rows>
+                      {(todays.data as Occ[]).map((o) => (
+                        <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} now={Date.now()} />
+                      ))}
+                    </Rows>
+                  </div>
+                </div>
+              )}
+            </Block>
+
+            <InsightsPanel
+              insights={brief?.insights ?? []}
+              money={brief?.money ?? {}}
+              handled={brief?.handled ?? 0}
+              lead={data.narratives.lead ?? null}
+            />
+          </div>
+
+          {/* 4.8 and 4.9 */}
+          <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <HealthWidget h={data.health} error={data.healthError} />
+            <ActivityFeed a={data.activity} timeZone={ctx.timeZone} error={data.activityError} />
+          </div>
+
+          {/* 4.11 and 4.10 */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Tasks t={data.tasks} error={data.tasksError} />
+            <MonthSnapshot m={data.month} weekStartsOn={data.month?.week_starts_on ?? 1} error={data.monthError} />
+          </div>
+        </>
       )}
 
-      {shown.length === 0 ? (
-        <Empty>
-          {roomFilter
-            ? <>Nothing in that room {view === "week" ? "this week" : "on this day"}. <Link href={qs({ room: undefined })} className="text-lime-text underline underline-offset-4">Show every room</Link>.</>
-            : isManagerUp(ctx.role)
-              ? <>No classes {view === "week" ? "this week" : "today"}. <Link href="/classes/new" className="text-lime-text underline underline-offset-4">Add one</Link> and members can book it.</>
-              : <>No classes {view === "week" ? "this week" : "today"}.</>}
-        </Empty>
-      ) : view === "day" ? (
+      {/* Instructors and front desk: today's classes, and nothing that
+          Permissions §12 keeps from them. Not a wall of refusals. */}
+      {!manager && (
         <section>
-          <SectionLabel>{dayLabel}</SectionLabel>
-          <Rows>
-            {shown.map((o) => (
-              <ScheduleRow key={o.id} o={o as Occ} timeZone={ctx.timeZone} now={now} />
-            ))}
-          </Rows>
+          <h2 className="section-label mb-2 text-ink-2">{dayLabel}</h2>
+          {(todays.data ?? []).length === 0 ? (
+            <Empty>No classes today.</Empty>
+          ) : (
+            <Rows>
+              {(todays.data as Occ[]).map((o) => (
+                <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} now={Date.now()} />
+              ))}
+            </Rows>
+          )}
         </section>
-      ) : (
-        <div className="space-y-6">
-          {days.map((d) => {
-            const key = zonedDateKey(d.toISOString(), ctx.timeZone);
-            const list = byDay.get(key) ?? [];
-            return (
-              <section key={key}>
-                <SectionLabel>
-                  {relativeDayName(d.toISOString(), ctx.timeZone) ?? fmtDayLong(d.toISOString(), ctx.timeZone)}
-                </SectionLabel>
-                {list.length === 0 ? (
-                  <p className="border-y border-line bg-surface px-3 py-2.5 text-[13px] text-ink-3">
-                    Nothing on.
-                  </p>
-                ) : (
-                  <Rows>
-                    {list.map((o) => (
-                      <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} now={now} />
-                    ))}
-                  </Rows>
-                )}
-              </section>
-            );
-          })}
-        </div>
       )}
     </AppShell>
   );

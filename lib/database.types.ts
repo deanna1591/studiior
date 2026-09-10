@@ -1481,6 +1481,112 @@ export type Database = {
           },
         ]
       }
+      dashboard_ai_config: {
+        Row: {
+          key: string
+          note: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          note?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          note?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
+      dashboard_narratives: {
+        Row: {
+          body: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          facts: Json
+          fallback: string
+          for_date: string
+          id: string
+          kind: string
+          lead_insight_id: string | null
+          model: string | null
+          net_request_id: number | null
+          prompt_version: string | null
+          queued_at: string
+          request_body: Json | null
+          response_body: Json | null
+          status: string
+          studio_id: string
+          subject_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          facts?: Json
+          fallback: string
+          for_date: string
+          id?: string
+          kind: string
+          lead_insight_id?: string | null
+          model?: string | null
+          net_request_id?: number | null
+          prompt_version?: string | null
+          queued_at?: string
+          request_body?: Json | null
+          response_body?: Json | null
+          status?: string
+          studio_id: string
+          subject_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          facts?: Json
+          fallback?: string
+          for_date?: string
+          id?: string
+          kind?: string
+          lead_insight_id?: string | null
+          model?: string | null
+          net_request_id?: number | null
+          prompt_version?: string | null
+          queued_at?: string
+          request_body?: Json | null
+          response_body?: Json | null
+          status?: string
+          studio_id?: string
+          subject_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_narratives_lead_insight_id_fkey"
+            columns: ["lead_insight_id"]
+            isOneToOne: false
+            referencedRelation: "ai_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_narratives_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_narratives_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gift_card_transactions: {
         Row: {
           balance_after: number
@@ -5391,6 +5497,7 @@ export type Database = {
         }
         Returns: string
       }
+      anthropic_api_key: { Args: never; Returns: string }
       apply_for_shift: {
         Args: { p_note?: string; p_occurrence_id: string }
         Returns: Json
@@ -5631,6 +5738,60 @@ export type Database = {
           p_starts_at: string
           p_studio_id: string
         }
+        Returns: Json
+      }
+      dashboard_absent_cards: { Args: { p_studio_id: string }; Returns: Json }
+      dashboard_activity: {
+        Args: { p_limit?: number; p_studio_id: string }
+        Returns: Json
+      }
+      dashboard_ai_setting: { Args: { p_key: string }; Returns: string }
+      dashboard_facts: {
+        Args: {
+          p_for_date?: string
+          p_kind: string
+          p_studio_id: string
+          p_subject_id?: string
+        }
+        Returns: Json
+      }
+      dashboard_forecast_cents: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
+      dashboard_forecast_min_months: { Args: never; Returns: number }
+      dashboard_health: { Args: { p_studio_id: string }; Returns: Json }
+      dashboard_heatmap: {
+        Args: { p_days?: number; p_studio_id: string }
+        Returns: Json
+      }
+      dashboard_kpis: { Args: { p_studio_id: string }; Returns: Json }
+      dashboard_money_text: {
+        Args: { p_cents: number; p_currency: string }
+        Returns: string
+      }
+      dashboard_month: {
+        Args: { p_month?: string; p_studio_id: string }
+        Returns: Json
+      }
+      dashboard_narrative: {
+        Args: {
+          p_for_date?: string
+          p_kind: string
+          p_studio_id: string
+          p_subject_id?: string
+        }
+        Returns: Json
+      }
+      dashboard_pct_floor: { Args: never; Returns: number }
+      dashboard_revenue: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: Json
+      }
+      dashboard_source_label: { Args: { p_src: string }; Returns: string }
+      dashboard_tasks: { Args: { p_studio_id: string }; Returns: Json }
+      dashboard_trend: {
+        Args: { p_basis: string; p_now: number; p_prior: number }
         Returns: Json
       }
       decline_cover_request: {
@@ -5903,6 +6064,12 @@ export type Database = {
         }
         Returns: Json
       }
+      narrative_numbers: { Args: { p_text: string }; Returns: string[] }
+      narrative_offending_number: {
+        Args: { p_allowed: string[]; p_text: string }
+        Returns: string
+      }
+      narrative_prompt: { Args: { p_kind: string }; Returns: string }
       next_class_day: {
         Args: { p_from?: string; p_studio_id: string }
         Returns: Json
@@ -6003,6 +6170,15 @@ export type Database = {
         Returns: number
       }
       queue_credit_expiries: { Args: { p_studio_id: string }; Returns: number }
+      queue_dashboard_narrative: {
+        Args: {
+          p_for_date?: string
+          p_kind: string
+          p_studio_id: string
+          p_subject_id?: string
+        }
+        Returns: string
+      }
       queue_instructor_assigned: {
         Args: { p_occurrence_id: string }
         Returns: string
@@ -6075,6 +6251,7 @@ export type Database = {
         Args: { p_dry_run?: boolean; p_studio_id?: string }
         Returns: Json
       }
+      reconcile_dashboard_narratives: { Args: never; Returns: Json }
       reconcile_notification_sends: { Args: never; Returns: Json }
       record_class_pay: { Args: { p_occurrence_id: string }; Returns: Json }
       record_document: {
@@ -6158,6 +6335,7 @@ export type Database = {
       }
       rrule_part: { Args: { p_key: string; p_rrule: string }; Returns: string }
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
+      run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
       say_count: { Args: { n: number }; Returns: string }
       schedule_range: {
@@ -6441,6 +6619,13 @@ export type Database = {
         Args: { p_ends_at: string; p_starts_at: string; p_studio_id: string }
         Returns: boolean
       }
+      studio_day_bounds: {
+        Args: { p_day: string; p_studio_id: string }
+        Returns: {
+          day_end: string
+          day_start: string
+        }[]
+      }
       studio_invite_preview: {
         Args: { p_token: string }
         Returns: Database["public"]["CompositeTypes"]["invite_preview"]
@@ -6462,6 +6647,10 @@ export type Database = {
           waitlist_enabled: boolean
           week_starts_on: number
         }[]
+      }
+      studio_revenue_between: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: number
       }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
       studio_today: { Args: { p_studio_id: string }; Returns: string }
