@@ -7,6 +7,7 @@ import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { moveClass } from "./actions";
+import CreateOnSlot, { type SlotDraft } from "./create-slot";
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -61,12 +62,15 @@ export type CalEvent = {
 type WallEvent = CalEvent & { start: Date; end: Date };
 
 export default function ScheduleCalendar({
-  events: initial, resources, timeZone, deadlineHours,
+  events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct,
   anchor, today, view, minHour, maxHour,
 }: {
   events: CalEvent[];
   resources: Resource[];
+  /** For the slot-click form. Empty means the studio has none yet. */
+  classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
+  rooms: { id: string; name: string; capacity: number }[];
   timeZone: string;
   deadlineHours: number;
   /** §11's own thresholds, passed in so the calendar and the brief agree. */
@@ -371,6 +375,42 @@ export default function ScheduleCalendar({
     },
   }), [fullness, loadByResource]);
 
+  // CLICKING AN EMPTY SLOT CREATES A CLASS THERE.
+  //
+  // react-big-calendar hands back WALL time, because that is all it has — see
+  // lib/tz.ts. It is converted back to a real instant here, once, before it goes
+  // anywhere near the database, exactly as a drag already is.
+  const [slot, setSlot] = useState<SlotDraft | null>(null);
+  const onSelectSlot = useCallback(
+    ({ start, end, resourceId }: { start: Date; end: Date; resourceId?: string | number }) => {
+      if (view !== "day") return;          // resources only exist on Day
+      if (!classTypes.length) return;      // nothing to create; the page says so
+      const startsAt = fromStudioWall(new Date(start), timeZone);
+      let endsAt = fromStudioWall(new Date(end), timeZone);
+      // A single click gives a zero- or one-slot range. Fall back to the first
+      // class type's own length rather than inventing a number.
+      if (endsAt.getTime() - startsAt.getTime() < 5 * 60_000) {
+        endsAt = new Date(startsAt.getTime() + (classTypes[0]?.duration_minutes ?? 50) * 60_000);
+      }
+      const id = resourceId === undefined ? null : String(resourceId);
+      const instructorId = !id || id === UNASSIGNED ? null : id;
+      setSlot({
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        instructorId,
+        instructorName: instructorId
+          ? resources.find((r) => r.resourceId === instructorId)?.resourceTitle ?? null
+          : null,
+        when: new Intl.DateTimeFormat("en-GB", {
+          weekday: "long", day: "numeric", month: "long",
+          hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
+        }).format(startsAt),
+        minutes: Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000),
+      });
+    },
+    [view, classTypes, resources, timeZone],
+  );
+
   // WHEN THE GRID IS WIDER THAN THE PANE, SAY SO.
   //
   // The columns keep a readable floor and the view scrolls, which is right — but
@@ -398,6 +438,15 @@ export default function ScheduleCalendar({
 
   return (
     <div>
+      {slot && (
+        <CreateOnSlot
+          draft={slot}
+          classTypes={classTypes}
+          rooms={rooms}
+          onCancel={() => setSlot(null)}
+          onDone={() => { setSlot(null); startTransition(() => router.refresh()); }}
+        />
+      )}
       {notice && (
         <p className="mb-3 border-l-[3px] px-3 py-2 text-[13px] leading-[18px] text-ink"
            style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}
@@ -492,7 +541,8 @@ export default function ScheduleCalendar({
           onEventDrop={onDrop}
           onEventResize={onResize}
           resizable
-          selectable={false}
+          selectable={view === "day" && classTypes.length > 0}
+          onSelectSlot={onSelectSlot}
           eventPropGetter={eventPropGetter}
           components={components}
           onSelectEvent={openRoster}

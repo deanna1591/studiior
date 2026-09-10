@@ -15,6 +15,24 @@ begin
   end if;
 end $$;
 
+create or replace function expect_true(label text, actual boolean)
+returns void language plpgsql as $$
+begin
+  if actual then raise notice 'PASS  %  (got true)', label;
+  else raise exception 'FAIL  %  expected true, got %', label, coalesce(actual::text,'null'); end if;
+end $$;
+
+create or replace function expect_raises(label text, stmt text, want_sqlstate text)
+returns void language plpgsql as $$
+begin
+  execute stmt;
+  raise exception 'FAIL  %  expected % but nothing was raised', label, want_sqlstate;
+exception when others then
+  if sqlstate = want_sqlstate then raise notice 'PASS  %  (got %)', label, sqlstate;
+  elsif sqlstate = 'P0001' and sqlerrm like 'FAIL%' then raise;
+  else raise exception 'FAIL  %  expected %, got % (%)', label, want_sqlstate, sqlstate, sqlerrm; end if;
+end $$;
+
 create or replace function expect_text(label text, actual text, want text)
 returns void language plpgsql as $$
 begin
@@ -456,6 +474,236 @@ select expect_text('dragging it straight back reads as an undo',
      date_trunc('day', now()) + interval '2 days 9 hours 15 minutes',
      date_trunc('day', now()) + interval '2 days 10 hours 15 minutes',
      p_confirm => true) ->> 'undo'), 'true');
+
+-- =============================================================================
+-- CREATING A CLASS ON THE CALENDAR (migration 089)
+-- =============================================================================
+-- Creation used to be a bare INSERT: no validity window, no availability check,
+-- and a clash surfacing as a raw exclusion_violation. It now goes through the
+-- same gate as move_occurrence(), with the same reason strings, so one screen
+-- can render both.
+
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+set local role authenticated;
+
+-- CLICKING AN INSTRUCTOR'S COLUMN ASSIGNS THEM.
+create temporary table _c1 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 3 + time '09:00') at time zone 'Europe/Prague',
+  (current_date + 3 + time '09:50') at time zone 'Europe/Prague',
+  'f00df00d-0000-0000-0000-00000000d101',
+  'f00df00d-0000-0000-0000-00000000ee01') as r;
+select expect_true('creating in an instructor''s column succeeds',
+  (select (r->>'ok')::boolean from _c1));
+select expect_text('...and assigns that instructor',
+  (select instructor_id::text from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c1)),
+  'f00df00d-0000-0000-0000-00000000d101');
+select expect_text('...so the class is staffed, not an open shift',
+  (select r->>'staffing' from _c1), 'assigned');
+select expect_num('...and takes the class type''s capacity when none is given',
+  (select capacity from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c1))::bigint,
+  (select default_capacity from class_types where id='f00df00d-0000-0000-0000-00000000cc01')::bigint);
+select expect_true('...as a ONE-OFF, with no series behind it',
+  (select series_id is null from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c1)));
+
+-- CLICKING UNASSIGNED CREATES AN OPEN SHIFT.
+create temporary table _c2 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 3 + time '11:00') at time zone 'Europe/Prague',
+  (current_date + 3 + time '11:50') at time zone 'Europe/Prague',
+  null,
+  'f00df00d-0000-0000-0000-00000000ee01') as r;
+select expect_text('creating in Unassigned leaves it open',
+  (select r->>'staffing' from _c2), 'open');
+select expect_true('...with nobody on it',
+  (select instructor_id is null from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c2)));
+
+-- THE NEW CLASS IS BOOKABLE IMMEDIATELY.
+-- Inside the booking window on purpose: a class forty days out fails on
+-- outside_booking_window, which would be §2.1 working and this assertion
+-- proving nothing about whether a newly created class can be booked.
+select expect_text('a class created this way can be booked straight away',
+  (book_class((select (r->>'occurrence_id')::uuid from _c1),
+              'f00df00d-0000-0000-0000-00000000dd01', 'staff', null, 'comp')).status::text,
+  'booked');
+
+-- A CLASH REFUSES AND NAMES WHAT IS IN THE WAY.
+create temporary table _c3 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 3 + time '09:20') at time zone 'Europe/Prague',
+  (current_date + 3 + time '10:10') at time zone 'Europe/Prague',
+  null,
+  'f00df00d-0000-0000-0000-00000000ee01') as r;
+select expect_true('a room already in use refuses',
+  (select not (r->>'ok')::boolean from _c3));
+select expect_text('...and says which of the two constraints it was',
+  (select r->>'reason' from _c3), 'room_busy');
+select expect_true('...and names the class in the way, with its time',
+  (select (r->'blocked_by'->>'name') is not null
+      and (r->'blocked_by'->>'at') is not null from _c3));
+select expect_num('...and nothing was written',
+  (select count(*) from class_occurrences
+    where studio_id='f00df00d-0000-0000-0000-000000000001'
+      and starts_at = (current_date + 3 + time '09:20') at time zone 'Europe/Prague'), 0);
+
+-- THE SAME INSTRUCTOR IN TWO PLACES AT ONCE.
+create temporary table _c4 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 3 + time '09:20') at time zone 'Europe/Prague',
+  (current_date + 3 + time '10:10') at time zone 'Europe/Prague',
+  'f00df00d-0000-0000-0000-00000000d101',
+  'f00df00d-0000-0000-0000-00000000ee02') as r;
+select expect_text('an instructor already teaching refuses too, and says so',
+  (select r->>'reason' from _c4), 'instructor_busy');
+
+-- DECISION 18: OUTSIDE THE VALIDITY WINDOW IS A REFUSAL, NOT A WARNING.
+insert into instructor_availability (studio_id, instructor_id, day_of_week,
+                                     starts_at_time, ends_at_time,
+                                     effective_from, effective_to)
+values ('f00df00d-0000-0000-0000-000000000001','f00df00d-0000-0000-0000-00000000d102',
+        extract(dow from current_date + 41)::int, '06:00', '22:00',
+        current_date, current_date + 5);
+create temporary table _c5 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 41 + time '09:00') at time zone 'Europe/Prague',
+  (current_date + 41 + time '09:50') at time zone 'Europe/Prague',
+  'f00df00d-0000-0000-0000-00000000d102',
+  'f00df00d-0000-0000-0000-00000000ee01') as r;
+select expect_text('a date outside the instructor''s agreed window is refused',
+  (select r->>'reason' from _c5), 'outside_availability_dates');
+select expect_true('...naming who and when, because that is what a person acts on',
+  (select (r->'blocked_by'->>'who') is not null
+      and (r->'blocked_by'->>'on') is not null from _c5));
+
+-- DECISION 9: OUTSIDE STATED HOURS WARNS AND SAVES.
+create temporary table _c6 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 2 + time '23:00') at time zone 'Europe/Prague',
+  (current_date + 2 + time '23:50') at time zone 'Europe/Prague',
+  'f00df00d-0000-0000-0000-00000000d102',
+  'f00df00d-0000-0000-0000-00000000ee01') as r;
+select expect_true('outside stated hours SAVES',
+  (select (r->>'ok')::boolean from _c6));
+select expect_true('...and warns',
+  (select r->'warnings' @> '["outside_availability"]'::jsonb from _c6));
+select expect_true('...and the class really is there',
+  (select exists (select 1 from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c6))));
+
+-- A DRAGGED RANGE IS JUST A LONGER CLASS.
+create temporary table _c7 as select create_occurrence(
+  'f00df00d-0000-0000-0000-000000000001',
+  'f00df00d-0000-0000-0000-00000000cc01',
+  (current_date + 42 + time '07:00') at time zone 'Europe/Prague',
+  (current_date + 42 + time '08:30') at time zone 'Europe/Prague',
+  null, 'f00df00d-0000-0000-0000-00000000ee01', 4) as r;
+select expect_num('a dragged range sets the duration',
+  (select extract(epoch from (ends_at - starts_at))::int / 60 from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c7))::bigint, 90);
+select expect_num('...and a capacity given overrides the class type''s',
+  (select capacity from class_occurrences
+    where id = (select (r->>'occurrence_id')::uuid from _c7))::bigint, 4);
+
+-- A class cannot end before it starts, and a class type from another studio is
+-- not a class type this studio may use.
+select expect_raises('a backwards range is refused',
+  $$select create_occurrence('f00df00d-0000-0000-0000-000000000001',
+      'f00df00d-0000-0000-0000-00000000cc01',
+      (current_date + 43 + time '10:00') at time zone 'Europe/Prague',
+      (current_date + 43 + time '09:00') at time zone 'Europe/Prague')$$, 'PT400');
+
+-- PERMISSIONS: the same boundary the rest of the timetable has.
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a2',false);
+select expect_raises('front desk cannot create a class',
+  $$select create_occurrence('f00df00d-0000-0000-0000-000000000001',
+      'f00df00d-0000-0000-0000-00000000cc01',
+      (current_date + 44 + time '10:00') at time zone 'Europe/Prague',
+      (current_date + 44 + time '11:00') at time zone 'Europe/Prague')$$, 'PT403');
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+
+
+-- =============================================================================
+-- move_occurrence()'s timezone and its warning (migration 090)
+-- =============================================================================
+-- Both found by copying this function's shape into create_occurrence() and then
+-- testing the copy. Neither was covered because every fixture in this suite
+-- leaves availability EMPTY, and instructor_available_at() returns true for
+-- somebody who has stated nothing — so the null date never had rows to fail
+-- against. These fixtures state something.
+
+select set_config('request.jwt.claim.sub','f00df00d-0000-0000-0000-0000000000a1',false);
+set local role authenticated;
+
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, room_id,
+                               capacity, starts_at, ends_at)
+values ('f00df00d-0000-0000-0000-000000000099','f00df00d-0000-0000-0000-000000000001',
+        'f00df00d-0000-0000-0000-00000000000c','f00df00d-0000-0000-0000-00000000cc01',
+        'Assign me','f00df00d-0000-0000-0000-00000000ee02',10,
+        (current_date + 6 + time '14:00') at time zone 'Europe/Prague',
+        (current_date + 6 + time '15:00') at time zone 'Europe/Prague');
+
+-- Available all day, every day, for a year: assigning them must WORK. It used
+-- to be refused as "outside the dates they agreed to", because v_tz was null on
+-- this path and instructor_valid_on(instructor, null) is false.
+insert into instructor_availability (studio_id, instructor_id, day_of_week,
+                                     starts_at_time, ends_at_time, effective_from)
+select 'f00df00d-0000-0000-0000-000000000001','f00df00d-0000-0000-0000-00000000d102',
+       g, '00:00', '23:59', current_date - 365 from generate_series(0,6) g;
+
+create temporary table _m1 as select move_occurrence(
+  'f00df00d-0000-0000-0000-000000000099',
+  p_instructor_id => 'f00df00d-0000-0000-0000-00000000d102',
+  p_confirm => true) as r;
+select expect_true('an instructor available every day CAN be assigned',
+  (select (r->>'ok')::boolean from _m1));
+select expect_true('...with no warning, because they really are available',
+  (select r->'warnings' = '[]'::jsonb from _m1));
+
+-- Narrow their hours so the class falls outside them: WARN, not refuse, and not
+-- raise. `v_warnings || 'literal'` on a text[] raised 22P02 until 090.
+delete from instructor_availability where instructor_id='f00df00d-0000-0000-0000-00000000d102';
+insert into instructor_availability (studio_id, instructor_id, day_of_week,
+                                     starts_at_time, ends_at_time, effective_from)
+select 'f00df00d-0000-0000-0000-000000000001','f00df00d-0000-0000-0000-00000000d102',
+       g, '05:00', '05:30', current_date - 365 from generate_series(0,6) g;
+
+create temporary table _m2 as select move_occurrence(
+  'f00df00d-0000-0000-0000-000000000099',
+  p_instructor_id => 'f00df00d-0000-0000-0000-00000000d102',
+  p_confirm => true) as r;
+select expect_true('outside stated HOURS still saves',
+  (select (r->>'ok')::boolean from _m2));
+select expect_true('...and warns rather than raising',
+  (select r->'warnings' @> '["outside_availability"]'::jsonb from _m2));
+
+-- Outside the agreed DATES: refuse, and name the date. The date used to come
+-- back null, which was the tell that the check itself had a null date.
+delete from instructor_availability where instructor_id='f00df00d-0000-0000-0000-00000000d102';
+insert into instructor_availability (studio_id, instructor_id, day_of_week,
+                                     starts_at_time, ends_at_time, effective_from, effective_to)
+select 'f00df00d-0000-0000-0000-000000000001','f00df00d-0000-0000-0000-00000000d102',
+       g, '00:00', '23:59', current_date - 365, current_date - 1 from generate_series(0,6) g;
+
+create temporary table _m3 as select move_occurrence(
+  'f00df00d-0000-0000-0000-000000000099',
+  p_instructor_id => 'f00df00d-0000-0000-0000-00000000d102',
+  p_confirm => true) as r;
+select expect_text('outside the agreed DATES is refused',
+  (select r->>'reason' from _m3), 'outside_availability_dates');
+select expect_true('...and the refusal names the date, which it could not before',
+  (select (r->'blocked_by'->>'on') is not null from _m3));
+delete from instructor_availability where instructor_id='f00df00d-0000-0000-0000-00000000d102';
+
 reset role;
 select expect_num('...and the unsent email is withdrawn rather than followed by a second',
   (select count(*) from notifications

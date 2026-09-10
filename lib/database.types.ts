@@ -5621,6 +5621,18 @@ export type Database = {
           token: string
         }[]
       }
+      create_occurrence: {
+        Args: {
+          p_capacity?: number
+          p_class_type_id: string
+          p_ends_at: string
+          p_instructor_id?: string
+          p_room_id?: string
+          p_starts_at: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       decline_cover_request: {
         Args: { p_reason?: string; p_request_id: string }
         Returns: Json

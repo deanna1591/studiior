@@ -57,12 +57,18 @@ export default async function Schedule({
   const from = shiftDateKey(weekStart, -1);
   const to = shiftDateKey(weekStart, view === "week" ? 7 : 1);
 
-  const [{ data: instructors }, { data: rows, error: rangeError }, { data: pending },
+  const [{ data: classTypes }, { data: rooms },
+         { data: instructors }, { data: rows, error: rangeError }, { data: pending },
          { data: settings },
          { data: quietPct }, { data: quietDays }, { data: fullPct },
          { data: elsewhereData }] =
     await Promise.all([
-      supabase.from("instructors")
+      supabase.from("class_types")
+      .select("id, name, duration_minutes, default_capacity")
+      .eq("status", "active").order("name"),
+    supabase.from("rooms")
+      .select("id, name, capacity").eq("status", "active").order("name"),
+    supabase.from("instructors")
         .select("id, display_name").eq("status", "active").order("display_name"),
       // One reader, and the day boundary resolved inside it. Comparing UTC
       // instants against a date here would lose every class either side of
@@ -302,6 +308,7 @@ export default async function Schedule({
       ) : (
         <ScheduleCalendar
           events={events} resources={shown}
+          classTypes={classTypes ?? []} rooms={rooms ?? []}
           timeZone={ctx.timeZone} deadlineHours={deadlineHours}
           quietPct={Number(quietPct ?? 0.4)}
           quietWindowDays={Number(quietDays ?? 7)}

@@ -27,7 +27,7 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Eighty-eight migrations, applying clean from `supabase db reset`:
+Ninety migrations, applying clean from `supabase db reset`:
 
 - **001** schema: 47 tables, 110 RLS policies, grants for `authenticated` and `service_role`
 - **002** `book_class()`: the booking transaction — occurrence locked `for update`, §2.1 eligibility gate in order with a specific reason code per failure, §2.2 payment source resolution, waitlist, booking + `credit_ledger` + `booked_count` in one transaction
@@ -49,6 +49,8 @@ Eighty-eight migrations, applying clean from `supabase db reset`:
 - **018** Decision 14 health score: `member_health()` (pure), the cache on `members`, `refresh_studio_health()` for the nightly pass, and a trigger recomputing on check-in. Includes the `new` band for members joined under 14 days, per the amendment recorded in Decision 14
 - **019** the importer's function half: `import_dry_run()`, `import_commit()`, `import_rollback()`. Also `import_member_status()` / `import_membership_status()`, which both halves share — a file saying "Active" against a lowercase enum must fail at review, not inside the commit transaction the review just promised was safe
 - **021** the member journey timeline: `rebuild_member_timeline()` / `rebuild_studio_timeline()`. Data model §4 asks for one writer that is testable and replayable, so every event is *derived* from its source and the whole thing can be dropped and rebuilt without drifting. `booked` is deliberately not emitted — it tells every attended class twice and every cancelled one twice
+- **090** `move_occurrence()` refused instructors who WERE available — `v_tz` was null on the ordinary path, so the date it checked was null — and its Decision 9 warning raised instead of warning
+- **089** `create_occurrence()`: creating a class goes through the same gate as moving one. `createClass` was a bare INSERT with no validity window, no availability check, and a clash surfacing as a raw Postgres error
 - **088** `set_series_guarantee()` had raised on every call since 081, which renamed `flex_confirmed_at` and missed it. Found by building the tier control — the writer had never been called by anything
 - **087** `update_series()` reported its PREDICTION as its RESULT — `v_moves` was incremented only in the preview loop and returned as `moved`, so an edit that moved nothing still answered "19 moved". Now returns what the apply loop did, asks the calendar afterwards, and writes an audit row
 - **086** eight SECURITY DEFINER functions from 080–083 had no guard inside them, found by running the advisor query against hosted after 085 landed and then asking the other half of the question. Also closes `set_series_flex` and `set_occurrence_guaranteed` to `anon`, which hosted had granted and local never showed
@@ -117,7 +119,7 @@ Eighty-eight migrations, applying clean from `supabase db reset`:
 - **022** `messages` and `message_templates`: one person writing to one member, per Permissions §12 — owner, manager and front desk, never instructors. Nothing sends. `send_message()` moves a draft to `queued` and stops, so a transport becomes one adapter reading queued rows rather than a refactor. `message_draft_for()` composes from the band's reason, one draft per reason, out of a table a studio can later edit
 - **020** `is_manager_up()` and `is_desk_up()` return false rather than null for a caller who is staff of no studio. `auth_role_in()` gives null, `null in (...)` is null, and every guard in the codebase is written `if not is_manager_up(x) then raise` — which does nothing against a null. Harmless in the ~110 policies that use these (a policy denies on null); a hole in every SECURITY DEFINER function that used them as a gate. See the rule below
 
-Thirty suites, **1,498 assertions**, all passing from a clean `db reset`:
+Thirty suites, **1,526 assertions**, all passing from a clean `db reset`:
 
 | Suite | Asserts | Covers |
 |---|---|---|
@@ -135,7 +137,7 @@ Thirty suites, **1,498 assertions**, all passing from a clean `db reset`:
 | `test/brief_test.sql` | 25 | the cap holds at five when twelve qualify, a dismissed subject stays gone seven days and comes back on the eighth, every `action_payload` href matches a route the app serves, retention_risk agrees with the band |
 | `test/messages_test.sql` | 34 | one draft per reason, sending queues and never sends, the journey learns once, §12 including an instructor and a stranger |
 | `test/timeline_test.sql` | 20 | derivation matches source, rebuilding twice does not double, a stranger and a front desk are both refused |
-| `test/scheduling_test.sql` | 46 | a room cannot hold two classes and an instructor cannot teach two, a cancelled class stops holding its room, a move with members booked refuses until confirmed and then emails them, two instructors apply and approving one auto-declines the other, and withdrawing returns the class to open |
+| `test/scheduling_test.sql` | 76 | a room cannot hold two classes and an instructor cannot teach two, a cancelled class stops holding its room, a move with members booked refuses until confirmed and then emails them, two instructors apply and approving one auto-declines the other, and withdrawing returns the class to open |
 | `test/platform_billing_test.sql` | 39 | a studio in grace still books and takes money, past grace both apps lock, cancellation survives lockout, paying reinstates with row counts proving nothing was lost, and neither webhook endpoint accepts the other's events |
 | `test/manual_payments_test.sql` | 32 | a studio with no provider sells a membership, grants a pack and takes a drop-in; a cash membership and a Stripe membership are the same row; a refund takes back the credits she had left and not the ones she used; front desk sells but cannot refund |
 | `test/stripe_connect_test.sql` | 38 | a forged signature is refused, an event for an unknown account is rejected rather than misattributed, a replay is a no-op, a plan price rise does not reprice existing members, a failed payment blocks new bookings while existing ones stand, and an abandoned hold is swept back to the waitlist |
@@ -350,6 +352,16 @@ It is branded as the studio, including the browser tab, the bookmark and the nam
 **A rule the grid cannot lay out is named rather than dropped.** Only `FREQ=WEEKLY` has a place in a week; anything else is listed under the grid with a link to it, because a series silently missing from the timetable is worse than one the screen admits it cannot draw.
 
 **The view is remembered in a cookie, not localStorage.** The server has to know which tab to render or the page arrives as a list every time and flips after hydration — a flash on every visit for a preference that never changes.
+
+**Clicking an empty slot creates a class there, and it goes through the same gate as a drag.** The slot supplies the date, the time and whose column it is; the form asks only for the class type, plus duration and capacity when they differ from the type's defaults. Dragging a range sets the length. Unassigned makes a Decision 17 open shift. **A ONE-OFF, never a series** — a calendar that silently created a year of classes from one click would be a bad surprise, and the form says so.
+
+**Creation used to bypass rules editing enforced.** `createClass` was a bare INSERT: no validity window, no availability check, and a room or instructor clash arriving as a raw `exclusion_violation` rather than a sentence. `create_occurrence()` shares `move_occurrence()`'s order of checks and its reason strings, so one screen renders both. **No room is never a silent default**: the exclusion constraint is partial on a non-null `room_id`, so a class with no room is opting out of the only thing that stops two classes in one space. One room, use it; several, ask.
+
+**Copying move_occurrence()'s shape and testing the copy found two live bugs in the original.**
+
+**`v_tz` WAS NULL ON THE ORDINARY PATH.** It was resolved only inside `if v_moved and booked_count > 0` and inside the clash handler, so assigning somebody to a class NOBODY HAD BOOKED reached neither, `(v_starts at time zone null)::date` was null, and `instructor_valid_on(instructor, null)` is false. Proved on the seed: an instructor available 00:00–23:59 every day for a year, `instructor_valid_on(them, the real date) = true`, and the assignment refused anyway with `{"reason": "outside_availability_dates", "blocked_by": {"on": null}}`. **The null `on` is the tell** — the message could not name the date because the date was null, which is the same reason the check failed. So **any instructor who had stated availability could not be drag-assigned to an unbooked class**, which is the Decision 18 flow, refused with a sentence saying they had not agreed to a date they plainly had. No test caught it because every scheduling fixture leaves availability empty, and `instructor_available_at()` returns true for somebody who has stated nothing (047, deliberately) — the null date only matters once there are rows to compare against.
+
+**`text[] || 'literal'` RAISES.** `v_warnings := v_warnings || 'outside_availability'` makes Postgres resolve `anyarray || anyarray` and parse the string as an array: `22P02 malformed array literal`. Decision 9 says warn and proceed; it did neither. Unreachable only because the refusal above always fired first, so fixing the timezone exposed it and both are fixed together. `array_append()`. The same shape as the `text[] || text || text` bug migration 049 fixed in `brief_summary()`.
 
 **A column with a default and no way to change it is this project's most repeated bug, and it now has a script.** `scripts/audit-settings-ui.py` compares every `studio_settings` and `membership_plans` column against what any screen reads or writes; `docs/SETTINGS_WITHOUT_UI.md` is the checked result. **26 columns a studio cannot reach**, ten of them deciding whether a member loses a credit or pays a fee. Three are correctly unreachable and named as such — `checkin_secret` most of all, since exposing it would let anybody forge a check-in.
 
