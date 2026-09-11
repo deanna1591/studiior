@@ -25,6 +25,11 @@
 
 set -uo pipefail
 
+# The repo root, resolved from this script's own location rather than from the
+# working directory — this is run from a git hook and by hand, and it must read
+# the same test/ and supabase/ either way.
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
 TMPDIR_SELF=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_SELF"' EXIT
 PARSE_ERR="$TMPDIR_SELF/parse.err"
@@ -51,10 +56,52 @@ select v as h from (
   select '#guard|'||count(*)||'|'||md5(coalesce(string_agg(v, chr(10) order by v), '')), 1 from f
 ) t order by k, h;"
 
-# rls_auto_enable is installed by the Supabase platform and exists on hosted
-# only. The expect_*/login/sig helpers are created by the TEST SUITES, so a
-# local database that has run them carries functions no migration defines.
-SKIP='^(rls_auto_enable|expect_[a-z_]*|expect|login|sig|psig)\('
+# WHAT IS NOT OURS TO COMPARE, AND IT IS DERIVED RATHER THAN LISTED.
+#
+# `rls_auto_enable` is installed by the Supabase platform and exists on hosted
+# only. Everything else here is created by the TEST SUITES: a local database that
+# has run them carries functions no migration defines, and hosted never runs
+# them, so each one is reported as MISSING ON HOSTED for ever.
+#
+# This used to be a hand-typed alternation — expect_*, login, sig, psig — and it
+# did its job right up until a suite added `t_late_cancel` and the script started
+# crying wolf. A FALSE POSITIVE IS THE WORST THING THIS TOOL CAN DO: it has
+# caught three real divergences, and each one was believed because the output is
+# normally silent. A list somebody has to remember to extend is a list that will
+# be wrong again.
+#
+# So the names are read out of `test/*.sql` themselves. Any helper any suite
+# defines is excluded automatically, and nothing else is.
+#
+# AND IT CANNOT HIDE REAL DRIFT: a name is skipped only if a suite defines it AND
+# no migration does. A function that exists in both — which would be a suite
+# shadowing product code, itself worth knowing about — is compared as normal and
+# named below.
+build_skip() {
+  local suite_fns migration_fns both
+  suite_fns=$(grep -rhoiE '^[[:space:]]*create (or replace )?function [a-z_][a-z0-9_]*' \
+                "$ROOT"/test/*.sql 2>/dev/null |
+              sed -E 's/.*function //' | tr 'A-Z' 'a-z' | sort -u)
+  migration_fns=$(grep -rhoiE '^[[:space:]]*create (or replace )?function (public\.)?[a-z_][a-z0-9_]*' \
+                    "$ROOT"/supabase/migrations/*.sql 2>/dev/null |
+                  sed -E 's/.*function (public\.)?//' | tr 'A-Z' 'a-z' | sort -u)
+
+  both=$(comm -12 <(printf '%s\n' "$suite_fns") <(printf '%s\n' "$migration_fns") | tr -d ' ')
+  if [ -n "$both" ]; then
+    echo "NOTE: defined by BOTH a suite and a migration, so compared as product code:" >&2
+    printf '  %s\n' $both >&2
+  fi
+
+  SUITE_ONLY=$(comm -23 <(printf '%s\n' "$suite_fns") <(printf '%s\n' "$migration_fns"))
+  local alt
+  alt=$(printf '%s\n' "$SUITE_ONLY" | grep -v '^$' | paste -sd'|' -)
+  if [ -n "$alt" ]; then
+    SKIP="^(rls_auto_enable|$alt)\\("
+  else
+    SKIP='^(rls_auto_enable)\('
+  fi
+}
+build_skip
 
 die() { printf '%s\n' "$*" >&2; exit 2; }
 
