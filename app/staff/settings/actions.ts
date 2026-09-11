@@ -201,3 +201,85 @@ export async function saveSeatCaps(_prev: PlainState, fd: FormData): Promise<Pla
       : "Saved. Limits are no longer applied, and the numbers on your plans are untouched.",
   };
 }
+
+/**
+ * Decision 24's peak switch. One checkbox; the windows are their own form, and
+ * the allowances live on each plan.
+ */
+export async function savePeakSwitch(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("peak_allowance_enabled") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ peak_allowance_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings"); revalidatePath("/plans");
+  return {
+    ok: true,
+    message: on
+      ? "Saved. Mark your busy hours below, then set an allowance on an unlimited plan."
+      : "Saved. Peak hours are no longer applied, and the windows you drew are untouched.",
+  };
+}
+
+/**
+ * Add a window, optionally to every day at once — which is the normal case. A
+ * studio's rush hours are the same Monday to Friday and typing them seven times
+ * is how somebody decides not to bother, the same argument as the availability
+ * editor's copy-to-days.
+ */
+export async function addPeakWindow(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const from = String(fd.get("starts_at") ?? "").slice(0, 5);
+  const to = String(fd.get("ends_at") ?? "").slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(from) || !/^\d{2}:\d{2}$/.test(to)) {
+    return { ok: false, message: "Give a start and an end time." };
+  }
+  if (to <= from) {
+    return { ok: false, message: "A window has to end after it starts. Hours that run past midnight are two windows, one on each day." };
+  }
+
+  const every = String(fd.get("every_day") ?? "") === "on";
+  const one = Number(String(fd.get("day_of_week") ?? "1"));
+  const days = every ? [0, 1, 2, 3, 4, 5, 6] : [one];
+  if (days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+    return { ok: false, message: "Pick a day." };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.from("peak_windows").insert(
+    days.map((d) => ({
+      studio_id: ctx.studioId, day_of_week: d,
+      starts_at: `${from}:00`, ends_at: `${to}:00`,
+    })),
+  );
+  if (error) {
+    // The unique index, which exists to stop a double-clicked form rather than
+    // to stop a studio having two windows in a day.
+    if (error.code === "23505") {
+      return { ok: false, message: "That window is already there." };
+    }
+    if (/row-level security/i.test(error.message) || error.code === "42501") {
+      return { ok: false, message: "Only owners and managers set peak hours." };
+    }
+    return { ok: false, message: error.message };
+  }
+  revalidatePath("/settings");
+  return { ok: true, message: "Added." };
+}
+
+export async function removePeakWindow(fd: FormData) {
+  const ctx = await getStaffContext();
+  if (!ctx) return;
+  const supabase = createClient();
+  await supabase.from("peak_windows").delete()
+    .eq("id", String(fd.get("id") ?? "")).eq("studio_id", ctx.studioId);
+  revalidatePath("/settings");
+}

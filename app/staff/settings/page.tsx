@@ -6,6 +6,7 @@ import HorizonPanel from "./horizon";
 import TimingPanel from "./timing";
 import GuaranteesPanel from "./guarantees";
 import SeatCapsPanel from "./seat-caps";
+import PeakPanel from "./peak";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +31,13 @@ export default async function Settings() {
     );
   }
 
-  const [{ data: settings }, { count: scheduled }, { data: last }, { count: capped }] =
+  const [{ data: settings }, { count: scheduled }, { data: last }, { count: capped },
+         { data: peakWindows }, { data: peakPlans }] =
     await Promise.all([
     supabase.from("studio_settings")
       // One string literal, not a concatenation: supabase-js infers the row type
       // from the literal, and joining it across lines gives back GenericStringError.
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
@@ -46,6 +48,13 @@ export default async function Settings() {
     // say "you have three limits set" to a studio about to turn it back on.
     supabase.from("membership_plans").select("id", { count: "exact", head: true })
       .eq("studio_id", ctx.studioId).not("max_active_members", "is", null),
+    // Empty while the peak switch is off, which is what keeps the grid absent
+    // rather than drawn and greyed.
+    supabase.rpc("studio_peak_windows", { p_studio_id: ctx.studioId }),
+    supabase.from("membership_plans")
+      .select("id, name, peak_allowance, peak_allowance_period")
+      .eq("studio_id", ctx.studioId).eq("status", "active")
+      .not("peak_allowance", "is", null).order("sort_order"),
   ]);
 
   // Formatted on the server: a formatter crossing into a client component is a
@@ -88,6 +97,24 @@ export default async function Settings() {
               flex_standby_pay_cents: settings?.flex_standby_pay_cents ?? 0,
               adjacency_minutes: settings?.adjacency_minutes ?? 90,
             }}
+          />
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <SectionLabel>Peak hours</SectionLabel>
+        <div className="mt-3">
+          <PeakPanel
+            enabled={settings?.peak_allowance_enabled ?? false}
+            windows={(peakWindows ?? []).map((w) => ({
+              id: w.id, day_of_week: w.day_of_week,
+              starts_at: w.starts_at, ends_at: w.ends_at, upcoming: w.upcoming,
+            }))}
+            plans={(peakPlans ?? []).map((p) => ({
+              id: p.id, name: p.name,
+              peak_allowance: p.peak_allowance!,
+              peak_allowance_period: p.peak_allowance_period,
+            }))}
           />
         </div>
       </section>

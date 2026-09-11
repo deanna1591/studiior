@@ -3190,6 +3190,8 @@ export type Database = {
           max_freeze_days: number | null
           name: string
           on_limit_reached: string
+          peak_allowance: number | null
+          peak_allowance_period: string
           price_cents: number
           restrictions: Json
           show_remaining_below: number | null
@@ -3226,6 +3228,8 @@ export type Database = {
           max_freeze_days?: number | null
           name: string
           on_limit_reached?: string
+          peak_allowance?: number | null
+          peak_allowance_period?: string
           price_cents: number
           restrictions?: Json
           show_remaining_below?: number | null
@@ -3262,6 +3266,8 @@ export type Database = {
           max_freeze_days?: number | null
           name?: string
           on_limit_reached?: string
+          peak_allowance?: number | null
+          peak_allowance_period?: string
           price_cents?: number
           restrictions?: Json
           show_remaining_below?: number | null
@@ -4039,6 +4045,142 @@ export type Database = {
           },
           {
             foreignKeyName: "payments_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      peak_allowance_ledger: {
+        Row: {
+          actor_user_id: string | null
+          booking_id: string
+          created_at: string
+          delta: number
+          id: string
+          is_demo: boolean
+          member_id: string
+          membership_id: string
+          period_end: string
+          period_start: string
+          reason: string
+          studio_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          booking_id: string
+          created_at?: string
+          delta: number
+          id?: string
+          is_demo?: boolean
+          member_id: string
+          membership_id: string
+          period_end: string
+          period_start: string
+          reason: string
+          studio_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          booking_id?: string
+          created_at?: string
+          delta?: number
+          id?: string
+          is_demo?: boolean
+          member_id?: string
+          membership_id?: string
+          period_end?: string
+          period_start?: string
+          reason?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peak_allowance_ledger_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_allowance_ledger_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_allowance_ledger_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_allowance_ledger_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_allowance_ledger_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_allowance_ledger_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      peak_windows: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          ends_at: string
+          id: string
+          is_demo: boolean
+          starts_at: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          ends_at: string
+          id?: string
+          is_demo?: boolean
+          starts_at: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          ends_at?: string
+          id?: string
+          is_demo?: boolean
+          starts_at?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peak_windows_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peak_windows_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -4962,6 +5104,7 @@ export type Database = {
           pay_period_anchor: string | null
           pay_period_days: number
           payment_grace_days: number
+          peak_allowance_enabled: boolean
           reminder_hours_before: number
           require_waiver: boolean
           seat_caps_enabled: boolean
@@ -5024,6 +5167,7 @@ export type Database = {
           pay_period_anchor?: string | null
           pay_period_days?: number
           payment_grace_days?: number
+          peak_allowance_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
           seat_caps_enabled?: boolean
@@ -5086,6 +5230,7 @@ export type Database = {
           pay_period_anchor?: string | null
           pay_period_days?: number
           payment_grace_days?: number
+          peak_allowance_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
           seat_caps_enabled?: boolean
@@ -5871,35 +6016,6 @@ export type Database = {
         }
       }
       evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_raises_saying: {
-        Args: {
-          label: string
-          stmt: string
-          want_like: string
-          want_sqlstate: string
-        }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -6132,6 +6248,17 @@ export type Database = {
           state: string
         }[]
       }
+      member_peak_slots: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: {
+          allowance: number
+          is_peak: boolean
+          occurrence_id: string
+          period_end: string
+          period_start: string
+          remaining: number
+        }[]
+      }
       membership_frozen_now: {
         Args: { p_membership_id: string }
         Returns: boolean
@@ -6219,12 +6346,20 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
+      occurrence_is_peak: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
       occurrence_seats_taken: {
         Args: { p_occurrence_id: string }
         Returns: number
       }
       pay_statement: {
         Args: { p_instructor_id: string; p_period_id: string }
+        Returns: Json
+      }
+      peak_allowance_state: {
+        Args: { p_for_date: string; p_membership_id: string }
         Returns: Json
       }
       plan_period_end: {
@@ -6758,6 +6893,16 @@ export type Database = {
           checkin_opens_minutes_before: number
           waitlist_enabled: boolean
           week_starts_on: number
+        }[]
+      }
+      studio_peak_windows: {
+        Args: { p_studio_id: string }
+        Returns: {
+          day_of_week: number
+          ends_at: string
+          id: string
+          starts_at: string
+          upcoming: number
         }[]
       }
       studio_revenue_between: {

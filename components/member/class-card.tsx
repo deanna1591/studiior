@@ -23,7 +23,7 @@ import Link from "next/link";
  */
 export default function ClassCard({
   href, startLabel, endLabel, durationLabel, name, instructor, room,
-  statusLabel, statusTone = "quiet", action, dimmed = false, booked = false,
+  statusLabel, statusTone = "quiet", action, dimmed = false, booked = false, tag = null,
 }: {
   href: string;
   /** "06:30" — the start alone, in the studio's zone. */
@@ -41,6 +41,12 @@ export default function ClassCard({
   action: React.ReactNode;
   dimmed?: boolean;
   booked?: boolean;
+  /**
+   * A small mark beside the time — "Peak" today, and nothing else yet. It takes
+   * the accent's TEXT step, never its fill: a mark sitting ON the card is
+   * measured against the card, where the raw accent can be as low as 1.23.
+   */
+  tag?: React.ReactNode;
 }) {
   const muted = dimmed || statusTone === "full";
   return (
@@ -55,6 +61,7 @@ export default function ClassCard({
           times are what made the old list read as prose. */}
       <div className="pointer-events-none w-[56px] shrink-0 pt-0.5">
         <p className="num m-time-lg text-ink">{startLabel}</p>
+        {tag}
         {endLabel && <p className="num m-dur mt-0.5 text-ink-3">{endLabel}</p>}
       </div>
 

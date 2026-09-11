@@ -118,15 +118,27 @@ export function ActionForm({
 }
 
 export function BookForm({
-  action, children, className = "",
+  action, children, className = "", confirm,
 }: {
   action: (p: BookResult, f: FormData) => Promise<BookResult>;
   children: React.ReactNode;
   className?: string;
+  /**
+   * Decision 24: asked before the LAST peak class of a period is spent, and
+   * nowhere else. A confirmation on every booking is a click everybody learns
+   * to dismiss; one that appears only when something is about to run out is one
+   * people read. Native `confirm` deliberately — this is a phone, and a custom
+   * sheet for one sentence is a second dialog system to maintain.
+   */
+  confirm?: string;
 }) {
   const [state, run] = useFormState<BookResult, FormData>(action, null);
   return (
-    <form action={run} className={className}>
+    <form
+      action={run}
+      className={className}
+      onSubmit={confirm ? (e) => { if (!window.confirm(confirm)) e.preventDefault(); } : undefined}
+    >
       {state && <Note ok={state.ok}>{state.message}</Note>}
       {children}
     </form>

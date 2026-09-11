@@ -70,7 +70,7 @@ export default async function Book({
   const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
-         { data: closures }] =
+         { data: closures }, { data: peak }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -96,8 +96,43 @@ export default async function Book({
       // the row readable — there is nothing on it a member may not see.
       supabase.from("studio_closures")
         .select("starts_on, ends_on, starts_at_time, ends_at_time, reason")
-        .lte("starts_on", weekEndKey).gte("ends_on", weekStartKey)
+        .lte("starts_on", weekEndKey).gte("ends_on", weekStartKey),
+      // Decision 24. Which of these classes are peak, and how many peak classes
+      // are left in EACH ONE'S period — both resolved in SQL, because peak-ness
+      // is a half-open comparison against a table of wall times and a period is
+      // a fixed week from the studio's own week start. A TypeScript copy of
+      // either would agree until the first studio whose week starts on Sunday.
+      //
+      // In the same batch, never a second round trip: this screen is two hops
+      // deep and has to stay that way.
+      supabase.rpc("member_peak_slots", {
+        p_studio_id: ctx.studioId,
+        p_from: from.toISOString(),
+        p_to: to.toISOString(),
+      }),
     ]);
+
+  // Empty when the studio does not use peak hours at all, so everything below
+  // renders exactly as it did before this feature existed.
+  const peakOf = new Map((peak ?? []).map((r) => [r.occurrence_id, r]));
+  const anyPeak = (peak ?? []).some((r) => r.is_peak);
+  // The persistent line is about the period the member is looking at, not about
+  // "today" — a member browsing next week wants next week's number.
+  const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
+
+  // `period_end` is a DATE and a date has no timezone, so it is parsed AS UTC
+  // and formatted IN UTC — it round-trips exactly. Handing it to a formatter in
+  // the studio's zone would render the day before for every studio west of
+  // Greenwich, which is this project's most repeated date bug.
+  const peakResetsOn = peakLine
+    ? (() => {
+        const d = new Date(`${peakLine.period_end}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + 1);          // the day the next period opens
+        return new Intl.DateTimeFormat("en-GB", {
+          weekday: "long", day: "numeric", month: "long", timeZone: "UTC",
+        }).format(d);
+      })()
+    : null;
 
   const byOcc = new Map((mine ?? []).map((b) => [b.occurrence_id, b]));
 
@@ -245,6 +280,32 @@ export default async function Book({
         ))}
       </div>
 
+      {/* Decision 24: what is left, said once and always, rather than discovered
+          at the moment of refusal. Absent entirely for a studio with no peak
+          hours and for a member on a plan that has no allowance — there is
+          nothing true to say in either case. */}
+      {peakLine && (
+        <p className={`m-meta mb-3 rounded-xl px-3 py-2 ${
+          peakLine.remaining === 0
+            ? "bg-coral-tint text-ink"
+            : "bg-accent-chip text-ink"}`}>
+          {peakLine.remaining === 0 ? (
+            <>
+              You have used all <span className="num">{peakLine.allowance}</span> of
+              your peak classes for this period. Off-peak classes are unlimited, and
+              your peak classes come back on{" "}
+              {peakResetsOn}.
+            </>
+          ) : (
+            <>
+              <span className="num">{peakLine.remaining}</span> of{" "}
+              <span className="num">{peakLine.allowance}</span> peak classes left
+              this period. Off-peak classes are unlimited.
+            </>
+          )}
+        </p>
+      )}
+
       {shown.length === 0 ? (
         <div className="m-card p-6 text-center">
           <p className="m-body text-ink">
@@ -284,6 +345,17 @@ export default async function Book({
             const past = new Date(o.starts_at).getTime() < now;
             const mins = minutes(o.starts_at, o.ends_at);
 
+            // Decision 24. `isPeak` is true whenever the studio marks this hour,
+            // whether or not this member's plan has an allowance — a studio
+            // marking its busy hours is telling every member something true.
+            // `peakBlocked` is the narrower thing: peak, and this member has
+            // nothing left for THIS class's period.
+            const pk = peakOf.get(o.id);
+            const isPeak = pk?.is_peak ?? false;
+            const peakBlocked =
+              isPeak && pk?.remaining !== null && pk?.remaining !== undefined
+              && pk.remaining <= 0 && !booked && !waiting && !holding;
+
             const status = booked ? "Booked"
               : holding ? "Holding your spot"
               : waiting ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the list</>
@@ -292,6 +364,15 @@ export default async function Book({
               : <><span className="num">{spaces}</span> left</>;
 
             const action = past ? null
+              // EXHAUSTED SLOTS STAY VISIBLE AND DISABLED. Hiding them would
+              // make the timetable look emptier than it is and teach a member
+              // that the studio has nothing on at the hour they want; the
+              // honest answer is the class, in its place, with the reason.
+              : peakBlocked ? (
+                  <span className="m-meta max-w-[7.5rem] text-right leading-[15px] text-ink-2">
+                    No peak classes left this period
+                  </span>
+                )
               : holding ? (
                   // Two ways to settle a held seat, because Decision 16 makes
                   // paying by card optional for the member as well as for the
@@ -326,7 +407,17 @@ export default async function Book({
                   ) : null
                 )
               : (
-                  <BookForm action={bookClass}>
+                  <BookForm
+                    action={bookClass}
+                    confirm={
+                      // The LAST one, and only the last one. `remaining` is
+                      // this class's own period, so a member with one left this
+                      // week and two next week is asked about the right one.
+                      isPeak && pk?.remaining === 1
+                        ? "This is your last peak class for this period. Book it?"
+                        : undefined
+                    }
+                  >
                     <input type="hidden" name="occurrence_id" value={o.id} />
                     <CardAction>Book</CardAction>
                   </BookForm>
@@ -336,6 +427,11 @@ export default async function Book({
               <ClassCard
                 key={o.id}
                 href={`/class/${o.id}`}
+                tag={isPeak ? (
+                  <span className="m-micro mt-0.5 block whitespace-nowrap text-lime-text">
+                    Peak
+                  </span>
+                ) : null}
                 startLabel={fmtTime(o.starts_at, ctx.timeZone)}
                 endLabel={o.ends_at ? fmtTime(o.ends_at, ctx.timeZone) : null}
                 durationLabel={mins ? `${mins} min` : "—"}
@@ -346,7 +442,7 @@ export default async function Book({
                 statusTone={booked ? "booked" : holding ? "holding" : full && !waiting ? "full" : "quiet"}
                 action={action}
                 booked={booked}
-                dimmed={past}
+                dimmed={past || peakBlocked}
               />
             );
           })}

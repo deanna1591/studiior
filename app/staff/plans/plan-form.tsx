@@ -34,6 +34,8 @@ export type PlanDraft = {
   max_active_members: number | null;
   show_remaining_below: number | null;
   on_limit_reached: string;
+  peak_allowance: number | null;
+  peak_allowance_period: string;
 };
 
 /**
@@ -59,7 +61,7 @@ function Submit({ label }: { label: string }) {
 const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
 export default function PlanForm({
-  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken,
+  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken, peakHours,
 }: {
   draft: PlanDraft;
   classTypes: { id: string; name: string }[];
@@ -70,6 +72,8 @@ export default function PlanForm({
   seatCaps: boolean;
   /** How many hold this plan right now — from plan_seats_taken(), never recounted here. */
   taken: number | null;
+  /** Decision 24's peak switch. Off, and this form must show no trace of peak hours. */
+  peakHours: boolean;
 }) {
   const [state, action] = useFormState<PlanFormState, FormData>(
     mode === "create" ? createPlan : updatePlan,
@@ -77,6 +81,10 @@ export default function PlanForm({
   );
   const [type, setType] = useState<PlanType>(draft.type);
   const [cap, setCap] = useState<string>(num(draft.max_active_members));
+  // Migration 104's CHECK: only an unlimited recurring plan may carry an
+  // allowance. The form says why rather than offering a field that would be
+  // refused at save.
+  const unlimitedRecurring = type === "recurring" && draft.credits_per_period === null;
   const f = FIELDS[type];
   const selected = new Set(draft.restrictions?.class_type_ids ?? []);
 
@@ -265,6 +273,49 @@ export default function PlanForm({
           they take effect immediately for everyone.
         </p>
       </Section>
+
+      {peakHours && (
+        <Section
+          title="Peak hours"
+          note={
+            unlimitedRecurring
+              ? "How many of this studio's peak classes this plan may book. Leave it empty for no limit."
+              : undefined
+          }
+        >
+          {unlimitedRecurring ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Peak classes allowed">
+                <input name="peak_allowance" type="number" min={0}
+                       defaultValue={num(draft.peak_allowance)}
+                       className={inputClass} placeholder="No limit" />
+                <p className="mt-1 text-xs text-ink-3">
+                  Nought means this plan may not book peak classes at all, which is
+                  not the same as no limit.
+                </p>
+              </Field>
+              <Field label="Per">
+                <select name="peak_allowance_period"
+                        defaultValue={draft.peak_allowance_period} className={inputClass}>
+                  <option value="week">week</option>
+                  <option value="month">month</option>
+                </select>
+                <p className="mt-1 text-xs text-ink-3">
+                  A fixed week, from whichever day your week starts on — not a
+                  rolling seven days.
+                </p>
+              </Field>
+            </div>
+          ) : (
+            <p className="text-xs text-ink-3">
+              A peak limit only applies to a plan with unlimited classes. This one
+              already includes a set number, and that number is its limit — a
+              missed class costs a class, so a second penalty on top would charge
+              twice for it.
+            </p>
+          )}
+        </Section>
+      )}
 
       {seatCaps && (
         <Section
