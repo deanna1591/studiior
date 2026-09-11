@@ -348,3 +348,38 @@ export async function saveSuspension(_prev: PlainState, fd: FormData): Promise<P
       : "Saved. Nobody is suspended and no new infractions are recorded. The ones already on file are kept.",
   };
 }
+
+/**
+ * Decision 25. The switch goes through set_publication_enabled() rather than a
+ * plain UPDATE, because turning it on has to publish this month and any month
+ * members have already booked into AT ONCE — hiding those would be the
+ * "unpublish" this feature refuses to offer, arriving by the back door. The
+ * function says what it published and the message repeats it.
+ */
+export async function savePublication(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("publication_enabled") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_publication_enabled", {
+    p_studio_id: ctx.studioId, p_enabled: on,
+  });
+  if (error) return { ok: false, message: error.message };
+
+  const r = data as { enabled: boolean; auto_published: { label: string; why: string }[] } | null;
+  const auto = r?.auto_published ?? [];
+  revalidatePath("/settings");
+  revalidatePath("/publish");
+  revalidatePath("/", "layout");
+  if (!on) return { ok: true, message: "Publication is off. Every month is live as soon as it is made, as before." };
+  if (auto.length === 0) {
+    return { ok: true, message: "Publication is on. Nothing is published yet — members cannot book until you publish a month." };
+  }
+  return {
+    ok: true,
+    message: "Publication is on. Published straight away: " +
+      auto.map((m) => `${m.label} (${m.why})`).join("; ") +
+      ". Nothing was emailed for those — instructors have had them on their schedule all along.",
+  };
+}

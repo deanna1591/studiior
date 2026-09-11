@@ -40,7 +40,10 @@ const REASONS: Record<string, string> = {
   class_cancelled: "That class has been cancelled.",
   class_completed: "That class has already finished.",
   class_in_past: "That class has already started.",
-  outside_booking_window: "That class is not open for booking yet.",
+  outside_booking_window: "That class is further ahead than you can book yet.",
+  // Decision 25. The other "not yet": the MONTH is not on the timetable, which
+  // is about the class rather than about how far ahead this member may book.
+  month_not_published: "That month's timetable has not been published yet.",
   past_booking_cutoff: "Booking has closed for that class.",
   waiver_not_signed: "Please sign the studio waiver before booking.",
   member_not_active: "Your membership is not active.",

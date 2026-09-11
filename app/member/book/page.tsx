@@ -70,7 +70,7 @@ export default async function Book({
   const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
-         { data: closures }, { data: peak }] =
+         { data: closures }, { data: peak }, { data: horizonRaw }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -110,7 +110,18 @@ export default async function Book({
         p_from: from.toISOString(),
         p_to: to.toISOString(),
       }),
+      // Decision 25. How far the published timetable runs. {enabled:false} for
+      // every studio that does not publish, so nothing below draws for them.
+      // In the same batch — this screen stays two hops deep.
+      supabase.rpc("timetable_horizon", { p_studio_id: ctx.studioId }),
     ]);
+
+  const horizon = horizonRaw as unknown as
+    { enabled: boolean; published_through?: string | null; next_unpublished?: string | null;
+      months?: string[] } | null;
+  // Dates, not instants: parsed AS UTC and formatted IN UTC so they round-trip.
+  const dateWord = (iso: string, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
   // Empty when the studio does not use peak hours at all, so everything below
   // renders exactly as it did before this feature existed.
@@ -160,6 +171,17 @@ export default async function Book({
   const selectedKey = zonedDateKey(from.toISOString(), ctx.timeZone);
   const closedToday = (closures ?? []).find(
     (c) => c.starts_on <= selectedKey && c.ends_on >= selectedKey) ?? null;
+
+  // Decision 25: an empty day in a DRAFT month is not an empty day, and a
+  // member has to be able to tell — the same rule as a closure. The month is
+  // the studio-local one the selected day falls in; a month is a draft when
+  // publication is on, it is this month or later, and it is not in the list.
+  const selectedMonthKey = `${selectedKey.slice(0, 7)}-01`;
+  const draftMonth =
+    horizon?.enabled === true &&
+    horizon.next_unpublished != null &&
+    selectedMonthKey >= horizon.next_unpublished.slice(0, 10) &&
+    !(horizon.months ?? []).includes(selectedMonthKey);
 
   // Which month the selected day falls in, so a leading or trailing cell in
   // the grid can be dimmed rather than pretending to belong here.
@@ -306,6 +328,19 @@ export default async function Book({
         </p>
       )}
 
+      {/* Decision 25: members can only book as far as the published month, and
+          that is said on the screen rather than discovered as an empty November.
+          Absent entirely for a studio that does not publish. */}
+      {horizon?.enabled && (
+        <p className="m-meta mb-3 rounded-xl bg-accent-chip px-3 py-2 text-ink">
+          {horizon.published_through
+            ? <>The timetable is published through{" "}
+                {dateWord(horizon.published_through, { day: "numeric", month: "long" })}.
+                {horizon.next_unpublished && <> {dateWord(horizon.next_unpublished, { month: "long" })} opens for booking when the studio publishes it.</>}</>
+            : <>This month&rsquo;s timetable has not been published yet. Classes appear here as soon as the studio publishes it.</>}
+        </p>
+      )}
+
       {shown.length === 0 ? (
         <div className="m-card p-6 text-center">
           <p className="m-body text-ink">
@@ -316,6 +351,8 @@ export default async function Book({
               ? closedToday.starts_at_time
                 ? `Closed ${closedToday.starts_at_time.slice(0, 5)}–${closedToday.ends_at_time?.slice(0, 5)} — ${closedToday.reason}`
                 : closedToday.reason
+              : draftMonth
+              ? `${dateWord(selectedMonthKey, { month: "long" })}'s timetable is not published yet.`
               : typeFilter || instFilter ? "Nothing matching on this day." : "No classes on this day."}
           </p>
           <p className="m-sub mt-1 text-ink-2">
@@ -324,6 +361,8 @@ export default async function Book({
                   <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">
                     Look at another day
                   </Link></>
+              : draftMonth
+              ? <>It opens for booking when the studio publishes it.{horizon?.published_through && <> You can book through {dateWord(horizon.published_through, { day: "numeric", month: "long" })}.</>}</>
               : typeFilter || instFilter
               ? <Link href={qs({ type: undefined, instructor: undefined })} className="text-lime-text underline underline-offset-4">Show everything</Link>
               : <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">Try tomorrow</Link>}

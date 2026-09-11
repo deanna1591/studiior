@@ -71,17 +71,26 @@ insert into studios (id, name, slug, timezone, currency, status) values
 -- from a weekday name. Studio A: today is its ask day, its remind day and its
 -- escalate day, with a 3-day escalation window. Studio B: tomorrow is, with a
 -- 7-day window — so nothing of B's may appear in a sweep run today.
+--
+-- "TODAY" IS THE STUDIO'S DAY, NOT THE SERVER'S. Both studios are in Prague and
+-- the sweep asks on the studio-local weekday; this fixture used current_date,
+-- which is UTC, and for the two hours a night when Prague is already tomorrow
+-- the suite set the ask day to yesterday and failed — found at 22:31 UTC while
+-- checking migration 112. The same trap `starts_on` was in (migration 095).
+select set_config('t.today', (now() at time zone 'Europe/Prague')::date::text, false);
 insert into studio_settings
   (studio_id, availability_due_day,
    week_confirm_ask_dow, week_confirm_remind_dow, week_confirm_escalate_dow,
    week_confirm_escalate_days)
 values
   ('1f5e1f5e-0000-0000-0000-000000000001', 20,
-   extract(dow from current_date)::int, extract(dow from current_date)::int,
-   extract(dow from current_date)::int, 3),
+   extract(dow from current_setting('t.today')::date)::int,
+   extract(dow from current_setting('t.today')::date)::int,
+   extract(dow from current_setting('t.today')::date)::int, 3),
   ('1f5e1f5e-0000-0000-0000-000000000002', 5,
-   extract(dow from current_date + 1)::int, extract(dow from current_date + 1)::int,
-   extract(dow from current_date + 1)::int, 7);
+   extract(dow from current_setting('t.today')::date + 1)::int,
+   extract(dow from current_setting('t.today')::date + 1)::int,
+   extract(dow from current_setting('t.today')::date + 1)::int, 7);
 
 insert into locations (id, studio_id, name, is_primary) values
   ('1f5e1f5e-0000-0000-0000-00000000000c','1f5e1f5e-0000-0000-0000-000000000001','Main',true),
@@ -426,7 +435,7 @@ select expect_num('running it twice on the same day asks nobody again',
 -- 8. ONE ACTION FOR THE WHOLE WEEK
 -- =============================================================================
 select set_config('t.week', (select (studio_week_start('1f5e1f5e-0000-0000-0000-000000000001',
-  current_date) + 7)::text), false);
+  current_setting('t.today')::date) + 7)::text), false);
 set role authenticated;
 select set_config('request.jwt.claim.sub','1f5e1f5e-0000-0000-0000-0000000000a2',false);
 select set_config('t.iw', (select instructor_week('1f5e1f5e-0000-0000-0000-00000000d101',
@@ -486,11 +495,11 @@ select expect_num('...and it counts as answered, so nobody is chased about it',
 -- to honour `week_starts_on`, which has been a setting since migration 001 and
 -- which date_trunc('week') would silently ignore.
 reset role;
-update studio_settings set week_starts_on = extract(dow from current_date)::int
+update studio_settings set week_starts_on = extract(dow from current_setting('t.today')::date)::int
  where studio_id = '1f5e1f5e-0000-0000-0000-000000000001';
 select expect_text('the studio''s week starts on the day it says it does',
-  studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date)::text,
-  current_date::text);
+  studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_setting('t.today')::date)::text,
+  current_setting('t.today'));
 insert into class_occurrences
   (studio_id, location_id, class_type_id, room_id, name, capacity, instructor_id,
    starts_at, ends_at, status, staffing)
@@ -498,18 +507,18 @@ values
   ('1f5e1f5e-0000-0000-0000-000000000001','1f5e1f5e-0000-0000-0000-00000000000c',
    '1f5e1f5e-0000-0000-0000-00000000cc01','1f5e1f5e-0000-0000-0000-00000000ee01',
    'Soon', 10, '1f5e1f5e-0000-0000-0000-00000000d103',
-   ((current_date + 2) + time '07:00') at time zone 'Europe/Prague',
-   ((current_date + 2) + time '07:50') at time zone 'Europe/Prague', 'scheduled', 'assigned'),
+   ((current_setting('t.today')::date + 2) + time '07:00') at time zone 'Europe/Prague',
+   ((current_setting('t.today')::date + 2) + time '07:50') at time zone 'Europe/Prague', 'scheduled', 'assigned'),
   ('1f5e1f5e-0000-0000-0000-000000000001','1f5e1f5e-0000-0000-0000-00000000000c',
    '1f5e1f5e-0000-0000-0000-00000000cc01','1f5e1f5e-0000-0000-0000-00000000ee01',
    'Later', 10, '1f5e1f5e-0000-0000-0000-00000000d103',
-   ((current_date + 6) + time '07:00') at time zone 'Europe/Prague',
-   ((current_date + 6) + time '07:50') at time zone 'Europe/Prague', 'scheduled', 'assigned');
+   ((current_setting('t.today')::date + 6) + time '07:00') at time zone 'Europe/Prague',
+   ((current_setting('t.today')::date + 6) + time '07:50') at time zone 'Europe/Prague', 'scheduled', 'assigned');
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','1f5e1f5e-0000-0000-0000-0000000000a1',false);
 select set_config('t.esc', (select unconfirmed_summary('1f5e1f5e-0000-0000-0000-000000000001',
-  studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date), 3)::text), false);
+  studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_setting('t.today')::date), 3)::text), false);
 select expect_num('inside a three-day window only the near class is escalated',
   (current_setting('t.esc')::jsonb ->> 'classes')::bigint, 1);
 select expect_text('...and the line names people, not classes one by one',
@@ -523,7 +532,7 @@ select expect_true('...with which classes, so staff can act without hunting',
 -- Widen the window and the far class appears. Same function, same data: the
 -- window is doing the work, not a filter somewhere else.
 select set_config('t.esc7', (select unconfirmed_summary('1f5e1f5e-0000-0000-0000-000000000001',
-  studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date), 7)::text), false);
+  studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_setting('t.today')::date), 7)::text), false);
 select expect_num('a seven-day window sees both',
   (current_setting('t.esc7')::jsonb ->> 'classes')::bigint, 2);
 
@@ -536,13 +545,13 @@ values
   ('1f5e1f5e-0000-0000-0000-000000000001','1f5e1f5e-0000-0000-0000-00000000000c',
    '1f5e1f5e-0000-0000-0000-00000000cc01','1f5e1f5e-0000-0000-0000-00000000ee02',
    'Gone', 10, '1f5e1f5e-0000-0000-0000-00000000d103',
-   ((current_date - 1) + time '07:00') at time zone 'Europe/Prague',
-   ((current_date - 1) + time '07:50') at time zone 'Europe/Prague', 'scheduled', 'assigned');
+   ((current_setting('t.today')::date - 1) + time '07:00') at time zone 'Europe/Prague',
+   ((current_setting('t.today')::date - 1) + time '07:50') at time zone 'Europe/Prague', 'scheduled', 'assigned');
 set role authenticated;
 select set_config('request.jwt.claim.sub','1f5e1f5e-0000-0000-0000-0000000000a1',false);
 select expect_num('a class that already happened is not escalated',
   (unconfirmed_summary('1f5e1f5e-0000-0000-0000-000000000001',
-    studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date), 7) ->> 'classes')::bigint, 2);
+    studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_setting('t.today')::date), 7) ->> 'classes')::bigint, 2);
 
 -- =============================================================================
 -- 10. CONFIRMING LATE CLEARS IT, SILENTLY
@@ -551,10 +560,10 @@ select expect_num('a class that already happened is not escalated',
 -- week does not reach back into one that has gone.
 select expect_num('the studio can confirm on somebody''s behalf',
   (confirm_week('1f5e1f5e-0000-0000-0000-00000000d103',
-    studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date)) ->> 'confirmed')::bigint, 2);
+    studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_setting('t.today')::date)) ->> 'confirmed')::bigint, 2);
 select expect_true('...and the alarm is simply gone',
   (unconfirmed_summary('1f5e1f5e-0000-0000-0000-000000000001',
-    studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date), 7) ->> 'line') is null);
+    studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_setting('t.today')::date), 7) ->> 'line') is null);
 reset role;
 select expect_num('...with nothing recorded about having been late',
   (select count(*) from notifications

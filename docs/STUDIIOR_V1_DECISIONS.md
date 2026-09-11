@@ -473,6 +473,60 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 25 — A month is a draft until the studio publishes it, and instructors confirm their roster when it is
+
+**Built: migrations 112 and 113.** Optional per studio, off by default, and a studio that never turns it on sees no draft state, no publish button, no month gate and no roster email — Decision 24's optional-not-merely-configurable rule again. Reform Collective is the studio that wants this.
+
+### The cycle, end to end
+
+1. Instructors submit next month's availability by the due day (Decision 18)
+2. Staff run "fill a month" — the engine assigns (migration 061)
+3. Staff review and adjust, then **publish the month**
+4. On publish, each instructor gets **their own roster** and confirms the month
+5. Each week during the month they confirm the week (migration 067)
+
+Both confirmations stay. The month is the agreement; the week is the check-in. Confirming the month confirms no week.
+
+### Per studio per month, not a state on the occurrence
+
+`schedule_publications` has one row per studio per published month. A month is the unit a studio thinks in, and a row per month makes the edges fall out rather than need code: a class added to a published month is published because its month is, publishing twice finds the row and sends nothing, and **unpublishing is not offered because there is no writer for it** — no UPDATE or DELETE policy, no function, and the table's other verbs are revoked from every client role.
+
+**"Published" is one predicate, `month_published()`, read by everything**: the member and staff RLS policies on `class_occurrences`, `book_class()`, every instructor reader, the flex sweep and the notification seam. **History is published by definition** — any month before the studio's current one answers true, or the switch would rewrite an instructor's past weeks.
+
+### Members: invisible and unbookable, and told why
+
+The boundary is `occ_member_read`, not a screen. `book_class()` gains rule **2.1.1b, placed with the occurrence checks and BEFORE the booking window**: an unpublished class is invisible to a member, so a member reaching it by id is refused for the reason it is invisible — `month_not_published`, about the class — and `outside_booking_window` goes on meaning what it has since migration 002: a class on the timetable that this member may not book yet, about the member. When both apply, publication refuses first. The desk may override it with a reason, like the window, and the booking records the bypass.
+
+The member app says the consequence on the screen: *"The timetable is published through 30 September. October opens for booking when the studio publishes it."*, and an empty day in a draft month says *"October's timetable is not published yet"* rather than "No classes on this day" — the closure rule in a new place.
+
+### Turning it on publishes what it may not hide
+
+Two kinds of month must not vanish the instant the switch goes on: the **current month**, which has already started, and any future month **members have already booked into** — "a month members have booked into cannot be withdrawn" is an edge of this decision, and a switch that withdrew three on its way on would break it by the back door. `set_publication_enabled()` publishes both automatically, marked `auto`, with no roster email, and the settings screen names them.
+
+### Publishing
+
+Manager-up and deliberate. The preview and the publish read the same facts (`month_publication_facts()`): classes, how many still unstaffed, which instructors and how many classes each, and who **cannot be emailed** because they have no login. Publishing with holes is allowed and warned, never blocked — an open shift is a real state and Decision 17 handles it. The roster email lists the classes **in the body**, dates and times, not a link to a calendar. One per instructor per month, ever; a class added later is told on its own. The result names anybody it could not reach — "published" must not read as "told".
+
+### Before publication, instructors see nothing
+
+`occ_staff_read` now lets desk-and-up read everything and an instructor read only published months; every SECURITY DEFINER instructor reader carries the same clause (056's rule). `queue_instructor_assigned()` — the seam the engine and cover approval both go through — refuses a draft month, so the engine fills a draft and tells nobody, and the roster email is the first they hear. The week-confirmation ask, `confirm_week()`, `unconfirmed_summary()` and `commitment_pending()` all skip draft months: a flex class nobody was allowed to book must not be cancelled for want of bookings.
+
+### Confirming the month
+
+`confirm_month_roster()` is one action for the whole month; flagging a class is `request_cover()` from migration 054 and nothing new. A pending cover request is the flag, not an obstacle. The studio may confirm on an instructor's behalf, as it may for a week. **A suspension-shaped rule was deliberately not built**: nothing stops the month if nobody confirms — an unconfirmed roster a week before the month is a Morning Brief item (`month_roster_unconfirmed`) and an action-centre row, and that is the escalation.
+
+### The state nobody inside the studio can see
+
+A studio with the switch on and the coming month — or the current one — unpublished has a full calendar in the staff app and an empty one in the member app. `month_unpublished` is the brief's loudest line, ranked above an unstaffed class because it is every class at once, and an urgent action-centre row. Both are absent for a studio with the switch off.
+
+### Found on the way
+
+`move_occurrence()` had checked an instructor's availability dates **after** the UPDATE and returned rather than raised, so a refusal for `outside_availability_dates` was words only: the class was already reassigned. Proved on the seed before 112 moved the check ahead of the write, and asserted in the publication suite.
+
+### Not built, and said
+
+Push does not exist; the roster arrives by email. A series created into a published month materialises its classes as published and tells nobody per class — the instructor's month screen counts them as "added since your roster", and that is the whole of it. A roster re-sent for a changed month is not offered: a class added later is told on its own, a class moved is told on its own, and the month screen is derived from the classes rather than from the email.
+
 ## 24 — Scarcity a studio can actually enforce: seat caps first
 
 Decision 24 covers four things — peak allowance, daily booking caps, a suspension ladder, and seat caps on a plan. **All four are optional per studio, all off by default, and a studio with them off sees no trace of any of them.** They are three independent switches, not one feature: turning any on must not reveal the others.

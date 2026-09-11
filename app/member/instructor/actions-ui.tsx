@@ -3,7 +3,7 @@
 import { useFormState } from "react-dom";
 import { PrimaryButton, CardAction, CardActionOutline, QuietButton } from "@/components/member/ui";
 import {
-  confirmMyWeek, askForCover, applyForShift, withdrawApplication, checkInMember,
+  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, withdrawApplication, checkInMember,
   type InstructorState,
 } from "./actions";
 
@@ -40,8 +40,53 @@ export function ConfirmWeek({
   );
 }
 
-export function AskForCover({ occurrenceId }: { occurrenceId: string }) {
+/**
+ * Decision 25: the month is the agreement. Flagging a class is AskForCover
+ * below, on the class itself; this confirms everything else in one press.
+ */
+export function ConfirmMonth({
+  instructorId, month, label, count, flagged,
+}: { instructorId: string; month: string; label: string; count: number; flagged: number }) {
+  const [state, action] = useFormState<InstructorState, FormData>(confirmMyMonth, null);
+  return (
+    <form action={action} className="m-card mb-4 px-4 py-3.5">
+      <p className="text-[15px] leading-[22px] text-ink">
+        <span className="num font-semibold">{count}</span>{" "}
+        {count === 1 ? "class" : "classes"} in {label}. Can you do them?
+      </p>
+      <p className="m-sub mt-0.5 text-ink-3">
+        One press for the month. Flag any you cannot do below, and confirm the rest.
+        {flagged > 0 && <> {flagged} already flagged for cover.</>}
+      </p>
+      <input type="hidden" name="instructor_id" value={instructorId} />
+      <input type="hidden" name="month" value={month} />
+      <div className="mt-3"><PrimaryButton>{`Confirm ${label}`}</PrimaryButton></div>
+      <Result state={state} />
+    </form>
+  );
+}
+
+export function AskForCover({ occurrenceId, compact = false }: { occurrenceId: string; compact?: boolean }) {
   const [state, action] = useFormState<InstructorState, FormData>(askForCover, null);
+  // On the month roster there are twenty of these in a column; the form opens
+  // on demand there. A native <details> — no state to lose.
+  if (compact) {
+    return (
+      <details className="mt-2">
+        <summary className="m-tap inline-flex cursor-pointer items-center text-[13px] font-medium text-[color:var(--accent-text)] underline underline-offset-4">
+          I can&rsquo;t do this one
+        </summary>
+        <form action={action} className="mt-2">
+          <input type="hidden" name="occurrence_id" value={occurrenceId} />
+          <input name="reason" required aria-label="Why"
+                 placeholder="Why — the studio decides from this"
+                 className="m-tap w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink placeholder:text-ink-3" />
+          <div className="mt-2"><CardActionOutline>Ask the studio for cover</CardActionOutline></div>
+          <Result state={state} />
+        </form>
+      </details>
+    );
+  }
   return (
     <form action={action} className="mt-3">
       <input type="hidden" name="occurrence_id" value={occurrenceId} />

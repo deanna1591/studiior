@@ -37,14 +37,27 @@ export default async function MyWeek({
   const from = shiftDate(today, offset * 7);
   const to = shiftDate(from, 13);
 
-  const [week, cover] = await Promise.all([
+  const [week, cover, rosters] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
     }),
     supabase.from("cover_requests")
       .select("occurrence_id, status")
       .eq("instructor_id", ctx.instructor_id).eq("status", "pending"),
+    // Decision 25. A roster sent and not yet confirmed — their own rows only,
+    // under roster_conf_own_read. Empty for a studio that never publishes.
+    supabase.from("roster_confirmations")
+      .select("month, classes_at_notify")
+      .eq("instructor_id", ctx.instructor_id)
+      .not("notified_at", "is", null).is("confirmed_at", null)
+      .gte("month", today.slice(0, 7) + "-01")
+      .order("month").limit(1),
   ]);
+  const roster = (rosters.data ?? [])[0] ?? null;
+  const rosterLabel = roster
+    ? new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" })
+        .format(new Date(`${roster.month}T00:00:00Z`))
+    : null;
 
   const w = week.data as { state: string; classes: Klass[]; empty_hint: string } | null;
   const classes = w?.classes ?? [];
@@ -71,6 +84,23 @@ export default async function MyWeek({
           </p>
           <p className="num mt-1 text-[11px] leading-4 text-ink-2">{week.error.message}</p>
         </div>
+      )}
+
+      {/* Decision 25: the month is the agreement, and it is asked for here
+          because this is the screen they open. The screen behind the link
+          lists the classes and takes the press. */}
+      {roster && rosterLabel && (
+        <Link href={`/instructor/month?m=${roster.month.slice(0, 7)}`}
+              className="m-card mb-4 block px-4 py-3.5">
+          <p className="text-[15px] leading-[22px] text-ink">
+            Your {rosterLabel} roster is ready —{" "}
+            <span className="num font-semibold">{roster.classes_at_notify}</span>{" "}
+            {roster.classes_at_notify === 1 ? "class" : "classes"}.
+          </p>
+          <p className="m-sub mt-0.5 text-[color:var(--accent-text)] underline underline-offset-4">
+            Confirm the month, or flag any you cannot do
+          </p>
+        </Link>
       )}
 
       {/* Migration 067's one press for the whole week, folded in rather than

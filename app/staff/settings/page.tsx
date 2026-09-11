@@ -9,6 +9,7 @@ import SeatCapsPanel from "./seat-caps";
 import PeakPanel from "./peak";
 import PeakReport, { type Report } from "./peak-report";
 import SuspensionPanel from "./suspension";
+import PublicationPanel from "./publication";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +35,12 @@ export default async function Settings() {
   }
 
   const [{ data: settings }, { count: scheduled }, { data: last }, { count: capped },
-         { data: peakWindows }, { data: peakPlans }, { data: report }] =
+         { data: peakWindows }, { data: peakPlans }, { data: report }, { data: horizon }] =
     await Promise.all([
     supabase.from("studio_settings")
       // One string literal, not a concatenation: supabase-js infers the row type
       // from the literal, and joining it across lines gives back GenericStringError.
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes, publication_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
@@ -60,7 +61,16 @@ export default async function Settings() {
     // Null for a studio using neither switch, so the block is absent rather
     // than a row of dashes.
     supabase.rpc("peak_allowance_report", { p_studio_id: ctx.studioId, p_days: 90 }),
+    // Decision 25. {enabled:false} for a studio with the switch off, so the
+    // panel has nothing to list.
+    supabase.rpc("timetable_horizon", { p_studio_id: ctx.studioId }),
   ]);
+
+  const hz = horizon as unknown as
+    { enabled: boolean; months?: string[]; next_unpublished?: string | null } | null;
+  const monthLabel = (iso: string) =>
+    new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+      .format(new Date(`${iso}T00:00:00Z`));
 
   // Formatted on the server: a formatter crossing into a client component is a
   // runtime error TypeScript does not warn about.
@@ -79,6 +89,17 @@ export default async function Settings() {
             current={settings?.occurrence_horizon_days ?? 60}
             scheduled={scheduled ?? 0}
             furthest={furthest}
+          />
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <SectionLabel>Publishing the month</SectionLabel>
+        <div className="mt-3">
+          <PublicationPanel
+            enabled={settings?.publication_enabled ?? false}
+            publishedMonths={(hz?.months ?? []).map(monthLabel)}
+            nextDraft={hz?.next_unpublished ? monthLabel(hz.next_unpublished) : null}
           />
         </div>
       </section>

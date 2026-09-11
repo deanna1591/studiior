@@ -38,6 +38,30 @@ export async function confirmMyWeek(
   };
 }
 
+/**
+ * Decision 25. One press for the whole month. Classes they have asked cover
+ * for are the flag, not an obstacle; the database says how many.
+ */
+export async function confirmMyMonth(
+  _prev: InstructorState, form: FormData,
+): Promise<InstructorState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("confirm_month_roster", {
+    p_instructor_id: String(form.get("instructor_id")),
+    p_month: String(form.get("month")),
+  });
+  if (error) return { error: error.message };
+  const r = (data ?? {}) as { classes?: number; cover_requested?: number };
+  revalidatePath("/instructor");
+  revalidatePath("/instructor/month");
+  return {
+    ok: `Confirmed — ${r.classes ?? 0} ${r.classes === 1 ? "class" : "classes"}.` +
+      (r.cover_requested
+        ? ` ${r.cover_requested} of ${r.cover_requested === 1 ? "them is" : "them are"} waiting on cover; the studio decides those.`
+        : ""),
+  };
+}
+
 export async function askForCover(
   _prev: InstructorState, form: FormData,
 ): Promise<InstructorState> {
@@ -50,6 +74,7 @@ export async function askForCover(
   });
   if (error) return { error: error.message };
   revalidatePath("/instructor");
+  revalidatePath("/instructor/month");
   return { ok: "Asked. The studio decides — you are still down to teach it until they do." };
 }
 

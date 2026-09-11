@@ -17,6 +17,10 @@ export type StaffContext = {
    *  — the calendar and the query behind it must not disagree about which
    *  seven days a week is. */
   weekStartsOn: number;
+  /** Decision 25. Whether a month is a draft until published. Decides whether
+   *  the rail offers Publish at all — a studio that never publishes sees
+   *  nothing of the feature. */
+  publicationEnabled: boolean;
   currency: string;
   onboardingComplete: boolean;
   studioStatus: string;
@@ -99,6 +103,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     locationName: row.location_name ?? null,
     timeZone: row.studio_timezone,
     weekStartsOn: row.studio_week_starts_on ?? 1,
+    publicationEnabled: row.publication_enabled === true,
     currency: row.studio_currency,
     studioStatus: row.studio_status,
     onboardingComplete: row.onboarding_complete === true,

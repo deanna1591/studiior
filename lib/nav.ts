@@ -41,8 +41,12 @@ export function railItems(
     // Setup leaves the rail the moment the list is finished. A permanent link
     // to a one-time task is clutter for every day after the first.
     if (setupIncomplete) items.push({ href: "/setup", label: "Setup" });
+    items.push({ href: "/schedule", label: "Schedule" });
+    // Decision 25. Only when the studio has turned publication on: for every
+    // other studio a month is live the moment it is made, and a Publish link
+    // would open a screen with nothing to do.
+    if (ctx.publicationEnabled) items.push({ href: "/publish", label: "Publish" });
     items.push(
-      { href: "/schedule", label: "Schedule" },
       // Decision 18. Staff always approve cover, so an unanswered request is
       // its own emergency and needs somewhere to live that is not a banner.
       { href: "/shifts/cover", label: "Cover" },

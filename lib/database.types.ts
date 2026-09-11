@@ -4838,6 +4838,106 @@ export type Database = {
           },
         ]
       }
+      roster_confirmations: {
+        Row: {
+          classes_at_notify: number
+          confirmed_at: string | null
+          id: string
+          instructor_id: string
+          month: string
+          notified_at: string | null
+          studio_id: string
+        }
+        Insert: {
+          classes_at_notify?: number
+          confirmed_at?: string | null
+          id?: string
+          instructor_id: string
+          month: string
+          notified_at?: string | null
+          studio_id: string
+        }
+        Update: {
+          classes_at_notify?: number
+          confirmed_at?: string | null
+          id?: string
+          instructor_id?: string
+          month?: string
+          notified_at?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_confirmations_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_confirmations_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_confirmations_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_publications: {
+        Row: {
+          auto: boolean
+          classes: number
+          id: string
+          month: string
+          open_shifts: number
+          published_at: string
+          published_by: string | null
+          studio_id: string
+        }
+        Insert: {
+          auto?: boolean
+          classes?: number
+          id?: string
+          month: string
+          open_shifts?: number
+          published_at?: string
+          published_by?: string | null
+          studio_id: string
+        }
+        Update: {
+          auto?: boolean
+          classes?: number
+          id?: string
+          month?: string
+          open_shifts?: number
+          published_at?: string
+          published_by?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_publications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_publications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_applications: {
         Row: {
           applied_at: string
@@ -5203,6 +5303,7 @@ export type Database = {
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
+          publication_enabled: boolean
           reminder_hours_before: number
           require_waiver: boolean
           seat_caps_enabled: boolean
@@ -5273,6 +5374,7 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
           seat_caps_enabled?: boolean
@@ -5343,6 +5445,7 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
           seat_caps_enabled?: boolean
@@ -6018,6 +6121,10 @@ export type Database = {
         Args: { p_booking_id: string; p_studio_id: string }
         Returns: boolean
       }
+      confirm_month_roster: {
+        Args: { p_instructor_id: string; p_month: string }
+        Returns: Json
+      }
       confirm_occurrence: { Args: { p_occurrence_id: string }; Returns: Json }
       confirm_week: {
         Args: { p_instructor_id: string; p_week_start?: string }
@@ -6143,6 +6250,35 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_raises_saying: {
+        Args: {
+          label: string
+          stmt: string
+          want_like: string
+          want_sqlstate: string
+        }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -6400,6 +6536,14 @@ export type Database = {
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
+      month_publication_facts: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: Json
+      }
+      month_published: {
+        Args: { p_at: string; p_studio_id: string }
+        Returns: boolean
+      }
       move_occurrence: {
         Args: {
           p_clear_instructor?: boolean
@@ -6413,6 +6557,10 @@ export type Database = {
         Returns: Json
       }
       my_instructor: { Args: never; Returns: Json }
+      my_month_roster: {
+        Args: { p_instructor_id: string; p_month: string }
+        Returns: Json
+      }
       narrative_covers_days: { Args: { p_facts: Json }; Returns: number }
       narrative_numbers: { Args: { p_text: string }; Returns: string[] }
       narrative_offending_number: {
@@ -6480,6 +6628,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
+      occurrence_published: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
       occurrence_seats_taken: {
         Args: { p_occurrence_id: string }
         Returns: number
@@ -6531,6 +6683,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      publication_enabled: { Args: { p_studio_id: string }; Returns: boolean }
+      publish_month: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: Json
+      }
+      publish_month_preview: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: Json
       }
       purge_demo_data: {
         Args: { p_confirm?: boolean; p_studio_id: string }
@@ -6897,6 +7058,10 @@ export type Database = {
         Args: { p_confirm?: boolean; p_days: number; p_studio_id: string }
         Returns: Json
       }
+      set_publication_enabled: {
+        Args: { p_enabled: boolean; p_studio_id: string }
+        Returns: Json
+      }
       set_series_flex: {
         Args: {
           p_flex: boolean
@@ -6924,6 +7089,7 @@ export type Database = {
           is_platform_admin: boolean
           location_name: string
           onboarding_complete: boolean
+          publication_enabled: boolean
           role: Database["public"]["Enums"]["staff_role"]
           staff_id: string
           studio_currency: string
@@ -7083,6 +7249,7 @@ export type Database = {
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {
         Args: {
           p_studio_id: string
