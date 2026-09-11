@@ -56,9 +56,19 @@ export async function recordPayment(_prev: PayState, fd: FormData): Promise<PayS
   });
 
   if (error) {
-    return /PT403/.test(error.message)
-      ? { ok: false, message: "You are not allowed to record payments." }
-      : { ok: false, message: error.message };
+    if (/PT403/.test(error.message) || error.code === "PT403") {
+      return { ok: false, message: "You are not allowed to record payments." };
+    }
+    // Decision 24: a full plan. The database's own sentence already names the
+    // plan and the count, so it is passed through rather than replaced with a
+    // vaguer one — and the hint beside it says what to do about it.
+    if (error.code === "PT409" || /places are taken/.test(error.message)) {
+      return {
+        ok: false,
+        message: [error.message, error.hint].filter(Boolean).join(" "),
+      };
+    }
+    return { ok: false, message: error.message };
   }
 
   revalidatePath(`/members/${memberId}`);

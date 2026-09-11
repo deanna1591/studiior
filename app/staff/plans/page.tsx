@@ -19,14 +19,24 @@ export default async function PlansList() {
     return <AppShell {...shell} title="Plans"><Denied what="Managing plans" role={ctx.role} /></AppShell>;
   }
 
-  const [{ data: plans }, { data: memberships }] = await Promise.all([
+  const [{ data: plans }, { data: memberships }, { data: seats }] = await Promise.all([
     supabase
       .from("membership_plans")
       .select("id, name, type, price_cents, currency, status, visibility, credits, credits_per_period, validity_days, billing_interval, sort_order")
       .order("status").order("sort_order").order("name"),
     supabase.from("memberships").select("plan_id, status"),
+    // Decision 24. Empty for a studio with the switch off, which is what makes
+    // the feature leave no trace on this screen rather than drawing a column of
+    // dashes.
+    supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
   ]);
 
+  const seatOf = new Map((seats ?? []).map((r) => [r.plan_id, r]));
+
+  // "Not cancelled and not expired" is the same four statuses plan_seats_taken()
+  // counts, so this line and a capped plan's seat count agree. Where a plan HAS
+  // a cap the number below comes from plan_seats() instead, so the screen is
+  // never quoting two implementations of one fact.
   const live = new Map<string, number>();
   for (const m of memberships ?? []) {
     if (m.status === "cancelled" || m.status === "expired") continue;
@@ -38,6 +48,7 @@ export default async function PlansList() {
 
   const row = (p: NonNullable<typeof plans>[number]) => {
     const n = live.get(p.id) ?? 0;
+    const seat = seatOf.get(p.id);
     const buys =
       p.type === "recurring"
         ? p.credits_per_period === null
@@ -64,7 +75,25 @@ export default async function PlansList() {
         <div className="shrink-0 text-right">
           <div className="num text-[13px] text-ink">{formatMoney(p.price_cents, p.currency)}</div>
           <div className="text-[12px] leading-4 text-ink-3">
-            {n === 0 ? "Nobody on it" : <><span className="num">{n}</span> member{n === 1 ? "" : "s"}</>}
+            {seat ? (
+              // Coral sets the tint and the rule, never the sentence: #D9401A
+              // is 4.47 on white and the floor is 4.5. Measured in the DOM at
+              // 4.47 before this was changed, which is how it was caught.
+              <span className="inline-flex items-center gap-1.5">
+                <span className="num">{seat.taken}</span> of{" "}
+                <span className="num">{seat.cap}</span> places
+                {(seat.is_over || seat.is_full) && (
+                  <span className={`rounded-sm px-1 py-px text-[11px] leading-4 text-ink ${
+                    seat.is_over ? "border border-coral bg-coral-tint" : "bg-paper"}`}>
+                    {seat.is_over ? "over" : "full"}
+                  </span>
+                )}
+              </span>
+            ) : n === 0 ? (
+              "Nobody on it"
+            ) : (
+              <><span className="num">{n}</span> member{n === 1 ? "" : "s"}</>
+            )}
           </div>
         </div>
       </Link>

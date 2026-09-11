@@ -23,7 +23,14 @@ type ReadResult =
   | { ok: false; error: string }
   | { ok: true; row: PlanFields };
 
-function readForm(fd: FormData, currency: string): ReadResult {
+async function studioUsesSeatCaps(studioId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data } = await supabase.from("studio_settings")
+    .select("seat_caps_enabled").eq("studio_id", studioId).maybeSingle();
+  return data?.seat_caps_enabled ?? false;
+}
+
+function readForm(fd: FormData, currency: string, seatCaps: boolean): ReadResult {
   const type = String(fd.get("type") ?? "") as PlanType;
   const f = FIELDS[type];
   if (!f) return { ok: false, error: "Pick a plan type." };
@@ -74,6 +81,24 @@ function readForm(fd: FormData, currency: string): ReadResult {
       booking_window_days: num("booking_window_days"),
       max_bookings_per_day: num("max_bookings_per_day"),
 
+      // Decision 24. Spread rather than assigned, so that a studio with the
+      // switch OFF leaves these three columns entirely alone: an update that
+      // wrote nulls would silently wipe a limit the studio had chosen, and the
+      // whole point of the switch is that turning it off keeps the numbers.
+      ...(seatCaps
+        ? {
+            max_active_members: num("max_active_members"),
+            // A "places left" threshold is meaningless without a limit, and
+            // the CHECK refuses the pair — so it is dropped here rather than
+            // sent to be rejected with a constraint name in the message.
+            show_remaining_below: num("max_active_members") === null
+              ? null : num("show_remaining_below"),
+            on_limit_reached:
+              String(fd.get("on_limit_reached") ?? "hide") === "staff_only"
+                ? "staff_only" : "hide",
+          }
+        : {}),
+
       // {class_type_ids: []} is "covers everything" to book_class(), so an
       // empty selection stores an empty object rather than an empty array.
       restrictions: classTypeIds.length > 0 ? { class_type_ids: classTypeIds } : {},
@@ -97,6 +122,9 @@ function explain(error: { code?: string; message: string }): string {
   if (error.code === "23505" && /membership_plans_active_name/.test(error.message)) {
     return "There is already an active plan with that name. Rename this one, or archive the existing plan first — archived plans keep their names.";
   }
+  if (error.code === "23514" && /plan_seat_cap_positive/.test(error.message)) {
+    return "A limit of nought is not a limit — it is an archived plan. Leave it empty for no limit.";
+  }
   if (error.code === "23514") {
     return `That combination of fields is not valid for this plan type (${error.message}).`;
   }
@@ -110,7 +138,7 @@ export async function createPlan(_prev: PlanFormState, fd: FormData): Promise<Pl
   const ctx = await getStaffContext();
   if (!ctx) return { error: "Not signed in." };
 
-  const parsed = readForm(fd, ctx.currency);
+  const parsed = readForm(fd, ctx.currency, await studioUsesSeatCaps(ctx.studioId));
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = createClient();
@@ -133,7 +161,7 @@ export async function updatePlan(_prev: PlanFormState, fd: FormData): Promise<Pl
   if (!ctx) return { error: "Not signed in." };
 
   const id = String(fd.get("id") ?? "");
-  const parsed = readForm(fd, ctx.currency);
+  const parsed = readForm(fd, ctx.currency, await studioUsesSeatCaps(ctx.studioId));
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = createClient();

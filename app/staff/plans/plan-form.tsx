@@ -31,6 +31,9 @@ export type PlanDraft = {
   booking_window_days: number | null;
   max_bookings_per_day: number | null;
   restrictions: { class_type_ids?: string[] } | null;
+  max_active_members: number | null;
+  show_remaining_below: number | null;
+  on_limit_reached: string;
 };
 
 /**
@@ -56,19 +59,24 @@ function Submit({ label }: { label: string }) {
 const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
 export default function PlanForm({
-  draft, classTypes, currency, activeMemberships, mode,
+  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken,
 }: {
   draft: PlanDraft;
   classTypes: { id: string; name: string }[];
   currency: string;
   activeMemberships: number;
   mode: "create" | "edit";
+  /** Decision 24's switch. Off, and this form must show NO TRACE of places. */
+  seatCaps: boolean;
+  /** How many hold this plan right now — from plan_seats_taken(), never recounted here. */
+  taken: number | null;
 }) {
   const [state, action] = useFormState<PlanFormState, FormData>(
     mode === "create" ? createPlan : updatePlan,
     null,
   );
   const [type, setType] = useState<PlanType>(draft.type);
+  const [cap, setCap] = useState<string>(num(draft.max_active_members));
   const f = FIELDS[type];
   const selected = new Set(draft.restrictions?.class_type_ids ?? []);
 
@@ -257,6 +265,61 @@ export default function PlanForm({
           they take effect immediately for everyone.
         </p>
       </Section>
+
+      {seatCaps && (
+        <Section
+          title="Places"
+          note="How many members may hold this plan at once. Leave it empty and there is no limit, which is how every plan starts."
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Limit to">
+              <input name="max_active_members" type="number" min={1} value={cap}
+                     onChange={(e) => setCap(e.target.value)}
+                     className={inputClass} placeholder="No limit" />
+              <p className="mt-1 text-xs text-ink-3">members at a time</p>
+            </Field>
+            {cap !== "" && (
+              <Field label="Say how many are left when">
+                <input name="show_remaining_below" type="number" min={1}
+                       defaultValue={num(draft.show_remaining_below)}
+                       className={inputClass} placeholder="Never say" />
+                <p className="mt-1 text-xs text-ink-3">
+                  or fewer places remain. Empty and the number is never shown.
+                </p>
+              </Field>
+            )}
+          </div>
+
+          {cap !== "" && (
+            <Field label="When it is full">
+              <select name="on_limit_reached" defaultValue={draft.on_limit_reached}
+                      className={inputClass}>
+                <option value="hide">Hide it from members</option>
+                <option value="staff_only">Leave it sellable at the desk only</option>
+              </select>
+              <p className="mt-1 text-xs text-ink-3">
+                Either way the desk is stopped from selling past the limit — this
+                is only what a member sees.
+              </p>
+            </Field>
+          )}
+
+          {mode === "edit" && taken !== null && cap !== "" && Number(cap) < taken && (
+            <div className="rounded border border-coral bg-coral-tint px-3 py-2.5 text-[13px] leading-[19px] text-ink">
+              <span className="num">{taken}</span> member{taken === 1 ? " holds" : "s hold"} this
+              plan already, which is more than a limit of <span className="num">{cap}</span>.
+              Nobody is removed and nobody is repriced — the plan simply sells to
+              nobody else until enough places come free.
+            </div>
+          )}
+
+          <p className="text-xs text-ink-3">
+            A member who cancels frees their place and buys at whatever the plan
+            costs on the day they come back. A member who freezes keeps their
+            place and their price — that is what freezing is.
+          </p>
+        </Section>
+      )}
 
       <div className="flex items-center gap-4">
         <Submit label={mode === "create" ? "Create plan" : "Save changes"} />

@@ -20,7 +20,8 @@ export default async function RecordPayment({ params }: { params: { id: string }
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
 
-  const [{ data: member }, { data: plans }, { data: unpaid }, { data: studio }] =
+  const [{ data: member }, { data: plans }, { data: unpaid }, { data: studio },
+         { data: seats }, { data: held }] =
     await Promise.all([
       supabase.from("members").select("id, first_name, last_name").eq("id", params.id).maybeSingle(),
       supabase.from("membership_plans")
@@ -34,7 +35,18 @@ export default async function RecordPayment({ params }: { params: { id: string }
         .in("status", ["booked", "pending_payment"])
         .order("booked_at", { ascending: false }).limit(10),
       supabase.from("studios").select("currency").eq("id", ctx.studioId).maybeSingle(),
+      // Decision 24: what is left on each capped plan. Empty for a studio with
+      // the switch off, which is what keeps this screen unchanged for them.
+      supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
+      // Which plans this member already holds — paying for one of those is a
+      // renewal under Decision 23 and takes no new place, so the screen must
+      // not warn that a full plan is closed to somebody already inside it.
+      supabase.from("memberships").select("plan_id")
+        .eq("member_id", params.id).not("status", "in", "(cancelled,expired)"),
     ]);
+
+  const seatOf = new Map((seats ?? []).map((r) => [r.plan_id, r]));
+  const holdsPlan = new Set((held ?? []).map((m) => m.plan_id));
 
   if (!member) notFound();
 
@@ -54,6 +66,16 @@ export default async function RecordPayment({ params }: { params: { id: string }
           plans={(plans ?? []).map((p) => ({
             id: p.id, name: p.name, type: p.type,
             price_cents: p.price_cents, currency: p.currency,
+            seats: seatOf.has(p.id)
+              ? {
+                  cap: seatOf.get(p.id)!.cap,
+                  taken: seatOf.get(p.id)!.taken,
+                  remaining: seatOf.get(p.id)!.remaining,
+                  is_full: seatOf.get(p.id)!.is_full,
+                  is_over: seatOf.get(p.id)!.is_over,
+                }
+              : null,
+            holds: holdsPlan.has(p.id),
           }))}
           bookings={(unpaid ?? []).map((b) => ({
             id: b.id,

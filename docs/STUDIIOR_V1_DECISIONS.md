@@ -473,6 +473,64 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 24 — Scarcity a studio can actually enforce: seat caps first
+
+Decision 24 covers four things — peak allowance, daily booking caps, a suspension ladder, and seat caps on a plan. **All four are optional per studio, all off by default, and a studio with them off sees no trace of any of them.** They are three independent switches, not one feature: turning any on must not reveal the others.
+
+This entry records the whole decision and marks which part is built. **Seat caps are built (migration 102). Peak allowance, daily caps and the suspension ladder are not.**
+
+### Why any of it exists
+
+A no-show fee is uncollectable without a card on file, and most design-partner studios take cash. The penalty that actually bites is the loss of a scarce thing: the class you did not turn up to, or the place on the plan somebody else wanted. Reform Collective's Unlimited Monthly is 12,000 PHP and was HIDDEN because its rules could not be enforced.
+
+### The cancellation deadline is not duplicated
+
+`studio_settings.cancellation_cutoff_minutes` already decides what counts as late. Nothing in Decision 24 adds a second window.
+
+### Seat caps — settled and built
+
+Three columns on `membership_plans`: `max_active_members` (null = no limit), `show_remaining_below` (null = never say), `on_limit_reached`. One switch on `studio_settings`: `seat_caps_enabled`, default false.
+
+**Places are counted ACTIVE, never lifetime.** `plan_seats_taken()` is the one definition and counts `trialing`, `active`, `past_due` and `frozen`. `past_due` counts because a member who owes money has not left, and §7.3's grace exists for exactly that. **`frozen` counts because keeping the seat and the rate is what freezing IS** — a member who pauses for January and returns to find her place sold and the price raised has been given a cancellation with extra steps. Cancelling frees the place, and §7.1's price snapshot means the old rate leaves with her.
+
+**A place is claimed inside `activate_purchase()`, under a row lock on the plan.** That is the only function in the product that creates a membership, so a cash sale and a Stripe sale are capped by one rule. The plan row is locked before the count, whether or not it is capped — deciding whether to lock by reading the cap first is the read-then-write the lock exists to prevent.
+
+**A completed Stripe checkout is never refused.** The charge is already captured; raising inside the webhook would return a non-2xx, be retried for days, and leave somebody who has paid with no membership. `activate_purchase()` takes `p_enforce_seat_cap`, and the checkout handler passes false. The studio goes one over and every screen says "4 of 3 — over" rather than pretending. The desk is still refused while over, which is the point of being told.
+
+**A renewal is not a second place.** Decision 23 makes a payment against an existing active membership advance its period rather than sell another, so it never reaches the cap at all.
+
+**`on_limit_reached` is `hide` or `staff_only`, and NOT `waitlist`.** A waiting list for a place on a plan is a table, an offer with an expiry, a notification template, a staff screen and a promotion path — the class waitlist again against a different scarce thing. It is more than this pass, so the value is absent from the CHECK rather than accepted and ignored.
+
+**Turning the switch off suspends the caps and keeps the numbers.** A studio that switches off, sells past a limit, and switches back on is over, and is told so in those words.
+
+### Peak allowance, daily caps and suspension — decided, not built
+
+- **Peak windows** are per studio, default off, multiple per day, studio-local and DST-aware. A class is peak if its **scheduled start** falls inside a window: 16:55 against a 17:00 window is off-peak.
+- **Only plans with no credits get an allowance.** Unlimited Monthly gets 2 per week and a daily cap of 1. The packs, the drop-in and the 8-a-month plan leave `peak_allowance` null — unlimited — and are never checked against it. **Their penalty for a no-show is the credit, which `no_show_consumes_credit` already handles and which is worth real money. A plan with credits does not need a second penalty.**
+- The allowance period is a **fixed week from `week_starts_on`**, never a rolling 168 hours.
+- **Allowance restoration is LEDGER-SHAPED**, like `credit_ledger`: a reversing row keyed on the booking, never a decrement, because the sweep can re-run and must not refund twice. Class credits and peak allowance are independent.
+- **The seam is `tg_stamp_booking_release()`**, the trigger from migration 079 that stamps `release_reason`, and its body has carried a comment marking the spot since it was written. There is **no `release_booking_entitlements()`** — that function has never existed. A booking is released from four places, which is why the seam is a trigger and not a function.
+- `booking_release_reason` currently has three values and needs more (flex-not-running, staff-excused). **A new enum value cannot be used in the transaction that adds it**, so that is a migration of its own, as 036 and 077 were.
+- **Infractions are late cancels AND no-shows** — both are the member failing to release a seat in time; they differ only in whether they told you. Rolling 30 days.
+- **Marking a member present after a no-show restores the allowance, VOIDS the infraction, and recalculates any suspension it triggered.** The edge most likely to be got wrong.
+- **An excused infraction is voided, not deleted** — a status with a reason and an actor — because the excuse RATE is the signal that a cap is set too tight, and deleting the rows makes that metric impossible.
+- **Billing continues during a suspension**, and member-facing copy has to say so or it reads as a refund entitlement.
+- **Suspension restricts ADVANCE booking only.** Same-day space-available still works, and the allowance still applies — a suspension does not hand out free peak slots.
+- **A plan change mid-period** gives `max(0, new total − already consumed this period)`: never more than the new plan's total, never negative.
+- **A configuration change never reclassifies history.**
+
+### The waitlist half of §7 is copy, not code
+
+A freed seat already creates a `waitlist_offer` with an expiry that a member accepts (§4.2); Decision 7 already releases the seat on a late cancel. Nothing books a member without asking, because that would consume their allowance and a credit without consent. What was missing is honesty in the copy: **a late cancellation gives the seat back to the studio, not to the member.**
+
+### Reporting reads both ways
+
+Very high allowance exhaustion means the cap is too tight and is suppressing revenue; near zero means it is not binding. Both readings get stated plainly rather than one being implied.
+
+**Where:** Business Rules §2.1, §3.1 and §4.2; Data Model §7; migration 102 (seat caps). **Status:** seat caps settled and built; peak allowance, daily caps and suspension settled and not yet built. **Extends:** Decisions 12, 16 and 23. **Reuses:** `credit_ledger`'s shape, `tg_stamp_booking_release()`'s seam, §4.2's existing waitlist offer.
+
+---
+
 ## 23 — A cash studio renews by being paid, and can see who owes it
 
 Extends Decision 16. A studio may take cash for ever; until now nothing in the product could tell it who had not paid this month, and a recurring membership sold as cash had no billing period at all.

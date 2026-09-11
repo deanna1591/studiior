@@ -3185,11 +3185,14 @@ export type Database = {
           freeze_allowed: boolean
           id: string
           is_demo: boolean
+          max_active_members: number | null
           max_bookings_per_day: number | null
           max_freeze_days: number | null
           name: string
+          on_limit_reached: string
           price_cents: number
           restrictions: Json
+          show_remaining_below: number | null
           signup_fee_cents: number
           sort_order: number
           status: string
@@ -3218,11 +3221,14 @@ export type Database = {
           freeze_allowed?: boolean
           id?: string
           is_demo?: boolean
+          max_active_members?: number | null
           max_bookings_per_day?: number | null
           max_freeze_days?: number | null
           name: string
+          on_limit_reached?: string
           price_cents: number
           restrictions?: Json
+          show_remaining_below?: number | null
           signup_fee_cents?: number
           sort_order?: number
           status?: string
@@ -3251,11 +3257,14 @@ export type Database = {
           freeze_allowed?: boolean
           id?: string
           is_demo?: boolean
+          max_active_members?: number | null
           max_bookings_per_day?: number | null
           max_freeze_days?: number | null
           name?: string
+          on_limit_reached?: string
           price_cents?: number
           restrictions?: Json
+          show_remaining_below?: number | null
           signup_fee_cents?: number
           sort_order?: number
           status?: string
@@ -4955,6 +4964,7 @@ export type Database = {
           payment_grace_days: number
           reminder_hours_before: number
           require_waiver: boolean
+          seat_caps_enabled: boolean
           setup_optional_items: string[]
           setup_progress: Json
           significant_move_hours: number
@@ -5016,6 +5026,7 @@ export type Database = {
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
+          seat_caps_enabled?: boolean
           setup_optional_items?: string[]
           setup_progress?: Json
           significant_move_hours?: number
@@ -5077,6 +5088,7 @@ export type Database = {
           payment_grace_days?: number
           reminder_hours_before?: number
           require_waiver?: boolean
+          seat_caps_enabled?: boolean
           setup_optional_items?: string[]
           setup_progress?: Json
           significant_move_hours?: number
@@ -5501,6 +5513,7 @@ export type Database = {
       activate_purchase: {
         Args: {
           p_currency: string
+          p_enforce_seat_cap?: boolean
           p_member_id: string
           p_plan_id: string
           p_price_cents: number
@@ -5858,12 +5871,25 @@ export type Database = {
         }
       }
       evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
       expect_raises: {
         Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_raises_saying: {
+        Args: {
+          label: string
+          stmt: string
+          want_like: string
+          want_sqlstate: string
+        }
         Returns: undefined
       }
       expect_text: {
@@ -6205,6 +6231,20 @@ export type Database = {
         Args: { p_from: string; p_plan_id: string }
         Returns: string
       }
+      plan_seats: {
+        Args: { p_studio_id: string }
+        Returns: {
+          cap: number
+          is_full: boolean
+          is_over: boolean
+          on_limit_reached: string
+          plan_id: string
+          remaining: number
+          show_remaining: boolean
+          taken: number
+        }[]
+      }
+      plan_seats_taken: { Args: { p_plan_id: string }; Returns: number }
       provision_studio: {
         Args: {
           p_country: string

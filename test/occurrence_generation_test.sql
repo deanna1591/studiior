@@ -760,14 +760,22 @@ select expect_true('reopening reports what stays cancelled rather than hiding it
   (current_setting('t.re')::jsonb ->> 'still_cancelled')::int > 0);
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
+-- SCOPED TO THE SERIES, like the assertions twenty lines above and for the
+-- reason their own comment gives: this suite's earlier sections put other
+-- Prague classes on the calendar, and a whole-studio count on this date is a
+-- count of those too. `t.cd` is current_date + 20, so WHICH of them land here
+-- depends on the weekday the suite is run — these two passed for as long as
+-- that date happened to be clear and failed the first time it was not. The
+-- third instance of "an unfiltered count(*) is a count of whatever ran first",
+-- after scheduling_test.sql's notifications and onboarding_test.sql's invites.
 select expect_num('the cancelled class is STILL cancelled — members were told it was off',
   (select count(*) from class_occurrences
-    where studio_id='0ccc0ccc-0000-0000-0000-000000000001'
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000c001'
       and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.cd')::date
       and status = 'cancelled')::bigint, 1);
 select expect_num('...and nothing new was created in its slot',
   (select count(*) from class_occurrences
-    where studio_id='0ccc0ccc-0000-0000-0000-000000000001'
+    where series_id = '0ccc0ccc-0000-0000-0000-00000000c001'
       and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.cd')::date
       and status = 'scheduled')::bigint, 0);
 

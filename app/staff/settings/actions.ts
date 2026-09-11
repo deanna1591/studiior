@@ -166,3 +166,38 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
       : "Saved.",
   };
 }
+
+/**
+ * Decision 24: the seat-cap switch.
+ *
+ * One checkbox and nothing else — the caps themselves are per plan. Turning it
+ * off does NOT clear the plans' numbers: a studio that switches off for a month
+ * and back on should find its configuration where it left it, and wiping a
+ * dozen carefully chosen limits because somebody unticked a box would be the
+ * expensive kind of tidy.
+ */
+export async function saveSeatCaps(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = String(fd.get("seat_caps_enabled") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ seat_caps_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  // A refused UPDATE does not raise — the row simply goes invisible and
+  // PostgREST answers 200 with an empty array.
+  if (!data?.length) {
+    return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  }
+
+  revalidatePath("/settings"); revalidatePath("/plans");
+  return {
+    ok: true,
+    message: on
+      ? "Saved. Set a limit on each plan that needs one — the rest stay unlimited."
+      : "Saved. Limits are no longer applied, and the numbers on your plans are untouched.",
+  };
+}

@@ -5,6 +5,7 @@ import { AppShell, Denied, SectionLabel } from "@/components/ui";
 import HorizonPanel from "./horizon";
 import TimingPanel from "./timing";
 import GuaranteesPanel from "./guarantees";
+import SeatCapsPanel from "./seat-caps";
 
 export const dynamic = "force-dynamic";
 
@@ -29,16 +30,22 @@ export default async function Settings() {
     );
   }
 
-  const [{ data: settings }, { count: scheduled }, { data: last }] = await Promise.all([
+  const [{ data: settings }, { count: scheduled }, { data: last }, { count: capped }] =
+    await Promise.all([
     supabase.from("studio_settings")
       // One string literal, not a concatenation: supabase-js infers the row type
       // from the literal, and joining it across lines gives back GenericStringError.
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
     supabase.from("class_occurrences").select("starts_at")
       .eq("status", "scheduled").order("starts_at", { ascending: false }).limit(1).maybeSingle(),
+    // Counted here rather than through plan_seats(), which deliberately answers
+    // nothing at all while the switch is off — and this line has to be able to
+    // say "you have three limits set" to a studio about to turn it back on.
+    supabase.from("membership_plans").select("id", { count: "exact", head: true })
+      .eq("studio_id", ctx.studioId).not("max_active_members", "is", null),
   ]);
 
   // Formatted on the server: a formatter crossing into a client component is a
@@ -81,6 +88,16 @@ export default async function Settings() {
               flex_standby_pay_cents: settings?.flex_standby_pay_cents ?? 0,
               adjacency_minutes: settings?.adjacency_minutes ?? 90,
             }}
+          />
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <SectionLabel>Places on a plan</SectionLabel>
+        <div className="mt-3">
+          <SeatCapsPanel
+            enabled={settings?.seat_caps_enabled ?? false}
+            capped={capped ?? 0}
           />
         </div>
       </section>

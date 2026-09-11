@@ -5,7 +5,17 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
 import { recordPayment, type PayState } from "./actions";
 
-type Plan = { id: string; name: string; type: string; price_cents: number; currency: string };
+type Plan = {
+  id: string; name: string; type: string; price_cents: number; currency: string;
+  /**
+   * Decision 24. Null for a plan with no limit and for every plan at a studio
+   * with the switch off — so a studio that does not use places sees no line
+   * here at all, rather than one reading "unlimited".
+   */
+  seats: { cap: number; taken: number; remaining: number; is_full: boolean; is_over: boolean } | null;
+  /** They already hold this plan, so paying for it is a renewal (Decision 23). */
+  holds: boolean;
+};
 type Booking = { id: string; status: string; label: string };
 
 function Submit() {
@@ -36,6 +46,7 @@ export default function PaymentForm({
     plans[0] ? (plans[0].price_cents / 100).toFixed(2) : "",
   );
   const [method, setMethod] = useState("cash");
+  const chosen = plans.find((p) => p.id === planId);
 
   // Prefilled from the plan, and editable: a studio that takes 2000 off a 2500
   // plan because somebody paid the rest last month should not have to fight the
@@ -70,6 +81,38 @@ export default function PaymentForm({
               </option>
             ))}
           </select>
+          {chosen?.holds ? (
+            <p className="mt-1.5 text-[12px] leading-[18px] text-ink-3">
+              They are already on this plan, so this renews it — the period moves
+              on and no new place is taken.
+            </p>
+          ) : chosen?.seats ? (
+            // A refusal is a sentence, so it is ink on the coral tint with a
+            // coral rule — never coral type, which measures 4.47 on white.
+            <p className={`mt-1.5 text-[12px] leading-[18px] ${
+              chosen.seats.is_full
+                ? "rounded border-l-2 border-coral bg-coral-tint px-2 py-1.5 text-ink"
+                : "text-ink-3"}`}>
+              {chosen.seats.is_over ? (
+                <>
+                  <span className="num">{chosen.seats.taken}</span> members hold this
+                  plan and it is limited to <span className="num">{chosen.seats.cap}</span>.
+                  It cannot be sold until enough places come free.
+                </>
+              ) : chosen.seats.is_full ? (
+                <>
+                  This plan is full — <span className="num">{chosen.seats.cap}</span> of{" "}
+                  <span className="num">{chosen.seats.cap}</span> places taken. It
+                  cannot be sold until somebody leaves it.
+                </>
+              ) : (
+                <>
+                  <span className="num">{chosen.seats.remaining}</span> of{" "}
+                  <span className="num">{chosen.seats.cap}</span> places left.
+                </>
+              )}
+            </p>
+          ) : null}
         </Field>
       )}
 
