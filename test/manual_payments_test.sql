@@ -757,4 +757,32 @@ select expect_raises('nor can a frozen membership be renewed by taking cash',
   $$ select advance_membership_period(current_setting('t.mf')::uuid) $$, 'PT409');
 reset role;
 
+-- Migration 103. `membership_frozen_now()` is SECURITY DEFINER, takes a
+-- membership id and answers a question about it, stepping over the RLS on
+-- `memberships` — and a boolean is the same class of leak as a row (migration
+-- 086 closed `occurrence_is_adjacent` for precisely that). It has no caller
+-- outside the database, so it lost the grant rather than gaining a guard.
+--
+-- The direct read is asserted at 0 first, so the refusal below is known to be
+-- the function being closed rather than the caller having nothing to see:
+-- a guard that never fires looks exactly like a guard that passes.
+set role authenticated;
+select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000d9',false);
+select expect_num('a stranger can read none of this studio''s memberships directly',
+  (select count(*) from memberships where id = current_setting('t.m1')::uuid), 0);
+select expect_raises('...and cannot ask whether one is frozen either',
+  $$ select membership_frozen_now(current_setting('t.m1')::uuid) $$, '42501');
+reset role;
+set role anon;
+select expect_raises('nor can anon',
+  $$ select membership_frozen_now(current_setting('t.m1')::uuid) $$, '42501');
+reset role;
+
+-- And the callers that DO need it still reach it, because record_manual_payment()
+-- is SECURITY DEFINER owned by postgres. The renewal assertions above are what
+-- actually prove this: had the revoke broken that path they would have failed
+-- long before here.
+select expect_true('the sweep still reaches it',
+  (select sweep_membership_periods() is not null));
+
 select 'ALL MANUAL PAYMENT TESTS PASSED' as result;
