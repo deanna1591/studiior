@@ -8,6 +8,7 @@ import GuaranteesPanel from "./guarantees";
 import SeatCapsPanel from "./seat-caps";
 import PeakPanel from "./peak";
 import PeakReport, { type Report } from "./peak-report";
+import SuspensionPanel from "./suspension";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export default async function Settings() {
     supabase.from("studio_settings")
       // One string literal, not a concatenation: supabase-js infers the row type
       // from the literal, and joining it across lines gives back GenericStringError.
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
@@ -121,6 +122,24 @@ export default async function Settings() {
               peak_allowance: p.peak_allowance!,
               peak_allowance_period: p.peak_allowance_period,
             }))}
+          />
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <SectionLabel>Repeated late cancellations</SectionLabel>
+        <div className="mt-3">
+          <SuspensionPanel
+            suspendedNow={(report as unknown as Report | null)?.suspended_now ?? 0}
+            s={{
+              suspension_enabled: settings?.suspension_enabled ?? false,
+              suspension_window_days: settings?.suspension_window_days ?? 30,
+              suspension_warn_at: settings?.suspension_warn_at ?? 2,
+              suspension_at: settings?.suspension_at ?? 3,
+              suspension_days: settings?.suspension_days ?? 14,
+              suspension_repeat_days: settings?.suspension_repeat_days ?? 30,
+              peak_cutoff_reminder_minutes: settings?.peak_cutoff_reminder_minutes ?? 120,
+            }}
           />
         </div>
       </section>

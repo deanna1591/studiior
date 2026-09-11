@@ -283,3 +283,68 @@ export async function removePeakWindow(fd: FormData) {
     .eq("id", String(fd.get("id") ?? "")).eq("studio_id", ctx.studioId);
   revalidatePath("/settings");
 }
+
+/**
+ * Decision 24's suspension ladder and the peak reminder's lead time.
+ *
+ * Every number the ladder uses is here. The CHECK in migration 108 refuses a
+ * ladder that does not make sense — suspending before warning, a window of nought
+ * — and its message is a constraint name, so the sane cases are caught here and
+ * the constraint stays as the wall behind them.
+ */
+export async function saveSuspension(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = String(fd.get("suspension_enabled") ?? "") === "on";
+  const int = (k: string) => Number(String(fd.get(k) ?? ""));
+  const window_ = int("suspension_window_days");
+  const warn = int("suspension_warn_at");
+  const at = int("suspension_at");
+  const days = int("suspension_days");
+  const repeat = int("suspension_repeat_days");
+  const lead = int("peak_cutoff_reminder_minutes");
+
+  const bad =
+    !Number.isFinite(lead) || lead < 0 || lead > 2880
+      ? "The reminder is a number of minutes, up to two days. Nought switches it off."
+    : !on ? null
+    : !Number.isFinite(window_) || window_ < 1 || window_ > 365
+      ? "The window is a number of days, up to a year."
+    : !Number.isFinite(warn) || warn < 1 ? "Warn at the first infraction or later."
+    : !Number.isFinite(at) || at <= warn
+      ? "Suspending has to come after warning, or the warning never happens."
+    : !Number.isFinite(days) || days < 1 || days > 365
+      ? "A suspension lasts between a day and a year."
+    : !Number.isFinite(repeat) || repeat < 1 || repeat > 365
+      ? "A repeat suspension lasts between a day and a year."
+    : null;
+  if (bad) return { ok: false, message: bad };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({
+      suspension_enabled: on,
+      peak_cutoff_reminder_minutes: Math.floor(lead),
+      ...(on
+        ? {
+            suspension_window_days: Math.floor(window_),
+            suspension_warn_at: Math.floor(warn),
+            suspension_at: Math.floor(at),
+            suspension_days: Math.floor(days),
+            suspension_repeat_days: Math.floor(repeat),
+          }
+        : {}),
+    })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings"); revalidatePath("/members");
+  return {
+    ok: true,
+    message: on
+      ? "Saved. Absentees will be marked from now on, and nothing reaches back into history."
+      : "Saved. Nobody is suspended and no new infractions are recorded. The ones already on file are kept.",
+  };
+}

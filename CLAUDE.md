@@ -884,6 +884,10 @@ The grant half is clean. `anon` reaches **exactly nine** surfaces and they are t
 
 **Eight more teeth checks, and one of mine was a no-op.** The sabotage for "excusing voids rather than deletes" was `booking_id = booking_id`, which changes nothing and proved nothing; redone as an actual DELETE, the assertion fails correctly. That is the second time this session a teeth check reported nothing because the sabotage was wrong rather than because the assertion was hollow — **a teeth check that does not bite is a claim about the SABOTAGE until you have read it.**
 
+**THE SETTINGS AUDIT CAUGHT ME SHIPPING A FEATURE WITH NO WAY TO TURN IT ON.** `scripts/audit-settings-ui.py`, run after migration 109 as this file's own rule requires, reported **six new columns with no UI** — the whole suspension ladder and the reminder's lead time — and `suspension_enabled` itself had only a read in a page's select and no control anywhere. A studio could not have switched suspension on at all. That is `occurrence_horizon_days` again, in a feature built in the same session as the paragraph warning about it, and only the script caught it. Zero unreachable Decision 24 settings now.
+
+**A CORRUPTED `.next` MADE TWO WORKING PANELS LOOK BROKEN, and the control experiment is what proved it.** The suspension switch would not reveal its numbers when clicked. Before touching the component, the same probe was run against `GuaranteesPanel` — shipped, unchanged, known to work — and it behaved identically: the checkbox ticked and its numbers stayed hidden. The page was serving no CSS and never hydrating, because a `next build` had been run while the dev server was up and overwrote its cache. `rm -rf .next` and a restart, and the tick reveals all five knobs. **When a UI probe fails, run it against something known to work before believing the new code is at fault.**
+
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
 ---
