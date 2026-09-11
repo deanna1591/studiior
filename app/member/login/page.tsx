@@ -1,3 +1,4 @@
+import { focalPoint } from "@/lib/focal";
 import Link from "next/link";
 import { createServerClient } from "@supabase/ssr";
 import { currentSlug } from "@/lib/tenant";
@@ -50,7 +51,12 @@ export default async function MemberLogin() {
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image} alt="" aria-hidden
-             className="absolute inset-0 h-full w-full object-cover" />
+             className="absolute inset-0 h-full w-full object-cover"
+             /* THE WORST CROP IN THE PRODUCT. Full bleed on a portrait phone
+                keeps about a sixth of a wide photograph, so which sixth is not
+                a detail — it is the whole picture the member sees. */
+             style={{ objectPosition: focalPoint(studio?.login_image_focus_x,
+                                                 studio?.login_image_focus_y) }} />
       ) : (
         <div aria-hidden className="absolute inset-0"
              style={{ background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)` }} />

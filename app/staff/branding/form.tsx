@@ -1,10 +1,12 @@
 "use client";
 
+import FocalPicker from "@/components/focal-picker";
+import { PHONE_LOGIN } from "@/lib/focal";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { PRESETS, PRESET_KEYS, type PresetKey } from "@/lib/theme";
 import { Notice, buttonClass, inputClass } from "@/components/ui";
-import { saveBranding, uploadLogo, uploadLoginImage, type BrandingState } from "./actions";
+import { saveBranding, uploadLogo, uploadLoginImage, saveLoginFocus, type BrandingState } from "./actions";
 import Preview from "./preview";
 
 function Submit({ label }: { label: string }) {
@@ -14,10 +16,13 @@ function Submit({ label }: { label: string }) {
 
 export default function BrandingForm({
   preset: initialPreset, accent: initialAccent, logoUrl, loginImageUrl,
+  loginFocusX, loginFocusY,
   contactEmail, contactPhone,
 }: {
   preset: PresetKey; accent: string | null; logoUrl: string | null;
   loginImageUrl: string | null;
+  loginFocusX: number;
+  loginFocusY: number;
   contactEmail: string;
   contactPhone: string;
 }) {
@@ -28,6 +33,7 @@ export default function BrandingForm({
   const [state, action] = useFormState<BrandingState, FormData>(saveBranding, null);
   const [logoState, logoAction] = useFormState<BrandingState, FormData>(uploadLogo, null);
   const [imgState, imgAction] = useFormState<BrandingState, FormData>(uploadLoginImage, null);
+  const [focusState, focusAction] = useFormState<BrandingState, FormData>(saveLoginFocus, null);
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row">
@@ -122,13 +128,38 @@ export default function BrandingForm({
           <Submit label="Upload" />
         </form>
 
+        {/* ITS OWN FORM, not part of the upload. A studio that already has a
+            photograph has to be able to move the point on it without finding
+            the file again — and forms cannot nest. */}
+        {loginImageUrl && (
+          <form action={focusAction} className="space-y-3 border-t border-line pt-6">
+            {focusState && <Notice kind={focusState.ok ? "ok" : "error"}>{focusState.message}</Notice>}
+            <span className="block text-[13px] font-medium leading-[18px] text-ink">
+              What stays in frame
+            </span>
+            {/* PREVIEWED AT PHONE PROPORTIONS, not in a wide band. The old
+                preview was 28px tall and full width — landscape, which is the
+                one shape that always looks fine, and the reason a crop keeping
+                a sixth of the picture went unnoticed for as long as it did. */}
+            <FocalPicker
+              src={loginImageUrl}
+              nameX="login_image_focus_x" nameY="login_image_focus_y"
+              x={loginFocusX} y={loginFocusY}
+              ratio={PHONE_LOGIN}
+              label="How it crops on a phone"
+              note="The sign-in screen is full bleed, so on a portrait phone only a narrow strip of a wide photograph survives."
+            />
+            <Submit label="Save crop" />
+          </form>
+        )}
+
         <form action={imgAction} className="space-y-3 border-t border-line pt-6">
           {imgState && <Notice kind={imgState.ok ? "ok" : "error"}>{imgState.message}</Notice>}
           <span className="block text-[13px] font-medium leading-[18px] text-ink">Login photo</span>
           {loginImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={loginImageUrl} alt="Current login photo"
-                 className="h-28 w-full rounded border border-line object-cover" />
+            <p className="text-[12px] leading-4 text-ink-3">
+              A photo is set. Choose what stays in frame below.
+            </p>
           ) : (
             <p className="text-[12px] leading-4 text-ink-3">
               No photo yet, so members see your accent as a full-screen colour instead.

@@ -169,3 +169,30 @@ export async function saveInstructor(_prev: SetupState, fd: FormData): Promise<S
   revalidatePath("/instructors"); revalidatePath("/");
   redirect("/instructors");
 }
+
+/**
+ * Where a class photograph is anchored when the member app crops it.
+ *
+ * The hero and the coming-up card are wider than they are tall, so a portrait
+ * photograph loses its top and bottom; the detail screen is a different shape
+ * again. One point serves all three, which is what `object-position` is for.
+ */
+export async function saveClassTypeFocus(_prev: SetupState, fd: FormData): Promise<SetupState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "Not signed in." };
+
+  const pct = (k: string) => {
+    const n = Number(String(fd.get(k) ?? ""));
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50;
+  };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("class_types")
+    .update({ image_focus_x: pct("image_focus_x"), image_focus_y: pct("image_focus_y") })
+    .eq("id", String(fd.get("id") ?? "")).eq("studio_id", ctx.studioId).select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/class-types");
+  return null;
+}

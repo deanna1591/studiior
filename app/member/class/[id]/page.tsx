@@ -1,3 +1,4 @@
+import { focalPoint } from "@/lib/focal";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { memberScreen } from "@/lib/member";
@@ -40,7 +41,7 @@ export default async function ClassDetail({ params }: { params: { id: string } }
 
   const [{ data: type }, { data: booking }] = await Promise.all([
     occ.class_type_id
-      ? supabase.from("class_types").select("name, description, image_url").eq("id", occ.class_type_id).maybeSingle()
+      ? supabase.from("class_types").select("name, description, image_url, image_focus_x, image_focus_y").eq("id", occ.class_type_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("bookings")
       .select("id, status, waitlist_position")
@@ -79,7 +80,8 @@ export default async function ClassDetail({ params }: { params: { id: string } }
       {type?.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={type.image_url} alt="" aria-hidden
-             className="mb-4 h-52 w-full rounded-[22px] object-cover" />
+             className="mb-4 h-52 w-full rounded-[22px] object-cover"
+             style={{ objectPosition: focalPoint(type.image_focus_x, type.image_focus_y) }} />
       )}
 
       <h1 className="m-title text-ink">{occ.name}</h1>

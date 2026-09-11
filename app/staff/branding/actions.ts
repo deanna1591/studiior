@@ -157,3 +157,36 @@ export async function uploadLoginImage(_prev: BrandingState, fd: FormData): Prom
   revalidatePath("/branding");
   return { ok: true, message: "Login photo updated. Members see it before they sign in." };
 }
+
+/**
+ * Where the login photograph is anchored when it is cropped.
+ *
+ * Its own action rather than part of the upload, because a studio that already
+ * has a photograph has to be able to move the point on it without finding the
+ * file again. Owner only, like everything else on this screen — `studios_owner_brand`
+ * is the boundary and this only turns its refusal into a sentence.
+ */
+export async function saveLoginFocus(_prev: BrandingState, fd: FormData): Promise<BrandingState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  // Clamped here as well as by the CHECK. The value ends up in an inline
+  // `object-position`, so "it came from our own form" is not a reason to trust it.
+  const pct = (k: string) => {
+    const n = Number(String(fd.get(k) ?? ""));
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50;
+  };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studios")
+    .update({ login_image_focus_x: pct("login_image_focus_x"),
+              login_image_focus_y: pct("login_image_focus_y") })
+    .eq("id", ctx.studioId).select("id");
+  if (error) return { ok: false, message: error.message };
+  // A refused UPDATE does not raise — the row goes invisible and PostgREST
+  // answers 200 with an empty array.
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners only." };
+
+  revalidatePath("/branding");
+  return { ok: true, message: "Saved. That is what members will see on the sign-in screen." };
+}

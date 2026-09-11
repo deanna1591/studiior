@@ -1,3 +1,4 @@
+import { focalPoint } from "@/lib/focal";
 import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
@@ -35,7 +36,7 @@ export default async function MemberHome() {
     await Promise.all([
     supabase
       .from("bookings")
-      .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name))")
+      .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url, image_focus_x, image_focus_y), rooms(name))")
       .eq("member_id", ctx.memberId)
       .in("status", ["booked", "waitlisted"])
       .order("booked_at"),
@@ -47,7 +48,7 @@ export default async function MemberHome() {
     membershipState(supabase, ctx.memberId),
     supabase
       .from("class_occurrences")
-      .select("id, name, starts_at, capacity, booked_count, instructors!instructor_id(display_name), class_types(image_url)")
+      .select("id, name, starts_at, capacity, booked_count, instructors!instructor_id(display_name), class_types(image_url, image_focus_x, image_focus_y)")
       .gt("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(3),
@@ -162,7 +163,9 @@ export default async function MemberHome() {
           {occ.class_types?.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={occ.class_types.image_url} alt="" aria-hidden
-                 className="absolute inset-0 h-full w-full object-cover" />
+                 className="absolute inset-0 h-full w-full object-cover"
+                 style={{ objectPosition: focalPoint(occ.class_types.image_focus_x,
+                                                     occ.class_types.image_focus_y) }} />
           )}
           <span aria-hidden className="m-hero-scrim" />
 
@@ -242,7 +245,9 @@ export default async function MemberHome() {
             {o.class_types?.image_url && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={o.class_types.image_url} alt="" aria-hidden
-                   className="absolute inset-0 h-full w-full object-cover" />
+                   className="absolute inset-0 h-full w-full object-cover"
+                   style={{ objectPosition: focalPoint(o.class_types.image_focus_x,
+                                                       o.class_types.image_focus_y) }} />
             )}
             <span aria-hidden className="m-hero-scrim" />
             <div className="relative flex h-full flex-col justify-between p-4">
@@ -293,7 +298,9 @@ export default async function MemberHome() {
                     {o.class_types?.image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={o.class_types.image_url} alt="" aria-hidden
-                           className="h-full w-full object-cover" />
+                           className="h-full w-full object-cover"
+                           style={{ objectPosition: focalPoint(o.class_types.image_focus_x,
+                                                               o.class_types.image_focus_y) }} />
                     )}
                   </span>
                   <span className="m-name block truncate text-ink">{o.name}</span>

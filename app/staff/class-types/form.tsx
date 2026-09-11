@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
-import { saveClassType, uploadClassTypeImage, type SetupState } from "../setup/actions";
+import { saveClassType, uploadClassTypeImage, saveClassTypeFocus, type SetupState } from "../setup/actions";
+import FocalPicker from "@/components/focal-picker";
+import { PHONE_HERO } from "@/lib/focal";
 
 export type ClassTypeDraft = {
   id?: string; name: string; description: string | null; duration_minutes: number;
   default_capacity: number; difficulty: string | null; color: string | null; status: string;
   image_url?: string | null;
+  image_focus_x?: number;
+  image_focus_y?: number;
 };
 
 function Submit({ label }: { label: string }) {
@@ -19,6 +23,7 @@ function Submit({ label }: { label: string }) {
 export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; mode: "create" | "edit" }) {
   const [state, action] = useFormState<SetupState, FormData>(saveClassType, null);
   const [imgState, imgAction] = useFormState<SetupState, FormData>(uploadClassTypeImage, null);
+  const [focusState, focusAction] = useFormState<SetupState, FormData>(saveClassTypeFocus, null);
   return (
     <>
     <form action={action} className="max-w-md space-y-4">
@@ -77,8 +82,9 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
         <input type="hidden" name="id" value={draft.id} />
         <span className="block text-[13px] font-medium leading-[18px] text-ink">Photo</span>
         {draft.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={draft.image_url} alt="" className="h-32 w-full rounded-lg border border-line object-cover" />
+          <p className="text-[12px] leading-4 text-ink-3">
+            A photo is set. Choose what stays in frame below.
+          </p>
         ) : (
           <p className="text-[12px] leading-4 text-ink-3">
             No photo yet. Members see a card with no picture on it.
@@ -90,6 +96,28 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
           Shown on the member&rsquo;s class list and detail screen. Landscape, under 2 MB.
         </p>
         <Submit label="Upload" />
+      </form>
+    )}
+
+    {/* Its own form, for the same reason as the login photo's: a class type that
+        already has a picture has to be adjustable without re-uploading it, and
+        forms cannot nest. */}
+    {draft.id && draft.image_url && (
+      <form action={focusAction} className="mt-8 max-w-md space-y-3 border-t border-line pt-6">
+        {focusState && <Notice kind="error">{focusState.error}</Notice>}
+        <input type="hidden" name="id" value={draft.id} />
+        <span className="block text-[13px] font-medium leading-[18px] text-ink">
+          What stays in frame
+        </span>
+        <FocalPicker
+          src={draft.image_url}
+          nameX="image_focus_x" nameY="image_focus_y"
+          x={draft.image_focus_x ?? 50} y={draft.image_focus_y ?? 50}
+          ratio={PHONE_HERO}
+          label="How it crops on a member's phone"
+          note="The card on a member's home screen is this shape — wider than it is tall, so the top and bottom of a portrait photograph go."
+        />
+        <Submit label="Save crop" />
       </form>
     )}
 

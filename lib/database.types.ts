@@ -1232,6 +1232,8 @@ export type Database = {
           difficulty: string | null
           duration_minutes: number
           id: string
+          image_focus_x: number
+          image_focus_y: number
           image_url: string | null
           is_demo: boolean
           name: string
@@ -1248,6 +1250,8 @@ export type Database = {
           difficulty?: string | null
           duration_minutes: number
           id?: string
+          image_focus_x?: number
+          image_focus_y?: number
           image_url?: string | null
           is_demo?: boolean
           name: string
@@ -1264,6 +1268,8 @@ export type Database = {
           difficulty?: string | null
           duration_minutes?: number
           id?: string
+          image_focus_x?: number
+          image_focus_y?: number
           image_url?: string | null
           is_demo?: boolean
           name?: string
@@ -5454,6 +5460,8 @@ export type Database = {
           currency: string
           custom_domain: string | null
           id: string
+          login_image_focus_x: number
+          login_image_focus_y: number
           login_image_url: string | null
           logo_url: string | null
           name: string
@@ -5475,6 +5483,8 @@ export type Database = {
           currency: string
           custom_domain?: string | null
           id?: string
+          login_image_focus_x?: number
+          login_image_focus_y?: number
           login_image_url?: string | null
           logo_url?: string | null
           name: string
@@ -5496,6 +5506,8 @@ export type Database = {
           currency?: string
           custom_domain?: string | null
           id?: string
+          login_image_focus_x?: number
+          login_image_focus_y?: number
           login_image_url?: string | null
           logo_url?: string | null
           name?: string
@@ -6720,7 +6732,9 @@ export type Database = {
           occ_flex: boolean
           occ_id: string
           occ_instructor_id: string
+          occ_minimum: number
           occ_name: string
+          occ_series_tier: string
           occ_staffing: string
           occ_standalone: boolean
           occ_status: string
@@ -6976,6 +6990,8 @@ export type Database = {
           accent_color: string
           currency: string
           id: string
+          login_image_focus_x: number
+          login_image_focus_y: number
           login_image_url: string
           logo_url: string
           name: string
