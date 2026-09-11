@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
+import Infractions from "./infractions";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { InviteOne } from "../invites/panel";
@@ -59,7 +60,7 @@ export default async function MemberDetail({
   const [
     { data: memberships }, { data: ledger }, { data: visits },
     { data: timeline }, { data: notes }, { data: goals }, { data: tags },
-    { data: docs },
+    { data: docs }, { data: standing }, { data: infractions },
   ] = await Promise.all([
     supabase.from("memberships")
       .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, membership_plans(name, type)")
@@ -86,6 +87,12 @@ export default async function MemberDetail({
     supabase.from("member_documents")
       .select("id, kind, filename, storage_path, size_bytes, signed_at, created_at")
       .eq("member_id", params.id).order("created_at", { ascending: false }),
+    // Decision 24. `member_suspension()` answers NULL for a studio not using
+    // suspension, so the whole section is absent there rather than drawn empty.
+    supabase.rpc("member_suspension", { p_member_id: params.id }),
+    supabase.from("member_infractions")
+      .select("id, kind, occurred_at, status, voided_reason, class_occurrences(name)")
+      .eq("member_id", params.id).order("occurred_at", { ascending: false }).limit(20)
   ]);
 
   // Payments are the one thing on this screen decided here rather than by the
@@ -424,6 +431,42 @@ export default async function MemberDetail({
                           waiverSignedAt={m.waiver_signed_at} canDelete={manager} />
         </div>
       </div>
+      <Infractions
+        standing={
+          standing
+            ? {
+                count: (standing as Record<string, number>).count,
+                warned: (standing as unknown as { warned: boolean }).warned,
+                suspended: (standing as unknown as { suspended: boolean }).suspended,
+                until: (standing as unknown as { until: string | null }).until,
+                // Formatted on the server: a formatter crossing into a client
+                // component is a runtime error TypeScript will not warn about.
+                untilLabel: (standing as unknown as { until: string | null }).until
+                  ? new Intl.DateTimeFormat("en-GB", {
+                      weekday: "long", day: "numeric", month: "long",
+                      timeZone: ctx.timeZone,
+                    }).format(new Date((standing as unknown as { until: string }).until))
+                  : null,
+                window_days: (standing as Record<string, number>).window_days,
+                suspend_at: (standing as Record<string, number>).suspend_at,
+                until_suspension: (standing as Record<string, number | null>).until_suspension,
+              }
+            : null
+        }
+        rows={(infractions ?? []).map((r: {
+          id: string; kind: string; occurred_at: string; status: string;
+          voided_reason: string | null; class_occurrences: { name: string } | null;
+        }) => ({
+          id: r.id, kind: r.kind, occurred_at: r.occurred_at,
+          occurredLabel: new Intl.DateTimeFormat("en-GB", {
+            day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+            timeZone: ctx.timeZone,
+          }).format(new Date(r.occurred_at)),
+          className: r.class_occurrences?.name ?? null,
+          status: r.status,
+          voided_reason: r.voided_reason,
+        }))}
+      />
     </AppShell>
   );
 }

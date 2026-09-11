@@ -7,6 +7,7 @@ import TimingPanel from "./timing";
 import GuaranteesPanel from "./guarantees";
 import SeatCapsPanel from "./seat-caps";
 import PeakPanel from "./peak";
+import PeakReport, { type Report } from "./peak-report";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +33,12 @@ export default async function Settings() {
   }
 
   const [{ data: settings }, { count: scheduled }, { data: last }, { count: capped },
-         { data: peakWindows }, { data: peakPlans }] =
+         { data: peakWindows }, { data: peakPlans }, { data: report }] =
     await Promise.all([
     supabase.from("studio_settings")
       // One string literal, not a concatenation: supabase-js infers the row type
       // from the literal, and joining it across lines gives back GenericStringError.
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
@@ -55,6 +56,9 @@ export default async function Settings() {
       .select("id, name, peak_allowance, peak_allowance_period")
       .eq("studio_id", ctx.studioId).eq("status", "active")
       .not("peak_allowance", "is", null).order("sort_order"),
+    // Null for a studio using neither switch, so the block is absent rather
+    // than a row of dashes.
+    supabase.rpc("peak_allowance_report", { p_studio_id: ctx.studioId, p_days: 90 }),
   ]);
 
   // Formatted on the server: a formatter crossing into a client component is a
@@ -100,6 +104,8 @@ export default async function Settings() {
           />
         </div>
       </section>
+
+      {report && <PeakReport r={report as unknown as Report} />}
 
       <section className="mb-10">
         <SectionLabel>Peak hours</SectionLabel>

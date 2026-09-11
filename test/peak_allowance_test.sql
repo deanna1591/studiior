@@ -752,9 +752,373 @@ select expect_raises('anon cannot reach it at all',
   '42501');
 reset role;
 
+-- =============================================================================
+-- 10. INFRACTIONS AND THE SUSPENSION LADDER — migration 108
+-- =============================================================================
+-- The late cancellation in section 9 happened while suspension was OFF. It is
+-- the same act that records an infraction below, so this is the switch being
+-- the only thing that stands between a studio and the ladder — asserted before
+-- the switch is touched.
+select expect_num('a late cancellation at a studio with suspension OFF records nothing',
+  (select count(*) from member_infractions
+    where studio_id = '9eac9eac-0000-0000-0000-000000000001'), 0);
+select expect_null_state('...and the member has no standing to read',
+  member_suspension('9eac9eac-0000-0000-0000-00000000dd01'));
+
+update studio_settings
+   set suspension_enabled = true, suspension_window_days = 30,
+       suspension_warn_at = 2, suspension_at = 3,
+       suspension_days = 14, suspension_repeat_days = 30
+ where studio_id = '9eac9eac-0000-0000-0000-000000000001';
+
+select expect_num('turning it on does not reach back for history',
+  (select count(*) from member_infractions
+    where studio_id = '9eac9eac-0000-0000-0000-000000000001'), 0);
+select expect_num('...and a member with none is at nought',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'count')::bigint, 0);
+select expect_false('...and is not suspended',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'suspended')::boolean);
+select expect_num('...and is told how many before anything happens',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'until_warning')::bigint, 2);
+
+-- --- three late cancellations, one at a time ---------------------------------
+-- Off-peak classes deliberately, so the ladder is being measured rather than
+-- the peak allowance, which the member has already spent this week.
+-- SECURITY DEFINER so the fixture INSERT is not refused by RLS while the session
+-- is a member's. `book_class()` decides trust from the `role` GUC, which SET ROLE
+-- set and which entering a definer function does not change — so the booking
+-- inside is still made as an ordinary member, which is the point.
+create or replace function t_late_cancel(p_n int, p_days int) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_occ uuid; v_b uuid;
+begin
+  v_occ := ('9eac9eac-0000-0000-0000-0000000009' || lpad(p_n::text, 2, '0'))::uuid;
+  insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
+                                 capacity, starts_at, ends_at, status)
+  values (v_occ, '9eac9eac-0000-0000-0000-000000000001',
+          '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01',
+          null, 'Midday ' || p_n, 10,
+          ((now() at time zone 'Asia/Manila')::date + 2 + time '12:00') at time zone 'Asia/Manila',
+          ((now() at time zone 'Asia/Manila')::date + 2 + time '12:50') at time zone 'Asia/Manila',
+          'scheduled');
+  v_b := (book_class(v_occ, '9eac9eac-0000-0000-0000-00000000dd01', 'member')).booking_id;
+  -- Drag it inside the cutoff so the cancellation is genuinely late, and back-date
+  -- it so the rolling window has something to order.
+  update class_occurrences
+     set starts_at = now() - make_interval(days => p_days) + interval '30 minutes',
+         ends_at   = now() - make_interval(days => p_days) + interval '80 minutes'
+   where id = v_occ;
+  perform cancel_booking(v_b);
+  return v_b;
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
+select set_config('t.i1', t_late_cancel(1, 20)::text, false);
+select expect_num('one late cancellation is one infraction',
+  (select count(*) from member_infractions
+    where member_id = '9eac9eac-0000-0000-0000-00000000dd01' and status = 'active'), 1);
+select expect_false('...and one is not a warning yet',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'warned')::boolean);
+
+select set_config('t.i2', t_late_cancel(2, 10)::text, false);
+select expect_true('the second warns',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'warned')::boolean);
+select expect_false('...and still does not suspend',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'suspended')::boolean);
+select expect_num('...with one to go',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'until_suspension')::bigint, 1);
+
+select set_config('t.i3', t_late_cancel(3, 1)::text, false);
+select expect_true('the third suspends',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'suspended')::boolean);
+select expect_false('...and a suspension is not also a warning',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'warned')::boolean);
+select expect_true('...running from the third one''s own date, not from today',
+  (select ((member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'until')::timestamptz
+            - interval '14 days')::date
+        = (now() - interval '1 day')::date));
+reset role;
+
+-- --- what a suspension actually stops ----------------------------------------
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
+                               capacity, starts_at, ends_at, status)
+values
+ ('9eac9eac-0000-0000-0000-0000000009a1','9eac9eac-0000-0000-0000-000000000001',
+  '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01', null,'Tomorrow',10,
+  ((now() at time zone 'Asia/Manila')::date + 1 + time '12:00') at time zone 'Asia/Manila',
+  ((now() at time zone 'Asia/Manila')::date + 1 + time '12:50') at time zone 'Asia/Manila','scheduled'),
+ ('9eac9eac-0000-0000-0000-0000000009a2','9eac9eac-0000-0000-0000-000000000001',
+  '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01', null,'Later today',10,
+  (now() + interval '3 hours'), (now() + interval '3 hours 50 minutes'),'scheduled');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
+select expect_text('a suspended member cannot book ahead',
+  (select (book_class('9eac9eac-0000-0000-0000-0000000009a1',
+     '9eac9eac-0000-0000-0000-00000000dd01','member')).failure_reason), 'suspended');
+select expect_null('...but can still take a seat TODAY — it restricts advance booking, not the studio',
+  (select (book_class('9eac9eac-0000-0000-0000-0000000009a2',
+     '9eac9eac-0000-0000-0000-00000000dd01','member')).failure_reason));
+reset role;
+
+-- Staff can let them in anyway, and it is recorded as an override.
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false);
+select expect_null('front desk can override a suspension with a reason',
+  (select (book_class('9eac9eac-0000-0000-0000-0000000009a1',
+     '9eac9eac-0000-0000-0000-00000000dd01','staff','She rang ahead')).failure_reason));
+reset role;
+select expect_true('...and the override says what was bypassed',
+  (select overridden_rules @> array['suspended']::text[] from bookings
+    where occurrence_id = '9eac9eac-0000-0000-0000-0000000009a1'
+      and member_id = '9eac9eac-0000-0000-0000-00000000dd01'
+      and status <> 'cancelled'));
+
+-- --- excusing one -------------------------------------------------------------
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false);  -- front desk
+select expect_raises('an excuse with no reason is refused',
+  $$ select excuse_infraction(
+       (select id from member_infractions where booking_id = current_setting('t.i3')::uuid),
+       '  ') $$, 'PT400');
+select set_config('t.ex',
+  (select excuse_infraction(
+     (select id from member_infractions where booking_id = current_setting('t.i3')::uuid),
+     'Hospital appointment, she rang')::text), false);
+select expect_false('excusing the third lifts the suspension at once — nothing had to recalculate',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'suspended')::boolean);
+select expect_num('...and the count drops',
+  (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'count')::bigint, 2);
+reset role;
+select expect_text('...the row is VOIDED, not deleted, so the excuse rate stays countable',
+  (select status from member_infractions where booking_id = current_setting('t.i3')::uuid), 'voided');
+select expect_text('...carrying who excused it and why',
+  (select voided_reason from member_infractions where booking_id = current_setting('t.i3')::uuid),
+  'Hospital appointment, she rang');
+select expect_num('...and an audit row was written',
+  (select count(*) from audit_logs
+    where studio_id = '9eac9eac-0000-0000-0000-000000000001'
+      and action = 'infraction.excused'), 1);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false);
+select expect_raises('the same one cannot be excused twice',
+  $$ select excuse_infraction(
+       (select id from member_infractions where booking_id = current_setting('t.i3')::uuid),
+       'again') $$, 'PT409');
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
+select expect_raises('a member cannot excuse their own',
+  $$ select excuse_infraction(
+       (select id from member_infractions where booking_id = current_setting('t.i2')::uuid),
+       'I would rather not') $$, 'PT403');
+reset role;
+
+-- --- marking somebody present -------------------------------------------------
+-- The brief says this restores the allowance. It does NOT, and the reason is
+-- that the allowance is spent at BOOKING: they booked a peak class and they were
+-- in the room, so the slot is correctly gone. What was wrong was the record.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
+                               capacity, starts_at, ends_at, status)
+values ('9eac9eac-0000-0000-0000-0000000009b1','9eac9eac-0000-0000-0000-000000000001',
+        '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01',
+        null, 'Peak, later', 10,
+        ((now() at time zone 'Asia/Manila')::date + 40 + time '17:00') at time zone 'Asia/Manila',
+        ((now() at time zone 'Asia/Manila')::date + 40 + time '17:50') at time zone 'Asia/Manila',
+        'scheduled');
+update membership_plans set booking_window_days = 60
+ where id = '9eac9eac-0000-0000-0000-0000000000c1';
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
+select set_config('t.bp', (select (book_class('9eac9eac-0000-0000-0000-0000000009b1',
+  '9eac9eac-0000-0000-0000-00000000dd01','member')).booking_id::text), false);
+reset role;
+select expect_num('(the peak class spent a slot)',
+  (select sum(delta) from peak_allowance_ledger
+    where booking_id = current_setting('t.bp')::uuid), -1);
+
+update bookings set status = 'no_show' where id = current_setting('t.bp')::uuid;
+select expect_num('a no-show records an infraction of its own kind',
+  (select count(*) from member_infractions
+    where booking_id = current_setting('t.bp')::uuid and kind = 'no_show'), 1);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false);
+select set_config('t.mp', (select mark_present(current_setting('t.bp')::uuid)::text), false);
+reset role;
+select expect_text('marking them present corrects the booking',
+  (select status::text from bookings where id = current_setting('t.bp')::uuid), 'attended');
+select expect_text('...voids the infraction',
+  (select status from member_infractions where booking_id = current_setting('t.bp')::uuid), 'voided');
+select expect_num('...and the peak slot STAYS SPENT, because they attended',
+  (select sum(delta) from peak_allowance_ledger
+    where booking_id = current_setting('t.bp')::uuid), -1);
+select expect_num('...with an audit row for the correction',
+  (select count(*) from audit_logs
+    where studio_id = '9eac9eac-0000-0000-0000-000000000001'
+      and action = 'booking.marked_present'), 1);
+
+-- Excusing a LATE CANCEL does give the slot back, which is what excusing means.
+select expect_num('(the second infraction''s booking spent nothing — it was off-peak)',
+  (select count(*) from peak_allowance_ledger
+    where booking_id = current_setting('t.i2')::uuid), 0);
+
+-- --- the sweep ----------------------------------------------------------------
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
+                               capacity, starts_at, ends_at, status)
+values
+ ('9eac9eac-0000-0000-0000-0000000009c1','9eac9eac-0000-0000-0000-000000000001',
+  '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01', null,'Finished',10,
+  now() - interval '3 hours', now() - interval '2 hours','scheduled'),
+ ('9eac9eac-0000-0000-0000-0000000009c2','9eac9eac-0000-0000-0000-000000000001',
+  '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01', null,'Still running',10,
+  now() - interval '20 minutes', now() + interval '30 minutes','scheduled'),
+ ('9eac9eac-0000-0000-0000-0000000009c3','9eac9eac-0000-0000-0000-000000000002',
+  '9eac9eac-0000-0000-0000-00000000000d','9eac9eac-0000-0000-0000-00000000cc02', null,'Other studio',10,
+  now() - interval '3 hours', now() - interval '2 hours','scheduled');
+insert into members (id, studio_id, first_name, last_name, email, joined_on, status, waiver_signed_at)
+values ('9eac9eac-0000-0000-0000-00000000dd03','9eac9eac-0000-0000-0000-000000000002',
+        'Cara','Diaz','9eac-m3@example.com', current_date - 30,'active', now());
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source)
+values
+ ('9eac9eac-0000-0000-0000-00000000bb01','9eac9eac-0000-0000-0000-000000000001',
+  '9eac9eac-0000-0000-0000-0000000009c1','9eac9eac-0000-0000-0000-00000000dd02','booked','member','comp'),
+ ('9eac9eac-0000-0000-0000-00000000bb02','9eac9eac-0000-0000-0000-000000000001',
+  '9eac9eac-0000-0000-0000-0000000009c2','9eac9eac-0000-0000-0000-00000000dd02','booked','member','comp'),
+ ('9eac9eac-0000-0000-0000-00000000bb03','9eac9eac-0000-0000-0000-000000000002',
+  '9eac9eac-0000-0000-0000-0000000009c3','9eac9eac-0000-0000-0000-00000000dd03','booked','member','comp');
+
+select set_config('t.sw', (select sweep_no_shows()::text), false);
+select expect_text('a booking on a class that has finished, with no check-in, is a no-show',
+  (select status::text from bookings where id = '9eac9eac-0000-0000-0000-00000000bb01'), 'no_show');
+select expect_text('...a class still running is left alone',
+  (select status::text from bookings where id = '9eac9eac-0000-0000-0000-00000000bb02'), 'booked');
+select expect_text('...and a studio with suspension OFF is not swept at all',
+  (select status::text from bookings where id = '9eac9eac-0000-0000-0000-00000000bb03'), 'booked');
+select expect_num('...the swept one becomes an infraction dated to the CLASS, not to the sweep',
+  (select count(*) from member_infractions
+    where booking_id = '9eac9eac-0000-0000-0000-00000000bb01'
+      and occurred_at < now() - interval '2 hours'), 1);
+select expect_num('a second run of the sweep marks nothing more',
+  ((select sweep_no_shows() -> 'marked')::text)::bigint, 0);
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false);
+-- 42501 and not PT403: the function is revoked from every client role, so there
+-- is no grant to try. That is the stronger answer — the same one migration 086
+-- gave ensure_pay_period() — and the guard inside it is the second wall rather
+-- than the first.
+select expect_raises('the sweep is a background job, and staff cannot even reach it',
+  $$ select sweep_no_shows() $$, '42501');
+reset role;
+
+-- =============================================================================
+-- 11. THE REPORT AND THE REMINDER — migration 109
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a1',false);  -- owner
+select expect_num('the report counts every infraction in the window',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'infractions')::bigint, 5);
+select expect_num('...including the ones that were excused, because they were KEPT',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'excused')::bigint, 2);
+select expect_num('...as a rate, which is the number that says the rule is wrong',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'excused_pct')::bigint, 40);
+select expect_null('...and below the threshold it says nothing, rather than filling the space',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'excuse_reading'));
+select expect_num('...a no-show is counted apart from a late cancellation',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'no_shows')::bigint, 2);
+
+-- Push it over half, and the report starts saying what that means.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false);
+select excuse_infraction(
+  (select id from member_infractions where booking_id = current_setting('t.i1')::uuid),
+  'Car broke down');
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a1',false);
+select expect_num('(three of five excused)',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'excused_pct')::bigint, 60);
+select expect_true('past half, the report says the rule is one staff cannot defend',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'excuse_reading')
+    like '%cannot defend at the counter%');
+
+select expect_true('exhaustion carries BOTH readings, not just a percentage',
+  (peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) ->> 'reading') is not null);
+
+select expect_raises('front desk cannot read the studio''s reporting',
+  $$ select peak_allowance_report('9eac9eac-0000-0000-0000-000000000001', 90) $$, 'PT403')
+  from (select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a2',false)) x;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000a1',false);
+select expect_null_state('a studio using neither switch has no report at all',
+  peak_allowance_report('9eac9eac-0000-0000-0000-000000000003', 90));
+reset role;
+
+-- --- the reminder --------------------------------------------------------------
+-- A booking that SPENT a peak slot, sitting just inside the lead-up to its free
+-- cancellation window. Nothing else is reminded: a member with nothing to lose
+-- must not be told they are about to lose it.
+update studio_settings
+   set cancellation_cutoff_minutes = 720, peak_cutoff_reminder_minutes = 120
+ where studio_id = '9eac9eac-0000-0000-0000-000000000001';
+update class_occurrences
+   set starts_at = now() + interval '13 hours', ends_at = now() + interval '13 hours 50 minutes'
+ where id = '9eac9eac-0000-0000-0000-00000000e021';
+
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
+                               capacity, starts_at, ends_at, status)
+values ('9eac9eac-0000-0000-0000-0000000009d1','9eac9eac-0000-0000-0000-000000000001',
+        '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01',
+        null, 'Peak tomorrow', 10,
+        now() + interval '13 hours', now() + interval '13 hours 50 minutes', 'scheduled');
+-- Peak by the clock it actually starts at, rather than by hope. Replaced rather
+-- than widened, because two windows widened to the same hours collide on the
+-- unique index that exists to stop a double-clicked form.
+delete from peak_windows where studio_id = '9eac9eac-0000-0000-0000-000000000001';
+insert into peak_windows (studio_id, day_of_week, starts_at, ends_at)
+select '9eac9eac-0000-0000-0000-000000000001', d, time '00:00', time '23:59'
+  from generate_series(0, 6) d;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
+select set_config('t.br', (select (book_class('9eac9eac-0000-0000-0000-0000000009d1',
+  '9eac9eac-0000-0000-0000-00000000dd01','member')).booking_id::text), false);
+reset role;
+select expect_num('(the booking spent a peak slot, so it has something to lose)',
+  (select count(*) from peak_allowance_ledger
+    where booking_id = current_setting('t.br')::uuid and reason = 'booked'), 1);
+
+select set_config('t.rem', (select sweep_peak_cutoff_reminders()::text), false);
+select expect_num('the member holding a peak class is reminded once, before the window shuts',
+  (select count(*) from notifications
+    where template_key = 'peak_cancel_window'
+      and dedupe_key = 'peak_cutoff:' || current_setting('t.br')), 1);
+select expect_true('...and the message names the hour the free window closes',
+  (select payload ->> 'cutoff_time' ~ '^[0-9]{2}:[0-9]{2}$' from notifications
+    where dedupe_key = 'peak_cutoff:' || current_setting('t.br')));
+select expect_num('a second sweep sends nothing more',
+  (select count(*) from notifications
+    where template_key = 'peak_cancel_window'
+      and dedupe_key = 'peak_cutoff:' || current_setting('t.br')), 1)
+  from (select sweep_peak_cutoff_reminders()) x;
+
+-- Past the cutoff there is nothing useful left to say.
+update class_occurrences set starts_at = now() + interval '2 hours',
+                             ends_at = now() + interval '2 hours 50 minutes'
+ where id = '9eac9eac-0000-0000-0000-0000000009d1';
+delete from notifications where dedupe_key = 'peak_cutoff:' || current_setting('t.br');
+select sweep_peak_cutoff_reminders();
+select expect_num('once the free window has closed, the reminder is not sent',
+  (select count(*) from notifications
+    where dedupe_key = 'peak_cutoff:' || current_setting('t.br')), 0);
+
+select expect_num('and a studio with peak hours OFF reminds nobody',
+  (select count(*) from notifications n join members m on m.id = n.member_id
+    where n.template_key = 'peak_cancel_window'
+      and m.studio_id <> '9eac9eac-0000-0000-0000-000000000001'), 0);
+
 do $$
 begin
   raise notice '--------------------------------------------------------------';
-  raise notice 'peak windows and allowance: all assertions passed';
+  raise notice 'peak, allowance, infractions and suspension: all assertions passed';
   raise notice '--------------------------------------------------------------';
 end $$;

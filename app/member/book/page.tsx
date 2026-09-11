@@ -350,6 +350,16 @@ export default async function Book({
             // marking its busy hours is telling every member something true.
             // `peakBlocked` is the narrower thing: peak, and this member has
             // nothing left for THIS class's period.
+            // Decision 24: what cancelling costs, said BEFORE they press it.
+            // The free window is the studio's one cancellation cutoff — there is
+            // no second deadline — and after it a peak slot stays spent.
+            // Already on the bootstrap — the member context has carried the
+            // studio's one cancellation cutoff since migration 051, so this
+            // costs no extra round trip.
+            const cutoffAt = new Date(new Date(o.starts_at).getTime()
+                                      - settings.cancellationCutoff * 60_000);
+            const insideFreeWindow = Date.now() < cutoffAt.getTime();
+
             const pk = peakOf.get(o.id);
             const isPeak = pk?.is_peak ?? false;
             const peakBlocked =
@@ -393,10 +403,21 @@ export default async function Book({
                   </span>
                 )
               : booked || waiting ? (
-                  <ActionForm action={cancelBooking}>
-                    <input type="hidden" name="booking_id" value={booking!.id} />
-                    <CardActionOutline>{booked ? "Cancel" : "Leave list"}</CardActionOutline>
-                  </ActionForm>
+                  <span className="flex flex-col items-end gap-1">
+                    <ActionForm action={cancelBooking}>
+                      <input type="hidden" name="booking_id" value={booking!.id} />
+                      <CardActionOutline>{booked ? "Cancel" : "Leave list"}</CardActionOutline>
+                    </ActionForm>
+                    {booked && isPeak && pk?.remaining !== null && pk?.remaining !== undefined && (
+                      // Only where there is genuinely something to lose. A member
+                      // whose cancellation costs nothing must not be told it will.
+                      <span className="m-micro max-w-[8.5rem] text-right leading-[14px] text-ink-2">
+                        {insideFreeWindow
+                          ? <>Free until {fmtTime(cutoffAt.toISOString(), ctx.timeZone)} — your peak class comes back</>
+                          : <>Cancelling now still uses your peak class</>}
+                      </span>
+                    )}
+                  </span>
                 )
               : full ? (
                   settings.waitlistEnabled ? (

@@ -2725,6 +2725,97 @@ export type Database = {
           },
         ]
       }
+      member_infractions: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          is_demo: boolean
+          kind: string
+          member_id: string
+          occurred_at: string
+          occurrence_id: string | null
+          status: string
+          studio_id: string
+          voided_at: string | null
+          voided_by: string | null
+          voided_reason: string | null
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          kind: string
+          member_id: string
+          occurred_at: string
+          occurrence_id?: string | null
+          status?: string
+          studio_id: string
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_reason?: string | null
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          kind?: string
+          member_id?: string
+          occurred_at?: string
+          occurrence_id?: string | null
+          status?: string
+          studio_id?: string
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_infractions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_infractions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_infractions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_infractions_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_infractions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_infractions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_invites: {
         Row: {
           accepted_at: string | null
@@ -5105,6 +5196,7 @@ export type Database = {
           pay_period_days: number
           payment_grace_days: number
           peak_allowance_enabled: boolean
+          peak_cutoff_reminder_minutes: number
           reminder_hours_before: number
           require_waiver: boolean
           seat_caps_enabled: boolean
@@ -5113,6 +5205,12 @@ export type Database = {
           significant_move_hours: number
           studio_id: string
           sub_late_free_cancel: boolean
+          suspension_at: number
+          suspension_days: number
+          suspension_enabled: boolean
+          suspension_repeat_days: number
+          suspension_warn_at: number
+          suspension_window_days: number
           unstaffed_deadline_hours: number
           updated_at: string
           waitlist_cutoff_minutes: number
@@ -5168,6 +5266,7 @@ export type Database = {
           pay_period_days?: number
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
+          peak_cutoff_reminder_minutes?: number
           reminder_hours_before?: number
           require_waiver?: boolean
           seat_caps_enabled?: boolean
@@ -5176,6 +5275,12 @@ export type Database = {
           significant_move_hours?: number
           studio_id: string
           sub_late_free_cancel?: boolean
+          suspension_at?: number
+          suspension_days?: number
+          suspension_enabled?: boolean
+          suspension_repeat_days?: number
+          suspension_warn_at?: number
+          suspension_window_days?: number
           unstaffed_deadline_hours?: number
           updated_at?: string
           waitlist_cutoff_minutes?: number
@@ -5231,6 +5336,7 @@ export type Database = {
           pay_period_days?: number
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
+          peak_cutoff_reminder_minutes?: number
           reminder_hours_before?: number
           require_waiver?: boolean
           seat_caps_enabled?: boolean
@@ -5239,6 +5345,12 @@ export type Database = {
           significant_move_hours?: number
           studio_id?: string
           sub_late_free_cancel?: boolean
+          suspension_at?: number
+          suspension_days?: number
+          suspension_enabled?: boolean
+          suspension_repeat_days?: number
+          suspension_warn_at?: number
+          suspension_window_days?: number
           unstaffed_deadline_hours?: number
           updated_at?: string
           waitlist_cutoff_minutes?: number
@@ -6016,6 +6128,10 @@ export type Database = {
         }
       }
       evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
+      excuse_infraction: {
+        Args: { p_infraction_id: string; p_reason: string }
+        Returns: Json
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -6173,6 +6289,7 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: boolean
       }
+      mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
         Args: { p_slug: string }
@@ -6259,6 +6376,7 @@ export type Database = {
           remaining: number
         }[]
       }
+      member_suspension: { Args: { p_member_id: string }; Returns: Json }
       membership_frozen_now: {
         Args: { p_membership_id: string }
         Returns: boolean
@@ -6356,6 +6474,10 @@ export type Database = {
       }
       pay_statement: {
         Args: { p_instructor_id: string; p_period_id: string }
+        Returns: Json
+      }
+      peak_allowance_report: {
+        Args: { p_days?: number; p_studio_id: string }
         Returns: Json
       }
       peak_allowance_state: {
@@ -6940,6 +7062,8 @@ export type Database = {
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_membership_periods: { Args: never; Returns: Json }
+      sweep_no_shows: { Args: never; Returns: Json }
+      sweep_peak_cutoff_reminders: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
