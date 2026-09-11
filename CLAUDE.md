@@ -1350,4 +1350,6 @@ The same blind spot produced migration 020: every fixture in every suite gives e
 
 
 
+**The instructor sign-in lands on a 404 until the page is reloaded.** Reproduced twice while building Decision 25, on `reform.localhost:3000/instructor/login` as `instructor@example.com`: the login action's `redirect("/instructor")` answers 303, the server log shows NO `GET /instructor` afterwards, and the tab shows Next's not-found page with `location.href` already at `/instructor`; navigating to that URL directly renders My week. The member sign-in's `redirect("/")` on the same host does not do this. Unchanged since migration 097's portal, not caused by 112/113, and not diagnosed — the client is resolving the post-action navigation without a request reaching the rewrite in `middleware.ts`.
+
 `btree_gist` internals throw grant warnings on every `db reset`. Cosmetic. Fix by scoping grants to own functions rather than `all functions in schema public`.
