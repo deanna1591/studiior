@@ -64,9 +64,18 @@ export function SetupShell({
 }
 
 export function SetupRow({
-  href, name, meta, right, archived, state,
+  href, name, meta, right, archived, state, mark, markLabel,
 }: {
   href: string; name: string; meta: string; right?: string; archived?: boolean;
+  /**
+   * A small shape before the name — Decision 22's tier on the series list, and
+   * nothing anywhere else yet. Before the name rather than after it so a column
+   * of them lines up and can be scanned down; that is the entire reason it is
+   * here rather than folded into `meta`.
+   */
+  mark?: React.ReactNode;
+  /** What the mark says, for anybody not looking at it. */
+  markLabel?: string;
   /**
    * ENDED IS NOT ARCHIVED and the row has to say which.
    *
@@ -83,6 +92,8 @@ export function SetupRow({
     <Link href={href} className="flex items-center justify-between gap-4 px-3 py-2.5 hover:bg-paper">
       <div className="min-w-0">
         <div className={`truncate text-[14px] leading-5 ${mode ? "text-ink-3" : "text-ink"}`}>
+          {mark && <span className="mr-1.5">{mark}</span>}
+          {markLabel && <span className="sr-only">{markLabel}. </span>}
           <span className={mode === "ended" ? "line-through decoration-ink-3/60" : undefined}>
             {name}
           </span>

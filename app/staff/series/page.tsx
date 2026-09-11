@@ -4,6 +4,7 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
 import { SetupShell, SetupRow, ArchivedSection } from "@/components/setup-list";
+import { TierMark, tierOf, tierWords, tierPhrase } from "@/components/tier-mark";
 import { parseRrule, describeRule } from "@/lib/rrule";
 import { studioToday } from "@/lib/tz";
 import ViewTabs from "./tabs";
@@ -38,10 +39,11 @@ export default async function SeriesList({
   // page just had taken out of it.
   const [{ data: series }, { data: settings }] = await Promise.all([
     supabase.from("class_series")
-      .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, class_types(name, color), rooms(name)")
+      .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, flex, minimum_bookings, class_types(name, color), rooms(name)")
       .order("status").order("time_of_day"),
     supabase.from("studio_settings")
-      .select("week_starts_on").eq("studio_id", ctx.studioId).maybeSingle(),
+      .select("week_starts_on, guarantees_enabled, flex_enabled, flex_min_bookings, core_min_bookings")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
   // THREE STATES, and they are three because they mean three different things.
@@ -83,12 +85,33 @@ export default async function SeriesList({
       </Link>
     );
 
+  // SAME CONDITION AS THE TIER CONTROL, and it is an OR rather than an AND for a
+  // reason that is not hypothetical: Reform Collective runs `flex_enabled` true
+  // with `guarantees_enabled` false, so an AND would have hidden this on the one
+  // studio it was built to be checked against. A studio using neither sees no
+  // mark anywhere and no extra word in any row.
+  const showTier = (settings?.guarantees_enabled ?? false) || (settings?.flex_enabled ?? false);
+  const flexMin = settings?.flex_min_bookings ?? 1;
+  const coreMin = settings?.core_min_bookings ?? 1;
+
+  const tierBits = (s: { guarantee_tier: string | null; flex: boolean | null; minimum_bookings: number | null }) => {
+    if (!showTier) return { mark: undefined, markLabel: undefined, label: null };
+    const t = tierOf(s.guarantee_tier, s.flex);
+    return {
+      mark: <TierMark tier={t} />,
+      markLabel: tierWords(t, s.minimum_bookings, flexMin),
+      label: tierPhrase(t, s.minimum_bookings, flexMin, coreMin),
+    };
+  };
+
   // Described on the server. describeRule is a pure function on both sides, but
   // the STRING crosses the boundary, never the function.
   const meta = (s: (typeof live)[number]) => {
     const { rule, until, unsupported } = parseRrule(s.rrule);
     if (unsupported) return `Repeat rule Studiior cannot keep (${unsupported})`;
-    return describeRule(rule, s.ends_on ?? until, s.time_of_day);
+    const base = describeRule(rule, s.ends_on ?? until, s.time_of_day);
+    const t = tierBits(s).label;
+    return t ? `${base} · ${t}` : base;
   };
 
   if (view === "grid") {
@@ -100,6 +123,10 @@ export default async function SeriesList({
       class_type_id: s.class_type_id,
       class_type_name: s.class_types?.name ?? null,
       class_type_color: s.class_types?.color ?? null,
+      // Undefined rather than "core" when the studio uses no tiers, so the grid
+      // draws no mark at all rather than a mark meaning nothing.
+      tier: showTier ? tierOf(s.guarantee_tier, s.flex) : undefined,
+      minimum: showTier ? (s.minimum_bookings ?? flexMin) : null,
     }));
     return (
       <AppShell {...shell} title="Recurring classes"
@@ -145,7 +172,8 @@ export default async function SeriesList({
         <ArchivedSection noun="series" count={archived.length}>
           {archived.map((s) => (
             <SetupRow key={s.id} href={`/series/${s.id}`} name={s.name}
-                      meta={meta(s)} state="archived" />
+                      meta={meta(s)} state="archived"
+                      mark={tierBits(s).mark} markLabel={tierBits(s).markLabel} />
           ))}
         </ArchivedSection>
       }
@@ -153,6 +181,7 @@ export default async function SeriesList({
       {live.map((s) => (
         <SetupRow key={s.id} href={`/series/${s.id}`} name={s.name}
                   meta={meta(s)}
+                  mark={tierBits(s).mark} markLabel={tierBits(s).markLabel}
                   right={s.instructor_id ? undefined : "open"} />
       ))}
       {/* Ended sits among the live ones rather than in its own block: it is
@@ -160,7 +189,8 @@ export default async function SeriesList({
           see that the thing that used to be there has stopped. */}
       {!hideEnded && ended.map((s) => (
         <SetupRow key={s.id} href={`/series/${s.id}`} name={s.name}
-                  meta={meta(s)} state="ended" />
+                  meta={meta(s)} state="ended"
+                  mark={tierBits(s).mark} markLabel={tierBits(s).markLabel} />
       ))}
     </SetupShell>
   );

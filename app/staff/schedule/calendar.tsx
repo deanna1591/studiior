@@ -8,6 +8,7 @@ import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { moveClass } from "./actions";
 import CreateOnSlot, { type SlotDraft } from "./create-slot";
+import { TierMark } from "@/components/tier-mark";
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -74,6 +75,8 @@ export type CalEvent = {
   /** Decision 21: flex and not yet decided. False once confirmed. */
   flexPending: boolean;
   tier: string | null;
+  effectiveTier?: string | null;
+  minimum?: number | null;
   standalone: boolean;
 };
 
@@ -82,7 +85,7 @@ type WallEvent = CalEvent & { start: Date; end: Date };
 
 export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
-  quietPct, quietWindowDays, fullPct,
+  quietPct, quietWindowDays, fullPct, showTier,
   anchor, today, view, minHour, maxHour, weekStartsOn,
 }: {
   events: CalEvent[];
@@ -92,6 +95,12 @@ export default function ScheduleCalendar({
   rooms: { id: string; name: string; capacity: number }[];
   timeZone: string;
   deadlineHours: number;
+  /**
+   * Decision 22's two switches, OR'd — the same condition as the tier control on
+   * /settings. Reform Collective runs flex on and guarantees off, so an AND
+   * would hide the mark on the one studio that has a mixed timetable to read.
+   */
+  showTier: boolean;
   /** §11's own thresholds, passed in so the calendar and the brief agree. */
   quietPct: number;
   quietWindowDays: number;
@@ -318,7 +327,12 @@ export default function ScheduleCalendar({
         // is not settled yet".
         outline: e.flexPending ? "1px dashed var(--ink-3)" : undefined,
         outlineOffset: "-2px",
-        opacity: f === "quiet" ? 0.92 : 1,
+        // NO OPACITY. It was 0.92 on a quiet block, which composites the label
+        // as well as the fill — this project has had to undo opacity on text
+        // twice for exactly that, and it was buying nothing here: quiet is
+        // already carried by the plain surface, the grey left border and the
+        // word "Quiet". Removing it makes the measurement honest rather than
+        // approximately right.
         color: "var(--ink)",
         borderRadius: 8,
         border: "none",
@@ -358,6 +372,24 @@ export default function ScheduleCalendar({
               {unstaffed && (
                 <span aria-hidden title="Nobody is teaching this">⚠ </span>
               )}
+              {/* THE TIER, AND ONLY THE TIER. Colour on this calendar already
+                  carries staffing and the dashed edge already means "flex,
+                  still waiting on its deadline" — a temporary state that clears
+                  when the class commits. Neither can also mean the tier, which
+                  is permanent: conflating them is why a committed flex class
+                  has until now looked exactly like a core one. A shape is the
+                  one channel nothing else is using. */}
+              {showTier && event.tier && (
+                <>
+                  <TierMark tier={event.tier as "core" | "flex" | "always"}
+                            effective={event.effectiveTier as "core" | "flex" | "always" | null}
+                            minimum={event.minimum ?? null} />
+                  <span className="sr-only">
+                    {event.tier === "flex" ? "Flex class. "
+                     : event.tier === "always" ? "Always runs. " : "Core class. "}
+                  </span>{" "}
+                </>
+              )}
               {event.title}
             </span>
             {/* The number a planner is actually scanning for, so it is the
@@ -384,13 +416,28 @@ export default function ScheduleCalendar({
               {event.waitlistCount === 0 && f === "quiet" && !event.flexPending && <span>Quiet</span>}
               {/* A flex slot with nothing else of this instructor's near it.
                   Worth seeing while you are still deciding where to put it:
-                  it is a trip for one class that may not run. */}
+                  it is a trip for one class that may not run.
+
+                  It used to be set in `--amber-deep`, which measured 3.58 here
+                  against a 4.5 floor — amber setting a sentence, which this
+                  palette does not allow: it is derived to be a DOT colour at
+                  3:1, not body text. It never showed up locally before because
+                  no seeded studio had a flex series to be standalone. Ink
+                  carries the words; the amber is already on the left border. */}
               {event.standalone && (
-                <span style={{ color: "var(--amber-deep)" }} title="Nothing else of this instructor's within 90 minutes">
+                <span className="text-ink-2" title="Nothing else of this instructor's within 90 minutes">
                   On its own
                 </span>
               )}
-              {event.flexPending && <span title="Runs only if it reaches its minimum">Flex</span>}
+              {/* The number that decides whether it runs, beside the word that
+                  says it might not. The word is the TEMPORARY half — it clears
+                  when the class commits — and the ○ beside the name is the
+                  permanent one. */}
+              {event.flexPending && (
+                <span title="Runs only if it reaches its minimum">
+                  Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}
+                </span>
+              )}
             </span>
           </div>
         </div>
@@ -604,6 +651,15 @@ export default function ScheduleCalendar({
         runs. A ring means full, a plain block means quiet with the class close
         enough to do something about, amber means nobody is teaching it, and a
         dashed edge means a flex class still waiting on its deadline.
+        {showTier ? (
+          <>
+            {" "}
+            <span className="tier-mark">●</span> is a core class and{" "}
+            <span className="tier-mark">○</span> a flex one — that is what the class
+            IS, and it does not change. The dashed edge is the temporary half: it
+            clears the moment a flex class reaches its minimum and commits.
+          </>
+        ) : null}
       </p>
     </div>
   );

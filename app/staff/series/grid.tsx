@@ -1,3 +1,4 @@
+import { TierMark } from "@/components/tier-mark";
 import Link from "next/link";
 import { DAYS, parseRrule } from "@/lib/rrule";
 
@@ -18,6 +19,9 @@ export type GridSeries = {
    * cannot see it — and it would otherwise draw as though it were still running.
    */
   ended?: boolean;
+  /** Decision 22's tier, resolved by the page in the same order as the database. */
+  tier?: "core" | "flex" | "always";
+  minimum?: number | null;
 };
 
 const MIN_IN_DAY = 24 * 60;
@@ -207,10 +211,17 @@ export default function SeriesGrid({
                     >
                       <div className={`truncate text-[11.5px] font-medium leading-[14px] ${
                         ended ? "text-ink-2 line-through decoration-ink-3" : "text-ink"}`}>
+                        {/* Before the name, so a column of them scans. The shape
+                            carries it: the block's colour is already the studio's
+                            own class-type colour and must stay that. */}
+                        {b.tier && <TierMark tier={b.tier} className="mr-1" />}
                         {b.name}
                       </div>
                       <div className="num truncate text-[10.5px] leading-[13px] text-ink-2">
                         {hhmm(b.start)}
+                        {b.tier === "flex" && b.minimum != null && (
+                          <span className="ml-1 font-sans text-ink-2">flex · {b.minimum}+</span>
+                        )}
                         {noRoom && <span className="ml-1 font-sans" style={{ color: "var(--coral)" }}>no room</span>}
                         {ending && <span className="ml-1 font-sans text-ink-2">ends {b.ends_on}</span>}
                         {ended && <span className="ml-1 font-sans text-ink-2">ended</span>}

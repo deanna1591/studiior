@@ -91,7 +91,7 @@ export default async function Schedule({
       supabase.from("shift_applications")
         .select("occurrence_id").eq("status", "pending"),
       supabase.from("studio_settings")
-        .select("unstaffed_deadline_hours, week_starts_on")
+        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
@@ -132,6 +132,7 @@ export default async function Schedule({
     occ_capacity: number; occ_booked: number; occ_waitlist: number; occ_staffing: string;
     occ_flex: boolean; occ_confirmed: boolean;
     occ_tier: string | null; occ_standalone: boolean | null;
+    occ_series_tier: string | null; occ_minimum: number | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -157,7 +158,13 @@ export default async function Schedule({
     // class is an ordinary class and drawing it differently would be marking a
     // distinction that has stopped existing.
     flexPending: o.occ_flex && !o.occ_confirmed,
-    tier: o.occ_tier ?? null,
+    // TWO FACTS, kept apart. `tier` is what the class IS — what the studio
+    // configured, and what the series list beside this screen shows. `effective`
+    // is what it will DO once the studio's switches are applied. They differ
+    // whenever a tier's switch is off, which is Reform Collective today.
+    tier: o.occ_series_tier ?? null,
+    effectiveTier: o.occ_tier ?? null,
+    minimum: o.occ_minimum ?? null,
     // A flex slot with nothing else of that instructor's beside it: the one
     // that costs a trip for a class that may not run, and the one a studio
     // should look at twice before putting it there.
@@ -328,6 +335,10 @@ export default async function Schedule({
           quietPct={Number(quietPct ?? 0.4)}
           quietWindowDays={Number(quietDays ?? 7)}
           fullPct={Number(fullPct ?? 0.95)}
+          // Decision 22's two switches, OR'd — the same condition as the tier
+          // control. A studio using neither sees no mark and no extra sentence
+          // in the legend.
+          showTier={(settings?.guarantees_enabled ?? false) || (settings?.flex_enabled ?? false)}
           anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
         />

@@ -394,6 +394,70 @@ select expect_true('...and gives a fill rate for flex and for core, to compare',
 select expect_true('...measured on what ran, so a cancellation does not drag it down',
   (current_setting('t.rep')::jsonb -> 'flex' ->> 'fill_pct')::numeric > 0);
 
+-- =============================================================================
+-- Migration 110: the calendar can say what a class IS, not only how it behaves
+-- =============================================================================
+-- `occurrence_guarantee()` demotes a tier whose switch is off to 'always' —
+-- correctly, because with that switch off the class genuinely runs regardless.
+-- But that demotion is studio-wide and carries no per-class information, so a
+-- calendar drawn from it marks every core class 'always' and disagrees with the
+-- series list beside it, which has no occurrence to resolve through and can only
+-- ever show what the studio configured.
+--
+-- `schedule_range()` therefore returns BOTH, and these assert they differ in
+-- exactly the case that caused the disagreement.
+set role authenticated;
+select set_config('request.jwt.claim.sub','f1e0f1e0-0000-0000-0000-0000000000a1',false);
+
+-- Studio A: flex ON, guarantees OFF — which is Reform Collective's own shape.
+-- THE LEGACY SHAPE, and it is the one on disk at any studio that used Decision
+-- 21's writer: `set_series_flex()` sets the BOOLEAN and never the column, so the
+-- series reads guarantee_tier='core' (the NOT NULL default) with flex=true. It
+-- is saved by the boolean being propagated to the occurrences, which is the
+-- second arm of the walk.
+select expect_text('(the fixture really is the legacy shape: column core, boolean true)',
+  (select guarantee_tier::text || '/' || flex::text from class_series
+    where id = 'f1e0f1e0-0000-0000-0000-00000000f001'), 'core/true');
+-- A window the suite's earlier sections have not reached into. Asserted to be
+-- untouched rather than assumed: those sections flip individual occurrences to
+-- guaranteed, and a range that included one would be measuring an override
+-- rather than the series.
+select expect_num('(the window under test carries no per-occurrence override)',
+  (select count(*) from class_occurrences o
+    where o.studio_id = 'f1e0f1e0-0000-0000-0000-000000000001'
+      and (o.starts_at at time zone 'Europe/Prague')::date
+          between current_date + 20 and current_date + 26
+      and o.guarantee_tier is not null), 0);
+
+select expect_text('a flex class behaves as flex where flex is on',
+  (select distinct occ_tier from schedule_range('f1e0f1e0-0000-0000-0000-000000000001',
+     current_date + 20, current_date + 26)), 'flex');
+select expect_text('...and says so as its configured tier too',
+  (select distinct occ_series_tier from schedule_range('f1e0f1e0-0000-0000-0000-000000000001',
+     current_date + 20, current_date + 26)), 'flex');
+select expect_true('...carrying the minimum that decides whether it runs',
+  (select min(occ_minimum) > 0 from schedule_range('f1e0f1e0-0000-0000-0000-000000000001',
+     current_date + 20, current_date + 26)));
+reset role;
+
+-- Studio C: flex OFF, and a series carrying the flag. THE ASSERTION THAT
+-- MATTERS: the two answers must come apart. The class BEHAVES as 'always',
+-- because with the switch off nothing evaluates it — and it IS still flex, which
+-- is what the series list shows and what the studio set.
+set role authenticated;
+select set_config('request.jwt.claim.sub','f1e0f1e0-0000-0000-0000-0000000000a3',false);
+select expect_text('with the switch off, a flex class BEHAVES as always',
+  (select distinct occ_tier from schedule_range('f1e0f1e0-0000-0000-0000-000000000003',
+     current_date + 20, current_date + 26)), 'always');
+select expect_text('...and is STILL configured flex, which is what the list shows',
+  (select distinct occ_series_tier from schedule_range('f1e0f1e0-0000-0000-0000-000000000003',
+     current_date + 20, current_date + 26)), 'flex');
+select expect_true('...so the two answers genuinely come apart',
+  (select bool_and(occ_tier <> occ_series_tier)
+     from schedule_range('f1e0f1e0-0000-0000-0000-000000000003',
+       current_date + 20, current_date + 26)));
+reset role;
+
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'flex suite finished' as done;

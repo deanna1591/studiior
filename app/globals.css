@@ -608,3 +608,17 @@ body {
   outline: 1px solid rgb(20 23 14 / 0.04);
   outline-offset: -1px;
 }
+
+/* Decision 22's tier mark — ● core, ○ flex, ◆ always.
+   Set a step LARGER than the metadata it sits beside, because the whole point is
+   that flex reads at a glance rather than as a subtle variation; at the same
+   size as an 11px label the difference between a filled and a hollow ring is
+   there and nobody sees it. `--ink-2` rather than `--ink-3`: the mark appears on
+   the series grid's class-type tint and on the calendar's staffing tints, and
+   `--ink-3` is the documented floor on plain white with nothing to spare. */
+.tier-mark {
+  font-size: 1.05em;
+  line-height: 1;
+  color: var(--ink-2);
+  font-variant-emoji: text;
+}
