@@ -26,10 +26,13 @@ type Rec = {
  */
 export default async function MePage() {
   const { ctx, supabase } = await instructorScreen();
-  const { data } = await supabase.rpc("instructor_recognition", {
-    p_instructor_id: ctx.instructor_id,
-  });
+  const [{ data }, { data: relData }] = await Promise.all([
+    supabase.rpc("instructor_recognition", { p_instructor_id: ctx.instructor_id }),
+    supabase.rpc("instructor_reliability", { p_instructor_id: ctx.instructor_id }),
+  ]);
   const r = data as Rec | null;
+  const rel = relData as unknown as
+    { applied: number; approved: number; withdrawn: number; short_notice: number } | null;
 
   return (
     <InstructorShell ctx={ctx} title="Me">
@@ -45,6 +48,29 @@ export default async function MePage() {
         {r?.state === "empty" && <p className="m-sub mt-2 text-ink-3">{r.empty_hint}</p>}
       </div>
       <p className="m-sub mt-2 text-ink-3">{r?.not_a_leaderboard}</p>
+
+      {/* Your own shift record — applied, approved, withdrawn. Yours to see, so
+          you can manage it yourself before anybody has to mention it. Not a
+          score and nothing is held against it. */}
+      {rel && rel.applied > 0 && (
+        <div className="m-card mt-4 px-4 py-4">
+          <p className="m-sub text-ink-3">Open shifts you have taken on</p>
+          <p className="mt-1 text-[15px] leading-6 text-ink">
+            Applied for <span className="num font-semibold">{rel.applied}</span>,
+            approved for <span className="num font-semibold">{rel.approved}</span>,
+            withdrew from <span className="num font-semibold">{rel.withdrawn}</span>.
+          </p>
+          {rel.short_notice > 0 && (
+            <p className="m-sub mt-1 text-ink-2">
+              <span className="num">{rel.short_notice}</span> of those withdrawals came at short
+              notice — inside the studio&rsquo;s cover window, when it is hardest to fill.
+            </p>
+          )}
+          <p className="m-sub mt-1.5 text-ink-3">
+            Nobody is scored on this. It is here so you can keep an eye on it yourself.
+          </p>
+        </div>
+      )}
 
       <div className="m-card mt-4 px-4 py-4">
         <p className="m-sub text-ink-3">Signed in as</p>

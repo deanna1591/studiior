@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { staffScreen } from "@/lib/screen";
+import { isManagerUp } from "@/lib/auth";
+import OpenShift from "../open-shift";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { HealthChip, bandOf } from "@/components/health-band";
 import { fmtDayLong, fmtTime, relativeDayName } from "@/lib/time";
@@ -18,7 +20,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
 
   const { data: occ } = await supabase
     .from("class_occurrences")
-    .select("id, name, starts_at, capacity, booked_count, waitlist_count, status, instructors!instructor_id(display_name), rooms(name)")
+    .select("id, name, starts_at, capacity, booked_count, waitlist_count, status, staffing, instructor_id, instructors!instructor_id(display_name), rooms(name)")
     .eq("id", params.occurrenceId)
     .maybeSingle();
   if (!occ) notFound();
@@ -78,6 +80,13 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
         {inCount > 0 && <>, <span className="num text-ink">{inCount}</span> checked in</>}
         {occ.status === "cancelled" && " · this class is cancelled"}
       </p>
+
+      {/* Take the instructor off and open the shift — from the class itself.
+          Manager-up, and only while there is somebody to remove on a live
+          class. */}
+      {isManagerUp(ctx.role) && occ.status === "scheduled" && occ.instructor_id && (
+        <OpenShift occurrenceId={occ.id} instructorName={occ.instructors?.display_name ?? "the instructor"} />
+      )}
 
       {/* The desk end of the member's rotating code. Without it the QR on
           their phone is a picture nothing can read. */}

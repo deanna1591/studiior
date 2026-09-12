@@ -133,6 +133,7 @@ export default async function Schedule({
     occ_flex: boolean; occ_confirmed: boolean;
     occ_tier: string | null; occ_standalone: boolean | null;
     occ_series_tier: string | null; occ_minimum: number | null;
+    occ_status: string; occ_cancellation_cause: string | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -169,6 +170,10 @@ export default async function Schedule({
     // that costs a trip for a class that may not run, and the one a studio
     // should look at twice before putting it there.
     standalone: (o.occ_standalone ?? false) && !o.occ_confirmed,
+    // A flex class the cutoff cancelled for want of its minimum. schedule_range
+    // keeps it (migration 116) so the slot that cancels week after week is
+    // visible; the calendar draws it not-running with the count that decided it.
+    notRunning: o.occ_status === "cancelled" && o.occ_cancellation_cause === "unmet_minimum",
   }));
 
   // THE VISIBLE HOURS COME FROM WHAT IS ON THE SCHEDULE, not from a constant.

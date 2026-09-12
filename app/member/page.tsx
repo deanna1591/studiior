@@ -49,6 +49,7 @@ export default async function MemberHome() {
     supabase
       .from("class_occurrences")
       .select("id, name, starts_at, capacity, booked_count, instructors!instructor_id(display_name), class_types(image_url, image_focus_x, image_focus_y)")
+      .eq("status", "scheduled")
       .gt("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(3),

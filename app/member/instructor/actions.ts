@@ -95,7 +95,10 @@ export async function withdrawApplication(
   _prev: InstructorState, form: FormData,
 ): Promise<InstructorState> {
   const supabase = createClient();
-  const { error } = await supabase.rpc("withdraw_from_shift", {
+  // withdraw_application(), not withdraw_from_shift(): this is a PENDING
+  // application on an open shift, where there is no assigned instructor —
+  // withdraw_from_shift() requires being the one teaching it and refused here.
+  const { error } = await supabase.rpc("withdraw_application", {
     p_occurrence_id: String(form.get("occurrence_id")),
   });
   if (error) return { error: error.message };

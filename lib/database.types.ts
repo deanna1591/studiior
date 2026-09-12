@@ -921,6 +921,7 @@ export type Database = {
           description: string | null
           ends_at: string
           flex: boolean
+          flex_reached_minimum_at: string | null
           guarantee_tier: Database["public"]["Enums"]["guarantee_tier"] | null
           id: string
           instructor_confirmed_at: string | null
@@ -934,6 +935,8 @@ export type Database = {
           room_id: string | null
           series_id: string | null
           series_slot_at: string | null
+          shift_alert_sent_at: string | null
+          shift_opened_at: string | null
           staffing: Database["public"]["Enums"]["staffing_state"]
           starts_at: string
           status: Database["public"]["Enums"]["occurrence_status"]
@@ -960,6 +963,7 @@ export type Database = {
           description?: string | null
           ends_at: string
           flex?: boolean
+          flex_reached_minimum_at?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
           instructor_confirmed_at?: string | null
@@ -973,6 +977,8 @@ export type Database = {
           room_id?: string | null
           series_id?: string | null
           series_slot_at?: string | null
+          shift_alert_sent_at?: string | null
+          shift_opened_at?: string | null
           staffing?: Database["public"]["Enums"]["staffing_state"]
           starts_at: string
           status?: Database["public"]["Enums"]["occurrence_status"]
@@ -999,6 +1005,7 @@ export type Database = {
           description?: string | null
           ends_at?: string
           flex?: boolean
+          flex_reached_minimum_at?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
           instructor_confirmed_at?: string | null
@@ -1012,6 +1019,8 @@ export type Database = {
           room_id?: string | null
           series_id?: string | null
           series_slot_at?: string | null
+          shift_alert_sent_at?: string | null
+          shift_opened_at?: string | null
           staffing?: Database["public"]["Enums"]["staffing_state"]
           starts_at?: string
           status?: Database["public"]["Enums"]["occurrence_status"]
@@ -4941,6 +4950,7 @@ export type Database = {
       shift_applications: {
         Row: {
           applied_at: string
+          approved_at: string | null
           created_at: string
           decided_at: string | null
           decided_by: string | null
@@ -4951,9 +4961,12 @@ export type Database = {
           status: string
           studio_id: string
           updated_at: string
+          withdrawal_notice_hours: number | null
+          withdrawn_at: string | null
         }
         Insert: {
           applied_at?: string
+          approved_at?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -4964,9 +4977,12 @@ export type Database = {
           status?: string
           studio_id: string
           updated_at?: string
+          withdrawal_notice_hours?: number | null
+          withdrawn_at?: string | null
         }
         Update: {
           applied_at?: string
+          approved_at?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -4977,6 +4993,8 @@ export type Database = {
           status?: string
           studio_id?: string
           updated_at?: string
+          withdrawal_notice_hours?: number | null
+          withdrawn_at?: string | null
         }
         Relationships: [
           {
@@ -6251,8 +6269,36 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_checkin: {
+        Args: {
+          label: string
+          p_at: string
+          p_booking: string
+          p_member: string
+          p_occ: string
+          p_studio: string
+          want_ok: boolean
+        }
+        Returns: undefined
+      }
       expect_false: {
         Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_null: {
+        Args: { actual: string; label: string }
+        Returns: undefined
+      }
+      expect_null_state: {
+        Args: { actual: Json; label: string }
         Returns: undefined
       }
       expect_num: {
@@ -6278,6 +6324,10 @@ export type Database = {
       }
       expect_true: {
         Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_write: {
+        Args: { label: string; sql: string; want_ok: boolean }
         Returns: undefined
       }
       extend_trial: {
@@ -6394,6 +6444,10 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: Json
       }
+      instructor_reliability: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
       instructor_roster: { Args: { p_occurrence_id: string }; Returns: Json }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       instructor_valid_on: {
@@ -6437,6 +6491,7 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: boolean
       }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
@@ -6598,6 +6653,7 @@ export type Database = {
         Args: { p_member_id: string; p_template: string }
         Returns: boolean
       }
+      notify_open_shifts: { Args: never; Returns: Json }
       occurrence_guarantee: {
         Args: { p_occurrence_id: string }
         Returns: {
@@ -6635,6 +6691,10 @@ export type Database = {
       occurrence_seats_taken: {
         Args: { p_occurrence_id: string }
         Returns: number
+      }
+      open_shift: {
+        Args: { p_occurrence_id: string; p_reason: string }
+        Returns: Json
       }
       pay_statement: {
         Args: { p_instructor_id: string; p_period_id: string }
@@ -6684,6 +6744,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      psig: { Args: { body: string; secret?: string }; Returns: string }
       publication_enabled: { Args: { p_studio_id: string }; Returns: boolean }
       publish_month: {
         Args: { p_month: string; p_studio_id: string }
@@ -6888,6 +6949,7 @@ export type Database = {
           local_end: string
           local_start: string
           occ_booked: number
+          occ_cancellation_cause: string
           occ_capacity: number
           occ_confirmed: boolean
           occ_flex: boolean
@@ -7079,6 +7141,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -7249,6 +7312,7 @@ export type Database = {
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      t_late_cancel: { Args: { p_days: number; p_n: number }; Returns: string }
       timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {
         Args: {
@@ -7281,6 +7345,7 @@ export type Database = {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
+      withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
     }

@@ -75,6 +75,11 @@ export default async function Book({
       supabase
         .from("class_occurrences")
         .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name)")
+        // A flex class the cutoff turned off is GONE here — not shown cancelled,
+        // not struck through, absent. occ_member_read already hides it from a
+        // member who never booked it; this closes the own-read path for one who
+        // did, so a not-running class leaves no trace in the bookable list.
+        .eq("status", "scheduled")
         .gte("starts_at", from.toISOString())
         .lt("starts_at", to.toISOString())
         .order("starts_at"),

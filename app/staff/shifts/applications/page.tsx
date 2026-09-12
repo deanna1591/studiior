@@ -34,7 +34,7 @@ export default async function Applications() {
 
   const [{ data: apps }, { data: unstaffed }] = await Promise.all([
     supabase.from("shift_applications")
-      .select("id, occurrence_id, applied_at, note, instructors(display_name), class_occurrences(name, starts_at, ends_at, booked_count, rooms(name))")
+      .select("id, occurrence_id, instructor_id, applied_at, note, instructors(display_name), class_occurrences(name, starts_at, ends_at, booked_count, rooms(name))")
       .eq("status", "pending")
       .order("applied_at"),
     supabase.from("class_occurrences")
@@ -50,6 +50,16 @@ export default async function Applications() {
     list.push(a);
     byOcc.set(a.occurrence_id, list as typeof apps);
   }
+
+  // Reliability, as plain context beside each name — "applied for 14, withdrew
+  // from 3". Not a score, not a ranking; it changes nothing about who can be
+  // approved. Studiior measures, the studio judges.
+  const applicantIds = [...new Set((apps ?? []).map((a) => a.instructor_id))];
+  const relEntries = await Promise.all(applicantIds.map(async (id) => {
+    const { data } = await supabase.rpc("instructor_reliability", { p_instructor_id: id });
+    return [id, data as unknown as { summary: string; withdrawn: number; short_notice: number } | null] as const;
+  }));
+  const reliability = new Map(relEntries);
 
   const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone)}`;
 
@@ -86,6 +96,20 @@ export default async function Applications() {
                         <span className="block truncate text-[14px] leading-5 text-ink">
                           {a.instructors?.display_name}
                         </span>
+                        {(() => {
+                          const r = reliability.get(a.instructor_id);
+                          if (!r || r.summary === "No applications yet") return null;
+                          return (
+                            <span className="mt-0.5 block text-[12px] leading-4 text-ink-3">
+                              {r.summary}
+                              {r.short_notice > 0 && (
+                                <span className="text-ink-2">
+                                  {" "}· {r.short_notice} at short notice
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                         {a.note && (
                           <span className="block text-[12px] leading-4 text-ink-2">{a.note}</span>
                         )}

@@ -78,6 +78,9 @@ export type CalEvent = {
   effectiveTier?: string | null;
   minimum?: number | null;
   standalone: boolean;
+  /** A flex class the cutoff turned off — a DECIDED state, not the dashed
+   *  "still waiting on its deadline". Kept apart on purpose. */
+  notRunning?: boolean;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -298,6 +301,18 @@ export default function ScheduleCalendar({
   }, [quietPct, quietWindowDays, fullPct]);
 
   const eventPropGetter = useCallback((e: WallEvent) => {
+    // A not-running flex slot is a decided cancellation: muted, with a
+    // line-through in the content, and NOT dashed (dashed means "flex, still
+    // deciding"). The ink stays full strength — muting the tint, not the text,
+    // is the lesson from the ended-series block.
+    if (e.notRunning) {
+      return {
+        style: {
+          background: "color-mix(in srgb, var(--ink-3) 8%, var(--surface))",
+          borderLeft: "3px solid var(--ink-3)",
+        },
+      };
+    }
     const unstaffed = e.staffing !== "assigned";
     const waiting = e.staffing === "pending_approval";
     // The single worst state in the timetable: people are coming, the deadline
@@ -365,6 +380,24 @@ export default function ScheduleCalendar({
     event: ({ event }: { event: WallEvent }) => {
       const f = fullness(event);
       const unstaffed = event.staffing !== "assigned";
+      if (event.notRunning) {
+        return (
+          <div className="text-[12px] leading-4">
+            <div className="flex items-baseline justify-between gap-1.5">
+              <span className="min-w-0 truncate font-medium text-ink line-through">{event.title}</span>
+              <span className="num shrink-0 text-[13px] font-semibold tabular-nums">
+                {event.bookedCount}/{event.capacity}
+              </span>
+            </div>
+            <div className="text-ink-2">
+              Not running — {event.bookedCount === 0 ? "nobody booked"
+                : (event.minimum ?? 0) > 0
+                  ? `${event.bookedCount} booked, needed ${event.minimum}`
+                  : `${event.bookedCount} booked`}
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="text-[12px] leading-4">
           <div className="flex items-baseline justify-between gap-1.5">

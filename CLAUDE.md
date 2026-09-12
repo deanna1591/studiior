@@ -946,6 +946,8 @@ The grant half is clean. `anon` reaches **exactly nine** surfaces and they are t
 
 **Twenty open cover forms is a wall.** The instructor's month screen first rendered the full ask-for-cover form under every class; it is a native `<details>` now, one line per class, opening on demand, with no state to lose.
 
+**THE FOUR SHIFT/FLEX SURFACES ARE WIRED.** open_shift() has a control on the roster (`/roster/[occurrenceId]`, which the calendar links to): a disclosure that takes the named instructor off with a required reason, manager-up, only on a live class with an instructor. The reliability record (115) shows as plain context beside each applicant on `/shifts/applications` — "applied for 2, withdrew from 1 · 1 at short notice" — and on the instructor's own `/instructor/me`, said as "nobody is scored on this". The portal's "withdraw application" now calls `withdraw_application()` rather than `withdraw_from_shift()`, which had 403'd on an open shift since 064. A not-running flex class draws on the staff calendar as a muted, struck-through block reading "Not running — N booked, needed M" (NOT the dashed flex-waiting edge, which is a different state), and is filtered out of the member `/book` and home lists with an explicit `status = 'scheduled'` — belt to the RLS braces, closing the own-read path for a member who had booked it. Part 2's alert is email-only (`notify_open_shifts` cron); there is no screen.
+
 **Next:** selling a plan to a member (§9 gives front desk that, unlike editing), then cancellation and the waitlist promotion flow.
 
 ---
