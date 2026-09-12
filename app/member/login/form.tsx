@@ -1,10 +1,9 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
 import { signIn } from "../actions";
+import { useAuthAction } from "@/components/member/ui";
 
-function Submit({ onImage }: { onImage: boolean }) {
-  const { pending } = useFormStatus();
+function Submit({ pending }: { pending: boolean }) {
   return (
     <button
       disabled={pending}
@@ -27,7 +26,7 @@ function Submit({ onImage }: { onImage: boolean }) {
  * photograph happened to be doing.
  */
 export default function LoginForm({ onImage }: { onImage: boolean }) {
-  const [error, action] = useFormState(signIn, null);
+  const { error, pending, onSubmit } = useAuthAction(signIn, "/");
 
   const field = onImage
     ? "m-glass-field m-tap w-full rounded-xl px-3.5 text-[16px] outline-none"
@@ -35,7 +34,7 @@ export default function LoginForm({ onImage }: { onImage: boolean }) {
   const label = onImage ? "text-white/80" : "text-ink-2";
 
   return (
-    <form action={action} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
       {error && (
         <p
           role="alert"
@@ -61,7 +60,7 @@ export default function LoginForm({ onImage }: { onImage: boolean }) {
                className={field} />
       </label>
 
-      <Submit onImage={onImage} />
+      <Submit pending={pending} />
     </form>
   );
 }

@@ -7,19 +7,29 @@ import { getMemberContext } from "@/lib/auth";
 import { stripeFor } from "@/lib/stripe";
 import { memberOrigin } from "@/lib/tenant";
 
-export async function signIn(_prev: string | null, formData: FormData) {
+export type SignInResult = { error: string } | { ok: true } | null;
+
+export async function signIn(_prev: SignInResult, formData: FormData): Promise<SignInResult> {
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),
   });
-  if (error) return error.message;
-  redirect("/");
+  if (error) return { error: error.message };
+  // NOT redirect("/"): a server-action redirect to a member path renders the
+  // STAFF app (the redirect-follow request loses the studio subdomain, so
+  // middleware resolves the bare host as staff). The form does a full-document
+  // navigation, which keeps the subdomain and re-runs the host->app rewrite.
+  return { ok: true };
 }
 
 export async function signOut() {
   const supabase = createClient();
   await supabase.auth.signOut();
+  // KNOWN BUG (same class as sign-in): a server-action redirect to a member
+  // path renders the staff app, so this lands a signed-out member on the staff
+  // login. Sign-OUT is lower severity than the sign-in 404 and the fix is a
+  // client-side navigation from the button; tracked in CLAUDE.md.
   redirect("/login");
 }
 
@@ -198,7 +208,7 @@ export async function respondToOffer(_prev: ActionResult, formData: FormData): P
     : { ok: true, message: "No problem — the seat goes to the next person." };
 }
 
-export type ClaimState = { error: string } | null;
+export type ClaimState = { error: string } | { ok: true } | null;
 
 /**
  * Take up an invite: account, profile and members.user_id, or none of it.
@@ -238,7 +248,8 @@ export async function claimAccount(_prev: ClaimState, fd: FormData): Promise<Cla
   if (r.email) {
     await supabase.auth.signInWithPassword({ email: r.email, password });
   }
-  redirect("/");
+  // Client navigates: a server redirect to a member path renders the staff app.
+  return { ok: true };
 }
 
 /**
@@ -270,7 +281,7 @@ export async function finishSignup(_prev: ClaimState, fd: FormData): Promise<Cla
   }
 
   revalidateMember();
-  redirect("/");
+  return { ok: true };
 }
 
 /** Self-signup: create the account, Supabase sends the confirmation. */
@@ -291,7 +302,7 @@ export async function signUp(_prev: ClaimState, fd: FormData): Promise<ClaimStat
       ? { error: "There is already an account for that email. Try signing in instead." }
       : { error: error.message };
   }
-  redirect("/signup?sent=1");
+  return { ok: true };
 }
 
 /**

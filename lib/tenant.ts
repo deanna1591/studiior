@@ -53,3 +53,4 @@ export function memberOrigin(slug: string): string {
   const scheme = base.includes("localhost") || base.includes("lvh.me") ? "http" : "https";
   return `${scheme}://${slug}.${base}`;
 }
+

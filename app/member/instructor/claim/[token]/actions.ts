@@ -1,12 +1,11 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
 
-export type ClaimState = { error: string } | null;
+export type ClaimState = { error: string } | { ok: true } | null;
 
 const SAYS: Record<string, string> = {
   invalid: "That link is not one we recognise.",
@@ -54,5 +53,7 @@ export async function claimInstructor(
   // thirty seconds after they chose it.
   const supabase = createClient();
   if (email) await supabase.auth.signInWithPassword({ email, password });
-  redirect("/instructor");
+  // Full-document navigation happens in the form: a server redirect to a
+  // member path renders the staff app. See app/member/actions signIn.
+  return { ok: true };
 }

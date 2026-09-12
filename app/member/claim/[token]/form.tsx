@@ -1,16 +1,15 @@
 "use client";
 
-import { useFormState } from "react-dom";
 import { claimAccount, type ClaimState } from "../../actions";
-import { Note, PrimaryButton } from "@/components/member/ui";
+import { Note, PrimaryButton, useAuthAction } from "@/components/member/ui";
 
 export default function ClaimForm({
   token, email, slug,
 }: { token: string; email: string; slug: string }) {
-  const [state, action] = useFormState<ClaimState, FormData>(claimAccount, null);
+  const { error, pending, onSubmit } = useAuthAction(claimAccount, "/");
   return (
-    <form action={action} className="mt-6 space-y-4">
-      {state && <Note ok={false}>{state.error}</Note>}
+    <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      {error && <Note ok={false}>{error}</Note>}
       <input type="hidden" name="token" value={token} />
       <p className="m-sub text-ink-2">
         Signing in as <span className="text-ink">{email}</span>
@@ -26,7 +25,7 @@ export default function ClaimForm({
                className="m-tap w-full rounded-lg border border-line-2 bg-surface px-3 text-[15px] text-ink" />
         <span className="m-micro mt-1 block text-ink-3">At least 8 characters.</span>
       </label>
-      <PrimaryButton>Set up my account</PrimaryButton>
+      <PrimaryButton pending={pending}>Set up my account</PrimaryButton>
       <input type="hidden" name="slug" value={slug} />
     </form>
   );

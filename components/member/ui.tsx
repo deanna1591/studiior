@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { ActionResult, BookResult } from "@/app/member/actions";
 
@@ -30,8 +31,13 @@ export function Note({ ok, children }: { ok: boolean; children: React.ReactNode 
 export const accentFill = { background: "var(--accent-solid)", color: "var(--accent-on-solid)" };
 
 /** The one big button. 56px, accent-filled, and only ever one per screen. */
-export function PrimaryButton({ children }: { children: React.ReactNode }) {
-  const { pending } = useFormStatus();
+export function PrimaryButton({ children, pending: pendingProp }: {
+  children: React.ReactNode; pending?: boolean;
+}) {
+  // useFormStatus only reports pending inside a <form action>. The auth forms
+  // call their action directly (see useAuthAction) and pass pending in.
+  const status = useFormStatus();
+  const pending = pendingProp ?? status.pending;
   return (
     <button
       disabled={pending}
@@ -143,4 +149,40 @@ export function BookForm({
       {children}
     </form>
   );
+}
+
+
+/**
+ * The one way an auth form lands the member on the right app.
+ *
+ * A server action cannot redirect to a member path: a server-action redirect
+ * renders the STAFF app, because the redirect-follow request loses the studio
+ * subdomain and middleware resolves the bare host as staff — a member sign-in
+ * lands on "no studio access", an instructor sign-in on a 404. So the action
+ * returns { ok: true } and the CLIENT navigates with a full-document load,
+ * which keeps the subdomain and re-runs the host->app rewrite.
+ *
+ * The action is called DIRECTLY here rather than through <form action>, on
+ * purpose: a form-action server call auto-refreshes the current route, and on
+ * the claim page that success-refresh swaps the form out for the "used" state
+ * and beats a useEffect navigation. Calling it directly does no refresh, so
+ * the navigation always wins.
+ */
+export function useAuthAction<S extends { error: string } | { ok: true } | null>(
+  action: (prev: S | null, fd: FormData) => Promise<S | null>,
+  to: string,
+) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setError(null);
+    start(async () => {
+      const res = await action(null, fd);
+      if (res && "error" in res) setError(res.error);
+      else window.location.assign(to);
+    });
+  }
+  return { error, pending, onSubmit };
 }

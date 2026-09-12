@@ -1,14 +1,13 @@
 "use client";
 
-import { useFormState } from "react-dom";
-import { signUp, type ClaimState } from "../actions";
-import { Note, PrimaryButton } from "@/components/member/ui";
+import { signUp } from "../actions";
+import { Note, PrimaryButton, useAuthAction } from "@/components/member/ui";
 
 export default function SignupForm() {
-  const [state, action] = useFormState<ClaimState, FormData>(signUp, null);
+  const { error, pending, onSubmit } = useAuthAction(signUp, "/signup?sent=1");
   return (
-    <form action={action} className="mt-6 space-y-4">
-      {state && <Note ok={false}>{state.error}</Note>}
+    <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      {error && <Note ok={false}>{error}</Note>}
       <label className="block">
         <span className="m-sub mb-1.5 block font-medium text-ink">Your name</span>
         <input name="full_name" autoComplete="name"
@@ -27,7 +26,7 @@ export default function SignupForm() {
         <input name="password" type="password" required minLength={8} autoComplete="new-password"
                className="m-tap w-full rounded-lg border border-line-2 bg-surface px-3 text-[15px] text-ink" />
       </label>
-      <PrimaryButton>Create my account</PrimaryButton>
+      <PrimaryButton pending={pending}>Create my account</PrimaryButton>
     </form>
   );
 }

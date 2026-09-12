@@ -1,9 +1,8 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export type SignInState = { error: string } | null;
+export type SignInState = { error: string } | { ok: true } | null;
 
 /**
  * Sign in and land on THEIR OWN SCREEN.
@@ -31,5 +30,13 @@ export async function instructorSignIn(
              "If you are staff, sign in on the main site instead.",
     };
   }
-  redirect("/instructor");
+  // NOT a server redirect. A server-action redirect() to a member path renders
+  // its target against the STAFF app — the Host->app rewrite middleware applies
+  // to a normal request is not applied to the inline render of a redirect
+  // target, so `resolveHost` falls back to its staff default and /instructor
+  // 404s. Proved by redirecting here to "/" and getting the staff dashboard on
+  // reform.localhost. The form does a full-document navigation instead, which
+  // re-enters middleware with the right Host. See lib/tenant memberRedirectUrl
+  // note.
+  return { ok: true };
 }
