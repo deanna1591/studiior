@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { ActionResult, BookResult } from "@/app/member/actions";
+import { haptic } from "@/lib/haptics";
 
 export function Note({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
@@ -41,8 +42,9 @@ export function PrimaryButton({ children, pending: pendingProp }: {
   return (
     <button
       disabled={pending}
+      onClick={() => haptic("tap")}
       style={accentFill}
-      className="m-action w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60"
+      className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60"
     >
       {pending ? "One moment…" : children}
     </button>
@@ -55,8 +57,9 @@ export function CardAction({ children }: { children: React.ReactNode }) {
   return (
     <button
       disabled={pending}
+      onClick={() => haptic("tap")}
       style={accentFill}
-      className="m-tap min-w-[84px] rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
+      className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "…" : children}
     </button>
@@ -85,8 +88,9 @@ export function CardActionOutline({ children }: { children: React.ReactNode }) {
       // by darkening until it clears 4.5 against the SURFACE; the tint is that
       // surface with 12% accent over it, so the same colour lands at 3.88 on
       // it. Ink is measured on both.
+      onClick={() => haptic("tap")}
       style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
-      className="m-tap min-w-[84px] rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
+      className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "…" : children}
     </button>
@@ -98,8 +102,9 @@ export function QuietButton({ children }: { children: React.ReactNode }) {
   return (
     <button
       disabled={pending}
+      onClick={() => haptic("tap")}
       style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
-      className="m-tap inline-flex items-center rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
+      className="m-tap m-press inline-flex items-center rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "…" : children}
     </button>

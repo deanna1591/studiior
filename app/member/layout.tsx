@@ -40,6 +40,20 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function MemberLayout({ children }: { children: React.ReactNode }) {
-  return children;
+export default function MemberLayout({
+  children, modal,
+}: {
+  children: React.ReactNode;
+  /** The @modal parallel-route slot: a class tapped from inside the app is
+      intercepted into a bottom sheet here, while `children` (the page it was
+      tapped from) stays mounted underneath. A direct load renders the full
+      page and this slot is its `default` (null). */
+  modal: React.ReactNode;
+}) {
+  return (
+    <>
+      {children}
+      {modal}
+    </>
+  );
 }

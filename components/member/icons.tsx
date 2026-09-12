@@ -110,6 +110,14 @@ export function Icon({
       {name === "shield" && (
         <path d="M11 3 17.5 5.4v5c0 4-2.7 7.2-6.5 8.6-3.8-1.4-6.5-4.6-6.5-8.6v-5Z" {...s} />
       )}
+      {/* Pull-to-refresh: a circular arrow. An arrowhead on one end of a broken
+          ring so it reads as "again" rather than as a plain circle. */}
+      {name === "refresh" && (
+        <>
+          <path d="M17.5 8A7 7 0 1 0 18 11" {...s} />
+          <path d="M18 4v4h-4" {...s} />
+        </>
+      )}
       {name === "chevron-down" && <path d="M5.5 8.5 11 14l5.5-5.5" {...s} />}
       {name === "chevron-left" && <path d="M13 5.5 7.5 11l5.5 5.5" {...s} />}
       {name === "chevron-right" && <path d="M9 5.5 14.5 11 9 16.5" {...s} />}
@@ -127,5 +135,5 @@ export function Icon({
 export type IconName =
   | "home" | "calendar" | "qr" | "clock" | "card"
   | "person" | "door" | "chevron-left" | "chevron-right" | "chevron-down"
-  | "tick" | "certificate" | "bell" | "user" | "flame" | "ticket"
+  | "tick" | "certificate" | "bell" | "user" | "flame" | "ticket" | "refresh"
   | "camera" | "phone" | "shield";

@@ -622,3 +622,147 @@ body {
   color: var(--ink-2);
   font-variant-emoji: text;
 }
+
+/* --- member app: the interaction layer ------------------------------------
+
+   Everything below is what makes the app feel like an app rather than a page:
+   momentum, press states, a bottom sheet, and the slide a day change rides.
+   None of it changes a colour or a layout — the measured palette above is
+   untouched. There is no JS test runner in this project, so none of this
+   carries an assertion; it is driven-and-shown.
+
+   REDUCED MOTION is honoured wholesale at the bottom of this block: a member
+   who has asked their phone to stop animating gets instant state changes and
+   no slide, which is a correctness requirement, not a nicety. */
+
+/* Momentum on every scroller that a thumb flicks. -webkit-overflow-scrolling
+   is the iOS momentum flag; overscroll-behavior stops a flick at the end of a
+   horizontal strip from also scrolling the page, and stops a pull inside the
+   list from becoming the browser's own pull-to-refresh (we run our own). */
+.m-hscroll,
+.m-strip {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.m-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* The continuous date strip. A single horizontal scroller of many days —
+   scroll-snap so a flick still lands cleanly on a day rather than mid-tile,
+   proximity not mandatory so a slow drag is not fought. */
+.m-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 16px;
+}
+.m-strip > * { scroll-snap-align: start; }
+
+/* THE PRESS STATE. A tap responds before the server does: the element dips and
+   dims on :active, so the touch is acknowledged in the same frame the finger
+   lands rather than when the round trip returns. Scoped to .m-press so it is
+   opt-in and never fights a component that animates itself. transform, not a
+   layout change, so it composites and cannot shift anything around it.
+   -webkit-tap-highlight-color off, because the grey iOS flash is the furniture
+   we are replacing. touch-action: manipulation kills the 300ms double-tap
+   wait. */
+.m-press {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 90ms ease, opacity 90ms ease;
+}
+.m-press:active { transform: scale(0.96); opacity: 0.9; }
+
+/* The header owns the top safe area, the same way the tab bar owns the bottom
+   one. Only meaningful once viewport-fit=cover is set (it now is). */
+.m-safe-top { padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+
+/* --- the bottom sheet (class detail) --------------------------------------
+   A scrim plus a panel that rises from the bottom edge and owns the home
+   indicator. This is the member app's own furniture — the login panel is the
+   same idea — brought to the one screen that was a full page. */
+.m-sheet-scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgb(20 16 14 / 0.42);
+  animation: m-fade-in 180ms ease both;
+}
+.m-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
+  max-height: 92dvh;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -18px 44px rgb(0 0 0 / 0.22);
+  animation: m-sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* The sheet's own scroller carries the bottom inset so the last line clears
+     the home indicator. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.m-sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* The grab handle — the affordance that says "this pulls down". */
+.m-sheet-grab {
+  width: 36px; height: 4px; border-radius: 999px;
+  background: var(--line-2); margin: 8px auto 0;
+}
+@keyframes m-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes m-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.m-sheet-closing { animation: m-sheet-down 200ms ease both; }
+.m-sheet-scrim-closing { animation: m-fade-out 200ms ease both; }
+@keyframes m-sheet-down { to { transform: translateY(100%); } }
+@keyframes m-fade-out { to { opacity: 0; } }
+
+/* --- swipe-to-reveal (booked class → Cancel) ------------------------------
+   The card sits on a coral bed; dragging it left uncovers the Cancel action
+   underneath. The transform is driven from JS during the drag and settles to
+   one of two rest points with this transition. */
+.m-swipe-track { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+.m-swipe-track.m-dragging { transition: none; }
+.m-swipe-bed {
+  position: absolute; inset: 0; z-index: 0;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 22px; border-radius: 22px;
+  background: var(--coral-tint);
+}
+
+/* --- pull to refresh ------------------------------------------------------
+   A spinner that a downward pull at the top of the list drags into view. The
+   translate is set from JS; this is only the spinner's look. */
+.m-ptr {
+  display: flex; align-items: center; justify-content: center;
+  height: 44px; margin-top: -44px;
+  color: var(--ink-3);
+}
+.m-ptr-spin { animation: m-spin 700ms linear infinite; }
+@keyframes m-spin { to { transform: rotate(360deg); } }
+
+/* --- the day slide --------------------------------------------------------
+   A day change (swipe or a strip tap) is a server navigation, and the honest
+   way to make that read as a push/pop is to slide the INCOMING day in from the
+   side the gesture implies. The View Transitions API would also animate the
+   outgoing frame, but over a router.push it captures the new snapshot before
+   the round trip commits and animates nothing — so this animates the arrival,
+   which is reliable and needs no timing guess. Direction comes from a
+   sessionStorage flag the gesture set just before navigating. */
+.m-day-enter {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+.m-day-enter-fwd  { animation-name: m-day-in-right; }
+.m-day-enter-back { animation-name: m-day-in-left; }
+@keyframes m-day-in-right { from { transform: translateX(30px); opacity: 0.001; } }
+@keyframes m-day-in-left  { from { transform: translateX(-30px); opacity: 0.001; } }
+
+/* A member who has asked their OS to reduce motion gets none of the above. */
+@media (prefers-reduced-motion: reduce) {
+  .m-press,
+  .m-swipe-track,
+  .m-sheet,
+  .m-sheet-scrim,
+  .m-sheet-closing,
+  .m-sheet-scrim-closing,
+  .m-day-enter { animation: none !important; transition: none !important; }
+  .m-press:active { transform: none; }
+}

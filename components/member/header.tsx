@@ -27,9 +27,14 @@ export default function MemberHeader({
   avatarUrl: string | null;
 }) {
   return (
-    <header className="px-4 pb-2 pt-3">
+    // m-safe-top: the header owns the top safe area the way the tab bar owns
+    // the bottom one — dead until viewport-fit=cover, which the root layout now
+    // sets. pb-2 keeps the old spacing below.
+    <header className="m-safe-top px-4 pb-2">
       <div className="mx-auto flex max-w-lg items-center gap-3">
-        <Link href="/account" className="flex min-w-0 flex-1 items-center gap-2.5">
+        {/* min-h-11 gives the studio row a 44px tap height without moving the
+            8px logo — the target was 32px tall before. */}
+        <Link href="/account" className="m-press flex min-h-[44px] min-w-0 flex-1 items-center gap-2.5">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" aria-hidden
@@ -44,7 +49,10 @@ export default function MemberHeader({
           <Icon name="chevron-down" size={16} className="shrink-0 text-ink-3" />
         </Link>
 
-        <Link href="/account" aria-label="Your account">
+        {/* A 44×44 hit area around the 36px avatar; -mr-1 keeps it visually on
+            the edge. */}
+        <Link href="/account" aria-label="Your account"
+              className="m-press -mr-1 flex h-11 w-11 items-center justify-center">
           <Avatar name={memberName} url={avatarUrl} size={36} />
         </Link>
       </div>

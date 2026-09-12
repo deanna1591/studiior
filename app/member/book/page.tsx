@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Icon } from "@/components/member/icons";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
-import WeekStrip, { MonthGrid, type WeekDay, type MonthDay } from "@/components/member/week-strip";
-import ClassCard from "@/components/member/class-card";
-import { BookForm, ActionForm, CardAction, CardActionOutline } from "@/components/member/ui";
+import { MonthGrid, type MonthDay } from "@/components/member/week-strip";
+import DateStrip from "@/components/member/date-strip";
+import DayView from "@/components/member/day-view";
+import DayClasses, { type Row } from "@/components/member/day-classes";
 import { bookClass, cancelBooking, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
 
@@ -37,11 +38,7 @@ export default async function Book({
   // Monday 00:00 in Prague is Sunday 23:00 UTC, and the strip would open on
   // the previous week for every studio east of London.
   const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const dow = Math.max(0, WEEKDAYS.indexOf(
-    new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, weekday: "short" }).format(from),
-  ));
   const monthView = searchParams.v === "month";
-  const weekFromOffset = offset - dow;
 
   // What the strip or the grid needs pips for. In week view that is seven days
   // from the selected week's Monday; in month view it is the whole calendar
@@ -59,8 +56,14 @@ export default async function Book({
       new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, weekday: "short" }).format(d),
     ));
   })();
-  const gridFromOffset = monthView ? monthStart - monthStartDow : weekFromOffset;
-  const gridLength = monthView ? 42 : 7;
+  // Week view is now a CONTINUOUS strip, not a paged seven. It spans four weeks
+  // back and eight forward around the selected day, so a flick carries and the
+  // pips show the studio's rhythm well past the current week — the same window
+  // the strip fetches presence for, in one lightweight id+time query.
+  const STRIP_PAST = 28;
+  const STRIP_LEN = 84;
+  const gridFromOffset = monthView ? monthStart - monthStartDow : offset - STRIP_PAST;
+  const gridLength = monthView ? 42 : STRIP_LEN;
 
   const weekStartDay = dayStart(new Date(), ctx.timeZone, gridFromOffset);
   const weekEndDay = addDays(weekStartDay, gridLength);
@@ -131,7 +134,6 @@ export default async function Book({
   // Empty when the studio does not use peak hours at all, so everything below
   // renders exactly as it did before this feature existed.
   const peakOf = new Map((peak ?? []).map((r) => [r.occurrence_id, r]));
-  const anyPeak = (peak ?? []).some((r) => r.is_peak);
   // The persistent line is about the period the member is looking at, not about
   // "today" — a member browsing next week wants next week's number.
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
@@ -238,16 +240,75 @@ export default async function Book({
   const minutes = (a: string, b: string | null) =>
     b ? Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000) : null;
 
+  // The rules stay here, in SQL and the reader; the client only flips the card.
+  // Every state a row can be in is resolved on the server and handed over as a
+  // plain descriptor — peak-blocked, holding a paid seat, the free-cancellation
+  // note, whether this is the last peak class of the period — so DayClasses
+  // never recomputes any of the peak/flex/publication logic.
+  const rows: Row[] = shown.map((o) => {
+    const booking = byOcc.get(o.id);
+    const booked = booking?.status === "booked";
+    const waiting = booking?.status === "waitlisted";
+    const holding = booking?.status === "pending_payment";
+    const spaces = o.capacity - o.booked_count;
+    const full = spaces <= 0;
+    const past = new Date(o.starts_at).getTime() < now;
+    const mins = minutes(o.starts_at, o.ends_at);
+
+    const pk = peakOf.get(o.id);
+    const isPeak = pk?.is_peak ?? false;
+    const remaining = pk?.remaining ?? null;
+    const peakBlocked =
+      isPeak && remaining !== null && remaining !== undefined
+      && remaining <= 0 && !booked && !waiting && !holding;
+
+    const cutoffAt = new Date(new Date(o.starts_at).getTime() - settings.cancellationCutoff * 60_000);
+    const insideFreeWindow = Date.now() < cutoffAt.getTime();
+    const peakCancelNote =
+      booked && isPeak && remaining !== null && remaining !== undefined
+        ? insideFreeWindow
+          ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone)} — your peak class comes back`
+          : "Cancelling now still uses your peak class"
+        : null;
+
+    const base: Row["base"] = past ? "past"
+      : holding ? "holding"
+      : booked ? "booked"
+      : waiting ? "waiting"
+      : peakBlocked ? "peakBlocked"
+      : full ? "full"
+      : "none";
+
+    return {
+      id: o.id,
+      bookingId: booking?.id ?? null,
+      name: o.name,
+      href: `/class/${o.id}`,
+      startLabel: fmtTime(o.starts_at, ctx.timeZone),
+      endLabel: o.ends_at ? fmtTime(o.ends_at, ctx.timeZone) : null,
+      durationLabel: mins ? `${mins} min` : "—",
+      instructor: o.instructors?.display_name ?? null,
+      room: o.rooms?.name ?? null,
+      isPeak,
+      base,
+      spaces,
+      waitlistPosition: booking?.waitlist_position ?? null,
+      waitlistEnabled: settings.waitlistEnabled,
+      confirmLast: isPeak && remaining === 1,
+      peakCancelNote,
+    };
+  });
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       <section aria-label="Choose a day" className="mb-4">
         <div className="mb-2.5 flex items-center gap-2">
           <h2 className="m-head flex-1 truncate text-[17px] leading-6 text-ink">{monthLabel}</h2>
 
-          {/* Week / Month. Both halves work: Week pages seven days at a time,
-              Month draws the calendar block with the same pips. A segmented
-              control with a dead half is exactly the decorative control this
-              build refuses to draw. */}
+          {/* Week / Month. Week is now a continuous strip you flick; Month draws
+              the calendar block with the same pips and answers "when is the
+              next Saturday class". Each half is a full 44px target — the old
+              control was 28px tall. */}
           <div className="flex rounded-full p-0.5"
                style={{ background: "var(--surface)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
             {([["week", "Week"], ["month", "Month"]] as const).map(([v, label]) => {
@@ -257,7 +318,7 @@ export default async function Book({
                   key={v}
                   href={qs({ v: v === "week" ? undefined : v })}
                   aria-pressed={on}
-                  className="rounded-full px-3 py-1.5 text-[12px] font-semibold leading-4"
+                  className="m-press flex min-h-[44px] items-center rounded-full px-3.5 text-[12px] font-semibold leading-4"
                   style={on
                     ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
                     : { color: "var(--ink-2)" }}
@@ -268,23 +329,27 @@ export default async function Book({
             })}
           </div>
 
-          <div className="flex items-center gap-1">
-            <Link href={qs({ d: offset - (monthView ? 28 : 7) })} aria-label={monthView ? "Earlier" : "Previous week"}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-2"
-                  style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-              <Icon name="chevron-left" size={16} />
-            </Link>
-            <Link href={qs({ d: offset + (monthView ? 28 : 7) })} aria-label={monthView ? "Later" : "Next week"}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-ink-2"
-                  style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-              <Icon name="chevron-right" size={16} />
-            </Link>
-          </div>
+          {/* Month paging only. Week has no chevrons any more — the strip is the
+              navigation. 44px, up from the old 32. */}
+          {monthView && (
+            <div className="flex items-center gap-1">
+              <Link href={qs({ d: offset - 28 })} aria-label="Earlier"
+                    className="m-press flex h-11 w-11 items-center justify-center rounded-full bg-surface text-ink-2"
+                    style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+                <Icon name="chevron-left" size={18} />
+              </Link>
+              <Link href={qs({ d: offset + 28 })} aria-label="Later"
+                    className="m-press flex h-11 w-11 items-center justify-center rounded-full bg-surface text-ink-2"
+                    style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+                <Icon name="chevron-right" size={18} />
+              </Link>
+            </div>
+          )}
         </div>
 
         {monthView
           ? <MonthGrid days={days} hrefFor={(o) => qs({ d: o, v: undefined })} />
-          : <WeekStrip days={days as WeekDay[]} hrefFor={(o) => qs({ d: o })} />}
+          : <DateStrip days={days.map((d) => ({ ...d, href: qs({ d: d.offset }) }))} selectedOffset={offset} />}
       </section>
 
       <div className="m-hscroll -mx-4 mb-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
@@ -346,6 +411,10 @@ export default async function Book({
         </p>
       )}
 
+      {/* Swipe left/right anywhere on the day to move between days, and pull
+          down at the top to refresh. The arriving day slides in from the side
+          the gesture implied. */}
+      <DayView key={offset} prevHref={qs({ d: offset - 1 })} nextHref={qs({ d: offset + 1 })}>
       {shown.length === 0 ? (
         <div className="m-card p-6 text-center">
           <p className="m-body text-ink">
@@ -374,145 +443,15 @@ export default async function Book({
           </p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {shown.map((o) => {
-            const booking = byOcc.get(o.id);
-            const booked = booking?.status === "booked";
-            const waiting = booking?.status === "waitlisted";
-            // A seat held while the member finishes paying. Deliberately not
-            // rendered as booked: they have not paid, the sweep will take it
-            // back, and telling them they are in the class would be a lie with
-            // a fifteen-minute fuse on it.
-            const holding = booking?.status === "pending_payment";
-            const spaces = o.capacity - o.booked_count;
-            const full = spaces <= 0;
-            const past = new Date(o.starts_at).getTime() < now;
-            const mins = minutes(o.starts_at, o.ends_at);
-
-            // Decision 24. `isPeak` is true whenever the studio marks this hour,
-            // whether or not this member's plan has an allowance — a studio
-            // marking its busy hours is telling every member something true.
-            // `peakBlocked` is the narrower thing: peak, and this member has
-            // nothing left for THIS class's period.
-            // Decision 24: what cancelling costs, said BEFORE they press it.
-            // The free window is the studio's one cancellation cutoff — there is
-            // no second deadline — and after it a peak slot stays spent.
-            // Already on the bootstrap — the member context has carried the
-            // studio's one cancellation cutoff since migration 051, so this
-            // costs no extra round trip.
-            const cutoffAt = new Date(new Date(o.starts_at).getTime()
-                                      - settings.cancellationCutoff * 60_000);
-            const insideFreeWindow = Date.now() < cutoffAt.getTime();
-
-            const pk = peakOf.get(o.id);
-            const isPeak = pk?.is_peak ?? false;
-            const peakBlocked =
-              isPeak && pk?.remaining !== null && pk?.remaining !== undefined
-              && pk.remaining <= 0 && !booked && !waiting && !holding;
-
-            const status = booked ? "Booked"
-              : holding ? "Holding your spot"
-              : waiting ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the list</>
-              : past ? "This one has started"
-              : full ? "Fully booked"
-              : <><span className="num">{spaces}</span> left</>;
-
-            const action = past ? null
-              // EXHAUSTED SLOTS STAY VISIBLE AND DISABLED. Hiding them would
-              // make the timetable look emptier than it is and teach a member
-              // that the studio has nothing on at the hour they want; the
-              // honest answer is the class, in its place, with the reason.
-              : peakBlocked ? (
-                  <span className="m-meta max-w-[7.5rem] text-right leading-[15px] text-ink-2">
-                    No peak classes left this period
-                  </span>
-                )
-              : holding ? (
-                  // Two ways to settle a held seat, because Decision 16 makes
-                  // paying by card optional for the member as well as for the
-                  // studio. Card is the filled button because they are already
-                  // on their phone; the desk is a quiet link beside it.
-                  <span className="flex flex-col items-end gap-1.5">
-                    <BookForm action={startCheckout}>
-                      <input type="hidden" name="kind" value="dropin" />
-                      <input type="hidden" name="booking_id" value={booking!.id} />
-                      <CardAction>Pay now</CardAction>
-                    </BookForm>
-                    <ActionForm action={payAtDesk}>
-                      <input type="hidden" name="booking_id" value={booking!.id} />
-                      <button className="m-meta text-ink-2 underline decoration-line-2 underline-offset-4">
-                        Pay at the studio
-                      </button>
-                    </ActionForm>
-                  </span>
-                )
-              : booked || waiting ? (
-                  <span className="flex flex-col items-end gap-1">
-                    <ActionForm action={cancelBooking}>
-                      <input type="hidden" name="booking_id" value={booking!.id} />
-                      <CardActionOutline>{booked ? "Cancel" : "Leave list"}</CardActionOutline>
-                    </ActionForm>
-                    {booked && isPeak && pk?.remaining !== null && pk?.remaining !== undefined && (
-                      // Only where there is genuinely something to lose. A member
-                      // whose cancellation costs nothing must not be told it will.
-                      <span className="m-micro max-w-[8.5rem] text-right leading-[14px] text-ink-2">
-                        {insideFreeWindow
-                          ? <>Free until {fmtTime(cutoffAt.toISOString(), ctx.timeZone)} — your peak class comes back</>
-                          : <>Cancelling now still uses your peak class</>}
-                      </span>
-                    )}
-                  </span>
-                )
-              : full ? (
-                  settings.waitlistEnabled ? (
-                    <BookForm action={bookClass}>
-                      <input type="hidden" name="occurrence_id" value={o.id} />
-                      <CardActionOutline>Join waitlist</CardActionOutline>
-                    </BookForm>
-                  ) : null
-                )
-              : (
-                  <BookForm
-                    action={bookClass}
-                    confirm={
-                      // The LAST one, and only the last one. `remaining` is
-                      // this class's own period, so a member with one left this
-                      // week and two next week is asked about the right one.
-                      isPeak && pk?.remaining === 1
-                        ? "This is your last peak class for this period. Book it?"
-                        : undefined
-                    }
-                  >
-                    <input type="hidden" name="occurrence_id" value={o.id} />
-                    <CardAction>Book</CardAction>
-                  </BookForm>
-                );
-
-            return (
-              <ClassCard
-                key={o.id}
-                href={`/class/${o.id}`}
-                tag={isPeak ? (
-                  <span className="m-micro mt-0.5 block whitespace-nowrap text-lime-text">
-                    Peak
-                  </span>
-                ) : null}
-                startLabel={fmtTime(o.starts_at, ctx.timeZone)}
-                endLabel={o.ends_at ? fmtTime(o.ends_at, ctx.timeZone) : null}
-                durationLabel={mins ? `${mins} min` : "—"}
-                name={o.name}
-                instructor={o.instructors?.display_name ?? null}
-                room={o.rooms?.name ?? null}
-                statusLabel={status}
-                statusTone={booked ? "booked" : holding ? "holding" : full && !waiting ? "full" : "quiet"}
-                action={action}
-                booked={booked}
-                dimmed={past || peakBlocked}
-              />
-            );
-          })}
-        </ul>
+        <DayClasses
+          rows={rows}
+          bookClass={bookClass}
+          cancelBooking={cancelBooking}
+          startCheckout={startCheckout}
+          payAtDesk={payAtDesk}
+        />
       )}
+      </DayView>
     </MemberShell>
   );
 }

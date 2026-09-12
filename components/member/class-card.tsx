@@ -93,7 +93,12 @@ export default function ClassCard({
         </p>
       </div>
 
-      <div className="pointer-events-auto flex shrink-0 items-center">{action}</div>
+      {/* relative z-10 lifts the action above the absolute overlay Link, which
+          otherwise paints on top of it (absolute over static) and swallows the
+          tap — so Book/Cancel opened the detail sheet instead of firing. The
+          rest of the card stays the Link's, so tapping anywhere else opens the
+          class. */}
+      <div className="pointer-events-auto relative z-10 flex shrink-0 items-center">{action}</div>
     </li>
   );
 }
