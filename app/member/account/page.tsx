@@ -5,7 +5,7 @@ import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { formatMoney } from "@/lib/plans";
 import { dayMonthParts } from "@/lib/time";
-import { signOut } from "../actions";
+import { SignOut } from "@/components/member/sign-out";
 
 export const dynamic = "force-dynamic";
 
@@ -157,11 +157,10 @@ export default async function Membership() {
         Email settings
       </Link>
 
-      <form action={signOut} className="mt-3">
-        <button className="m-tap m-card w-full text-[14px] font-semibold text-ink-2">
-          Sign out
-        </button>
-      </form>
+      <SignOut to="/login"
+               className="m-tap m-card mt-3 w-full text-[14px] font-semibold text-ink-2">
+        Sign out
+      </SignOut>
     </MemberShell>
   );
 }

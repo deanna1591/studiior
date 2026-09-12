@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
-import { signOut } from "@/app/staff/actions";
+import { SignOut } from "@/components/member/sign-out";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +50,11 @@ export default async function MePage() {
         <p className="m-sub text-ink-3">Signed in as</p>
         <p className="mt-0.5 text-[15px] leading-5 text-ink">{ctx.email}</p>
         <p className="m-sub mt-0.5 text-ink-3">{ctx.display_name} · {ctx.studio_name}</p>
-        <form action={signOut} className="mt-3">
-          <button className="m-tap inline-flex items-center rounded-full px-4 text-[13px] font-bold"
-                  style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-            Sign out
-          </button>
-        </form>
+        <SignOut to="/instructor/login"
+                 className="m-tap mt-3 inline-flex items-center rounded-full px-4 text-[13px] font-bold"
+                 style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+          Sign out
+        </SignOut>
       </div>
 
       {/* Said rather than half-drawn. Three things an instructor might look for

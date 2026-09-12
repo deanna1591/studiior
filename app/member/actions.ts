@@ -24,13 +24,13 @@ export async function signIn(_prev: SignInResult, formData: FormData): Promise<S
 }
 
 export async function signOut() {
+  // Clears the session server-side and returns; the client navigates. A
+  // server-action redirect() to a member path would render the STAFF app (the
+  // redirect-follow loses the studio subdomain — see signIn), landing a
+  // signed-out member on the staff login. <SignOut> does the navigation with a
+  // full-document load instead.
   const supabase = createClient();
   await supabase.auth.signOut();
-  // KNOWN BUG (same class as sign-in): a server-action redirect to a member
-  // path renders the staff app, so this lands a signed-out member on the staff
-  // login. Sign-OUT is lower severity than the sign-in 404 and the fix is a
-  // client-side navigation from the button; tracked in CLAUDE.md.
-  redirect("/login");
 }
 
 /**
