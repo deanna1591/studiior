@@ -11,6 +11,7 @@ export function railItems(
   ctx: StaffContext,
   isPlatformAdmin = false,
   setupIncomplete = false,
+  hasChallenges = false,
 ): RailItem[] {
   const items: RailItem[] = [
     // "Dashboard", not "Schedule". `/` is the morning brief, today's classes and
@@ -64,6 +65,10 @@ export function railItems(
       { href: "/class-types", label: "Class types" },
       { href: "/instructors", label: "Instructors" },
       { href: "/imports", label: "Import" },
+      // §9 challenges. Only once the studio has one — a studio that never runs a
+      // challenge sees no trace of the feature (Decisions 24/25's rule). The
+      // first is created from the Morning Brief's challenge_opportunity nudge.
+      ...(hasChallenges ? [{ href: "/challenges", label: "Challenges" }] : []),
       // How far ahead the timetable runs, and the instructor timing settings.
       // Every one of them was a column with a default and nowhere to change it.
       { href: "/settings", label: "Settings" },

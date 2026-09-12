@@ -721,6 +721,7 @@ export type Database = {
           goal_value: number
           id: string
           join_deadline: string
+          leaderboard_enabled: boolean
           reward_description: string | null
           starts_on: string
           status: Database["public"]["Enums"]["challenge_status"]
@@ -742,6 +743,7 @@ export type Database = {
           goal_value: number
           id?: string
           join_deadline: string
+          leaderboard_enabled?: boolean
           reward_description?: string | null
           starts_on: string
           status?: Database["public"]["Enums"]["challenge_status"]
@@ -763,6 +765,7 @@ export type Database = {
           goal_value?: number
           id?: string
           join_deadline?: string
+          leaderboard_enabled?: boolean
           reward_description?: string | null
           starts_on?: string
           status?: Database["public"]["Enums"]["challenge_status"]
@@ -3733,6 +3736,7 @@ export type Database = {
         Row: {
           booking_email: boolean
           booking_push: boolean
+          challenge_email: boolean
           challenge_push: boolean
           created_at: string
           credit_expiry_email: boolean
@@ -3750,6 +3754,7 @@ export type Database = {
         Insert: {
           booking_email?: boolean
           booking_push?: boolean
+          challenge_email?: boolean
           challenge_push?: boolean
           created_at?: string
           credit_expiry_email?: boolean
@@ -3767,6 +3772,7 @@ export type Database = {
         Update: {
           booking_email?: boolean
           booking_push?: boolean
+          challenge_email?: boolean
           challenge_push?: boolean
           created_at?: string
           credit_expiry_email?: boolean
@@ -5963,6 +5969,10 @@ export type Database = {
       }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
+      auth_participates_in: {
+        Args: { p_challenge_id: string }
+        Returns: boolean
+      }
       auth_role_in: {
         Args: { target: string }
         Returns: Database["public"]["Enums"]["staff_role"]
@@ -6027,6 +6037,12 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
+      }
+      challenge_goal_line: { Args: { p_challenge_id: string }; Returns: string }
+      challenge_overview: { Args: { p_challenge_id: string }; Returns: Json }
+      challenge_qualifies: {
+        Args: { p_challenge_id: string; p_occurrence_id: string }
+        Returns: boolean
       }
       checkin_code_for: {
         Args: { p_bucket: number; p_member_id: string }
@@ -6148,6 +6164,23 @@ export type Database = {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
       }
+      create_challenge: {
+        Args: {
+          p_class_type_ids?: Json
+          p_description?: string
+          p_ends_on: string
+          p_goal_value: number
+          p_join_deadline: string
+          p_leaderboard?: boolean
+          p_reward?: string
+          p_starts_on: string
+          p_studio_id: string
+          p_template_id?: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["challenge_type"]
+        }
+        Returns: string
+      }
       create_member_invite: {
         Args: { p_days?: number; p_member_id: string }
         Returns: {
@@ -6174,6 +6207,7 @@ export type Database = {
         Returns: Json
       }
       dashboard_ai_setting: { Args: { p_key: string }; Returns: string }
+      dashboard_challenge_kpi: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_facts: {
         Args: {
           p_for_date?: string
@@ -6269,65 +6303,16 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_checkin: {
-        Args: {
-          label: string
-          p_at: string
-          p_booking: string
-          p_member: string
-          p_occ: string
-          p_studio: string
-          want_ok: boolean
-        }
-        Returns: undefined
-      }
       expect_false: {
         Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_null: {
-        Args: { actual: string; label: string }
-        Returns: undefined
-      }
-      expect_null_state: {
-        Args: { actual: Json; label: string }
         Returns: undefined
       }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_raises_saying: {
-        Args: {
-          label: string
-          stmt: string
-          want_like: string
-          want_sqlstate: string
-        }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
       expect_true: {
         Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_write: {
-        Args: { label: string; sql: string; want_ok: boolean }
         Returns: undefined
       }
       extend_trial: {
@@ -6491,7 +6476,10 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: boolean
       }
-      login: { Args: { uid: string }; Returns: undefined }
+      join_challenge: {
+        Args: { p_challenge_id: string; p_member_id?: string }
+        Returns: Json
+      }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
@@ -6521,6 +6509,11 @@ export type Database = {
           waitlist_enabled: boolean
         }[]
       }
+      member_challenge_detail: {
+        Args: { p_challenge_id: string }
+        Returns: Json
+      }
+      member_challenges: { Args: { p_studio_id: string }; Returns: Json }
       member_checkin_code: {
         Args: never
         Returns: {
@@ -6744,8 +6737,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      psig: { Args: { body: string; secret?: string }; Returns: string }
       publication_enabled: { Args: { p_studio_id: string }; Returns: boolean }
+      publish_challenge: { Args: { p_challenge_id: string }; Returns: string }
       publish_month: {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json
@@ -6765,6 +6758,26 @@ export type Database = {
       }
       queue_booking_notifications: {
         Args: { p_booking_id: string }
+        Returns: number
+      }
+      queue_challenge_completed: {
+        Args: { p_participant_id: string }
+        Returns: number
+      }
+      queue_challenge_ending_soon: {
+        Args: { p_participant_id: string }
+        Returns: number
+      }
+      queue_challenge_joined: {
+        Args: { p_participant_id: string }
+        Returns: number
+      }
+      queue_challenge_milestone: {
+        Args: { p_participant_id: string }
+        Returns: number
+      }
+      queue_challenge_opening: {
+        Args: { p_challenge_id: string }
         Returns: number
       }
       queue_class_moved: {
@@ -6836,6 +6849,7 @@ export type Database = {
         Returns: number
       }
       queue_waitlist_offer: { Args: { p_offer_id: string }; Returns: number }
+      rank_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
       rebuild_member_timeline: {
         Args: { p_member_id: string }
         Returns: number
@@ -6848,6 +6862,10 @@ export type Database = {
       recompute_member_stats: {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number
+      }
+      recompute_participant: {
+        Args: { p_participant_id: string }
+        Returns: undefined
       }
       reconcile_booked_counts: {
         Args: { p_dry_run?: boolean; p_studio_id?: string }
@@ -7141,7 +7159,6 @@ export type Database = {
         }
         Returns: Json
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -7164,6 +7181,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      staff_challenges: { Args: { p_studio_id: string }; Returns: Json }
       stamp_open_shift: {
         Args: { p_occurrence_id: string }
         Returns: undefined
@@ -7304,6 +7322,7 @@ export type Database = {
       }
       sweep_availability_reminders: { Args: never; Returns: Json }
       sweep_booked_count_reconcile: { Args: never; Returns: Json }
+      sweep_challenges: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_membership_periods: { Args: never; Returns: Json }
@@ -7312,7 +7331,6 @@ export type Database = {
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
-      t_late_cancel: { Args: { p_days: number; p_n: number }; Returns: string }
       timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {
         Args: {
@@ -7321,6 +7339,22 @@ export type Database = {
           p_within_days?: number
         }
         Returns: Json
+      }
+      update_challenge: {
+        Args: {
+          p_challenge_id: string
+          p_class_type_ids?: Json
+          p_description?: string
+          p_ends_on: string
+          p_goal_value: number
+          p_join_deadline: string
+          p_leaderboard?: boolean
+          p_reward?: string
+          p_starts_on: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["challenge_type"]
+        }
+        Returns: undefined
       }
       update_series: {
         Args: {

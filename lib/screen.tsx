@@ -29,9 +29,17 @@ export async function staffScreen(path?: string) {
   // setup checklist and the banner's two counts — and those no longer wait on
   // each other: the banner needed `summary.complete` only to decide whether to
   // show the setup nudge, which is a decision, not a dependency.
-  const [summary, bannerCounts] = await Promise.all([
+  const [summary, bannerCounts, challengeCount] = await Promise.all([
     setupSummary(supabase, ctx.studioId),
     studioBanner(supabase, ctx.studioId, true, ctx.billing, ctx.role),
+    // The Challenges rail item shows only when the studio has one — a studio
+    // that never creates a challenge sees no trace of the feature (same rule as
+    // publication and peak). A head-only count, indexed, on a back-office screen.
+    isManagerUp(ctx.role)
+      ? supabase.from("challenges").select("id", { count: "exact", head: true })
+          .eq("studio_id", ctx.studioId).eq("audience", "member").limit(1)
+          .then((r) => r.count ?? 0)
+      : Promise.resolve(0),
   ]);
   const isPlatformAdmin = ctx.isPlatformAdmin;
   const billing = ctx.billing;
@@ -66,17 +74,19 @@ export async function staffScreen(path?: string) {
     banner,
     billing,
     shell: {
-      ...shellProps(ctx, isPlatformAdmin === true, summary.complete),
+      ...shellProps(ctx, isPlatformAdmin === true, summary.complete, (challengeCount as number) > 0),
       banner,
     },
   } as const;
 }
 
-export function shellProps(ctx: StaffContext, isPlatformAdmin: boolean, setupComplete: boolean) {
+export function shellProps(
+  ctx: StaffContext, isPlatformAdmin: boolean, setupComplete: boolean, hasChallenges = false,
+) {
   return {
     studioName: ctx.studioName,
     location: ctx.locationName,
-    items: railItems(ctx, isPlatformAdmin, !setupComplete && isManagerUp(ctx.role)),
+    items: railItems(ctx, isPlatformAdmin, !setupComplete && isManagerUp(ctx.role), hasChallenges),
     user: { email: ctx.email, role: ctx.role },
     signOut: (
       <form action={signOut}>

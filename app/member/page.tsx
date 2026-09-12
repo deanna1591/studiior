@@ -32,7 +32,8 @@ export default async function MemberHome() {
     }).format(new Date()) + "-01T00:00:00Z",
   );
 
-  const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth }] =
+  const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
+         { data: challenges }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -58,6 +59,8 @@ export default async function MemberHome() {
       .select("id", { count: "exact", head: true })
       .eq("member_id", ctx.memberId)
       .gte("checked_in_at", monthStart.toISOString()),
+    // §9. Empty array for a studio with no challenges — no section, no trace.
+    supabase.rpc("member_challenges", { p_studio_id: ctx.studioId }),
   ]);
 
   const mine = (bookings ?? [])
@@ -335,6 +338,58 @@ export default async function MemberHome() {
           </div>
         ))}
       </div>
+
+      {/* Challenges — only when the studio runs them. A joined one shows its
+          progress; otherwise the section invites a look. No sixth tab: the
+          whole feature lives here and at /challenges. */}
+      {(() => {
+        const chs = (challenges ?? []) as { id: string; title: string; type: string;
+          goal_value: number; joined: boolean; progress: number; completed: boolean;
+          can_join: boolean }[];
+        if (chs.length === 0) return null;
+        const joined = chs.filter((c) => c.joined);
+        const show = joined.length > 0 ? joined : chs.filter((c) => c.can_join).slice(0, 1);
+        if (show.length === 0) return null;
+        return (
+          <section className="mt-5">
+            <div className="mb-2.5 flex items-baseline justify-between">
+              <h2 className="m-eyebrow font-semibold text-ink">Challenges</h2>
+              <Link href="/challenges" className="m-subtle font-medium" style={{ color: "var(--lime-text)" }}>
+                See all
+              </Link>
+            </div>
+            <ul className="space-y-3">
+              {show.map((c) => {
+                const pct = Math.min(100, Math.round((c.progress / Math.max(1, c.goal_value)) * 100));
+                const unit = c.type === "streak" ? "weeks" : "classes";
+                return (
+                  <li key={c.id}>
+                    <Link href={`/challenges/${c.id}`} className="m-card m-press block p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="m-name text-ink">{c.title}</p>
+                        {c.completed
+                          ? <span className="m-micro rounded-full px-2 py-0.5" style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>Done</span>
+                          : c.joined
+                          ? <span className="m-micro num text-ink-3">{c.progress}/{c.goal_value}</span>
+                          : <span className="m-micro text-lime-text">Join</span>}
+                      </div>
+                      {c.joined ? (
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--accent-chip)" }}>
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent-solid)" }} />
+                        </div>
+                      ) : (
+                        <p className="m-subtle mt-0.5 text-ink-3">
+                          {c.type === "streak" ? `${c.goal_value} weeks in a row` : `${c.goal_value} classes`}
+                        </p>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })()}
 
       {mine.filter((b) => b.status === "booked" && b.id !== next?.id).length > 0 && (
         <section className="mt-5">

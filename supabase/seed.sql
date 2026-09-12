@@ -1033,3 +1033,53 @@ begin
   get diagnostics n = row_count;
   raise notice 'seed: cleared % queued notifications — fixture data does not email anybody', n;
 end $$;
+
+-- -----------------------------------------------------------------------------
+-- Challenges (§9, members only) — a few system templates and one live challenge
+-- so the feature is visible in the running app. Inserted directly as 'active'
+-- (not through publish_challenge), so no opening broadcast is queued and there
+-- is nothing to clear. Participants are backfilled from real attendance the way
+-- join_challenge would, without the join notification.
+-- -----------------------------------------------------------------------------
+do $$
+declare v_studio uuid := '11111111-0000-0000-0000-000000000001'; v_ch uuid; r record; v_n int;
+begin
+  if not exists (select 1 from studios where id = v_studio) then return; end if;
+
+  insert into challenge_templates (studio_id, title, description, audience, type,
+                                   goal_value, duration_days, reward_description)
+  select v.* from (values
+    (null::uuid, 'Ten in a month', 'Ten classes in thirty days.',
+     'member'::challenge_audience, 'class_count'::challenge_type, 10, 30, 'A free class on us.'),
+    (null::uuid, 'Six-week streak', 'A class every week for six weeks.',
+     'member'::challenge_audience, 'streak'::challenge_type, 6, 42, 'A studio water bottle.'),
+    (null::uuid, 'Try three', 'Three different class types in a month.',
+     'member'::challenge_audience, 'class_type_count'::challenge_type, 3, 30, 'A guest pass for a friend.')
+  ) v(studio_id, title, description, audience, type, goal_value, duration_days, reward_description)
+  where not exists (select 1 from challenge_templates t
+                     where t.studio_id is null and t.title = v.title);
+
+  insert into challenges (studio_id, title, description, audience, type, goal_value,
+                          class_type_ids, starts_on, ends_on, join_deadline, status,
+                          leaderboard_enabled)
+  values (v_studio, 'Reformer month', 'Eight classes this month — any class counts.',
+          'member', 'class_count', 8, '[]'::jsonb,
+          current_date - 10, current_date + 20, current_date + 10, 'active', true)
+  returning id into v_ch;
+
+  for r in select id from members where studio_id = v_studio limit 6 loop
+    insert into challenge_participants (studio_id, challenge_id, audience, member_id, goal_value)
+    values (v_studio, v_ch, 'member', r.id, 8) on conflict do nothing;
+    insert into challenge_progress_events
+      (studio_id, challenge_id, member_id, booking_id, occurrence_id, delta, occurred_at)
+    select v_studio, v_ch, r.id, b.id, b.occurrence_id, 1, o.starts_at
+      from bookings b join class_occurrences o on o.id = b.occurrence_id
+     where b.member_id = r.id and b.status = 'attended' and challenge_qualifies(v_ch, o.id)
+    on conflict do nothing;
+    perform recompute_participant((select id from challenge_participants
+      where challenge_id = v_ch and member_id = r.id));
+  end loop;
+  perform rank_challenge(v_ch);
+  select count(*) into v_n from challenge_participants where challenge_id = v_ch;
+  raise notice 'seed: 1 active challenge, % participants enrolled', v_n;
+end $$;

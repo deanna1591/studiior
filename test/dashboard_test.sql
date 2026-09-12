@@ -166,10 +166,14 @@ select expect_num('every empty block says what it will show',
 
 -- A card that can never populate is the insight-without-a-button mistake; one
 -- silently missing is how it is rediscovered as a bug in six months.
-select expect_num('both absent cards are named, with a reason',
-  jsonb_array_length(dashboard_absent_cards('da58da58-0000-0000-0000-00000000000a'))::bigint, 2);
-select expect_true('challenge participation is named as waiting on challenges',
-  (dashboard_absent_cards('da58da58-0000-0000-0000-00000000000a'))::text like '%Challenges have no screens yet%');
+-- Challenge participation is no longer an absent "coming soon" card — it ships
+-- as a real KPI (migration 121) that is simply null for a studio with no
+-- challenges, so this fixture (which has none) shows neither. The forecast is
+-- now the only absent card.
+select expect_num('the forecast is the only absent card now',
+  jsonb_array_length(dashboard_absent_cards('da58da58-0000-0000-0000-00000000000a'))::bigint, 1);
+select expect_true('challenge participation is a real KPI, null (absent) with no challenges',
+  (dashboard_challenge_kpi('da58da58-0000-0000-0000-00000000000a') is null));
 select expect_true('the forecast names how many months it still needs',
   (dashboard_absent_cards('da58da58-0000-0000-0000-00000000000a'))::text like '%3 complete months%');
 
