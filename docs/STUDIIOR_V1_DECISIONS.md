@@ -473,6 +473,20 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 27 — Studio announcements, one-way, and never a feed
+
+**Built: migrations 131 and 132.** A studio posts something and members see it on their Home — a workshop, a closure, a new instructor, a price change, an event. Title, body, an optional photo (the migration-116 focal-point treatment, since `object-fit: cover` on a phone crops a wide image to a sixth of itself), a start and end, a draft/published state, an audience (members, instructors, or both), and a pinned flag. Staff create, edit, publish and unpublish; members see published ones in range, newest first with pinned on top, and dismiss the ones they have read; a pinned one stays until it ends.
+
+**ONE-WAY, and it must not become a feed.** Decision 13 excluded a community feed — posts, comments, likes, friend connections — from V1, and that stands. This is studio-to-members only: no replies, no reactions, no member-authored anything, no threading. It is recorded here so that nobody grows it into the very thing V1 excluded. The audience field is the only social axis, and it points one way.
+
+**Optional per studio BY EXISTENCE — no switch.** A studio with no published, in-range announcement shows no "What's on" section on Home, absent not empty (the challenge pattern). Unlike challenges or guest passes, there is no enable toggle: announcements are a basic communication tool every studio plausibly uses (a closure, at least), so the staff admin is always in the manager's rail, and member visibility is pure existence. Turning it off is deleting or unpublishing, not a setting.
+
+**The audience field earns its place.** "Closed for Christmas" is for both members and instructors; "new intro offer" is members only. Instructor-audience announcements surface in the portal (096/097), never on a member's Home; a members-only one never reaches an instructor.
+
+**Notifying is opt-in, off by default.** A studio that emails every announcement trains members to ignore them; a closure is the case where they genuinely should be told. So publishing offers a "notify" checkbox, and only then are members of the audience emailed — once, keyed on the announcement, never re-sent on a re-publish. Instructors are not emailed (they see it in the portal); that is a noted gap, not a decision to keep it that way forever.
+
+---
+
 ## 26 — A member may bring a guest, and the guest's first class is free
 
 **Built: migration 127.** Optional per studio, off by default (`guest_passes_enabled`), and a studio that never turns it on sees no "bring a guest" option in the member app and no guest column anywhere — Decision 24/25's optional-not-merely-configurable rule again.

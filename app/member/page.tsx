@@ -10,6 +10,7 @@ import { bookClass, cancelBooking, respondToOffer } from "./actions";
 import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts } from "@/lib/time";
 import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 import WaiverBanner from "@/components/member/waiver-banner";
+import Announcements, { type Announcement } from "@/components/member/announcements";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function MemberHome() {
   );
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
-         { data: challenges }, { data: meRow }, { count: guestPassCount }] =
+         { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -66,7 +67,13 @@ export default async function MemberHome() {
     // and whether they were brought as a guest — the banner shows only for them.
     supabase.from("members").select("waiver_signed_at").eq("id", ctx.memberId).maybeSingle(),
     supabase.from("guest_passes").select("id", { count: "exact", head: true }).eq("guest_member_id", ctx.memberId),
+    // Recognition (Decision 10). Leads to /milestones; a compact card on Home.
+    supabase.rpc("member_milestones", { p_studio_id: ctx.studioId }),
+    // Decision 27. Empty array for a studio with none -> no section, no trace.
+    supabase.rpc("member_announcements", { p_studio_id: ctx.studioId }),
   ]);
+
+  const ms = milestones as unknown as { total: number; next_target: number | null; to_go: number | null } | null;
 
   const needsWaiver =
     (meRow as { waiver_signed_at?: string | null } | null)?.waiver_signed_at == null &&
@@ -116,6 +123,7 @@ export default async function MemberHome() {
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       {needsWaiver && <WaiverBanner memberId={ctx.memberId} />}
+      <Announcements items={(announcements ?? []) as unknown as Announcement[]} />
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}
       {/* Text only. The greeting had the member's photograph beside it and the
@@ -348,6 +356,22 @@ export default async function MemberHome() {
           </div>
         ))}
       </div>
+
+      {/* Milestones — recognition, leading with the next one. Links to the full
+          screen; personal, no ranking (Decision 10). */}
+      {ms && ms.next_target != null && (
+        <Link href="/milestones" className="m-card m-press mt-2.5 flex items-center gap-3 p-4">
+          <span className="min-w-0 flex-1">
+            <span className="m-body block font-semibold text-ink">
+              <span className="num">{ms.to_go}</span> to your next milestone
+            </span>
+            <span className="m-micro block text-ink-3">
+              <span className="num">{ms.total}</span> classes so far · next is <span className="num">{ms.next_target}</span>
+            </span>
+          </span>
+          <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
+        </Link>
+      )}
 
       {/* Challenges — only when the studio runs them. A joined one shows its
           progress; otherwise the section invites a look. No sixth tab: the

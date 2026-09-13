@@ -128,6 +128,7 @@ export function Icon({
           <path d="M7.5 13.5 6.5 19l4.5-2.2L15.5 19l-1-5.5" {...s} />
         </>
       )}
+      {name === "x" && <path d="M6 6l10 10M16 6 6 16" {...s} />}
     </svg>
   );
 }
@@ -136,4 +137,4 @@ export type IconName =
   | "home" | "calendar" | "qr" | "clock" | "card"
   | "person" | "door" | "chevron-left" | "chevron-right" | "chevron-down"
   | "tick" | "certificate" | "bell" | "user" | "flame" | "ticket" | "refresh"
-  | "camera" | "phone" | "shield";
+  | "camera" | "phone" | "shield" | "x";

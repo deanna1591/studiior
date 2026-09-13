@@ -163,6 +163,14 @@ export async function bringGuest(_prev: BookResult, formData: FormData): Promise
   return { ok: true, message: "Your guest is booked. We've emailed them to set up and sign the waiver." };
 }
 
+export async function dismissAnnouncement(id: string): Promise<void> {
+  const ctx = await getMemberContext();
+  if (!ctx) return;
+  const supabase = createClient();
+  await supabase.rpc("dismiss_announcement", { p_id: id });
+  revalidateMember();
+}
+
 export async function signMyWaiver(_prev: BookResult, formData: FormData): Promise<BookResult> {
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "Not signed in." };
@@ -434,6 +442,7 @@ export async function updateProfile(
       // Stored as one object so it is either a usable contact or absent — a
       // name with no number is not somebody you can ring.
       emergency_contact: ecName || ecPhone ? { name: ecName, phone: ecPhone } : null,
+      marketing_opt_in: String(formData.get("marketing_opt_in") ?? "") === "on",
       updated_at: new Date().toISOString(),
     })
     .eq("id", ctx.memberId)

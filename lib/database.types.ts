@@ -191,6 +191,125 @@ export type Database = {
           },
         ]
       }
+      announcement_dismissals: {
+        Row: {
+          announcement_id: string
+          dismissed_at: string
+          member_id: string
+        }
+        Insert: {
+          announcement_id: string
+          dismissed_at?: string
+          member_id: string
+        }
+        Update: {
+          announcement_id?: string
+          dismissed_at?: string
+          member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_dismissals_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_dismissals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_dismissals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          audience: string
+          body: string
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          image_focus_x: number
+          image_focus_y: number
+          image_url: string | null
+          notified_at: string | null
+          pinned: boolean
+          starts_at: string
+          status: string
+          studio_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          image_focus_x?: number
+          image_focus_y?: number
+          image_url?: string | null
+          notified_at?: string | null
+          pinned?: boolean
+          starts_at?: string
+          status?: string
+          studio_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          image_focus_x?: number
+          image_focus_y?: number
+          image_url?: string | null
+          notified_at?: string | null
+          pinned?: boolean
+          starts_at?: string
+          status?: string
+          studio_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -6067,6 +6186,7 @@ export type Database = {
         Args: { p_confirm?: boolean; p_series_id: string }
         Returns: Json
       }
+      as_state: { Args: { sql: string; uid: string }; Returns: string }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -6291,6 +6411,18 @@ export type Database = {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
       }
+      create_announcement: {
+        Args: {
+          p_audience: string
+          p_body: string
+          p_ends_at: string
+          p_pinned?: boolean
+          p_starts_at: string
+          p_studio_id: string
+          p_title: string
+        }
+        Returns: string
+      }
       create_challenge: {
         Args: {
           p_class_type_ids?: Json
@@ -6392,12 +6524,14 @@ export type Database = {
         Args: { p_application_id: string; p_reason?: string }
         Returns: Json
       }
+      delete_announcement: { Args: { p_id: string }; Returns: Json }
       deliver_notification: {
         Args: { p_notification_id: string }
         Returns: number
       }
       demo_purge_census: { Args: { p_studio_id: string }; Returns: Json }
       demo_purge_preview: { Args: { p_studio_id: string }; Returns: Json }
+      dismiss_announcement: { Args: { p_id: string }; Returns: Json }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
@@ -6430,6 +6564,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -6495,6 +6641,7 @@ export type Database = {
         Args: { p_key: string; p_studio_id: string }
         Returns: number
       }
+      instructor_announcements: { Args: { p_studio_id: string }; Returns: Json }
       instructor_availability_week: {
         Args: { p_instructor_id: string }
         Returns: Json
@@ -6603,6 +6750,7 @@ export type Database = {
       }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      member_announcements: { Args: { p_studio_id: string }; Returns: Json }
       member_bootstrap: {
         Args: { p_slug: string }
         Returns: {
@@ -6682,6 +6830,7 @@ export type Database = {
           state: string
         }[]
       }
+      member_milestones: { Args: { p_studio_id: string }; Returns: Json }
       member_peak_slots: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: {
@@ -6874,6 +7023,10 @@ export type Database = {
         }
       }
       publication_enabled: { Args: { p_studio_id: string }; Returns: boolean }
+      publish_announcement: {
+        Args: { p_id: string; p_notify?: boolean }
+        Returns: Json
+      }
       publish_challenge: { Args: { p_challenge_id: string }; Returns: string }
       publish_month: {
         Args: { p_month: string; p_studio_id: string }
@@ -7297,6 +7450,7 @@ export type Database = {
         Returns: Json
       }
       sign_waiver: { Args: { p_member_id: string }; Returns: Json }
+      staff_announcements: { Args: { p_studio_id: string }; Returns: Json }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -7415,6 +7569,7 @@ export type Database = {
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
           guest_passes_enabled: boolean
+          has_payment_provider: boolean
           waitlist_enabled: boolean
           week_starts_on: number
         }[]
@@ -7464,6 +7619,7 @@ export type Database = {
       sweep_challenges: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
+      sweep_guest_waivers: { Args: never; Returns: Json }
       sweep_membership_periods: { Args: never; Returns: Json }
       sweep_no_shows: { Args: never; Returns: Json }
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }
@@ -7477,6 +7633,19 @@ export type Database = {
           p_studio_id: string
           p_week_start?: string
           p_within_days?: number
+        }
+        Returns: Json
+      }
+      unpublish_announcement: { Args: { p_id: string }; Returns: Json }
+      update_announcement: {
+        Args: {
+          p_audience: string
+          p_body: string
+          p_ends_at: string
+          p_id: string
+          p_pinned: boolean
+          p_starts_at: string
+          p_title: string
         }
         Returns: Json
       }

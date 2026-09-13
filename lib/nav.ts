@@ -70,6 +70,10 @@ export function railItems(
       // sees no trace (Decisions 24/25's rule). Turning it on in Settings is the
       // one door: the item then leads here and to the create screen.
       ...(hasChallenges ? [{ href: "/challenges", label: "Challenges" }] : []),
+      // Decision 27. A basic studio tool, so always available to managers — a
+      // studio posts a closure sooner or later. Member visibility is by
+      // existence (no published one -> no section on Home), so no switch.
+      { href: "/announcements", label: "What\u2019s on" },
       // How far ahead the timetable runs, and the instructor timing settings.
       // Every one of them was a column with a default and nowhere to change it.
       { href: "/settings", label: "Settings" },

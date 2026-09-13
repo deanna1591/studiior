@@ -21,7 +21,7 @@ export default async function Profile() {
 
   const { data: me } = await supabase
     .from("members")
-    .select("first_name, preferred_name, phone, emergency_contact")
+    .select("first_name, preferred_name, phone, emergency_contact, marketing_opt_in")
     .eq("id", ctx.memberId)
     .maybeSingle();
 
@@ -42,6 +42,7 @@ export default async function Profile() {
         phone={me?.phone ?? ""}
         emergencyName={ec.name ?? ""}
         emergencyPhone={ec.phone ?? ""}
+        marketingOptIn={me?.marketing_opt_in ?? false}
       />
     </MemberShell>
   );

@@ -37,7 +37,7 @@ export default async function MyWeek({
   const from = shiftDate(today, offset * 7);
   const to = shiftDate(from, 13);
 
-  const [week, cover, rosters] = await Promise.all([
+  const [week, cover, rosters, anns] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
     }),
@@ -52,7 +52,11 @@ export default async function MyWeek({
       .not("notified_at", "is", null).is("confirmed_at", null)
       .gte("month", today.slice(0, 7) + "-01")
       .order("month").limit(1),
+    // Decision 27: instructor-audience announcements for the portal.
+    supabase.rpc("instructor_announcements", { p_studio_id: ctx.studio_id }),
   ]);
+  const announcements = (anns.data ?? []) as unknown as
+    { id: string; title: string; body: string }[];
   const roster = (rosters.data ?? [])[0] ?? null;
   const rosterLabel = roster
     ? new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" })
@@ -76,6 +80,16 @@ export default async function MyWeek({
 
   return (
     <InstructorShell ctx={ctx} title={offset === 0 ? "My week" : "Later"}>
+      {announcements.length > 0 && (
+        <section className="mb-4 space-y-3">
+          {announcements.map((a) => (
+            <article key={a.id} className="m-card p-4">
+              <p className="m-name text-ink">{a.title}</p>
+              <p className="m-sub mt-1 whitespace-pre-line text-ink-2">{a.body}</p>
+            </article>
+          ))}
+        </section>
+      )}
       {week.error && (
         <div className="m-card mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)" }} role="alert">

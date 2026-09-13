@@ -33,7 +33,7 @@ const field =
   "m-tap w-full rounded-xl border border-line-2 bg-surface px-3.5 text-[16px] text-ink outline-none";
 
 export default function ProfileForm({
-  name, avatarUrl, preferredName, phone, emergencyName, emergencyPhone,
+  name, avatarUrl, preferredName, phone, emergencyName, emergencyPhone, marketingOptIn,
 }: {
   name: string;
   avatarUrl: string | null;
@@ -41,6 +41,7 @@ export default function ProfileForm({
   phone: string;
   emergencyName: string;
   emergencyPhone: string;
+  marketingOptIn: boolean;
 }) {
   const [state, action] = useFormState(updateProfile, null);
   const [photoState, photoAction] = useFormState(uploadAvatar, null);
@@ -97,6 +98,16 @@ export default function ProfileForm({
             <span className="m-meta mb-1.5 block text-ink-2">Their phone</span>
             <input name="emergency_phone" type="tel" inputMode="tel"
                    defaultValue={emergencyPhone} className={field} />
+          </label>
+        </div>
+
+        <div className="mt-6 border-t border-line pt-5">
+          <label className="flex items-start gap-3">
+            <input name="marketing_opt_in" type="checkbox" defaultChecked={marketingOptIn} className="mt-1" />
+            <span className="m-sub text-ink-2">
+              Email me about {"the studio's"} offers and events. Your class emails
+              and receipts come either way.
+            </span>
           </label>
         </div>
 
