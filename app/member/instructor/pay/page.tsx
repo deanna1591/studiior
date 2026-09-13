@@ -13,7 +13,7 @@ type Record_ = {
 };
 type Pay = {
   state: "ok" | "empty" | "no_period"; currency: string;
-  period?: { starts_on: string; ends_on: string; status: string };
+  period?: { id: string; starts_on: string; ends_on: string; status: string };
   total_cents?: number; classes_paid?: number; not_running_paid?: number; held_cents?: number;
   records?: Record_[]; empty_hint: string; read_only?: string;
 };
@@ -39,6 +39,28 @@ export default async function PayPage() {
     p_instructor_id: ctx.instructor_id,
   });
   const p = data as Pay | null;
+
+  // Has the studio recorded paying this period? An instructor reads their own
+  // settlement (RLS pay_settlements_self) and nobody else's; the receipt, if
+  // one was attached, is a signed URL into the private bucket.
+  let paid: { paid_on: string; method: string; reference: string | null; proofUrl: string | null } | null = null;
+  if (p?.state === "ok" && p.period) {
+    const { data: s } = await supabase
+      .from("instructor_pay_settlements")
+      .select("paid_on, method, reference, proof_path")
+      .eq("period_id", p.period.id)
+      .eq("instructor_id", ctx.instructor_id)
+      .maybeSingle();
+    if (s) {
+      let proofUrl: string | null = null;
+      if (s.proof_path) {
+        const { data: signed } = await supabase.storage
+          .from("instructor-pay-proofs").createSignedUrl(s.proof_path, 300);
+        proofUrl = signed?.signedUrl ?? null;
+      }
+      paid = { paid_on: s.paid_on, method: s.method, reference: s.reference, proofUrl };
+    }
+  }
 
   const d = (iso: string) =>
     new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short" })
@@ -76,6 +98,16 @@ export default async function PayPage() {
             {(p.held_cents ?? 0) > 0 && (
               <p className="m-sub mt-1.5 text-ink-2">
                 {money(p.held_cents ?? 0, p.currency)} is held until you check in — tap the class on My week.
+              </p>
+            )}
+            {paid && (
+              <p className="m-sub mt-2 border-t border-line pt-2 text-ink-2">
+                <span style={{ color: "var(--lime-text)" }} className="font-semibold">Paid</span>{" "}
+                {d(paid.paid_on)} · {paid.method.replace("_", " ")}
+                {paid.reference && <> · ref {paid.reference}</>}
+                {paid.proofUrl && (
+                  <> · <a href={paid.proofUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">receipt</a></>
+                )}
               </p>
             )}
           </div>

@@ -2532,6 +2532,77 @@ export type Database = {
           },
         ]
       }
+      instructor_pay_settlements: {
+        Row: {
+          created_at: string
+          id: string
+          instructor_id: string
+          method: string
+          paid_on: string
+          period_id: string
+          proof_path: string | null
+          recorded_by: string | null
+          reference: string | null
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructor_id: string
+          method: string
+          paid_on: string
+          period_id: string
+          proof_path?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          method?: string
+          paid_on?: string
+          period_id?: string
+          proof_path?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_pay_settlements_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_settlements_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "pay_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_settlements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_pay_settlements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_rate_versions: {
         Row: {
           base_rate_cents: number
@@ -6210,7 +6281,6 @@ export type Database = {
         Args: { p_confirm?: boolean; p_series_id: string }
         Returns: Json
       }
-      as_state: { Args: { sql: string; uid: string }; Returns: string }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -6592,14 +6662,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -7004,6 +7066,7 @@ export type Database = {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
       }
+      pay_period_export: { Args: { p_period_id: string }; Returns: Json }
       pay_statement: {
         Args: { p_instructor_id: string; p_period_id: string }
         Returns: Json
@@ -7221,6 +7284,17 @@ export type Database = {
           p_plan_id?: string
           p_reference?: string
           p_studio_id: string
+        }
+        Returns: Json
+      }
+      record_pay_settlement: {
+        Args: {
+          p_instructor_id: string
+          p_method: string
+          p_paid_on: string
+          p_period_id: string
+          p_proof_path?: string
+          p_reference?: string
         }
         Returns: Json
       }

@@ -47,6 +47,10 @@ export function railItems(
     // other studio a month is live the moment it is made, and a Publish link
     // would open a screen with nothing to do.
     if (ctx.publicationEnabled) items.push({ href: "/publish", label: "Publish" });
+    // Decision 28. Pay periods: what each instructor is owed, releasing held
+    // records, and marking a closed period paid. Manager-up — this is money and
+    // proof of payment, not the desk's takings (/due is theirs).
+    items.push({ href: "/pay", label: "Pay" });
     items.push(
       // Decision 18. Staff always approve cover, so an unanswered request is
       // its own emergency and needs somewhere to live that is not a banner.
