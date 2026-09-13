@@ -29,7 +29,7 @@ export default async function ClassDetail({ params }: { params: { id: string } }
       </Link>
 
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} />
+                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} />
     </MemberShell>
   );
 }

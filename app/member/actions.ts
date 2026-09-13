@@ -124,6 +124,59 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
   return { ok: true, message: `Booked — ${paid}.` };
 }
 
+// Decision 26 — the host brings a guest. Refusals are sentences.
+const GUEST_REASONS: Record<string, string> = {
+  not_enabled: "This studio doesn't offer guest passes.",
+  bad_email: "That email doesn't look right — check it and try again.",
+  have_active_guest: "You already have a guest booked — you can invite another once they've come.",
+  already_had_free: "That email has already had a free class here.",
+  already_member: "That email is already a member here.",
+  only_one_seat: "There's only one seat left — not enough for you and a guest.",
+  class_full: "This class is full.",
+  host_not_booked: "We couldn't book you into this class, so there's nothing to bring a guest to.",
+  not_authorised: "Please sign in as a member to bring a guest.",
+  not_found: "That class could not be found.",
+};
+
+export async function bringGuest(_prev: BookResult, formData: FormData): Promise<BookResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("book_guest", {
+    p_occurrence_id: String(formData.get("occurrence_id") ?? ""),
+    p_guest_email: String(formData.get("guest_email") ?? ""),
+    p_guest_first: String(formData.get("guest_first") ?? ""),
+    p_guest_last: String(formData.get("guest_last") ?? ""),
+  });
+  if (error) return { ok: false, message: error.message };
+
+  const r = data as unknown as { ok: boolean; reason?: string } | null;
+  if (!r) return { ok: false, message: "No response." };
+  if (!r.ok) {
+    const reason = r.reason ?? "";
+    // host_<code> means the host's own booking failed for that reason.
+    const key = reason.startsWith("host_") && !GUEST_REASONS[reason] ? "host_not_booked" : reason;
+    return { ok: false, message: GUEST_REASONS[key] ?? "That didn't work — please try again." };
+  }
+  revalidateMember();
+  return { ok: true, message: "Your guest is booked. We've emailed them to set up and sign the waiver." };
+}
+
+export async function signMyWaiver(_prev: BookResult, formData: FormData): Promise<BookResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("sign_waiver", {
+    p_member_id: String(formData.get("member_id") ?? ctx.memberId),
+  });
+  if (error) return { ok: false, message: error.message };
+  const r = data as unknown as { ok?: boolean } | null;
+  if (!r?.ok) return { ok: false, message: "That didn't work — please try again." };
+  revalidateMember();
+  return { ok: true, message: "Waiver signed." };
+}
+
 
 /** Every member screen shows some slice of the same booking state. */
 function revalidateMember() {

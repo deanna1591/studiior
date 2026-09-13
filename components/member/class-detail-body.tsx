@@ -4,6 +4,7 @@ import { Icon } from "@/components/member/icons";
 import IconChip from "@/components/member/icon-chip";
 import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/components/member/ui";
 import { bookClass, cancelBooking } from "@/app/member/actions";
+import GuestInvite from "@/components/member/guest-invite";
 import { fmtTime, fmtDayLong } from "@/lib/time";
 
 /**
@@ -42,13 +43,14 @@ export type DetailType = {
 export type DetailBooking = { id: string; status: string; waitlist_position: number | null } | null;
 
 export default function ClassDetailBody({
-  occ, type, booking, timeZone, waitlistEnabled,
+  occ, type, booking, timeZone, waitlistEnabled, guest,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
   booking: DetailBooking;
   timeZone: string;
   waitlistEnabled: boolean;
+  guest?: { enabled: boolean; canInvite: boolean };
 }) {
   const booked = booking?.status === "booked";
   const waiting = booking?.status === "waitlisted";
@@ -126,6 +128,10 @@ export default function ClassDetailBody({
           </BookForm>
         )}
       </div>
+
+      {guest?.canInvite && !past && !waiting && (
+        <GuestInvite occurrenceId={occ.id} />
+      )}
 
       {type?.description && (
         <section className="mt-6">

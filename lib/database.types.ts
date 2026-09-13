@@ -1750,6 +1750,112 @@ export type Database = {
           },
         ]
       }
+      guest_passes: {
+        Row: {
+          created_at: string
+          guest_booking_id: string | null
+          guest_email: string
+          guest_member_id: string
+          host_booking_id: string | null
+          host_member_id: string
+          id: string
+          occurrence_id: string
+          status: string
+          studio_id: string
+          waiver_signed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          guest_booking_id?: string | null
+          guest_email: string
+          guest_member_id: string
+          host_booking_id?: string | null
+          host_member_id: string
+          id?: string
+          occurrence_id: string
+          status?: string
+          studio_id: string
+          waiver_signed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          guest_booking_id?: string | null
+          guest_email?: string
+          guest_member_id?: string
+          host_booking_id?: string | null
+          host_member_id?: string
+          id?: string
+          occurrence_id?: string
+          status?: string
+          studio_id?: string
+          waiver_signed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_passes_guest_booking_id_fkey"
+            columns: ["guest_booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_guest_member_id_fkey"
+            columns: ["guest_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_guest_member_id_fkey"
+            columns: ["guest_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_host_booking_id_fkey"
+            columns: ["host_booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_host_member_id_fkey"
+            columns: ["host_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_host_member_id_fkey"
+            columns: ["host_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_passes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_rows: {
         Row: {
           created_at: string
@@ -5320,6 +5426,7 @@ export type Database = {
           flex_standby_pay_cents: number
           flex_unmet_pay_cents: number
           guarantees_enabled: boolean
+          guest_passes_enabled: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -5392,6 +5499,7 @@ export type Database = {
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
           guarantees_enabled?: boolean
+          guest_passes_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -5464,6 +5572,7 @@ export type Database = {
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
           guarantees_enabled?: boolean
+          guest_passes_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6025,6 +6134,15 @@ export type Database = {
         Args: { p_status: Database["public"]["Enums"]["member_status"] }
         Returns: boolean
       }
+      book_guest: {
+        Args: {
+          p_guest_email: string
+          p_guest_first: string
+          p_guest_last: string
+          p_occurrence_id: string
+        }
+        Returns: Json
+      }
       brief_summary: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
@@ -6231,6 +6349,7 @@ export type Database = {
         Returns: number
       }
       dashboard_forecast_min_months: { Args: never; Returns: number }
+      dashboard_guest_kpi: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_health: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_heatmap: {
         Args: { p_days?: number; p_studio_id: string }
@@ -6312,26 +6431,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -6376,6 +6475,11 @@ export type Database = {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
       }
+      guest_pass_eligibility: {
+        Args: { p_email: string; p_host_member_id: string; p_studio_id: string }
+        Returns: Json
+      }
+      guest_pass_report: { Args: { p_studio_id: string }; Returns: Json }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
       import_dry_run: { Args: { p_import_id: string }; Returns: Json }
       import_member_status: {
@@ -6497,7 +6601,6 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
@@ -7193,7 +7296,7 @@ export type Database = {
         }
         Returns: Json
       }
-      sig: { Args: { body: string; secret?: string }; Returns: string }
+      sign_waiver: { Args: { p_member_id: string }; Returns: Json }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -7311,6 +7414,7 @@ export type Database = {
           cancellation_cutoff_minutes: number
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
+          guest_passes_enabled: boolean
           waitlist_enabled: boolean
           week_starts_on: number
         }[]

@@ -11,6 +11,7 @@ import PeakReport, { type Report } from "./peak-report";
 import SuspensionPanel from "./suspension";
 import PublicationPanel from "./publication";
 import ChallengesPanel from "./challenges";
+import GuestPassesPanel from "./guest-passes";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function Settings() {
     supabase.from("studio_settings")
       // One string literal, not a concatenation: supabase-js infers the row type
       // from the literal, and joining it across lines gives back GenericStringError.
-      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes, publication_enabled, challenges_enabled")
+      .select("occurrence_horizon_days, availability_due_day, week_confirm_escalate_days, guarantees_enabled, flex_enabled, seat_caps_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes, publication_enabled, challenges_enabled, guest_passes_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
@@ -187,6 +188,13 @@ export default async function Settings() {
             enabled={settings?.challenges_enabled ?? false}
             hasChallenges={(challengeCount ?? 0) > 0}
           />
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <SectionLabel>Guest passes</SectionLabel>
+        <div className="mt-3">
+          <GuestPassesPanel enabled={settings?.guest_passes_enabled ?? false} />
         </div>
       </section>
 

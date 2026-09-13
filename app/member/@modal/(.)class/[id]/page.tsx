@@ -24,7 +24,7 @@ export default async function ClassSheet({ params }: { params: { id: string } })
   return (
     <Sheet preset={preset} accent={accent}>
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} />
+                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} />
     </Sheet>
   );
 }

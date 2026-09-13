@@ -9,6 +9,7 @@ import { Icon } from "@/components/member/icons";
 import { bookClass, cancelBooking, respondToOffer } from "./actions";
 import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts } from "@/lib/time";
 import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
+import WaiverBanner from "@/components/member/waiver-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function MemberHome() {
   );
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
-         { data: challenges }] =
+         { data: challenges }, { data: meRow }, { count: guestPassCount }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -61,7 +62,15 @@ export default async function MemberHome() {
       .gte("checked_in_at", monthStart.toISOString()),
     // §9. Empty array for a studio with no challenges — no section, no trace.
     supabase.rpc("member_challenges", { p_studio_id: ctx.studioId }),
+    // Decision 26: a guest must sign the waiver before their class. Their own row
+    // and whether they were brought as a guest — the banner shows only for them.
+    supabase.from("members").select("waiver_signed_at").eq("id", ctx.memberId).maybeSingle(),
+    supabase.from("guest_passes").select("id", { count: "exact", head: true }).eq("guest_member_id", ctx.memberId),
   ]);
+
+  const needsWaiver =
+    (meRow as { waiver_signed_at?: string | null } | null)?.waiver_signed_at == null &&
+    (guestPassCount ?? 0) > 0;
 
   const mine = (bookings ?? [])
     .filter((b) => b.class_occurrences && new Date(b.class_occurrences.starts_at).getTime() > now - 3600e3)
@@ -106,6 +115,7 @@ export default async function MemberHome() {
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+      {needsWaiver && <WaiverBanner memberId={ctx.memberId} />}
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}
       {/* Text only. The greeting had the member's photograph beside it and the

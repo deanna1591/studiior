@@ -473,6 +473,32 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 26 — A member may bring a guest, and the guest's first class is free
+
+**Built: migration 127.** Optional per studio, off by default (`guest_passes_enabled`), and a studio that never turns it on sees no "bring a guest" option in the member app and no guest column anywhere — Decision 24/25's optional-not-merely-configurable rule again.
+
+**The mechanic is acquisition, not a discount.** A member invites a friend to the class they are booking; the friend's first class costs nothing; and a real member record exists by the time the friend wants to book again, so buying a pack is a purchase rather than a signup.
+
+**Free once, ever, keyed on email.** One free guest class per person at a studio, enforced by a unique index on `guest_passes(studio_id, lower(email))` and a check against `members` — a returning or lapsed member is not "new". The two are distinct refusals ("already had a free class" vs "already a member here").
+
+**The guest books the HOST's class, at the same time — a referral, not a free pass.** `book_guest()` ensures the host holds a real seat (booking them if they had none) and gives the guest a second seat in the same occurrence, so a guest never takes a seat the host didn't also take and a full class needs TWO free seats — refused as "only one seat left" when one short.
+
+**One guest at a time.** A partial unique index on `guest_passes(studio_id, host_member_id) where status in ('invited','confirmed')` blocks a second invitation until the current guest has attended (or cancelled). This stops ten invitations on a Monday and ten unfillable free seats.
+
+**The guest seat is free and separate.** `payment_source 'comp'`, no membership, no credit consumed, no peak allowance — two seats, one paid for.
+
+**If the host cancels, the guest's booking STANDS** and the guest is told their friend cancelled (a trigger; the guest keeps their seat). The host's own cancellation follows the normal rules — late is late.
+
+**The waiver is signed in the app before the class, and an unsigned waiver blocks CHECK-IN, not booking.** A guest account created by somebody else has signed nothing, and `members.waiver_signed_at` gates booking (§2.1) — so the guest is booked anyway and a trigger on `check_ins` refuses check-in until they sign (`sign_waiver()`, self-serve). A guest who has not signed by the time the class starts is turned away and the desk is told.
+
+**The account is a real member, status 'lead'** (Decision 15 already lets a lead book a drop-in). The guest is invited to claim (the migration-073 invite path) and is an ordinary member afterwards — nothing special except that their one free class is spent. **Conversion is derived**, never stored: a guest converted iff their member row holds any membership, which is the number `guest_pass_report()` and the `dashboard_guest_kpi` surface — the figure that says whether this works at all.
+
+**Instructor guests are not built.** Guests are member-brought only; if a studio-brought guest ever arrives it is a different mechanism.
+
+**Pricing note, recorded not enforced:** Reform Collective's Intro Offer (three classes for 1,999 PHP) is undercut by a free guest class — a pricing question for the studio, so the copy does not advertise both in the same breath.
+
+---
+
 ## 25 — A month is a draft until the studio publishes it, and instructors confirm their roster when it is
 
 **Built: migrations 112 and 113.** Optional per studio, off by default, and a studio that never turns it on sees no draft state, no publish button, no month gate and no roster email — Decision 24's optional-not-merely-configurable rule again. Reform Collective is the studio that wants this.

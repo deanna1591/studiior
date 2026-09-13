@@ -36,6 +36,18 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
       supabase.from("check_ins").select("booking_id").eq("occurrence_id", params.occurrenceId),
     ]);
 
+  // Decision 26: who on this roster is a GUEST, and who brought them — an
+  // instructor needs to know both (a guest is always a first-timer). Only when
+  // the studio runs guest passes will there be any rows.
+  const { data: guestRows } = await supabase
+    .from("guest_passes")
+    .select("guest_member_id, host_member_id, status")
+    .eq("occurrence_id", params.occurrenceId)
+    .in("status", ["invited", "confirmed", "attended"]);
+  const guestOf = new Map((guestRows ?? []).map((g) => [g.guest_member_id, g.host_member_id]));
+  const nameOf = new Map((bookings ?? []).map((b) =>
+    [b.member_id, `${b.members?.preferred_name || b.members?.first_name || ""} ${b.members?.last_name || ""}`.trim()]));
+
   // PINNED NOTES, which is the whole reason pinning exists — and this screen
   // has never read them. "Pin to the roster" was a checkbox that changed a
   // boolean nothing looked at, so an instructor arriving at a class knew
@@ -123,6 +135,12 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                     {b.members?.preferred_name || b.members?.first_name} {b.members?.last_name}
                   </Link>
                   {flag && <HealthChip band={band} />}
+                  {guestOf.has(b.member_id) && (
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>
+                      Guest · first time
+                    </span>
+                  )}
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
                     {b.payment_source?.replace("_", " ") ?? "—"}
                     {b.override_reason ? ` · override: ${b.override_reason}` : ""}
@@ -139,6 +157,11 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                     roster before a class is reading down the list, and a note
                     about a shoulder has to be in the column their eye is
                     already in. */}
+                {guestOf.has(b.member_id) && (
+                  <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
+                    Brought by {nameOf.get(guestOf.get(b.member_id) ?? "") || "a member"}
+                  </p>
+                )}
                 {(notesFor.get(b.member_id) ?? []).map((n, i) => (
                   <p key={i} className="mt-1 pl-9 text-[12px] leading-[18px]"
                      style={{ color: n.category === "injury" || n.category === "medical"

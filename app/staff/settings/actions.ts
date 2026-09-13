@@ -224,6 +224,28 @@ export async function saveChallenges(_prev: PlainState, fd: FormData): Promise<P
   };
 }
 
+export async function saveGuestPasses(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = String(fd.get("guest_passes_enabled") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ guest_passes_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings"); revalidatePath("/");
+  return {
+    ok: true,
+    message: on
+      ? "Saved. Members can now bring a guest — their first class is free."
+      : "Saved. The guest option is hidden. Anyone already booked as a guest keeps their place.",
+  };
+}
+
 /**
  * Decision 24's peak switch. One checkbox; the windows are their own form, and
  * the allowances live on each plan.

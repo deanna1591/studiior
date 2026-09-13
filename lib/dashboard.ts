@@ -123,7 +123,7 @@ export async function dashboardData(
 
   const [
     kpis, revenue, heatmap, health, activity, tasks, month, absent,
-    nRevenue, nAttendance, nLead, challengeKpi,
+    nRevenue, nAttendance, nLead, challengeKpi, guestKpi,
   ] = await Promise.all([
     supabase.rpc("dashboard_kpis", { p_studio_id: studioId }),
     supabase.rpc("dashboard_revenue", { p_studio_id: studioId, p_from: from, p_to: today }),
@@ -139,6 +139,9 @@ export async function dashboardData(
     // §9. Null (and so appended to nothing) for a studio with no challenge — the
     // KPI is present only once the feature is in use.
     supabase.rpc("dashboard_challenge_kpi", { p_studio_id: studioId }),
+    // Decision 26. Null (and so appended to nothing) unless the studio runs guest
+    // passes and has had at least one guest.
+    supabase.rpc("dashboard_guest_kpi", { p_studio_id: studioId }),
   ]);
 
   // A FAILED QUERY MUST NOT LOOK LIKE AN EMPTY STUDIO. schedule_range() raised
@@ -154,10 +157,10 @@ export async function dashboardData(
     kpis: (() => {
       const base = (kpis.data ?? null) as { cards: Kpi[]; currency: string;
         forecast_months_needed: number; forecast_months_have: number } | null;
-      const card = challengeKpi.data as Kpi | null;
-      // The challenge KPI is its own function so dashboard_kpis need not be
+      // Each optional KPI is its own function so dashboard_kpis need not be
       // re-issued for one card; appended here, and absent when null.
-      if (base && card) return { ...base, cards: [...base.cards, card] };
+      const extra = [challengeKpi.data, guestKpi.data].filter(Boolean) as Kpi[];
+      if (base && extra.length) return { ...base, cards: [...base.cards, ...extra] };
       return base;
     })(),
     kpisError: err(kpis),
