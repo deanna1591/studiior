@@ -76,3 +76,24 @@ export async function recordPaperWaiver(_prev: PaperWaiverState, fd: FormData): 
   revalidatePath(`/roster/${occurrenceId}`);
   return { ok: true, message: "Waiver recorded — you can check them in now." };
 }
+
+export type ReleasePayState = { ok: boolean; message: string } | null;
+
+/**
+ * Decision 28: a manager releases a held pay record on the instructor's behalf,
+ * with a reason (audited). For when the instructor taught and forgot to tap.
+ */
+export async function releasePay(_prev: ReleasePayState, fd: FormData): Promise<ReleasePayState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const reason = String(fd.get("reason") ?? "").trim();
+  if (!reason) return { ok: false, message: "Say why — the instructor did the work, and this goes on the record." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("confirm_class_for_pay", { p_occurrence_id: occurrenceId, p_reason: reason });
+  if (error) return { ok: false, message: error.message };
+  const r = data as unknown as { ok?: boolean } | null;
+  if (!r?.ok) return { ok: false, message: "That could not be released." };
+  revalidatePath(`/roster/${occurrenceId}`);
+  return { ok: true, message: "Released. The instructor's pay for this class is confirmed." };
+}

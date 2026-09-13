@@ -490,6 +490,11 @@ select expect_true('...and the record still points at the version it was compute
 select set_config('t.period',
   (select period_id::text from instructor_pay_records
     where occurrence_id='9a179a17-0000-0000-0000-00000000e006'), false);
+-- Decision 28: this suite predates check-in; confirm the held class records so
+-- the period can close (the suite is about Decision 22's computation, not check-in).
+reset role; select set_config('request.jwt.claim.sub','',false);
+update instructor_pay_records set confirmed_at = now(), confirm_method = 'auto'
+  where period_id = current_setting('t.period')::uuid and type = 'class' and confirmed_at is null;
 select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
 set role authenticated;
 select expect_true('closing a period reports what was in it',
@@ -637,6 +642,9 @@ select expect_num('a purchase 200 days after the first class is outside the wind
 select set_config('t.bonus_period',
   (select period_id::text from instructor_pay_records
     where type='conversion' and source_id='9a179a17-0000-0000-0000-0000000b1001'), false);
+reset role; select set_config('request.jwt.claim.sub','',false);
+update instructor_pay_records set confirmed_at = now(), confirm_method = 'auto'
+  where period_id = current_setting('t.bonus_period')::uuid and type = 'class' and confirmed_at is null;
 select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
 set role authenticated;
 select close_pay_period(current_setting('t.bonus_period')::uuid) is not null as closed;

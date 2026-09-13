@@ -126,3 +126,20 @@ export async function checkInMember(
   revalidatePath(`/instructor/roster/${occurrenceId}`);
   return { ok: "In." };
 }
+
+
+/**
+ * Decision 28: the instructor checks themselves in for a class, so their pay is
+ * released. One tap; the window and "your class" checks are in the function.
+ */
+export async function confirmClass(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("instructor_confirm_class", {
+    p_occurrence_id: String(form.get("occurrence_id")),
+  });
+  if (error) return { error: error.message };
+  const r = (data ?? {}) as { ok?: boolean };
+  if (!r.ok) return { error: "That could not be confirmed." };
+  revalidatePath("/instructor");
+  return { ok: "Checked in — your pay for this class is released." };
+}

@@ -1052,6 +1052,8 @@ export type Database = {
           flex_reached_minimum_at: string | null
           guarantee_tier: Database["public"]["Enums"]["guarantee_tier"] | null
           id: string
+          instructor_checked_in_at: string | null
+          instructor_checked_in_by: string | null
           instructor_confirmed_at: string | null
           instructor_id: string | null
           instructor_notes: string | null
@@ -1094,6 +1096,8 @@ export type Database = {
           flex_reached_minimum_at?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
+          instructor_checked_in_at?: string | null
+          instructor_checked_in_by?: string | null
           instructor_confirmed_at?: string | null
           instructor_id?: string | null
           instructor_notes?: string | null
@@ -1136,6 +1140,8 @@ export type Database = {
           flex_reached_minimum_at?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
+          instructor_checked_in_at?: string | null
+          instructor_checked_in_by?: string | null
           instructor_confirmed_at?: string | null
           instructor_id?: string | null
           instructor_notes?: string | null
@@ -2421,6 +2427,10 @@ export type Database = {
         Row: {
           amount_cents: number
           basis: Json | null
+          confirm_method: string | null
+          confirm_note: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -2438,6 +2448,10 @@ export type Database = {
         Insert: {
           amount_cents: number
           basis?: Json | null
+          confirm_method?: string | null
+          confirm_note?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           created_by?: string | null
           currency: string
@@ -2455,6 +2469,10 @@ export type Database = {
         Update: {
           amount_cents?: number
           basis?: Json | null
+          confirm_method?: string | null
+          confirm_note?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -6192,6 +6210,7 @@ export type Database = {
         Args: { p_confirm?: boolean; p_series_id: string }
         Returns: Json
       }
+      as_state: { Args: { sql: string; uid: string }; Returns: string }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -6403,6 +6422,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: Json
       }
+      confirm_class_for_pay: {
+        Args: { p_occurrence_id: string; p_reason: string }
+        Returns: Json
+      }
       confirm_dropin_payment: {
         Args: { p_booking_id: string; p_studio_id: string }
         Returns: boolean
@@ -6570,6 +6593,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -6646,6 +6677,10 @@ export type Database = {
           p_starts_at: string
         }
         Returns: boolean
+      }
+      instructor_confirm_class: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
       }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
@@ -7585,6 +7620,10 @@ export type Database = {
       }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
       studio_today: { Args: { p_studio_id: string }; Returns: string }
+      studio_unconfirmed_pay_count: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
       studio_week_start: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
@@ -7615,6 +7654,7 @@ export type Database = {
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_guest_waivers: { Args: never; Returns: Json }
+      sweep_instructor_confirmations: { Args: never; Returns: Json }
       sweep_membership_periods: { Args: never; Returns: Json }
       sweep_no_shows: { Args: never; Returns: Json }
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }

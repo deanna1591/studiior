@@ -9,11 +9,12 @@ type Record_ = {
   amount_cents: number; base_cents: number | null; per_head_cents: number | null;
   bonus_cents: number | null; head_count: number | null; kind: string;
   occurrence_status: string | null; cancellation_cause: string | null; did_not_run: boolean;
+  held: boolean; confirmed: boolean;
 };
 type Pay = {
   state: "ok" | "empty" | "no_period"; currency: string;
   period?: { starts_on: string; ends_on: string; status: string };
-  total_cents?: number; classes_paid?: number; not_running_paid?: number;
+  total_cents?: number; classes_paid?: number; not_running_paid?: number; held_cents?: number;
   records?: Record_[]; empty_hint: string; read_only?: string;
 };
 
@@ -72,6 +73,11 @@ export default async function PayPage() {
                 <> · <span className="num">{p.not_running_paid}</span> paid that did not run</>
               )}
             </p>
+            {(p.held_cents ?? 0) > 0 && (
+              <p className="m-sub mt-1.5 text-ink-2">
+                {money(p.held_cents ?? 0, p.currency)} is held until you check in — tap the class on My week.
+              </p>
+            )}
           </div>
 
           <ul className="mt-3 space-y-2">
@@ -84,8 +90,11 @@ export default async function PayPage() {
                     </span>
                     <span className="m-sub block text-ink-3">{r.local_when}</span>
                   </span>
-                  <span className="num shrink-0 text-[15px] font-semibold leading-5 text-ink">
-                    {money(r.amount_cents, p.currency)}
+                  <span className="shrink-0 text-right">
+                    <span className="num block text-[15px] font-semibold leading-5 text-ink">
+                      {money(r.amount_cents, p.currency)}
+                    </span>
+                    {r.held && <span className="m-micro block text-ink-2">held</span>}
                   </span>
                 </div>
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { ConfirmWeek } from "./actions-ui";
+import PayCheckIn from "./pay-checkin";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ type Klass = {
   status: string; cancellation_reason: string | null; cancellation_cause: string | null;
   flex: boolean; minimum_bookings: number | null; committed: boolean;
   tier: string | null; confirmed: boolean; cover_requested: boolean;
+  checked_in: boolean; checkin_open: boolean;
 };
 
 /**
@@ -216,6 +218,15 @@ function ClassRow({ c }: { c: Klass }) {
           <p className="mt-1.5 text-[12px] leading-[17px] text-ink-3">Confirmed.</p>
         )}
       </Link>
+      {/* Decision 28: check in for pay. A ran, committed class you have not
+          checked into, while the window is open. Cancelled/flex-waiting ones
+          have no check-in — you cannot check in to a class that did not run. */}
+      {!off && !waiting && c.committed && !c.checked_in && c.checkin_open && (
+        <PayCheckIn occurrenceId={c.occurrence_id} />
+      )}
+      {!off && c.checked_in && (
+        <p className="mt-1.5 text-[12px] font-medium" style={{ color: "var(--lime-text)" }}>Checked in for pay ✓</p>
+      )}
     </li>
   );
 }

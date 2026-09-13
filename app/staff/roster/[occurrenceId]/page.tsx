@@ -9,6 +9,7 @@ import { fmtDayLong, fmtTime, relativeDayName } from "@/lib/time";
 import CheckInButton from "./check-in-button";
 import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
+import ReleasePay from "./release-pay";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
 
@@ -46,6 +47,13 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
     .eq("occurrence_id", params.occurrenceId)
     .in("status", ["invited", "confirmed", "attended"]);
   const guestOf = new Map((guestRows ?? []).map((g) => [g.guest_member_id, g.host_member_id]));
+
+  // Decision 28: is this class's pay held (instructor not checked in)? Managers
+  // can release it. Only a class that ran has a held record.
+  const { data: heldPay } = isManagerUp(ctx.role)
+    ? await supabase.from("instructor_pay_records").select("id")
+        .eq("occurrence_id", params.occurrenceId).eq("type", "class").is("confirmed_at", null).maybeSingle()
+    : { data: null };
   const nameOf = new Map((bookings ?? []).map((b) =>
     [b.member_id, `${b.members?.preferred_name || b.members?.first_name || ""} ${b.members?.last_name || ""}`.trim()]));
 
@@ -100,6 +108,8 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
       {isManagerUp(ctx.role) && occ.status === "scheduled" && occ.instructor_id && (
         <OpenShift occurrenceId={occ.id} instructorName={occ.instructors?.display_name ?? "the instructor"} />
       )}
+
+      {heldPay && <ReleasePay occurrenceId={occ.id} />}
 
       {/* The desk end of the member's rotating code. Without it the QR on
           their phone is a picture nothing can read. */}
