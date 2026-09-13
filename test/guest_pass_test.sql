@@ -129,6 +129,20 @@ select expect_num('guest consumed no peak allowance',
   (select count(*) from peak_allowance_ledger where booking_id=(current_setting('t.g1')::jsonb->>'guest_booking_id')::uuid), 0);
 
 -- =============================================================================
+-- 1b. sign_waiver guards against signing SOMEONE ELSE's waiver (migration 129).
+--     The guest (t.g1) has a null user_id; a null auth-guard must still refuse.
+-- =============================================================================
+do $$
+declare v_guest uuid := (current_setting('t.g1')::jsonb->>'guest_member_id')::uuid; v_raised text := 'NOT REFUSED';
+begin
+  perform set_config('request.jwt.claim.sub','9e579e57-0000-0000-0000-000000000e03', true);
+  set local role authenticated;
+  begin perform sign_waiver(v_guest); exception when others then v_raised := sqlstate; end;
+  perform expect_text('a member cannot sign another member''s waiver', v_raised, 'PT403');
+end $$;
+select set_config('request.jwt.claim.sub','',false);
+
+-- =============================================================================
 -- 2/3. Refusals: second free class for the same email; an existing member's email.
 -- =============================================================================
 set role authenticated; select set_config('request.jwt.claim.sub','9e579e57-0000-0000-0000-000000000e03',false);
