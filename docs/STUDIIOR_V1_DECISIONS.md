@@ -473,6 +473,22 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 28 — The instructor checks themselves in for pay, and a held record blocks the period from closing
+
+**Built: migrations 134–137.** Decision 22 computed what a studio owes each instructor and wrote a pay record at the class's terminal transition — but nothing recorded that the instructor was actually in the room. This closes that gap without turning it into surveillance: **the instructor checks themselves in**, in the portal on their My week screen, one tap on the class, and only within a window.
+
+**The window is the member check-in window, reused not reinvented.** Migration 007's `checkin_opens_minutes_before` / `checkin_closes_minutes_after` already define "around the class"; a class-for-pay confirmation uses the same two settings rather than a hardcoded 60/30 or a new pair of columns. Outside it, `instructor_confirm_class()` refuses (PT422).
+
+**A ran class's pay is written HELD, and a held record cannot sit in a closed period.** `record_class_pay` stamps `confirmed_at` null on a class that ran until the instructor confirms (method `self`); a class that did NOT run is auto-confirmed (method `auto`) and needs no check-in, because Decision 22 already says what a not-running class pays and there is no room to be in. **`close_pay_period()` refuses while any class record is held, and names the count (PT409)** — closing is the studio asserting "this is what we owe", and an unconfirmed class is precisely the thing still in question. Staff release a held record on the instructor's behalf with a reason via `confirm_class_for_pay()` (manager, method `manager`, audited `pay_record.released`), so a forgotten tap never traps a period.
+
+**Payment frequency is a setting, not a constant.** Decision 22's periods were fortnightly and days-based with no control to set them. A studio may now choose weekly, fortnightly, monthly, or twice-monthly on set days (`pay_period_mode` + `pay_period_second_day`); `ensure_pay_period()` branches on the mode in studio-local dates. Default fortnightly leaves every existing period exactly as it was.
+
+**Proof of payment is recorded, never moved.** Studiior does not move money (Decision 22 stands). On a CLOSED period a manager records that the studio paid an instructor elsewhere — the date, the method, a reference, an optional receipt — into `instructor_pay_settlements`, so the instructor's statement reads paid and "did you pay me" stops. An OPEN period cannot be marked paid (PT409): you pay what the closed statement says. The receipt lives in a private per-studio bucket keyed so an instructor reaches only their own; managers read all, an instructor reads their own. This is the member side's `record_manual_payment` posture — Studiior records what the studio says happened and does not verify it.
+
+**The CSV export must equal the statement.** `pay_period_export()` returns the statement's exact line shape across every instructor plus a per-instructor summary; the app only formats it. If the CSV and the statement disagreed, the CSV is what an accountant believes and the studio has a problem — so they read the same source and the suite asserts parity three ways (row count, total, each line's amount).
+
+---
+
 ## 27 — Studio announcements, one-way, and never a feed
 
 **Built: migrations 131 and 132.** A studio posts something and members see it on their Home — a workshop, a closure, a new instructor, a price change, an event. Title, body, an optional photo (the migration-116 focal-point treatment, since `object-fit: cover` on a phone crops a wide image to a sixth of itself), a start and end, a draft/published state, an audience (members, instructors, or both), and a pinned flag. Staff create, edit, publish and unpublish; members see published ones in range, newest first with pinned on top, and dismiss the ones they have read; a pinned one stays until it ends.
