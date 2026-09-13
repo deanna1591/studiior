@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Rail, { type RailItem, type RailUser } from "./rail";
+import Rail, { type RailGroup, type RailUser } from "./rail";
 import Banner, { type BannerMsg } from "./banner";
 
 /* --------------------------------------------------------------------------
@@ -7,12 +7,12 @@ import Banner, { type BannerMsg } from "./banner";
    -------------------------------------------------------------------------- */
 
 export function AppShell({
-  studioName, location, items, user, signOut,
+  studioName, location, groups, user, signOut,
   title, actions, banner, filters, children,
 }: {
   studioName: string;
   location: string | null;
-  items: RailItem[];
+  groups: RailGroup[];
   user: RailUser;
   signOut: React.ReactNode;
   title: string;
@@ -23,7 +23,7 @@ export function AppShell({
 }) {
   return (
     <>
-      <Rail studioName={studioName} location={location} items={items} user={user} signOut={signOut} />
+      <Rail studioName={studioName} location={location} groups={groups} user={user} signOut={signOut} />
       <div className="lg:pl-[--rail-w]">
         {/* Left-aligned rather than centred: the content keeps one left edge
             with the rail, so the eye has a single column to track down. */}
@@ -63,7 +63,7 @@ export function AdminShell({
       <Rail
         studioName="Studiior"
         location="Platform"
-        items={[{ href: "/admin", label: "Studios" }]}
+        groups={[{ heading: null, items: [{ href: "/admin", label: "Studios" }] }]}
         user={{ email, role: "platform admin" }}
         signOut={signOut}
       />

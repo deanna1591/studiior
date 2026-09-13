@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffAccess, requireOnboarded, isManagerUp, type StaffContext } from "@/lib/auth";
 import StaffAccessGate from "@/components/staff-access-gate";
-import { railItems } from "@/lib/nav";
+import { railGroups } from "@/lib/nav";
 import { setupSummary } from "@/lib/setup";
 import { studioBanner } from "@/lib/banner";
 import { signOut } from "@/app/staff/actions";
@@ -86,12 +86,12 @@ export async function staffScreen(path?: string) {
 }
 
 export function shellProps(
-  ctx: StaffContext, isPlatformAdmin: boolean, setupComplete: boolean, hasChallenges = false,
+  ctx: StaffContext, isPlatformAdmin: boolean, _setupComplete: boolean, hasChallenges = false,
 ) {
   return {
     studioName: ctx.studioName,
     location: ctx.locationName,
-    items: railItems(ctx, isPlatformAdmin, !setupComplete && isManagerUp(ctx.role), hasChallenges),
+    groups: railGroups(ctx, isPlatformAdmin, hasChallenges),
     user: { email: ctx.email, role: ctx.role },
     signOut: (
       <form action={signOut}>
