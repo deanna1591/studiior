@@ -14,11 +14,11 @@ export const dynamic = "force-dynamic";
  * bottom sheet instead (app/member/@modal/(.)class/[id]); both render the same
  * ClassDetailBody, so they cannot drift.
  */
-export default async function ClassDetail({ params }: { params: { id: string } }) {
+export default async function ClassDetail({ params, searchParams }: { params: { id: string }; searchParams: { t?: string } }) {
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
-  const data = await loadClassDetail(supabase, ctx.memberId, params.id);
+  const data = await loadClassDetail(supabase, ctx.memberId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
   if (!data) notFound();
 
   return (

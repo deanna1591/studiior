@@ -51,7 +51,7 @@ export default async function MemberHome() {
     membershipState(supabase, ctx.memberId),
     supabase
       .from("class_occurrences")
-      .select("id, name, starts_at, capacity, booked_count, instructors!instructor_id(display_name), class_types(image_url, image_focus_x, image_focus_y)")
+      .select("id, name, starts_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name), class_types(image_url, image_focus_x, image_focus_y)")
       .eq("status", "scheduled")
       .gt("starts_at", new Date().toISOString())
       .order("starts_at")
@@ -312,7 +312,7 @@ export default async function MemberHome() {
           <ul className="m-hscroll -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
             {(upcoming ?? []).map((o) => (
               <li key={o.id} className="w-[124px] shrink-0">
-                <Link href={`/class/${o.id}`} className="block">
+                <Link href={`/class/${o.id}?t=${o.class_type_id}`} className="block">
                   <span
                     className="mb-2 block h-[88px] w-full overflow-hidden rounded-2xl"
                     style={!o.class_types?.image_url ? { background: heroFallback } : undefined}

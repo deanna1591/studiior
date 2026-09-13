@@ -1,20 +1,23 @@
 import Link from "next/link";
 import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
-import { memberScreen } from "@/lib/member";
+import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { SignOut } from "@/components/member/sign-out";
+import { formatMoney } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Account is a hub, not a wall — a list that leads somewhere. The person at the
- * top, then each thing they might want on its own screen. The tab bar stays at
- * five; everything here hangs off this one tab.
+ * Account is a hub — a list that leads somewhere. But the one thing a member
+ * opens Account to check is usually their plan and credits, so that glance sits
+ * at the top (a tap to /account/plan for the detail), and the list is below.
+ * Making it a hub must not turn a one-tap "what are my credits" into two.
  */
 export default async function Account() {
-  const { studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
+  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
     await memberScreen();
+  const { live } = await membershipState(supabase, ctx.memberId);
 
   const rows: { href: string; label: string; sub: string }[] = [
     { href: "/account/classes", label: "Your classes", sub: "Every class you have booked, and what happened" },
@@ -32,6 +35,23 @@ export default async function Account() {
         <Avatar name={memberName || studioName} url={avatarUrl} size={56} />
         <span className="m-title text-ink">{memberName || "You"}</span>
       </div>
+
+      {/* The glance: plan and credits, the reason most people open Account. Tap
+          through for the full plan. Absent (not empty) with no plan. */}
+      {live && (
+        <Link href="/account/plan" className="m-card m-press mb-4 flex items-center gap-3 p-4">
+          <span className="min-w-0 flex-1">
+            <span className="m-name block text-ink">{live.membership_plans?.name}</span>
+            <span className="m-sub block text-ink-2">
+              {live.credits_remaining === null
+                ? "Unlimited classes"
+                : <><span className="num font-semibold text-ink">{live.credits_remaining}</span> classes left</>}
+              {live.status !== "active" && <> · {live.status.replace("_", " ")}</>}
+            </span>
+          </span>
+          <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
+        </Link>
+      )}
 
       <ul className="m-card divide-y divide-line overflow-hidden">
         {rows.map((r) => (

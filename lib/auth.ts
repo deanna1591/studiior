@@ -159,6 +159,8 @@ export type MemberBootstrap = {
   waitlist_enabled: boolean;
   billing_locked: boolean;
   open_offers: number;
+  guest_passes_enabled: boolean;
+  has_payment_provider: boolean;
 };
 
 /** Who is making this request, on the member PWA. */

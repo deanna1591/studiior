@@ -14,9 +14,9 @@ export const dynamic = "force-dynamic";
  *
  * Same loader and same body as the page: one query, one presentation, no drift.
  */
-export default async function ClassSheet({ params }: { params: { id: string } }) {
+export default async function ClassSheet({ params, searchParams }: { params: { id: string }; searchParams: { t?: string } }) {
   const { ctx, supabase, settings, preset, accent } = await memberScreen();
-  const data = await loadClassDetail(supabase, ctx.memberId, params.id);
+  const data = await loadClassDetail(supabase, ctx.memberId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
   // Not found or not visible: show no sheet rather than an empty one. The
   // address bar still reads /class/[id]; a back step closes it.
   if (!data) return null;

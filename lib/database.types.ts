@@ -6186,7 +6186,6 @@ export type Database = {
         Args: { p_confirm?: boolean; p_series_id: string }
         Returns: Json
       }
-      as_state: { Args: { sql: string; uid: string }; Returns: string }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -6565,18 +6564,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -6764,6 +6751,8 @@ export type Database = {
           checkin_opens_minutes_before: number
           current_streak: number
           first_name: string
+          guest_passes_enabled: boolean
+          has_payment_provider: boolean
           last_name: string
           lifetime_visits: number
           logo_url: string

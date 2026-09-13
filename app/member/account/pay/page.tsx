@@ -13,16 +13,14 @@ export const dynamic = "force-dynamic";
  * not "Stripe" — a future PayMongo/Xendit adapter appears here with no change.
  */
 export default async function HowYouPay() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
-  const [{ data: settingsRows }, { data: studio }] = await Promise.all([
-    supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
-    supabase.from("studios").select("contact_email, contact_phone").eq("id", ctx.studioId).maybeSingle(),
-  ]);
-  const settings = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as
-    { has_payment_provider?: boolean } | null;
-  const hasProvider = settings?.has_payment_provider ?? false;
+  // The provider flag arrives with the member (bootstrap); only the contact
+  // details need a query here, and only for the no-provider path.
+  const { data: studio } = await supabase.from("studios")
+    .select("contact_email, contact_phone").eq("id", ctx.studioId).maybeSingle();
+  const hasProvider = settings.hasPaymentProvider;
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}

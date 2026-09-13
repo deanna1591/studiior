@@ -297,7 +297,7 @@ export default async function Book({
       id: o.id,
       bookingId: booking?.id ?? null,
       name: o.name,
-      href: `/class/${o.id}`,
+      href: `/class/${o.id}?t=${o.class_type_id}`,
       startLabel: fmtTime(o.starts_at, ctx.timeZone),
       endLabel: o.ends_at ? fmtTime(o.ends_at, ctx.timeZone) : null,
       durationLabel: mins ? `${mins} min` : "—",

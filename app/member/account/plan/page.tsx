@@ -8,26 +8,27 @@ import { dayMonthParts, addDays, dayStart } from "@/lib/time";
 export const dynamic = "force-dynamic";
 
 export default async function Plan() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
+  const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
   const { live, all } = await membershipState(supabase, ctx.memberId);
 
   const from = dayStart(new Date(), ctx.timeZone, 0);
   const to = addDays(from, 30);
-  const [{ data: ledger }, { data: settingsRows }, { count: activeGuests }, { data: peak }] =
+  // guest_passes_enabled arrives with the member (bootstrap). This batch is the
+  // three reads that actually need a query: the ledger, the active-guest count
+  // (only when guest passes are on), and the peak slots.
+  const guestEnabled = settings.guestPassesEnabled;
+  const [{ data: ledger }, { count: activeGuests }, { data: peak }] =
     await Promise.all([
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
         .eq("member_id", ctx.memberId).order("created_at", { ascending: false }).limit(30),
-      supabase.rpc("studio_member_settings", { p_studio_id: ctx.studioId }),
-      supabase.from("guest_passes").select("id", { count: "exact", head: true })
-        .eq("host_member_id", ctx.memberId).in("status", ["invited", "confirmed"]),
+      guestEnabled
+        ? supabase.from("guest_passes").select("id", { count: "exact", head: true })
+            .eq("host_member_id", ctx.memberId).in("status", ["invited", "confirmed"])
+        : Promise.resolve({ count: 0 }),
       supabase.rpc("member_peak_slots", { p_studio_id: ctx.studioId, p_from: from.toISOString(), p_to: to.toISOString() }),
     ]);
-
-  const settings = (Array.isArray(settingsRows) ? settingsRows[0] : settingsRows) as
-    { guest_passes_enabled?: boolean } | null;
-  const guestEnabled = settings?.guest_passes_enabled ?? false;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
 
   const d = (iso: string) => {
