@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { focalPoint } from "@/lib/focal";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { ActionForm, PrimaryButton } from "@/components/member/ui";
 import { joinChallenge } from "../actions";
 import { fmtDayLong } from "@/lib/time";
+import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +15,10 @@ type Detail = {
   id: string; title: string; description: string | null; type: string; goal_value: number;
   status: string; starts_on: string; ends_on: string; join_deadline: string;
   reward_description: string | null; leaderboard_enabled: boolean;
+  cover_image_url: string | null; cover_focus_x: number; cover_focus_y: number;
   joined: boolean; progress: number; completed_at: string | null; can_join: boolean;
-  history: { occurred_at: string; class_name: string | null }[];
+  history: { occurred_at: string; class_name: string | null; instructor: string | null;
+    counted: boolean; reason: string | null }[];
   leaderboard: { name: string; progress: number; rank: number | null; is_me: boolean }[] | null;
 };
 
@@ -33,12 +37,27 @@ export default async function MemberChallengeDetail({ params }: { params: { id: 
   const canJoin = c.can_join;
   const closedRunning = !c.joined && !c.can_join && (c.status === "active" || c.status === "scheduled");
 
+  // The cover, or the accent gradient the member hero already falls back to.
+  const [g1, g2] = accentGradient(accentRamp(accent ?? neutralAccent(preset), preset));
+  const coverFallback = `linear-gradient(140deg, ${g1} 0%, ${g2} 100%)`;
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
                  studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       <Link href="/challenges" className="m-sub m-press mb-3 inline-flex items-center gap-1 text-ink-2">
         <Icon name="chevron-left" size={16} /> Challenges
       </Link>
+
+      {/* The cover, above the title where they decide whether to join. Focal
+          point so a wide photo is not cropped to a sixth of itself on a phone. */}
+      <span className="m-hero mb-4 block" style={!c.cover_image_url ? { background: coverFallback } : undefined}>
+        {c.cover_image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={c.cover_image_url} alt="" aria-hidden
+               className="absolute inset-0 h-full w-full object-cover"
+               style={{ objectPosition: focalPoint(c.cover_focus_x, c.cover_focus_y) }} />
+        )}
+      </span>
 
       <h1 className="m-title text-ink">{c.title}</h1>
       <p className="m-sub mt-1 text-ink-2">
@@ -116,12 +135,27 @@ export default async function MemberChallengeDetail({ params }: { params: { id: 
 
       {c.joined && c.history.length > 0 && (
         <section className="mt-6">
-          <h2 className="section-label text-ink-2">Counted so far</h2>
-          <ul className="mt-2 space-y-1.5">
+          <h2 className="section-label text-ink-2">Your classes</h2>
+          <ul className="m-card mt-2 divide-y divide-line overflow-hidden">
             {c.history.map((h, i) => (
-              <li key={i} className="m-sub flex items-center justify-between text-ink-2">
-                <span>{h.class_name ?? "Class"}</span>
-                <span className="num text-ink-3">{fmtDayLong(h.occurred_at, ctx.timeZone)}</span>
+              <li key={i} className="flex items-start justify-between gap-3 px-4 py-2.5">
+                <span className="min-w-0">
+                  <span className="m-body block truncate text-ink">{h.class_name ?? "Class"}</span>
+                  <span className="m-micro block text-ink-3">
+                    {fmtDayLong(h.occurred_at, ctx.timeZone)}{h.instructor ? ` · ${h.instructor}` : ""}
+                  </span>
+                </span>
+                {h.counted ? (
+                  <span className="m-micro shrink-0 font-semibold" style={{ color: "var(--lime-text)" }}>
+                    Counted
+                  </span>
+                ) : (
+                  // Why it did not count, so the number is trusted rather than
+                  // argued with — a late cancel or a no-show in the window.
+                  <span className="m-micro max-w-[9rem] shrink-0 text-right leading-[15px] text-ink-2">
+                    Didn&rsquo;t count · {h.reason}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

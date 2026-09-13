@@ -713,6 +713,8 @@ export type Database = {
           audience: Database["public"]["Enums"]["challenge_audience"]
           auto_enrol: boolean
           class_type_ids: Json
+          cover_image_focus_x: number
+          cover_image_focus_y: number
           cover_image_url: string | null
           created_at: string
           created_by: string | null
@@ -735,6 +737,8 @@ export type Database = {
           audience?: Database["public"]["Enums"]["challenge_audience"]
           auto_enrol?: boolean
           class_type_ids?: Json
+          cover_image_focus_x?: number
+          cover_image_focus_y?: number
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
@@ -757,6 +761,8 @@ export type Database = {
           audience?: Database["public"]["Enums"]["challenge_audience"]
           auto_enrol?: boolean
           class_type_ids?: Json
+          cover_image_focus_x?: number
+          cover_image_focus_y?: number
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null

@@ -80,6 +80,16 @@ export default function ChallengeForm({
         <textarea name="description" defaultValue={t?.description ?? ""} className={field} rows={2} />
       </div>
 
+      <div>
+        <label className={lbl}>Cover photo (optional)</label>
+        <input name="cover" type="file" accept="image/png,image/jpeg,image/webp"
+               className="block w-full text-[13px] text-ink-2 file:mr-3 file:rounded-full file:border-0 file:bg-paper file:px-3 file:py-1.5 file:text-[13px]" />
+        <p className="mt-1 text-[11px] text-ink-3">
+          Shown to members on the challenge. You can set the focal point after creating it.
+          No photo falls back to your studio accent.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={lbl}>Goal type</label>

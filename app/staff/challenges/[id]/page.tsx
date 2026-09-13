@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
-import { AppShell, Denied, Empty } from "@/components/ui";
+import { AppShell, Denied, Empty, SectionLabel } from "@/components/ui";
 import { publishChallenge } from "../actions";
+import ChallengeCover from "../cover";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ type Overview = {
   id: string; title: string; description: string | null; type: string; goal_value: number;
   status: string; starts_on: string; ends_on: string; join_deadline: string;
   leaderboard_enabled: boolean; reward_description: string | null; participants: Participant[];
+  cover_image_url: string | null; cover_focus_x: number; cover_focus_y: number;
 };
 
 export default async function ChallengeOverview({ params }: { params: { id: string } }) {
@@ -61,6 +63,14 @@ export default async function ChallengeOverview({ params }: { params: { id: stri
           </form>
         )}
       </div>
+
+      <section className="mb-6">
+        <SectionLabel>Cover photo</SectionLabel>
+        <div className="mt-2">
+          <ChallengeCover challengeId={c.id} coverUrl={c.cover_image_url}
+                          focusX={c.cover_focus_x} focusY={c.cover_focus_y} />
+        </div>
+      </section>
 
       <p className="mb-2 text-[13px] text-ink-2">
         <span className="num font-semibold text-ink">{c.participants.length}</span> joined
