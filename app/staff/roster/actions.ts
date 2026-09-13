@@ -42,3 +42,37 @@ export async function openShift(_prev: OpenShiftState, fd: FormData): Promise<Op
     : ` ${r.removed_instructor} has been told.`;
   return { ok: true, message: `Opened as a shift.${tail} Qualified instructors are emailed shortly.` };
 }
+
+export type PaperWaiverState =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Decision 26 — front desk records a guest's waiver signed ON PAPER at the door.
+ * Through record_document, so it is a real filed document (auditable), and that
+ * confirms the guest's pass and clears the check-in gate — the studio hands an
+ * unsigned guest a form rather than sending them home.
+ */
+export async function recordPaperWaiver(_prev: PaperWaiverState, fd: FormData): Promise<PaperWaiverState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const memberId = String(fd.get("member_id") ?? "");
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("record_document", {
+    p_member_id: memberId,
+    p_kind: "waiver",
+    p_filename: "Paper waiver (signed at the desk)",
+    p_storage_path: `guest-paper-waiver/${memberId}/${Date.now()}`,
+    p_note: "Signed on paper at the front desk.",
+    p_signed_at: new Date().toISOString(),
+  });
+  if (error) return { ok: false, message: error.message };
+  const r = data as unknown as { ok?: boolean } | null;
+  if (!r?.ok) return { ok: false, message: "That could not be recorded." };
+
+  revalidatePath(`/roster/${occurrenceId}`);
+  return { ok: true, message: "Waiver recorded — you can check them in now." };
+}

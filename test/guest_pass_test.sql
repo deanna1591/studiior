@@ -251,4 +251,48 @@ select expect_num('A''s report counts only A''s guests',
 select expect_num('B''s report counts only B''s one guest',
   (guest_pass_report('9e579e57-0000-0000-0000-000000000002')->>'total')::bigint, 1);
 
+-- =============================================================================
+-- 12. The waiver chase (migration 128). An unsigned guest within a few hours of
+--     the class is reminded, and their host is nudged — each once.
+-- =============================================================================
+-- t.g2's guest is claimed (section 9) but has NOT signed; their class is ~2h
+-- out, so the sweep should catch them.
+select set_config('t.sweep1', (sweep_guest_waivers())::text, false);
+select expect_num('the unsigned guest is reminded',
+  (select count(*) from notifications where template_key='guest_waiver_reminder'
+     and member_id=(current_setting('t.g2')::jsonb->>'guest_member_id')::uuid), 1);
+select expect_num('the host is nudged about their guest',
+  (select count(*) from notifications where template_key='guest_waiver_host_nudge'
+     and member_id='9e579e57-0000-0000-0000-0000000d0a01'), 1);
+select set_config('t.sweep2', (sweep_guest_waivers())::text, false);
+select expect_num('a second sweep reminds nobody twice',
+  (select count(*) from notifications where template_key='guest_waiver_reminder'
+     and member_id=(current_setting('t.g2')::jsonb->>'guest_member_id')::uuid), 1);
+
+-- =============================================================================
+-- 13. The paper fallback. Front desk files the waiver signed on paper through
+--     record_document, which confirms the pass and clears the check-in gate.
+-- =============================================================================
+set role authenticated; select set_config('request.jwt.claim.sub','9e579e57-0000-0000-0000-0000000000a1',false);  -- desk
+select set_config('t.paper', (record_document(
+   (current_setting('t.g2')::jsonb->>'guest_member_id')::uuid,
+   'waiver', 'Paper waiver.pdf', 'guest/paper/'||(current_setting('t.g2')::jsonb->>'guest_member_id'),
+   null, null, 'Signed on paper at the desk', now()))::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('the paper waiver was recorded', (current_setting('t.paper')::jsonb->>'ok')::boolean);
+select expect_text('filing the paper waiver confirms the pass',
+  (select status from guest_passes where guest_member_id=(current_setting('t.g2')::jsonb->>'guest_member_id')::uuid), 'confirmed');
+select expect_num('the guest waiver is now signed',
+  (select count(*) from members where id=(current_setting('t.g2')::jsonb->>'guest_member_id')::uuid and waiver_signed_at is not null), 1);
+-- and the check-in the gate would have blocked now goes through
+do $$
+declare v_guest uuid := (current_setting('t.g2')::jsonb->>'guest_member_id')::uuid; v_ok boolean := false;
+begin
+  insert into check_ins (studio_id, member_id, occurrence_id, booking_id, checked_in_at, method)
+  values ('9e579e57-0000-0000-0000-000000000001', v_guest, '9e579e57-0000-0000-0000-00000000c0e1',
+          (current_setting('t.g2')::jsonb->>'guest_booking_id')::uuid, now(), 'staff');
+  v_ok := true;
+  perform expect_true('the guest with a paper waiver checks in', v_ok);
+end $$;
+
 do $$ begin raise notice 'guest_pass_test: all assertions passed'; end $$;

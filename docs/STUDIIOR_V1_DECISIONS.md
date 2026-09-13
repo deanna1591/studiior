@@ -493,7 +493,9 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 **The account is a real member, status 'lead'** (Decision 15 already lets a lead book a drop-in). The guest is invited to claim (the migration-073 invite path) and is an ordinary member afterwards — nothing special except that their one free class is spent. **Conversion is derived**, never stored: a guest converted iff their member row holds any membership, which is the number `guest_pass_report()` and the `dashboard_guest_kpi` surface — the figure that says whether this works at all.
 
-**Instructor guests are not built.** Guests are member-brought only; if a studio-brought guest ever arrives it is a different mechanism.
+**Chasing the waiver, and the paper fallback (migration 128).** An unsigned guest turned away at the door with nobody having chased them is the worst first impression of a business they were weighing. So `sweep_guest_waivers()` (every 15 minutes, a 4-hour lead) reminds the guest if their pass is still unsigned a few hours before the class AND nudges the host — the friend who invited them is who can actually make it happen — each once. And front desk records a waiver signed ON PAPER at the door through `record_document`, which confirms the pass and clears the check-in gate exactly as signing in the app: a studio hands an unsigned guest a form, it does not send them home, and the product has to be able to record that.
+
+****Instructor guests are not built.** Guests are member-brought only; if a studio-brought guest ever arrives it is a different mechanism.
 
 **Pricing note, recorded not enforced:** Reform Collective's Intro Offer (three classes for 1,999 PHP) is undercut by a free guest class — a pricing question for the studio, so the copy does not advertise both in the same breath.
 

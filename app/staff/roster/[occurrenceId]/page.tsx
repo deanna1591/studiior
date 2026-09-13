@@ -8,6 +8,7 @@ import { HealthChip, bandOf } from "@/components/health-band";
 import { fmtDayLong, fmtTime, relativeDayName } from "@/lib/time";
 import CheckInButton from "./check-in-button";
 import CodeCheckIn from "./code-check-in";
+import PaperWaiverButton from "./paper-waiver-button";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
 
@@ -29,7 +30,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
     await Promise.all([
       supabase
         .from("bookings")
-        .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason)")
+        .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at)")
         .eq("occurrence_id", params.occurrenceId)
         .order("waitlist_position", { ascending: true, nullsFirst: true })
         .order("booked_at"),
@@ -161,6 +162,9 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                   <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
                     Brought by {nameOf.get(guestOf.get(b.member_id) ?? "") || "a member"}
                   </p>
+                )}
+                {guestOf.has(b.member_id) && !b.members?.waiver_signed_at && (
+                  <PaperWaiverButton memberId={b.member_id} occurrenceId={occ.id} />
                 )}
                 {(notesFor.get(b.member_id) ?? []).map((n, i) => (
                   <p key={i} className="mt-1 pl-9 text-[12px] leading-[18px]"
