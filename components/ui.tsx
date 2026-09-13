@@ -24,7 +24,7 @@ export function AppShell({
   return (
     <>
       <Rail studioName={studioName} location={location} items={items} user={user} signOut={signOut} />
-      <div className="md:pl-[--rail-w]">
+      <div className="lg:pl-[--rail-w]">
         {/* Left-aligned rather than centred: the content keeps one left edge
             with the rail, so the eye has a single column to track down. */}
         <main className="max-w-[1120px] px-5 py-6 md:px-8 md:py-8">
@@ -67,7 +67,7 @@ export function AdminShell({
         user={{ email, role: "platform admin" }}
         signOut={signOut}
       />
-      <div className="md:pl-[--rail-w]">
+      <div className="lg:pl-[--rail-w]">
         <main className="max-w-[1120px] px-5 py-6 md:px-8 md:py-8">
           <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
             <h1 className="display text-ink">{title}</h1>

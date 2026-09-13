@@ -11,7 +11,7 @@ export type RailUser = { email: string; role: string };
  * The persistent left rail: who you are looking at, at the top; where you can
  * go, in the middle; who you are, at the bottom.
  *
- * Below md it becomes a drawer rather than a bottom bar. Front desk runs this
+ * Below lg it becomes a drawer rather than a bottom bar. Front desk runs this
  * on an iPad at a counter, where the check-in roster wants every vertical
  * pixel it can get, and a bottom bar would also split studio identity from the
  * signed-in user across two edges of the screen.
@@ -70,7 +70,7 @@ export default function Rail({
   return (
     <>
       {/* Compact header, below md only. */}
-      <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface px-4 md:hidden">
+      <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface px-4 lg:hidden">
         <button
           onClick={() => setOpen(true)}
           aria-label="Open menu"
@@ -84,7 +84,7 @@ export default function Rail({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 lg:hidden">
           {/* An inline rgba, not bg-ink/30: --ink is a plain hex in a custom
               property, and Tailwind's opacity modifier cannot slice one, so
               the utility silently produced no scrim at all. */}
@@ -98,7 +98,7 @@ export default function Rail({
         </div>
       )}
 
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[--rail-w] border-r border-line md:block">
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-[--rail-w] border-r border-line lg:block">
         {body}
       </aside>
     </>
