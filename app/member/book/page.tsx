@@ -73,7 +73,7 @@ export default async function Book({
   const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
-         { data: closures }, { data: peak }, { data: horizonRaw }] =
+         { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -122,6 +122,16 @@ export default async function Book({
       // every studio that does not publish, so nothing below draws for them.
       // In the same batch — this screen stays two hops deep.
       supabase.rpc("timetable_horizon", { p_studio_id: ctx.studioId }),
+      // §4.2. How many seats a live waitlist offer is holding, per class. Only
+      // classes with a hold come back, so this is nothing for almost every
+      // studio. Without it a held seat shows as a free space and the row would
+      // say "Book" while book_class quietly sends the member to the waitlist.
+      // Same batch — this screen stays two hops deep.
+      supabase.rpc("occurrence_holds", {
+        p_studio_id: ctx.studioId,
+        p_from: from.toISOString(),
+        p_to: to.toISOString(),
+      }),
     ]);
 
   const horizon = horizonRaw as unknown as
@@ -134,6 +144,9 @@ export default async function Book({
   // Empty when the studio does not use peak hours at all, so everything below
   // renders exactly as it did before this feature existed.
   const peakOf = new Map((peak ?? []).map((r) => [r.occurrence_id, r]));
+  // Seats held for the waitlist (§4.2). Subtracted from the visible spaces
+  // below, so a held-full class reads as full rather than bookable.
+  const holdsOf = new Map((holds ?? []).map((r) => [r.occurrence_id, r.held]));
   // The persistent line is about the period the member is looking at, not about
   // "today" — a member browsing next week wants next week's number.
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
@@ -250,7 +263,8 @@ export default async function Book({
     const booked = booking?.status === "booked";
     const waiting = booking?.status === "waitlisted";
     const holding = booking?.status === "pending_payment";
-    const spaces = o.capacity - o.booked_count;
+    const held = holdsOf.get(o.id) ?? 0;
+    const spaces = Math.max(0, o.capacity - o.booked_count - held);
     const full = spaces <= 0;
     const past = new Date(o.starts_at).getTime() < now;
     const mins = minutes(o.starts_at, o.ends_at);
@@ -294,6 +308,7 @@ export default async function Book({
       spaces,
       waitlistPosition: booking?.waitlist_position ?? null,
       waitlistEnabled: settings.waitlistEnabled,
+      heldSeats: held,
       confirmLast: isPeak && remaining === 1,
       peakCancelNote,
     };

@@ -6312,12 +6312,20 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
       expect_false: {
         Args: { actual: boolean; label: string }
         Returns: undefined
       }
       expect_num: {
         Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       expect_true: {
@@ -6489,6 +6497,7 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_bootstrap: {
@@ -6674,6 +6683,13 @@ export type Database = {
           tier: Database["public"]["Enums"]["guarantee_tier"]
         }[]
       }
+      occurrence_holds: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: {
+          held: number
+          occurrence_id: string
+        }[]
+      }
       occurrence_is_adjacent: {
         Args: { p_occurrence_id: string }
         Returns: boolean
@@ -6690,9 +6706,17 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
+      occurrence_seats_held: {
+        Args: { p_exclude_member?: string; p_occurrence_id: string }
+        Returns: number
+      }
       occurrence_seats_taken: {
         Args: { p_occurrence_id: string }
         Returns: number
+      }
+      offer_waitlist_seat: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
       }
       open_shift: {
         Args: { p_occurrence_id: string; p_reason: string }
@@ -6857,6 +6881,7 @@ export type Database = {
         Args: { p_new: string; p_occurrence_id: string; p_old: string }
         Returns: number
       }
+      queue_waitlist_missed: { Args: { p_booking_id: string }; Returns: number }
       queue_waitlist_offer: { Args: { p_offer_id: string }; Returns: number }
       rank_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
       rebuild_member_timeline: {
@@ -7168,6 +7193,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sig: { Args: { body: string; secret?: string }; Returns: string }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -7339,6 +7365,7 @@ export type Database = {
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
+      sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
       timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {

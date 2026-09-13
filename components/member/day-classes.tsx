@@ -42,6 +42,9 @@ export type Row = {
   spaces: number;
   waitlistPosition: number | null;
   waitlistEnabled: boolean;
+  /** §4.2: seats a live waitlist offer is holding — a full class with a
+   *  physically free seat, so the status can say WHY it is full. */
+  heldSeats: number;
   /** Ask before spending the last peak class of the period. */
   confirmLast: boolean;
   /** For a booked peak class: what cancelling costs, said before they tap it. */
@@ -135,7 +138,10 @@ export default function DayClasses({
           : state === "holding" ? "Holding your spot"
           : state === "waiting" ? <>You&rsquo;re #<span className="num">{r.waitlistPosition}</span> on the list</>
           : state === "past" ? "This one has started"
-          : state === "full" ? "Fully booked"
+          : state === "full"
+            ? (r.heldSeats > 0
+                ? <>Full · <span className="num">{r.heldSeats}</span> on hold</>
+                : "Fully booked")
           // A peak-blocked row keeps its real seat count as its status — the
           // action carries the reason it cannot be booked.
           : <><span className="num">{r.spaces}</span> left</>;
