@@ -13,7 +13,7 @@ type Detail = {
   id: string; title: string; description: string | null; type: string; goal_value: number;
   status: string; starts_on: string; ends_on: string; join_deadline: string;
   reward_description: string | null; leaderboard_enabled: boolean;
-  joined: boolean; progress: number; completed_at: string | null;
+  joined: boolean; progress: number; completed_at: string | null; can_join: boolean;
   history: { occurred_at: string; class_name: string | null }[];
   leaderboard: { name: string; progress: number; rank: number | null; is_me: boolean }[] | null;
 };
@@ -28,7 +28,10 @@ export default async function MemberChallengeDetail({ params }: { params: { id: 
 
   const unit = c.type === "streak" ? "weeks" : "classes";
   const pct = Math.min(100, Math.round((c.progress / Math.max(1, c.goal_value)) * 100));
-  const canJoin = !c.joined && (c.status === "scheduled" || c.status === "active");
+  // From the reader, which respects the deadline: a running challenge past its
+  // join date is visible but not joinable.
+  const canJoin = c.can_join;
+  const closedRunning = !c.joined && !c.can_join && (c.status === "active" || c.status === "scheduled");
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
@@ -75,8 +78,17 @@ export default async function MemberChallengeDetail({ params }: { params: { id: 
             </p>
           </ActionForm>
         </div>
+      ) : closedRunning ? (
+        <div className="m-card mt-4 p-4">
+          <p className="m-sub text-ink-2">
+            {c.status === "scheduled"
+              ? <>Starts {fmtDayLong(`${c.starts_on}T00:00:00Z`, "UTC")}.</>
+              : <>Started {fmtDayLong(`${c.starts_on}T00:00:00Z`, "UTC")} — joining has closed.</>}
+          </p>
+          {c.reward_description && <p className="m-sub mt-1 text-ink-2">Reward: {c.reward_description}</p>}
+        </div>
       ) : (
-        <p className="m-sub mt-4 text-ink-2">This challenge is closed to new joiners.</p>
+        <p className="m-sub mt-4 text-ink-2">This challenge has finished.</p>
       )}
 
       {c.reward_description && c.joined && (

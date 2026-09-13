@@ -65,9 +65,10 @@ export function railItems(
       { href: "/class-types", label: "Class types" },
       { href: "/instructors", label: "Instructors" },
       { href: "/imports", label: "Import" },
-      // §9 challenges. Only once the studio has one — a studio that never runs a
-      // challenge sees no trace of the feature (Decisions 24/25's rule). The
-      // first is created from the Morning Brief's challenge_opportunity nudge.
+      // §9 challenges. Shown once the studio turns the switch on in Settings, or
+      // already has a challenge — off by default, so a studio that never runs one
+      // sees no trace (Decisions 24/25's rule). Turning it on in Settings is the
+      // one door: the item then leads here and to the create screen.
       ...(hasChallenges ? [{ href: "/challenges", label: "Challenges" }] : []),
       // How far ahead the timetable runs, and the instructor timing settings.
       // Every one of them was a column with a default and nowhere to change it.

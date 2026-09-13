@@ -5290,6 +5290,7 @@ export type Database = {
           booking_cutoff_minutes: number
           booking_window_days: number
           cancellation_cutoff_minutes: number
+          challenges_enabled: boolean
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
           checkin_secret: string
@@ -5361,6 +5362,7 @@ export type Database = {
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
+          challenges_enabled?: boolean
           checkin_closes_minutes_after?: number
           checkin_opens_minutes_before?: number
           checkin_secret?: string
@@ -5432,6 +5434,7 @@ export type Database = {
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
+          challenges_enabled?: boolean
           checkin_closes_minutes_after?: number
           checkin_opens_minutes_before?: number
           checkin_secret?: string

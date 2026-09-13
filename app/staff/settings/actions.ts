@@ -202,6 +202,28 @@ export async function saveSeatCaps(_prev: PlainState, fd: FormData): Promise<Pla
   };
 }
 
+export async function saveChallenges(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = String(fd.get("challenges_enabled") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ challenges_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings"); revalidatePath("/");
+  return {
+    ok: true,
+    message: on
+      ? "Saved. Challenges is now in your menu — create one and members can join it."
+      : "Saved. Challenges is hidden. Any that are still running keep going for the members in them.",
+  };
+}
+
 /**
  * Decision 24's peak switch. One checkbox; the windows are their own form, and
  * the allowances live on each plan.

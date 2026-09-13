@@ -29,17 +29,22 @@ export async function staffScreen(path?: string) {
   // setup checklist and the banner's two counts — and those no longer wait on
   // each other: the banner needed `summary.complete` only to decide whether to
   // show the setup nudge, which is a decision, not a dependency.
-  const [summary, bannerCounts, challengeCount] = await Promise.all([
+  const [summary, bannerCounts, showChallenges] = await Promise.all([
     setupSummary(supabase, ctx.studioId),
     studioBanner(supabase, ctx.studioId, true, ctx.billing, ctx.role),
-    // The Challenges rail item shows only when the studio has one — a studio
-    // that never creates a challenge sees no trace of the feature (same rule as
-    // publication and peak). A head-only count, indexed, on a back-office screen.
+    // The Challenges rail item is the studio's ONE door in — gated on the
+    // studio_settings switch (off by default, so a studio that never turns it on
+    // sees no trace, the publication/peak rule) OR the studio already having a
+    // challenge (so turning the switch off never orphans a running one). Two
+    // head-only reads on a back-office screen.
     isManagerUp(ctx.role)
-      ? supabase.from("challenges").select("id", { count: "exact", head: true })
-          .eq("studio_id", ctx.studioId).eq("audience", "member").limit(1)
-          .then((r) => r.count ?? 0)
-      : Promise.resolve(0),
+      ? Promise.all([
+          supabase.from("studio_settings").select("challenges_enabled")
+            .eq("studio_id", ctx.studioId).maybeSingle(),
+          supabase.from("challenges").select("id", { count: "exact", head: true })
+            .eq("studio_id", ctx.studioId).eq("audience", "member").limit(1),
+        ]).then(([s, c]) => (s.data?.challenges_enabled ?? false) || (c.count ?? 0) > 0)
+      : Promise.resolve(false),
   ]);
   const isPlatformAdmin = ctx.isPlatformAdmin;
   const billing = ctx.billing;
@@ -74,7 +79,7 @@ export async function staffScreen(path?: string) {
     banner,
     billing,
     shell: {
-      ...shellProps(ctx, isPlatformAdmin === true, summary.complete, (challengeCount as number) > 0),
+      ...shellProps(ctx, isPlatformAdmin === true, summary.complete, showChallenges as boolean),
       banner,
     },
   } as const;

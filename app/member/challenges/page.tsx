@@ -3,6 +3,11 @@ import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { ActionForm, QuietButton } from "@/components/member/ui";
 import { joinChallenge } from "./actions";
+import { fmtDayLong } from "@/lib/time";
+
+// A challenge date is a wall-calendar date; parse and format it AS UTC so it
+// round-trips (this project's most repeated date bug otherwise).
+const dayWord = (iso: string) => fmtDayLong(`${iso}T00:00:00Z`, "UTC");
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +32,10 @@ export default async function MemberChallenges() {
   const rows = (data ?? []) as MChallenge[];
   const mine = rows.filter((c) => c.joined);
   const open = rows.filter((c) => !c.joined && c.can_join);
+  // Running (or upcoming) but the join deadline has passed: visible, not
+  // joinable. The deadline governs joining, not visibility — a studio running a
+  // challenge the app hides looks broken. Ended ones nobody joined stay hidden.
+  const closed = rows.filter((c) => !c.joined && !c.can_join && (c.status === "active" || c.status === "scheduled"));
 
   const Ring = ({ c }: { c: MChallenge }) => {
     const pct = Math.min(100, Math.round((c.progress / Math.max(1, c.goal_value)) * 100));
@@ -40,7 +49,7 @@ export default async function MemberChallenges() {
   return (
     <MemberShell title="Challenges" openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
                  studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
-      {rows.length === 0 && (
+      {mine.length === 0 && open.length === 0 && closed.length === 0 && (
         <div className="m-card p-5">
           <p className="m-sub text-ink-2">No challenges on right now. Your studio will add them.</p>
         </div>
@@ -81,7 +90,7 @@ export default async function MemberChallenges() {
                 <Link href={`/challenges/${c.id}`} className="block">
                   <p className="m-name text-ink">{c.title}</p>
                   <p className="m-subtle mt-0.5 text-ink-3">
-                    {goalWord(c.type, c.goal_value)} · join by {c.join_deadline}
+                    {goalWord(c.type, c.goal_value)} · join by {dayWord(c.join_deadline)}
                   </p>
                   {c.reward_description && (
                     <p className="m-subtle mt-1 text-ink-2">Reward: {c.reward_description}</p>
@@ -91,6 +100,29 @@ export default async function MemberChallenges() {
                   <input type="hidden" name="challenge_id" value={c.id} />
                   <QuietButton>Join</QuietButton>
                 </ActionForm>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {closed.length > 0 && (
+        <section className={open.length > 0 ? "mt-5" : ""}>
+          <h2 className="m-eyebrow mb-2.5 font-semibold text-ink">Running</h2>
+          <ul className="space-y-3">
+            {closed.map((c) => (
+              <li key={c.id}>
+                <Link href={`/challenges/${c.id}`} className="m-card m-press block p-4">
+                  <p className="m-name text-ink">{c.title}</p>
+                  <p className="m-subtle mt-0.5 text-ink-3">
+                    {goalWord(c.type, c.goal_value)}
+                  </p>
+                  <p className="m-micro mt-1 text-ink-2">
+                    {c.status === "scheduled"
+                      ? `Starts ${dayWord(c.starts_on)}`
+                      : `Started ${dayWord(c.starts_on)} · joining closed`}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>

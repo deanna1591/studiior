@@ -30,6 +30,23 @@ export default function ChallengeForm({
   const [type, setType] = useState("class_count");
   const [tpl, setTpl] = useState("");
 
+  // Sensible dates rather than a deadline that equals the start (which, once the
+  // start is in the past, is a challenge nobody can ever join). A month to run,
+  // a week to join.
+  const addDays = (iso: string, n: number) => {
+    const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const [starts, setStarts] = useState(today);
+  const [ends, setEnds] = useState(addDays(today, 30));
+  const [deadline, setDeadline] = useState(addDays(today, 7));
+
+  const deadlineWarning =
+    deadline < today ? "That deadline has already passed — nobody could join."
+    : deadline < starts ? "The deadline is before the challenge starts."
+    : deadline > ends ? "The deadline is after the challenge ends."
+    : null;
+
   // Prefill from a template — a starting point a studio edits, not a lock.
   const t = templates.find((x) => x.id === tpl);
 
@@ -95,13 +112,20 @@ export default function ChallengeForm({
 
       <div className="grid grid-cols-3 gap-3">
         <div><label className={lbl}>Starts</label>
-          <input name="starts_on" type="date" required defaultValue={today} className={`${field} num`} /></div>
+          <input name="starts_on" type="date" required value={starts}
+                 onChange={(e) => setStarts(e.target.value)} className={`${field} num`} /></div>
         <div><label className={lbl}>Ends</label>
-          <input name="ends_on" type="date" required className={`${field} num`} /></div>
+          <input name="ends_on" type="date" required value={ends}
+                 onChange={(e) => setEnds(e.target.value)} className={`${field} num`} /></div>
         <div><label className={lbl}>Join by</label>
-          <input name="join_deadline" type="date" required className={`${field} num`} /></div>
+          <input name="join_deadline" type="date" required value={deadline}
+                 onChange={(e) => setDeadline(e.target.value)}
+                 className={`${field} num`}
+                 style={deadlineWarning ? { borderColor: "var(--coral)" } : undefined} /></div>
       </div>
-      <p className="text-[11px] text-ink-3">The join deadline must fall between the start and end.</p>
+      {deadlineWarning
+        ? <p className="text-[12px] font-medium" style={{ color: "var(--coral-deep, #a33)" }}>{deadlineWarning}</p>
+        : <p className="text-[11px] text-ink-3">Members can join up to this date; their attendance counts from the start.</p>}
 
       <div>
         <label className={lbl}>Reward (optional)</label>

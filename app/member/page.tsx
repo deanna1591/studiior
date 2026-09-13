@@ -344,11 +344,17 @@ export default async function MemberHome() {
           whole feature lives here and at /challenges. */}
       {(() => {
         const chs = (challenges ?? []) as { id: string; title: string; type: string;
-          goal_value: number; joined: boolean; progress: number; completed: boolean;
-          can_join: boolean }[];
+          goal_value: number; status: string; joined: boolean; progress: number;
+          completed: boolean; can_join: boolean }[];
         if (chs.length === 0) return null;
         const joined = chs.filter((c) => c.joined);
-        const show = joined.length > 0 ? joined : chs.filter((c) => c.can_join).slice(0, 1);
+        // If they have joined none, surface one they can join, else one that is
+        // running-but-closed — the deadline governs joining, not visibility.
+        const other = [
+          ...chs.filter((c) => c.can_join),
+          ...chs.filter((c) => !c.joined && !c.can_join && (c.status === "active" || c.status === "scheduled")),
+        ];
+        const show = joined.length > 0 ? joined : other.slice(0, 1);
         if (show.length === 0) return null;
         return (
           <section className="mt-5">
@@ -371,7 +377,9 @@ export default async function MemberHome() {
                           ? <span className="m-micro rounded-full px-2 py-0.5" style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>Done</span>
                           : c.joined
                           ? <span className="m-micro num text-ink-3">{c.progress}/{c.goal_value}</span>
-                          : <span className="m-micro text-lime-text">Join</span>}
+                          : c.can_join
+                          ? <span className="m-micro text-lime-text">Join</span>
+                          : <span className="m-micro text-ink-3">Running</span>}
                       </div>
                       {c.joined ? (
                         <div className="mt-2 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--accent-chip)" }}>
