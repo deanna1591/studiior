@@ -224,6 +224,28 @@ export async function saveChallenges(_prev: PlainState, fd: FormData): Promise<P
   };
 }
 
+export async function savePayFrequency(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const mode = String(fd.get("pay_period_mode") ?? "fortnightly");
+  const secondRaw = Number(fd.get("pay_period_second_day") ?? 16);
+  const second = Math.min(28, Math.max(2, Math.round(Number.isFinite(secondRaw) ? secondRaw : 16)));
+  // weekly/fortnightly also drive pay_period_days so the days-based engine and
+  // the mode agree; monthly/semimonthly ignore days.
+  const days = mode === "weekly" ? 7 : mode === "fortnightly" ? 14 : undefined;
+
+  const supabase = createClient();
+  const patch = days
+    ? { pay_period_mode: mode, pay_period_second_day: second, pay_period_days: days }
+    : { pay_period_mode: mode, pay_period_second_day: second };
+  const { data, error } = await supabase.from("studio_settings").update(patch)
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/payroll");
+  return { ok: true, message: "Saved. Periods created from here on use the new frequency." };
+}
+
 export async function saveGuestPasses(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

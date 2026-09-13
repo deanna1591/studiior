@@ -5557,6 +5557,8 @@ export type Database = {
           onboarding_completed_at: string | null
           pay_period_anchor: string | null
           pay_period_days: number
+          pay_period_mode: string
+          pay_period_second_day: number
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
@@ -5630,6 +5632,8 @@ export type Database = {
           onboarding_completed_at?: string | null
           pay_period_anchor?: string | null
           pay_period_days?: number
+          pay_period_mode?: string
+          pay_period_second_day?: number
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
@@ -5703,6 +5707,8 @@ export type Database = {
           onboarding_completed_at?: string | null
           pay_period_anchor?: string | null
           pay_period_days?: number
+          pay_period_mode?: string
+          pay_period_second_day?: number
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number

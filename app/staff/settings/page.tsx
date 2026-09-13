@@ -25,6 +25,7 @@ export default async function Settings() {
     { href: "/settings/fair-use", label: "Peak & fair use", sub: "Peak hours, repeated late cancellations, and places on a plan" },
     { href: "/settings/features", label: "Member features", sub: "Challenges and guest passes" },
     { href: "/settings/instructors", label: "Instructors", sub: "When the month is due, and when to chase confirmations" },
+    { href: "/settings/payroll", label: "Payroll", sub: "How often instructors are paid, and when the period closes" },
     { href: "/settings/closures", label: "Closures", sub: "Days you are shut — nothing is generated, and members are told" },
     { href: "/settings/stripe", label: "Card payments", sub: "Take card payments online (optional — a studio can take cash)" },
   ];
