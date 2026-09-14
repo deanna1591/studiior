@@ -7712,6 +7712,7 @@ export type Database = {
         Args: { p_studio_id: string }
         Returns: number
       }
+      studio_uses_payroll: { Args: { p_studio_id: string }; Returns: boolean }
       studio_week_start: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string

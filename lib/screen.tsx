@@ -29,7 +29,7 @@ export async function staffScreen(path?: string) {
   // setup checklist and the banner's two counts — and those no longer wait on
   // each other: the banner needed `summary.complete` only to decide whether to
   // show the setup nudge, which is a decision, not a dependency.
-  const [summary, bannerCounts, showChallenges] = await Promise.all([
+  const [summary, bannerCounts, showChallenges, usesPayroll] = await Promise.all([
     setupSummary(supabase, ctx.studioId),
     studioBanner(supabase, ctx.studioId, true, ctx.billing, ctx.role),
     // The Challenges rail item is the studio's ONE door in — gated on the
@@ -44,6 +44,14 @@ export async function staffScreen(path?: string) {
           supabase.from("challenges").select("id", { count: "exact", head: true })
             .eq("studio_id", ctx.studioId).eq("audience", "member").limit(1),
         ]).then(([s, c]) => (s.data?.challenges_enabled ?? false) || (c.count ?? 0) > 0)
+      : Promise.resolve(false),
+    // Payroll is opt-in (migration 139): the Pay rail item shows only when the
+    // studio uses the guarantee system. A studio that pays instructors in its
+    // own books sees no Pay at all — absent, not an empty screen.
+    isManagerUp(ctx.role)
+      ? supabase.from("studio_settings").select("guarantees_enabled, flex_enabled")
+          .eq("studio_id", ctx.studioId).maybeSingle()
+          .then(({ data }) => (data?.guarantees_enabled ?? false) || (data?.flex_enabled ?? false))
       : Promise.resolve(false),
   ]);
   const isPlatformAdmin = ctx.isPlatformAdmin;
@@ -79,19 +87,19 @@ export async function staffScreen(path?: string) {
     banner,
     billing,
     shell: {
-      ...shellProps(ctx, isPlatformAdmin === true, summary.complete, showChallenges as boolean),
+      ...shellProps(ctx, isPlatformAdmin === true, summary.complete, showChallenges as boolean, usesPayroll as boolean),
       banner,
     },
   } as const;
 }
 
 export function shellProps(
-  ctx: StaffContext, isPlatformAdmin: boolean, _setupComplete: boolean, hasChallenges = false,
+  ctx: StaffContext, isPlatformAdmin: boolean, _setupComplete: boolean, hasChallenges = false, hasPayroll = false,
 ) {
   return {
     studioName: ctx.studioName,
     location: ctx.locationName,
-    groups: railGroups(ctx, isPlatformAdmin, hasChallenges),
+    groups: railGroups(ctx, isPlatformAdmin, hasChallenges, hasPayroll),
     user: { email: ctx.email, role: ctx.role },
     signOut: (
       <form action={signOut}>

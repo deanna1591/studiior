@@ -33,6 +33,7 @@ export function railGroups(
   ctx: StaffContext,
   isPlatformAdmin = false,
   hasChallenges = false,
+  hasPayroll = false,
 ): RailGroup[] {
   const manager = isManagerUp(ctx.role);
   const instructor = ctx.role === "instructor";
@@ -105,9 +106,10 @@ export function railGroups(
             // unconfirmed line — one place rather than three.
             { href: "/availability", label: "Availability" },
             // Decision 28. Pay periods: what each instructor is owed, releasing
-            // held records, proof of payment. Manager-up — this is money owed to
-            // a named person, not the desk's takings (/due is theirs).
-            { href: "/pay", label: "Pay" },
+            // held records, proof of payment. Manager-up — and only when the
+            // studio uses the guarantee system (migration 139): payroll is
+            // opt-in, so a studio paying in its own books sees no Pay at all.
+            ...(hasPayroll ? [{ href: "/pay", label: "Pay" }] : []),
           ]
         : [],
     },

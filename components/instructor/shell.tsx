@@ -64,7 +64,13 @@ export default function InstructorShell({
         {title && <h1 className="m-head mb-5 text-[24px] leading-8 text-ink">{title}</h1>}
         {children}
       </main>
-      {!bare && <TabBar tabs={TABS} rootHref="/instructor" badges={badges} />}
+      {!bare && (
+        <TabBar
+          // Payroll is opt-in (migration 139): a studio that pays in its own
+          // books shows no Pay tab at all — absent, not an empty screen.
+          tabs={ctx.usesPayroll ? TABS : TABS.filter((t) => t.href !== "/instructor/pay")}
+          rootHref="/instructor" badges={badges} />
+      )}
     </div>
   );
 }

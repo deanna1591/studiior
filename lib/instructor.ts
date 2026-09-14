@@ -36,6 +36,7 @@ export type InstructorContext = {
   logo_url: string | null;
   email: string;
   role: string;
+  usesPayroll: boolean;
 };
 
 /**
@@ -49,6 +50,11 @@ export async function instructorScreen() {
   const { data } = await supabase.rpc("my_instructor");
   const ctx = data as InstructorContext | null;
   if (!ctx?.instructor_id) redirect("/instructor/login");
+  // Payroll is opt-in (migration 139): the Pay tab shows only when the studio
+  // uses the guarantee system. A studio that pays in its own books shows the
+  // instructor no Pay tab at all — absent, not an empty screen.
+  const { data: uses } = await supabase.rpc("studio_uses_payroll", { p_studio_id: ctx.studio_id });
+  ctx.usesPayroll = uses === true;
   return { ctx, supabase };
 }
 
