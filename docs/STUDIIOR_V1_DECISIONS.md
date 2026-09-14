@@ -487,6 +487,8 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 **The CSV export must equal the statement.** `pay_period_export()` returns the statement's exact line shape across every instructor plus a per-instructor summary; the app only formats it. If the CSV and the statement disagreed, the CSV is what an accountant believes and the studio has a problem — so they read the same source and the suite asserts parity three ways (row count, total, each line's amount).
 
+**An instructor no-show is THIS check-in, not a cancellation cause — and there must never be a fourth cause for it.** A `cancellation_cause` says the studio decided something about the *class*; an unconfirmed (held) pay record is a fact about whether the *instructor* turned up. They are the same real event modelled from two sides, and the check-in wins. Adding `instructor_no_show` to `cancellation_cause` (migration 079's enum: `unmet_minimum`, `studio_fault`, `force_majeure`, `closure`) would let a class read `instructor_no_show` while its pay record sits `confirmed` — the two disagreeing about the same class, with no rule saying which is true. So a no-show is represented as a held record that is never released: `close_pay_period()` refuses while it is held, and a manager either releases it (the instructor did teach — a forgotten tap) or leaves it unreleased and unpaid (they did not). The zero-pay outcome the contract wants is "held and never released", not a cancellation. **Do not add the cause.** (Cross-checked against Reform Collective's instructor agreement, September 2026.)
+
 ---
 
 ## 27 — Studio announcements, one-way, and never a feed

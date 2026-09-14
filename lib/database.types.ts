@@ -1045,6 +1045,7 @@ export type Database = {
           class_type_id: string | null
           committed_at: string | null
           core_min_bookings: number | null
+          core_reached_minimum_at: string | null
           created_at: string
           description: string | null
           ends_at: string
@@ -1089,6 +1090,7 @@ export type Database = {
           class_type_id?: string | null
           committed_at?: string | null
           core_min_bookings?: number | null
+          core_reached_minimum_at?: string | null
           created_at?: string
           description?: string | null
           ends_at: string
@@ -1133,6 +1135,7 @@ export type Database = {
           class_type_id?: string | null
           committed_at?: string | null
           core_min_bookings?: number | null
+          core_reached_minimum_at?: string | null
           created_at?: string
           description?: string | null
           ends_at?: string
@@ -5622,6 +5625,7 @@ export type Database = {
           conversion_window_days: number
           core_cutoff_hours: number
           core_min_bookings: number
+          core_unmet_pay_cents: number | null
           core_unmet_pay_pct: number
           cover_escalation_hours: number
           created_at: string
@@ -5697,6 +5701,7 @@ export type Database = {
           conversion_window_days?: number
           core_cutoff_hours?: number
           core_min_bookings?: number
+          core_unmet_pay_cents?: number | null
           core_unmet_pay_pct?: number
           cover_escalation_hours?: number
           created_at?: string
@@ -5772,6 +5777,7 @@ export type Database = {
           conversion_window_days?: number
           core_cutoff_hours?: number
           core_min_bookings?: number
+          core_unmet_pay_cents?: number | null
           core_unmet_pay_pct?: number
           cover_escalation_hours?: number
           created_at?: string
@@ -6662,6 +6668,14 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }

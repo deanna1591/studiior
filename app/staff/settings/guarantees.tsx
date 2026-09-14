@@ -39,6 +39,7 @@ export default function GuaranteesPanel({ s, currency }: {
   s: {
     guarantees_enabled: boolean; flex_enabled: boolean;
     core_min_bookings: number; core_cutoff_hours: number; core_unmet_pay_pct: number;
+    core_unmet_pay_cents: number | null;
     flex_min_bookings: number; flex_deadline_mode: string; flex_deadline_time: string;
     flex_deadline_hours: number; flex_unmet_pay_cents: number;
     flex_standby_pay_cents: number; adjacency_minutes: number;
@@ -84,9 +85,22 @@ export default function GuaranteesPanel({ s, currency }: {
                  min={0} max={336} suffix="hours before the class" />
             <Num name="core_unmet_pay_pct" label="If it does not run, pay"
                  value={s.core_unmet_pay_pct} min={0} max={100} suffix="% of base" />
+            <label className="text-[13px] leading-[20px] text-ink-2">
+              <span className="mb-1 block">or a flat amount</span>
+              <span className="inline-flex items-center gap-1.5">
+                <input name="core_unmet_pay_flat" type="number" min={0} step="any"
+                       defaultValue={s.core_unmet_pay_cents == null ? "" : s.core_unmet_pay_cents / 100}
+                       placeholder="—"
+                       className="w-24 rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink" />
+                <span className="text-[12px] text-ink-3">{currency} a class</span>
+              </span>
+            </label>
             <p className="w-full max-w-[58ch] text-[12px] leading-[18px] text-ink-3">
               Counted back from each class, deliberately: it mirrors the
               cancellation window, and by then the headcount is effectively final.
+              A flat amount wins where you set one; leave it blank to use the
+              percentage — &ldquo;pay 400 regardless&rdquo; is not a percentage of
+              a rate that changes.
             </p>
           </div>
         )}

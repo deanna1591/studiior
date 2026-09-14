@@ -112,6 +112,10 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
   const coreMin = int("core_min_bookings");
   const coreCut = int("core_cutoff_hours");
   const corePct = int("core_unmet_pay_pct");
+  // A FLAT slot-holding amount (whole units -> cents). Blank means null, which
+  // is what makes the percentage the fallback; a flat amount wins where set.
+  const coreFlatRaw = String(fd.get("core_unmet_pay_flat") ?? "").trim();
+  const coreFlat = coreFlatRaw === "" ? null : Math.round(Number(coreFlatRaw) * 100);
   const flexMin = int("flex_min_bookings");
   const mode = String(fd.get("flex_deadline_mode") ?? "previous_day_at");
   const flexTime = String(fd.get("flex_deadline_time") ?? "20:00");
@@ -125,6 +129,8 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
     : !Number.isFinite(coreCut) || coreCut < 0 ? "A cutoff cannot be negative."
     : !Number.isFinite(corePct) || corePct < 0 || corePct > 100
       ? "The holding rate is a percentage between 0 and 100."
+    : coreFlat !== null && (!Number.isFinite(coreFlat) || coreFlat < 0)
+      ? "A flat holding fee cannot be negative."
     : !Number.isFinite(flexMin) || flexMin < 0 ? "A flex minimum cannot be negative."
     : mode === "hours_before" && (!Number.isFinite(flexHours) || flexHours < 0)
       ? "A flex cutoff in hours cannot be negative."
@@ -145,6 +151,7 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
       core_min_bookings: Math.floor(coreMin),
       core_cutoff_hours: Math.floor(coreCut),
       core_unmet_pay_pct: Math.floor(corePct),
+      core_unmet_pay_cents: coreFlat,
       flex_min_bookings: Math.floor(flexMin),
       flex_deadline_mode: mode,
       flex_deadline_time: `${flexTime.slice(0, 5)}:00`,

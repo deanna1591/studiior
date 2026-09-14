@@ -204,7 +204,13 @@ export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promis
   if (error) return { ok: false, message: say(error.message) };
 
   refresh();
-  const n = (data as unknown as { occurrences_updated?: number })?.occurrences_updated ?? 0;
+  const r = data as unknown as { occurrences_updated?: number; standalone_count?: number };
+  const n = r?.occurrences_updated ?? 0;
+  // A standalone flex slot — nothing of the instructor's beside it — is a
+  // standby-fee obligation under the instructor agreement, so the studio is
+  // told rather than left to find it at payroll. A warning, not a refusal:
+  // adjacency changes when other classes move.
+  const standalone = tier === "flex" ? (r?.standalone_count ?? 0) : 0;
   return {
     ok: true,
     message:
@@ -213,6 +219,9 @@ export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promis
         : tier === "flex"
         ? "Set to flex. It runs only if it reaches its minimum by the cutoff."
         : "Set to core. It runs if it reaches its minimum, and pays a holding rate if it does not.")
-      + (n ? ` ${n} class${n === 1 ? "" : "es"} already on the calendar updated.` : ""),
+      + (n ? ` ${n} class${n === 1 ? "" : "es"} already on the calendar updated.` : "")
+      + (standalone
+          ? ` Heads up: ${standalone} of them ${standalone === 1 ? "is" : "are"} standalone — no other class of this instructor beside ${standalone === 1 ? "it" : "them"} — so ${standalone === 1 ? "it carries" : "each carries"} a standby fee.`
+          : ""),
   };
 }
