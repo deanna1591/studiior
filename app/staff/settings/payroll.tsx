@@ -17,7 +17,9 @@ const field = "rounded border border-line-2 bg-surface px-3 py-2 text-[14px] tex
  * anchor; monthly is the calendar month; twice-monthly splits at the 1st and a
  * day you choose. Changing this only shapes periods created from here on.
  */
-export default function PayrollPanel({ mode, secondDay }: { mode: string; secondDay: number }) {
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export default function PayrollPanel({ mode, secondDay, settleDow }: { mode: string; secondDay: number; settleDow: number | null }) {
   const [state, action] = useFormState<PlainState, FormData>(savePayFrequency, null);
   const [m, setM] = useState(mode);
 
@@ -44,6 +46,19 @@ export default function PayrollPanel({ mode, secondDay }: { mode: string; second
             </span>
           </label>
         )}
+        {/* F: the settle day. Blank = not set, so the statement shows no payment
+            date. When set, each statement names the first such day after the
+            period ends — "we pay you on the Friday after close". */}
+        <label className="mt-4 block border-t border-line pt-4">
+          <span className="mb-1 block text-[13px] font-medium text-ink">Payment day</span>
+          <select name="pay_settle_dow" defaultValue={settleDow === null ? "" : String(settleDow)} className={field}>
+            <option value="">Not set — no payment date shown</option>
+            {DAYS.map((d, i) => <option key={i} value={i}>{d} after the period closes</option>)}
+          </select>
+          <span className="mt-1 block text-[12px] text-ink-3">
+            The date an instructor’s statement promises. Studiior works out what is owed; it does not move money.
+          </span>
+        </label>
         <div className="mt-4"><Save /></div>
       </div>
     </form>

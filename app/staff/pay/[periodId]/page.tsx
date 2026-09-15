@@ -8,7 +8,7 @@ import MarkPaid from "./mark-paid";
 export const dynamic = "force-dynamic";
 
 type Sum = { instructor_id: string; instructor_name: string; total_cents: number; held_cents: number };
-type Export = { starts_on: string; ends_on: string; status: string; currency: string; summary: Sum[] };
+type Export = { starts_on: string; ends_on: string; status: string; currency: string; settle_on?: string | null; summary: Sum[] };
 
 export default async function PayPeriod({ params }: { params: { periodId: string } }) {
   const screen = await staffScreen("/pay");
@@ -30,7 +30,8 @@ export default async function PayPeriod({ params }: { params: { periodId: string
     <AppShell {...shell} title="Pay period"
       actions={closed ? <a href={`/pay/${params.periodId}/export`} className="rounded-full border border-line-2 bg-surface px-4 py-2 text-[13px] font-semibold text-ink">Export CSV</a> : undefined}>
       <Link href="/pay" className="mb-3 inline-block text-[13px] text-ink-2 underline underline-offset-4">← All periods</Link>
-      <p className="mb-4 text-[13px] text-ink-2">{d(e.starts_on)} – {d(e.ends_on)} · <span className="s-tag">{e.status}</span></p>
+      <p className="mb-4 text-[13px] text-ink-2">{d(e.starts_on)} – {d(e.ends_on)} · <span className="s-tag">{e.status}</span>
+        {e.settle_on && <> · pays <span className="font-medium text-ink">{d(e.settle_on)}</span></>}</p>
       {!closed && <p className="mb-4 max-w-2xl text-[13px] text-ink-2">This period is still open. Close it (from an instructor's statement) before recording payments; a CSV is available once it is closed, so it matches the final figures.</p>}
 
       {(e.summary ?? []).length === 0 ? (

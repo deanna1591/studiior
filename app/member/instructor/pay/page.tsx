@@ -13,7 +13,7 @@ type Record_ = {
 };
 type Pay = {
   state: "ok" | "empty" | "no_period"; currency: string;
-  period?: { id: string; starts_on: string; ends_on: string; status: string };
+  period?: { id: string; starts_on: string; ends_on: string; status: string; settle_on?: string | null };
   total_cents?: number; classes_paid?: number; not_running_paid?: number; held_cents?: number;
   records?: Record_[]; empty_hint: string; read_only?: string;
 };
@@ -98,6 +98,13 @@ export default async function PayPage() {
             {(p.held_cents ?? 0) > 0 && (
               <p className="m-sub mt-1.5 text-ink-2">
                 {money(p.held_cents ?? 0, p.currency)} is held until you check in — tap the class on My week.
+              </p>
+            )}
+            {/* F: the studio's committed payment date, until it is actually
+                paid — then the "Paid" line below carries the real date. */}
+            {!paid && p.period!.settle_on && (
+              <p className="m-sub mt-1.5 text-ink-2">
+                Payment expected <span className="font-medium text-ink">{d(p.period!.settle_on)}</span>.
               </p>
             )}
             {paid && (

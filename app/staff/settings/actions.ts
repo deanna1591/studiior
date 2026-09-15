@@ -240,11 +240,15 @@ export async function savePayFrequency(_prev: PlainState, fd: FormData): Promise
   // weekly/fortnightly also drive pay_period_days so the days-based engine and
   // the mode agree; monthly/semimonthly ignore days.
   const days = mode === "weekly" ? 7 : mode === "fortnightly" ? 14 : undefined;
+  // F: the settle day. Blank ("") means the studio has not set one, so no
+  // payment date is shown — null, not a default day.
+  const dowRaw = String(fd.get("pay_settle_dow") ?? "").trim();
+  const settleDow = dowRaw === "" ? null : Math.min(6, Math.max(0, Math.round(Number(dowRaw))));
 
   const supabase = createClient();
   const patch = days
-    ? { pay_period_mode: mode, pay_period_second_day: second, pay_period_days: days }
-    : { pay_period_mode: mode, pay_period_second_day: second };
+    ? { pay_period_mode: mode, pay_period_second_day: second, pay_period_days: days, pay_settle_dow: settleDow }
+    : { pay_period_mode: mode, pay_period_second_day: second, pay_settle_dow: settleDow };
   const { data, error } = await supabase.from("studio_settings").update(patch)
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
