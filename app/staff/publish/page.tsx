@@ -3,7 +3,7 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Notice, SectionLabel } from "@/components/ui";
 import PublishForm from "./publish-form";
-import { confirmRosterFor } from "./actions";
+import { confirmRosterFor, carryForwardNow } from "./actions";
 import { buttonQuietClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ function rosterState(i: Facts["instructors"][number]) {
  * Publishing with holes is allowed and warned, never blocked. An open shift is
  * a real state and Decision 17 handles it.
  */
-export default async function PublishPage({ searchParams }: { searchParams: { m?: string; just?: string; err?: string } }) {
+export default async function PublishPage({ searchParams }: { searchParams: { m?: string; just?: string; err?: string; carried?: string } }) {
   const screen = await staffScreen("/publish");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -96,6 +96,21 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
     facts.find((f) => f && !f.published) ??
     facts[0];
 
+  // G: carry-forward. The preview is empty (enabled:false) for a studio with
+  // the switch off, and lists the silent-past-deadline instructors otherwise —
+  // what would carry, and what would not with why. Only meaningful once the
+  // month is published (that is when instructors are notified).
+  type CarryPreview = {
+    enabled: boolean;
+    instructors: { instructor_id: string; instructor_name: string; carry_count: number;
+      report: { label: string; reason: string; carried: boolean }[] }[];
+  };
+  let carry: CarryPreview | null = null;
+  if (selected?.published) {
+    const { data: cp } = await supabase.rpc("roster_carry_preview", { p_studio_id: ctx.studioId, p_month: selected.month });
+    carry = cp as unknown as CarryPreview | null;
+  }
+
   const when = (iso: string) =>
     new Intl.DateTimeFormat("en-GB", {
       day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
@@ -119,6 +134,7 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
       )}
 
       {searchParams.err && <Notice kind="error">{searchParams.err}</Notice>}
+      {searchParams.carried === "1" && <Notice kind="ok">Rosters carried forward. Anything not carried is listed below with why.</Notice>}
 
       {/* Rendered from the facts, not from a message the action carried back:
           the row says who was sent a roster and who could not be. */}
@@ -223,6 +239,45 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
                   </li>
                 ))}
               </ul>
+            )}
+
+            {/* G: what a silent roster will carry into this month, and what it
+                will not. Shown only when the switch is on and someone is past
+                their deadline; the nightly sweep does the same, this is the
+                manager doing it now and seeing why anything was left. */}
+            {carry?.enabled && carry.instructors.length > 0 && (
+              <div className="mt-6 rounded border border-line bg-surface p-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <SectionLabel>Carry forward on silence</SectionLabel>
+                  <form action={carryForwardNow}>
+                    <input type="hidden" name="month" value={selected.month} />
+                    <button className={buttonQuietClass}>Carry forward now</button>
+                  </form>
+                </div>
+                <p className="mt-2 text-[13px] leading-[19px] text-ink-2">
+                  {carry.instructors.length} {carry.instructors.length === 1 ? "instructor has" : "instructors have"} said
+                  nothing past the deadline. Last month’s confirmed classes will be assigned into this month’s open slots.
+                </p>
+                <ul className="mt-3 space-y-3">
+                  {carry.instructors.map((i) => (
+                    <li key={i.instructor_id} className="border-t border-line pt-3">
+                      <p className="text-[13px] font-medium leading-[18px] text-ink">
+                        {i.instructor_name} — <span className="num">{i.carry_count}</span> {i.carry_count === 1 ? "class" : "classes"} will carry
+                      </p>
+                      {i.report.length > 0 && (
+                        <ul className="mt-1.5 space-y-1">
+                          {i.report.map((r, n) => (
+                            <li key={n} className="text-[12px] leading-[17px] text-ink-2">
+                              <span className="text-ink">{r.label}</span> — {r.reason}
+                              {!r.carried && <span className="text-ink-3"> · not carried</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {selected.published ? (

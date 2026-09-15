@@ -5178,6 +5178,7 @@ export type Database = {
       }
       roster_confirmations: {
         Row: {
+          carried_at: string | null
           classes_at_notify: number
           confirmed_at: string | null
           id: string
@@ -5187,6 +5188,7 @@ export type Database = {
           studio_id: string
         }
         Insert: {
+          carried_at?: string | null
           classes_at_notify?: number
           confirmed_at?: string | null
           id?: string
@@ -5196,6 +5198,7 @@ export type Database = {
           studio_id: string
         }
         Update: {
+          carried_at?: string | null
           classes_at_notify?: number
           confirmed_at?: string | null
           id?: string
@@ -5613,6 +5616,7 @@ export type Database = {
           booking_cutoff_minutes: number
           booking_window_days: number
           cancellation_cutoff_minutes: number
+          carry_forward_enabled: boolean
           challenges_enabled: boolean
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
@@ -5659,6 +5663,7 @@ export type Database = {
           publication_enabled: boolean
           reminder_hours_before: number
           require_waiver: boolean
+          roster_confirm_days: number
           seat_caps_enabled: boolean
           setup_optional_items: string[]
           setup_progress: Json
@@ -5690,6 +5695,7 @@ export type Database = {
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
+          carry_forward_enabled?: boolean
           challenges_enabled?: boolean
           checkin_closes_minutes_after?: number
           checkin_opens_minutes_before?: number
@@ -5736,6 +5742,7 @@ export type Database = {
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
+          roster_confirm_days?: number
           seat_caps_enabled?: boolean
           setup_optional_items?: string[]
           setup_progress?: Json
@@ -5767,6 +5774,7 @@ export type Database = {
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
+          carry_forward_enabled?: boolean
           challenges_enabled?: boolean
           checkin_closes_minutes_after?: number
           checkin_opens_minutes_before?: number
@@ -5813,6 +5821,7 @@ export type Database = {
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
+          roster_confirm_days?: number
           seat_caps_enabled?: boolean
           setup_optional_items?: string[]
           setup_progress?: Json
@@ -6388,6 +6397,10 @@ export type Database = {
         }
         Returns: Json
       }
+      carry_forward_roster: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: Json
+      }
       challenge_goal_line: { Args: { p_challenge_id: string }; Returns: string }
       challenge_overview: { Args: { p_challenge_id: string }; Returns: Json }
       challenge_qualifies: {
@@ -6671,11 +6684,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      exp_settle: { Args: { per: string; uid: string }; Returns: string }
-      expect_txt: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -7361,6 +7369,18 @@ export type Database = {
       }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
       restore_series: { Args: { p_series_id: string }; Returns: Json }
+      roster_carry_due: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: string[]
+      }
+      roster_carry_plan: {
+        Args: { p_instructor_id: string; p_month: string; p_studio_id: string }
+        Returns: Json
+      }
+      roster_carry_preview: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: Json
+      }
       rrule_last_date: {
         Args: { p_rrule: string; p_starts_on: string }
         Returns: string
@@ -7600,10 +7620,6 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: undefined
       }
-      stmt_settle: {
-        Args: { inst: string; per: string; uid: string }
-        Returns: string
-      }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }
         Returns: string
@@ -7756,6 +7772,7 @@ export type Database = {
       sweep_no_shows: { Args: never; Returns: Json }
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
+      sweep_roster_carry: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }

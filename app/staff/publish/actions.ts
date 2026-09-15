@@ -51,3 +51,23 @@ export async function confirmRosterFor(fd: FormData): Promise<void> {
   revalidatePath("/publish");
   redirect(`/publish?m=${month.slice(0, 7)}${error ? `&err=${encodeURIComponent(error.message)}` : ""}`);
 }
+
+/**
+ * G — carry a silent instructor's roster into the selected month now, rather
+ * than waiting for the nightly sweep. carry_forward_roster() is manager-up and
+ * idempotent; the report of what did and did not carry is on the page from the
+ * preview, so this only has to do it and come back.
+ */
+export async function carryForwardNow(fd: FormData): Promise<void> {
+  const ctx = await getStaffContext();
+  if (!ctx) return;
+  const month = String(fd.get("month") ?? "");
+  if (!/^\d{4}-\d{2}-01$/.test(month)) return;
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("carry_forward_roster", { p_studio_id: ctx.studioId, p_month: month });
+  revalidatePath("/publish");
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  redirect(`/publish?m=${month.slice(0, 7)}${error ? `&err=${encodeURIComponent(error.message)}` : "&carried=1"}`);
+}

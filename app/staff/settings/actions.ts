@@ -460,3 +460,30 @@ export async function savePublication(_prev: PlainState, fd: FormData): Promise<
       ". Nothing was emailed for those — instructors have had them on their schedule all along.",
   };
 }
+
+/**
+ * G — carry-forward on silence, and the roster deadline. Off by default; a
+ * studio that never turns it on is untouched. The deadline is the number of
+ * days after an instructor is notified that silence begins to carry.
+ */
+export async function saveCarryForward(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const enabled = String(fd.get("carry_forward_enabled") ?? "") === "on";
+  const daysRaw = Number(fd.get("roster_confirm_days") ?? 5);
+  const days = Math.min(31, Math.max(1, Math.round(Number.isFinite(daysRaw) ? daysRaw : 5)));
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ carry_forward_enabled: enabled, roster_confirm_days: days })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/instructors");
+  return {
+    ok: true,
+    message: enabled
+      ? `Saved. If an instructor says nothing for ${days} day${days === 1 ? "" : "s"} after being sent a roster, last month's is carried forward.`
+      : "Saved. Carry-forward is off — a silent roster stays unstaffed until you fill it.",
+  };
+}
