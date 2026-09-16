@@ -71,6 +71,22 @@ insert into roster_confirmations (studio_id,instructor_id,month,notified_at,conf
   ('0ff00ff0-0000-0000-0000-000000000001','0ff00ff0-0000-0000-0000-0000000d0001','2026-11-01', now()-interval '40 days', now()-interval '35 days'),
   ('0ff00ff0-0000-0000-0000-000000000001','0ff00ff0-0000-0000-0000-0000000d0001','2026-12-01', now()-interval '20 days', null);
 
+-- Ada gets a LOGIN, a class next week, and the studio's ask/due days are set to
+-- TODAY — so the weekly-confirmation and availability sweeps WOULD email her if
+-- the gates weren't holding. That is what makes "0 notifications" mean the
+-- switch, not the absence of somebody to email.
+insert into auth.users (id) values ('0ff00ff0-0000-0000-0000-0000000000a1');
+insert into profiles (id, email) values ('0ff00ff0-0000-0000-0000-0000000000a1','0ff0-ada@example.com');
+insert into studio_staff (id,studio_id,user_id,email,role) values
+  ('0ff00ff0-0000-0000-0000-0000000aa001','0ff00ff0-0000-0000-0000-000000000001','0ff00ff0-0000-0000-0000-0000000000a1','0ff0-ada@example.com','instructor');
+update instructors set staff_id='0ff00ff0-0000-0000-0000-0000000aa001' where id='0ff00ff0-0000-0000-0000-0000000d0001';
+insert into class_occurrences (id,studio_id,location_id,class_type_id,room_id,instructor_id,name,starts_at,ends_at,capacity,booked_count,status) values
+  ('0ff00ff0-0000-0000-0000-00000000c004','0ff00ff0-0000-0000-0000-000000000001','0ff00ff0-0000-0000-0000-00000000000a','0ff00ff0-0000-0000-0000-0000000cc001','0ff00ff0-0000-0000-0000-0000000ee001','0ff00ff0-0000-0000-0000-0000000d0001','Next week', now()+interval '8 days', now()+interval '8 days'+interval '50 min',8,0,'scheduled');
+update studio_settings set
+  week_confirm_ask_dow = extract(dow from (now())::date)::int,
+  availability_due_day = greatest(1, least(28, extract(day from (now())::date)::int))
+ where studio_id = '0ff00ff0-0000-0000-0000-000000000001';
+
 -- Baseline notifications for this studio (fixtures may queue booking confirms);
 -- what matters is that the SWEEPS add none.
 create temp table _off_base as
@@ -121,8 +137,17 @@ select expect_num('no roster was carried (carry-forward off)',
   (select count(*) from roster_confirmations where studio_id = :'S' and carried_at is not null), 0);
 select expect_num('the silent instructor is not even DUE a carry (the switch is off)',
   (select count(*) from roster_carry_due(:'S', date '2026-12-01')), 0);
-select expect_num('the sweeps queued no notifications for this studio',
+select expect_num('the sweeps queued no notifications for this studio (a login instructor, an in-window class, and still nothing)',
   (select count(*) from notifications where studio_id = :'S') - (select c from _off_base), 0);
+
+-- The three gates 142 added, at their defaults for a studio that inserted only
+-- its studio_id.
+select expect_true('weekly confirmation is OFF by default (142 flipped it)',
+  (select coalesce(week_confirm_enabled, true) from studio_settings where studio_id = :'S') = false);
+select expect_true('availability reminders are OFF by default (their own new switch)',
+  (select coalesce(availability_reminders_enabled, true) from studio_settings where studio_id = :'S') = false);
+select expect_true('studio_uses_seat_caps is false — no seat-cap UI',
+  studio_uses_seat_caps(:'S') = false);
 
 -- =============================================================================
 -- Invisible: reporting says nothing about the features it never turned on.
@@ -148,5 +173,13 @@ update class_occurrences set status='cancelled', cancellation_cause='studio_faul
  where id='0ff00ff0-0000-0000-0000-00000000c009';
 select expect_num('teeth: with guarantees ON and a rate on file, the identical cancellation DOES write a record',
   (select count(*) from instructor_pay_records where studio_id = :'S'), 1);
+
+-- Teeth for the weekly-confirmation gate: turn it ON and the login instructor
+-- with an in-window class on the ask day IS asked — so the zero above was the
+-- switch being off, not the sweep having nobody to email.
+update studio_settings set week_confirm_enabled = true where studio_id = :'S';
+select run_sweep('week_confirmations (on)', 'select sweep_week_confirmations()');
+select expect_num('teeth: with weekly confirmation ON, the login instructor IS asked to confirm',
+  (select count(*) from notifications where studio_id = :'S' and template_key = 'week_confirm_ask'), 1);
 
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;

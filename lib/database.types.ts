@@ -5613,6 +5613,7 @@ export type Database = {
         Row: {
           adjacency_minutes: number
           availability_due_day: number
+          availability_reminders_enabled: boolean
           booking_cutoff_minutes: number
           booking_window_days: number
           cancellation_cutoff_minutes: number
@@ -5692,6 +5693,7 @@ export type Database = {
         Insert: {
           adjacency_minutes?: number
           availability_due_day?: number
+          availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
@@ -5771,6 +5773,7 @@ export type Database = {
         Update: {
           adjacency_minutes?: number
           availability_due_day?: number
+          availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
           booking_window_days?: number
           cancellation_cutoff_minutes?: number
@@ -6685,6 +6688,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7389,6 +7400,7 @@ export type Database = {
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
+      run_sweep: { Args: { label: string; sql: string }; Returns: undefined }
       say_count: { Args: { n: number }; Returns: string }
       schedule_range: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
@@ -7737,6 +7749,7 @@ export type Database = {
         Returns: number
       }
       studio_uses_payroll: { Args: { p_studio_id: string }; Returns: boolean }
+      studio_uses_seat_caps: { Args: { p_studio_id: string }; Returns: boolean }
       studio_week_start: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string

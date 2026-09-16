@@ -78,16 +78,18 @@ insert into studios (id, name, slug, timezone, currency, status) values
 -- the suite set the ask day to yesterday and failed — found at 22:31 UTC while
 -- checking migration 112. The same trap `starts_on` was in (migration 095).
 select set_config('t.today', (now() at time zone 'Europe/Prague')::date::text, false);
+-- These studios RUN the instructor confirmation/availability workflow, which is
+-- opt-in and off by default since migration 142 — so they turn it on explicitly.
 insert into studio_settings
-  (studio_id, availability_due_day,
+  (studio_id, availability_due_day, week_confirm_enabled, availability_reminders_enabled,
    week_confirm_ask_dow, week_confirm_remind_dow, week_confirm_escalate_dow,
    week_confirm_escalate_days)
 values
-  ('1f5e1f5e-0000-0000-0000-000000000001', 20,
+  ('1f5e1f5e-0000-0000-0000-000000000001', 20, true, true,
    extract(dow from current_setting('t.today')::date)::int,
    extract(dow from current_setting('t.today')::date)::int,
    extract(dow from current_setting('t.today')::date)::int, 3),
-  ('1f5e1f5e-0000-0000-0000-000000000002', 5,
+  ('1f5e1f5e-0000-0000-0000-000000000002', 5, true, true,
    extract(dow from current_setting('t.today')::date + 1)::int,
    extract(dow from current_setting('t.today')::date + 1)::int,
    extract(dow from current_setting('t.today')::date + 1)::int, 7);

@@ -36,20 +36,22 @@ export default async function NewPlan({
     );
   }
 
-  const [{ data: templates }, { data: classTypes }, { data: settings }] = await Promise.all([
+  const [{ data: templates }, { data: classTypes }, { data: settings }, { data: usesSeatCaps }] = await Promise.all([
     supabase
       .from("plan_templates")
       .select("id, name, description, type, billing_interval, billing_interval_count, credits, credits_per_period, validity_days, signup_fee_cents, commitment_months, cancellation_notice_days, freeze_allowed, max_freeze_days, booking_window_days, max_bookings_per_day, restrictions, visibility")
       .order("sort_order"),
     supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
-    supabase.from("studio_settings").select("seat_caps_enabled, peak_allowance_enabled")
+    supabase.from("studio_settings").select("peak_allowance_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
+    // 142: whether seat caps are on at all is one predicate, not a per-plan null.
+    supabase.rpc("studio_uses_seat_caps", { p_studio_id: ctx.studioId }),
   ]);
 
   // Decision 24. A system template says nothing about places — the six of them
   // are shapes of plan, not a studio's capacity — so a plan started from one
   // begins with no limit, like every other plan.
-  const seatCaps = settings?.seat_caps_enabled ?? false;
+  const seatCaps = usesSeatCaps ?? false;
   const peakHours = settings?.peak_allowance_enabled ?? false;
   const blank = searchParams.template === "blank";
   const chosen = (templates ?? []).find((t) => t.id === searchParams.template);

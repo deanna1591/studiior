@@ -32,7 +32,7 @@ export default async function EditPlan({
     .maybeSingle();
   if (!plan) notFound();
 
-  const [{ data: classTypes }, { count: liveCount }, { data: settings }, { data: seats }] =
+  const [{ data: classTypes }, { count: liveCount }, { data: settings }, { data: seats }, { data: usesSeatCaps }] =
     await Promise.all([
       supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
       supabase
@@ -40,7 +40,7 @@ export default async function EditPlan({
         .select("id", { count: "exact", head: true })
         .eq("plan_id", params.id)
         .not("status", "in", "(cancelled,expired)"),
-      supabase.from("studio_settings").select("seat_caps_enabled, peak_allowance_enabled")
+      supabase.from("studio_settings").select("peak_allowance_enabled")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       // Decision 24: the seat count comes from plan_seats(), never from the
       // count above. The two happen to agree — "not cancelled and not expired"
@@ -48,10 +48,12 @@ export default async function EditPlan({
       // exactly why the capped screen must not rely on the coincidence.
       // plan_seats() answers nothing at all while the switch is off.
       supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
+      // 142: whether seat caps are on at all is one predicate.
+      supabase.rpc("studio_uses_seat_caps", { p_studio_id: ctx.studioId }),
     ]);
 
   const active = liveCount ?? 0;
-  const seatCaps = settings?.seat_caps_enabled ?? false;
+  const seatCaps = usesSeatCaps ?? false;
   const peakHours = settings?.peak_allowance_enabled ?? false;
   const taken = (seats ?? []).find((r) => r.plan_id === params.id)?.taken ?? null;
 

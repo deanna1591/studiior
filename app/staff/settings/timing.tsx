@@ -10,12 +10,29 @@ function Save() {
 }
 
 export default function TimingPanel({
-  dueDay, escalateDays,
-}: { dueDay: number; escalateDays: number }) {
+  dueDay, escalateDays, weekConfirm, availReminders,
+}: { dueDay: number; escalateDays: number; weekConfirm: boolean; availReminders: boolean }) {
   const [state, action] = useFormState<PlainState, FormData>(saveTiming, null);
   return (
     <form action={action} className="max-w-xl">
       {state && <Notice kind={state.ok ? "ok" : "error"}>{state.message}</Notice>}
+      {/* Both off by default — an instructor at a booking-only studio is not
+          asked to confirm a week or submit availability for a workflow the
+          studio does not run. */}
+      <div className="mb-4 space-y-2">
+        <label className="flex items-start gap-2.5 text-[13px] leading-[20px] text-ink">
+          <input type="checkbox" name="week_confirm_enabled" defaultChecked={weekConfirm} className="mt-0.5 h-4 w-4" />
+          <span>Ask instructors to confirm the week ahead
+            <span className="block text-[12px] leading-[17px] text-ink-3">A weekly request to confirm the classes they are down for, with an escalation if it goes unanswered.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2.5 text-[13px] leading-[20px] text-ink">
+          <input type="checkbox" name="availability_reminders_enabled" defaultChecked={availReminders} className="mt-0.5 h-4 w-4" />
+          <span>Remind instructors to submit their availability
+            <span className="block text-[12px] leading-[17px] text-ink-3">A monthly nudge before the due day. Instructors can always submit without it; this is the automated reminder.</span>
+          </span>
+        </label>
+      </div>
       <div className="flex flex-wrap items-end gap-4">
         <label className="text-[13px] leading-[20px] text-ink-2">
           <span className="mb-1 block">Availability due on the</span>

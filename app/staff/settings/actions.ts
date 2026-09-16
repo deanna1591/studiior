@@ -79,6 +79,9 @@ export async function saveTiming(_prev: PlainState, fd: FormData): Promise<Plain
     .update({
       availability_due_day: Math.floor(due),
       week_confirm_escalate_days: Math.floor(esc),
+      // Off by default (142): a checkbox absent from the form data is off.
+      week_confirm_enabled: String(fd.get("week_confirm_enabled") ?? "") === "on",
+      availability_reminders_enabled: String(fd.get("availability_reminders_enabled") ?? "") === "on",
     })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
