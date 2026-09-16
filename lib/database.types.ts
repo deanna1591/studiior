@@ -5661,6 +5661,7 @@ export type Database = {
           core_min_bookings: number
           core_unmet_pay_cents: number | null
           core_unmet_pay_pct: number | null
+          cover_auto_accept_enabled: boolean
           cover_escalation_hours: number
           created_at: string
           dropin_payment_window_minutes: number
@@ -5743,6 +5744,7 @@ export type Database = {
           core_min_bookings?: number
           core_unmet_pay_cents?: number | null
           core_unmet_pay_pct?: number | null
+          cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
@@ -5825,6 +5827,7 @@ export type Database = {
           core_min_bookings?: number
           core_unmet_pay_cents?: number | null
           core_unmet_pay_pct?: number | null
+          cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
@@ -6282,6 +6285,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_cover: { Args: { p_occurrence_id: string }; Returns: Json }
       accept_studio_invite: {
         Args: { p_full_name: string; p_password: string; p_token: string }
         Returns: Database["public"]["CompositeTypes"]["invite_acceptance"]
@@ -6368,6 +6372,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["staff_role"]
       }
       auth_staff_studios: { Args: never; Returns: string[] }
+      availability_conflicts: { Args: { p_studio_id: string }; Returns: Json }
       availability_cycle: {
         Args: { p_period_start?: string; p_studio_id: string }
         Returns: Json
@@ -6577,6 +6582,7 @@ export type Database = {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
       }
+      cover_available_to: { Args: { p_instructor_id: string }; Returns: Json }
       create_announcement: {
         Args: {
           p_audience: string
@@ -6732,6 +6738,22 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }

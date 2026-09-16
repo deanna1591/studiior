@@ -32,7 +32,7 @@ export default async function Applications() {
     );
   }
 
-  const [{ data: apps }, { data: unstaffed }] = await Promise.all([
+  const [{ data: apps }, { data: unstaffed }, { data: conflictsData }] = await Promise.all([
     supabase.from("shift_applications")
       .select("id, occurrence_id, instructor_id, applied_at, note, instructors(display_name), class_occurrences(name, starts_at, ends_at, booked_count, rooms(name))")
       .eq("status", "pending")
@@ -42,7 +42,18 @@ export default async function Applications() {
       .eq("staffing", "open").eq("status", "scheduled")
       .gt("starts_at", new Date().toISOString())
       .order("starts_at").limit(30),
+    // B (155): future classes whose assigned instructor has since narrowed their
+    // availability out from under them. Same weight as an unstaffed class — the
+    // instructor is still on it, so it is a decision to reassign or open, not an
+    // auto-unstaffing.
+    supabase.rpc("availability_conflicts", { p_studio_id: ctx.studioId }),
   ]);
+  const conflicts = ((conflictsData as unknown as { conflicts: {
+    occurrence_id: string; name: string; local_when: string; instructor_name: string;
+    room: string | null; booked: number; starts_at: string;
+  }[] } | null)?.conflicts) ?? [];
+  const conflictDay = (iso: string) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone }).format(new Date(iso));
 
   const byOcc = new Map<string, typeof apps>();
   for (const a of apps ?? []) {
@@ -88,6 +99,40 @@ export default async function Applications() {
   return (
     <AppShell {...shell} title="Applications"
               actions={<NavLink href="/schedule">Back to the schedule</NavLink>}>
+      {conflicts.length > 0 && (
+        <div className="mb-6">
+          <div className="max-w-[62ch] rounded border-l-[3px] px-3.5 py-3"
+               style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }} role="alert">
+            <p className="text-[13px] leading-[19px] text-ink">
+              <span className="font-semibold">
+                <span className="num">{conflicts.length}</span>{" "}
+                {conflicts.length === 1 ? "class is" : "classes are"} assigned to an instructor
+                who has since removed those hours from their availability.
+              </span>{" "}
+              They are still on it until you act — reassign or open each.
+            </p>
+          </div>
+          <Rows>
+            {conflicts.map((c) => (
+              <div key={c.occurrence_id} className="flex items-start justify-between gap-4 px-3 py-3">
+                <span className="min-w-0">
+                  <span className="block truncate text-[14px] leading-5 text-ink">{c.name}</span>
+                  <span className="block text-[12px] leading-4 text-ink-3">
+                    {c.instructor_name} · {c.local_when}
+                    {c.room ? ` · ${c.room}` : ""}
+                    {c.booked > 0 && <> · <span className="num">{c.booked}</span> booked</>}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-3 text-[12px]">
+                  <NavLink href={`/schedule?d=${conflictDay(c.starts_at)}`}>Reassign</NavLink>
+                  <NavLink href={`/roster/${c.occurrence_id}`}>Open</NavLink>
+                </span>
+              </div>
+            ))}
+          </Rows>
+        </div>
+      )}
+
       <SectionLabel>Waiting on you</SectionLabel>
       {byOcc.size === 0 ? (
         <Empty>Nobody is waiting on an answer.</Empty>

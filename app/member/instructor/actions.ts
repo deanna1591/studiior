@@ -131,6 +131,29 @@ export async function claimClass(_prev: ClaimState, form: FormData): Promise<Cla
   return { error: "That could not be claimed." };
 }
 
+/**
+ * Auto-accept cover (156): an instructor takes an urgent, auto-acceptable cover.
+ * The database checks qualified / valid / available / not-clashing and assigns
+ * through move_occurrence — no staff approval, no cap (an urgent cover is not
+ * hoarding a month). accept_cover returns {ok:false} with move's reason on a
+ * clash, which can happen if two instructors race for it.
+ */
+export async function acceptCover(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("accept_cover", {
+    p_occurrence_id: String(form.get("occurrence_id")),
+  });
+  if (error) {
+    const m = error.message;
+    return { error: /PT409/.test(m) ? "Somebody else has taken it, or it needs the studio to approve." : m };
+  }
+  const r = (data ?? {}) as { ok?: boolean; reason?: string };
+  if (!r.ok) return { error: r.reason === "instructor_busy" ? "You are already teaching then." : "Somebody else has just taken it." };
+  revalidatePath("/instructor");
+  revalidatePath("/instructor/shifts");
+  return { ok: "Taken — it is yours. The studio has been told." };
+}
+
 export async function withdrawApplication(
   _prev: InstructorState, form: FormData,
 ): Promise<InstructorState> {

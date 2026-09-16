@@ -3,7 +3,7 @@
 import { useFormState } from "react-dom";
 import { PrimaryButton, CardAction, CardActionOutline, QuietButton } from "@/components/member/ui";
 import {
-  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, withdrawApplication, checkInMember,
+  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, acceptCover, withdrawApplication, checkInMember,
   type InstructorState, type ClaimState,
 } from "./actions";
 
@@ -142,6 +142,18 @@ export function ClaimClass({ occurrenceId }: { occurrenceId: string }) {
         <CardAction>Claim it</CardAction>
       )}
       {state && ("error" in state || "ok" in state) && <Result state={state as InstructorState} />}
+    </form>
+  );
+}
+
+/** Auto-accept cover (156): take an urgent cover, no approval round. */
+export function AcceptCover({ occurrenceId }: { occurrenceId: string }) {
+  const [state, action] = useFormState<InstructorState, FormData>(acceptCover, null);
+  return (
+    <form action={action} className="mt-2">
+      <input type="hidden" name="occurrence_id" value={occurrenceId} />
+      <CardAction>Take it</CardAction>
+      <Result state={state} />
     </form>
   );
 }

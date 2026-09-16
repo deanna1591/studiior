@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
-import { ConfirmWeek } from "./actions-ui";
+import { ConfirmWeek, AcceptCover } from "./actions-ui";
 import PayCheckIn from "./pay-checkin";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export default async function MyWeek({
   const from = shiftDate(today, offset * 7);
   const to = shiftDate(from, 13);
 
-  const [week, cover, rosters, anns] = await Promise.all([
+  const [week, cover, rosters, anns, coverNeeded] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
     }),
@@ -56,7 +56,16 @@ export default async function MyWeek({
       .order("month").limit(1),
     // Decision 27: instructor-audience announcements for the portal.
     supabase.rpc("instructor_announcements", { p_studio_id: ctx.studio_id }),
+    // Auto-accept cover (156): urgent covers this instructor can take right now,
+    // no approval round. Empty unless the studio runs auto-accept.
+    supabase.rpc("cover_available_to", { p_instructor_id: ctx.instructor_id }),
   ]);
+  const coverClasses = ((coverNeeded.data as unknown as { classes: {
+    id: string; time: string; date: string; class_name: string; room: string | null; booked: number; capacity: number;
+  }[] } | null)?.classes) ?? [];
+  const coverWhen = (iso: string, t: string) =>
+    new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+      .format(new Date(`${iso}T12:00:00Z`)) + ` · ${t}`;
   const announcements = (anns.data ?? []) as unknown as
     { id: string; title: string; body: string }[];
   const roster = (rosters.data ?? [])[0] ?? null;
@@ -100,6 +109,35 @@ export default async function MyWeek({
           </p>
           <p className="num mt-1 text-[11px] leading-4 text-ink-2">{week.error.message}</p>
         </div>
+      )}
+
+      {/* Auto-accept cover (156): a class needs cover soon and you can take it
+          right now, first come. Loud, above the roster nudge. */}
+      {coverClasses.length > 0 && (
+        <section className="mb-4">
+          <div className="m-card px-4 py-3.5" style={{ boxShadow: "0 0 0 1.5px var(--lime-text)" }}>
+            <p className="text-[15px] font-semibold leading-[22px] text-ink">Cover needed now</p>
+            <p className="m-sub mt-0.5 text-ink-3">
+              A class needs cover soon — whoever takes it first gets it, no waiting on the studio.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {coverClasses.map((c) => (
+                <li key={c.id} className="rounded-xl border border-line px-3 py-2.5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="num shrink-0 text-[15px] font-semibold text-ink">{c.time}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] text-ink">{c.class_name}</span>
+                      <span className="m-sub block text-ink-3">
+                        {coverWhen(c.date, c.time)}{c.room ? ` · ${c.room}` : ""} · <span className="num">{c.booked}/{c.capacity}</span> booked
+                      </span>
+                    </span>
+                  </div>
+                  <AcceptCover occurrenceId={c.id} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       )}
 
       {/* Decision 25: the month is the agreement, and it is asked for here

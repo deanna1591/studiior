@@ -514,6 +514,34 @@ export async function saveClaiming(_prev: PlainState, fd: FormData): Promise<Pla
   };
 }
 
+/**
+ * Auto-accept cover (156). Per tenant, off by default. When on, a cover request
+ * inside the cover-escalation window is filled by the first qualified instructor
+ * to take it — no staff approval round — and staff are told who took it. Beyond
+ * the window, staff approve as usual. Reuses the one escalation window (hours).
+ */
+export async function saveCover(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const enabled = String(fd.get("cover_auto_accept_enabled") ?? "") === "on";
+  const hoursRaw = Number(fd.get("cover_escalation_hours") ?? 4);
+  const hours = Math.min(72, Math.max(1, Math.round(Number.isFinite(hoursRaw) ? hoursRaw : 4)));
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ cover_auto_accept_enabled: enabled, cover_escalation_hours: hours })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/instructors");
+  return {
+    ok: true,
+    message: enabled
+      ? `Saved. A cover request within ${hours} hour${hours === 1 ? "" : "s"} of the class is taken by the first qualified instructor — you are told, not asked.`
+      : `Saved. Cover requests wait for you to approve, however close the class.`,
+  };
+}
+
 export async function saveCarryForward(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
