@@ -4975,6 +4975,27 @@ export type Database = {
           },
         ]
       }
+      public_schedule_cache: {
+        Row: {
+          computed_at: string
+          days: number
+          payload: Json
+          slug: string
+        }
+        Insert: {
+          computed_at?: string
+          days: number
+          payload: Json
+          slug: string
+        }
+        Update: {
+          computed_at?: string
+          days?: number
+          payload?: Json
+          slug?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -6471,19 +6492,6 @@ export type Database = {
         }
         Returns: Json
       }
-      co: {
-        Args: {
-          ct: string
-          instr: string
-          minb: number
-          room: string
-          startt: string
-          studio: string
-          tier: string
-          uid: string
-        }
-        Returns: Json
-      }
       commitment_pending: {
         Args: { p_studio_id: string }
         Returns: {
@@ -6703,12 +6711,12 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
+      expect_false: {
+        Args: { actual: boolean; label: string }
         Returns: undefined
       }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
       expect_text: {
@@ -6717,10 +6725,6 @@ export type Database = {
       }
       expect_true: {
         Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_txt: {
-        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       extend_trial: {
@@ -7178,6 +7182,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      public_schedule: {
+        Args: { p_days?: number; p_slug: string }
+        Returns: Json
       }
       publication_enabled: { Args: { p_studio_id: string }; Returns: boolean }
       publish_announcement: {
@@ -7877,7 +7885,6 @@ export type Database = {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
-      warns: { Args: { res: Json; w: string }; Returns: boolean }
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
