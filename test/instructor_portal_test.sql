@@ -120,6 +120,32 @@ select expect_num('and exactly one email is queued',
       and template_key = 'instructor_invite'), 1);
 reset role;
 
+-- Migration 143: the invite is addressed to the address it was SENT TO (the
+-- payload's to_email), because an invitee has no login and the member/staff
+-- chain resolves to null — which reached Resend as "to": [null] and 422'd.
+select expect_text('the invite email is addressed to the address it was sent to, not a null user',
+  (select to_email from render_notification(
+     (select id from notifications where template_key = 'instructor_invite'
+        and studio_id = 'beefbeef-0000-0000-0000-00000000000a' order by created_at desc limit 1))),
+  'isla@example.com');
+-- And its footer points at no member-app settings screen — the invitee has no
+-- account, so "Choose which emails you get" would be a control that does nothing.
+select expect_true('the invite footer offers no settings link the invitee cannot use',
+  (select text_body not like '%/settings%' and text_body like '%set up your account%'
+     from render_notification(
+     (select id from notifications where template_key = 'instructor_invite'
+        and studio_id = 'beefbeef-0000-0000-0000-00000000000a' order by created_at desc limit 1))));
+-- A recipient-less notification is refused with a reason, not discovered as a
+-- provider 422 — at queue time, and again at the door as a backstop.
+select expect_raises('queue_notification refuses a row with no member and no to_email',
+  $$ select queue_notification('beefbeef-0000-0000-0000-00000000000a', null, 'member_invite', '{}'::jsonb, 'beef-null-q') $$,
+  'PT422');
+insert into notifications (studio_id, recipient_type, member_id, template_key, channel, payload, dedupe_key, scheduled_for, status)
+  values ('beefbeef-0000-0000-0000-00000000000a','member',null,'member_invite','email','{}'::jsonb,'beef-null-d', now(), 'scheduled');
+select expect_raises('deliver_notification refuses a null recipient before the provider sees it',
+  $$ select deliver_notification((select id from notifications where dedupe_key = 'beef-null-d')) $$, 'PT422');
+delete from notifications where dedupe_key = 'beef-null-d';
+
 select set_config('t.tok',
   (select regexp_replace(payload ->> 'claim_url', '.*/', '') from notifications
     where template_key = 'instructor_invite'
