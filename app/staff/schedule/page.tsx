@@ -221,6 +221,28 @@ export default async function Schedule({
   // `?all=1` puts everyone back, and it has to exist: dragging a class onto
   // somebody who is not teaching yet is how a class gets assigned, and a column
   // that is not there cannot be dropped on.
+  // CLASSES IN THE VISIBLE WEEK WITH NOBODY TEACHING THEM, said once at the top
+  // rather than left to be found by scanning amber blocks. It AGREES with the
+  // Morning Brief's `unstaffed_class` insight rather than counting differently:
+  // same definition (scheduled, staffing not assigned, still in the future),
+  // and the members-booked subset — which is exactly what the brief raises
+  // however far away — is called out. The brief looks 14 days ahead; this is
+  // scoped to the week on screen, which is where somebody is about to act.
+  const weekEnd = shiftDateKey(weekStart, view === "week" ? 6 : 0);
+  const unstaffed = occurrences
+    .filter((o) =>
+      o.occ_status === "scheduled" &&
+      (o.occ_staffing ?? "assigned") !== "assigned" &&
+      o.local_date >= weekStart && o.local_date <= weekEnd &&
+      new Date(o.starts_at).getTime() > now)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const unstaffedBooked = unstaffed.filter((o) => o.occ_booked > 0).length;
+  const hhmm = (mins: number) =>
+    `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  const shortDay = (isoDate: string) =>
+    new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: ctx.timeZone })
+      .format(new Date(`${isoDate}T12:00:00Z`));
+
   const showAll = searchParams.all === "1";
   // THE ANCHOR DAY ONLY. The fetch deliberately spans a day either side, so
   // counting every event in `events` puts a column up for somebody who teaches
@@ -246,6 +268,45 @@ export default async function Schedule({
                 </>
               }>
       {everyone.length > 1 && <FillPanel />}
+
+      {/* Nobody teaching them — the count made visible without scanning the
+          grid. Amber on a block is easy to miss across a week; a sentence with
+          the classes named and linked is not. Each links to its roster, where
+          the Assign control lives. */}
+      {unstaffed.length > 0 && (
+        <div className="mb-4 max-w-[62ch] rounded border-l-[3px] px-3.5 py-3"
+             style={{ borderLeftColor: "var(--amber-deep)", background: "var(--amber-tint)" }}>
+          <p className="text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">
+              <span className="num">{unstaffed.length}</span>{" "}
+              {unstaffed.length === 1 ? "class" : "classes"}{" "}
+              {view === "week" ? "this week" : "this day"}{" "}
+              {unstaffed.length === 1 ? "has" : "have"} nobody teaching {unstaffed.length === 1 ? "it" : "them"}.
+            </span>
+            {unstaffedBooked > 0 && (
+              <>
+                {" "}
+                <span className="num">{unstaffedBooked}</span>{" "}
+                {unstaffedBooked === 1 ? "has" : "have"} members already booked.
+              </>
+            )}
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {unstaffed.map((o) => (
+              <li key={o.occ_id} className="text-[12.5px] leading-[18px]">
+                <Link href={`/roster/${o.occ_id}`}
+                      className="text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+                  {o.occ_name}
+                </Link>
+                <span className="num text-ink-3">
+                  {" "}· {shortDay(o.local_date)} {hhmm(o.start_minutes)}
+                  {o.occ_booked > 0 ? ` · ${o.occ_booked} booked` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {events.length === 0 && (
         <p className="mb-4 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">

@@ -43,6 +43,106 @@ export async function openShift(_prev: OpenShiftState, fd: FormData): Promise<Op
   return { ok: true, message: `Opened as a shift.${tail} Qualified instructors are emailed shortly.` };
 }
 
+export type AssignState =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Assign an instructor to an unstaffed class, from the class itself.
+ *
+ * Through move_occurrence() — the same gate a drag uses — so it gets the same
+ * validation: the validity-window hard refusal (they have not agreed to work
+ * that date), the room/instructor clash, the availability warning. No time
+ * changes, so nobody booked is emailed; move_occurrence only mails on a time
+ * move, and the confirm flag is passed because assigning to a class with
+ * members booked would otherwise ask a question that has no email behind it.
+ */
+export async function assignInstructor(_prev: AssignState, fd: FormData): Promise<AssignState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const instructorId = String(fd.get("instructor_id") ?? "");
+  if (!instructorId) return { ok: false, message: "Pick who is teaching it." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("move_occurrence", {
+    p_occurrence_id: occurrenceId,
+    p_instructor_id: instructorId,
+    // Assigning to a previously-open class emails nobody (no time change), so
+    // the members-booked confirmation has nothing to confirm — pass it.
+    p_confirm: true,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers assign classes."
+        : /PT402/.test(m) ? "This studio's Studiior subscription is not active."
+        : m,
+    };
+  }
+
+  const r = data as unknown as {
+    ok: boolean; reason?: string;
+    blocked_by?: { who?: string | null; on?: string | null; name?: string | null; at?: string | null } | null;
+  };
+  if (!r.ok) {
+    const b = r.blocked_by;
+    const msg =
+      r.reason === "outside_availability_dates"
+        ? `${b?.who ?? "They"} have not agreed to work on ${b?.on ?? "that date"} — that is dates they never agreed to, not hours, so it cannot be assigned here.`
+      : r.reason === "instructor_busy"
+        ? `They are already teaching ${b?.name ?? "another class"}${b?.at ? ` at ${b.at}` : ""}.`
+      : r.reason === "room_busy"
+        ? "The room is in use then."
+      : "That could not be assigned.";
+    return { ok: false, message: msg };
+  }
+
+  revalidatePath(`/roster/${occurrenceId}`);
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  return { ok: true, message: "Assigned. They are teaching this class now." };
+}
+
+export type RepublishState = { ok: boolean; message: string } | null;
+
+/**
+ * "Put it out to instructors again." An unstaffed class is already an open
+ * shift and qualified instructors were emailed once; this clears the alert
+ * latch so the next sweep re-solicits them — the honest action for a gap
+ * nobody has applied for yet.
+ */
+export async function republishShift(_prev: RepublishState, fd: FormData): Promise<RepublishState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("republish_open_shift", { p_occurrence_id: occurrenceId });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers open a shift to instructors."
+        : /PT409/.test(m) ? m.replace(/^.*?:\s*/, "")
+        : m,
+    };
+  }
+  const r = data as unknown as { ok?: boolean; qualified_contactable?: number } | null;
+  if (!r?.ok) return { ok: false, message: "That could not be done." };
+
+  revalidatePath(`/roster/${occurrenceId}`);
+  const n = r.qualified_contactable ?? 0;
+  return {
+    ok: true,
+    message: n > 0
+      ? `Out to instructors. ${n} qualified instructor${n === 1 ? "" : "s"} with a login will be emailed shortly.`
+      : "Out to instructors — but none of your qualified instructors have a login, so tell them yourself.",
+  };
+}
+
 export type PaperWaiverState =
   | { ok: true; message: string }
   | { ok: false; message: string }

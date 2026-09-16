@@ -7384,6 +7384,7 @@ export type Database = {
         }[]
       }
       reopen_studio: { Args: { p_closure_id: string }; Returns: Json }
+      republish_open_shift: { Args: { p_occurrence_id: string }; Returns: Json }
       request_availability_changes: {
         Args: { p_note: string; p_submission_id: string }
         Returns: Json

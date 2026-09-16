@@ -226,6 +226,50 @@ select expect_num('a second sweep alerts none of THIS studio''s shifts again',
       and studio_id='0b570b57-0000-0000-0000-000000000001'), 2);
 
 -- =============================================================================
+-- 2b. REPUBLISH — put an already-open shift back out to instructors (146)
+-- =============================================================================
+-- Both C1 and C2 are open and alerted; nobody has applied yet. A manager who
+-- wants to ask again clears the alert latch so the next sweep re-solicits.
+set role authenticated;
+select set_config('request.jwt.claim.sub','0b570b57-0000-0000-0000-0000000000a2',false);  -- front desk
+select expect_raises('front desk cannot republish a shift',
+  $$ select republish_open_shift('0b570b57-0000-0000-0000-0000000c0001') $$, 'PT403');
+reset role;
+
+-- An assigned class is not an open shift to republish.
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, name, capacity, instructor_id, starts_at, ends_at, status, staffing)
+values
+  ('0b570b57-0000-0000-0000-0000000c0009','0b570b57-0000-0000-0000-000000000001','0b570b57-0000-0000-0000-00000000000a',
+   '0b570b57-0000-0000-0000-000000cc0001','0b570b57-0000-0000-0000-000000ee0001','Assigned Reformer',10,'0b570b57-0000-0000-0000-0000000d0001',
+   ((current_date+5)+time '07:00') at time zone 'Europe/Prague', ((current_date+5)+time '07:50') at time zone 'Europe/Prague','scheduled','assigned');
+set role authenticated;
+select set_config('request.jwt.claim.sub','0b570b57-0000-0000-0000-0000000000a1',false);  -- owner
+select expect_raises('an assigned class is not an open shift to republish',
+  $$ select republish_open_shift('0b570b57-0000-0000-0000-0000000c0009') $$, 'PT409');
+
+-- Owner republishes C1: the latch clears and the count of qualified,
+-- contactable instructors comes back — Ada and Bea (Cai is qualified but has no
+-- login, so not counted).
+select set_config('t.rp', (select republish_open_shift('0b570b57-0000-0000-0000-0000000c0001')::text), false);
+select expect_true('C1 is put back out to instructors', (current_setting('t.rp')::jsonb ->> 'ok')::boolean);
+select expect_num('...and two qualified instructors with a login will be emailed',
+  (current_setting('t.rp')::jsonb ->> 'qualified_contactable')::bigint, 2);
+reset role;
+select expect_true('...C1''s alert latch is cleared so the sweep re-alerts it',
+  (select shift_alert_sent_at is null from class_occurrences where id='0b570b57-0000-0000-0000-0000000c0001'));
+select expect_true('...C2''s latch is untouched — only C1 was republished',
+  (select shift_alert_sent_at is not null from class_occurrences where id='0b570b57-0000-0000-0000-0000000c0002'));
+
+-- The third sweep re-solicits C1: Ada and Bea each get a fresh email.
+select set_config('t.sweep3', (select notify_open_shifts()::text), false);
+select expect_num('a re-solicit sends Ada and Bea a fresh email about C1',
+  (select count(*) from notifications where template_key='open_shifts_available'
+      and studio_id='0b570b57-0000-0000-0000-000000000001'), 4);
+select expect_true('...and C1 is alerted again',
+  (select shift_alert_sent_at is not null from class_occurrences where id='0b570b57-0000-0000-0000-0000000c0001'));
+
+-- =============================================================================
 -- 3. RELIABILITY — MEASURED, NEVER ENFORCED
 -- =============================================================================
 -- Ada applies for both open shifts; Bea applies for C1.
