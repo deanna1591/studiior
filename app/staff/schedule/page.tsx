@@ -6,6 +6,7 @@ import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./ca
 import JumpToDate from "./jump";
 import InstructorFilter from "./instructor-filter";
 import FillPanel from "./fill/panel";
+import PublishForm from "@/app/staff/publish/publish-form";
 
 export const dynamic = "force-dynamic";
 
@@ -277,6 +278,42 @@ export default async function Schedule({
     new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: ctx.timeZone })
       .format(new Date(`${isoDate}T12:00:00Z`));
 
+  // PUBLICATION STATE for the month(s) the visible range covers. Decision 25:
+  // members can see and book only published months, so a studio looking at a full
+  // calendar of a DRAFT month and assuming it is live is exactly the failure to
+  // prevent. Only relevant when the studio builds months as drafts — with
+  // publication off, every month is live the moment its classes exist, so there
+  // is nothing to say and no control to show. A week can cross a month boundary,
+  // so the range may span two months in two different states.
+  type PubFacts = {
+    month: string; label: string; published: boolean;
+    classes: number; open_shifts: number;
+    instructors: { instructor_id: string; name: string; classes: number; reachable: boolean }[];
+  };
+  let pubMonths: PubFacts[] = [];
+  if (ctx.publicationEnabled) {
+    // Which months, of those the range covers, actually have classes on screen —
+    // a banner about a month with nothing visible is noise.
+    const monthsWithClasses = new Set(
+      occurrences
+        .filter((o) => o.local_date >= rangeStart && o.local_date <= rangeEnd && o.occ_status === "scheduled")
+        .map((o) => o.local_date.slice(0, 7)));
+    const candKeys = Array.from(new Set([rangeStart.slice(0, 7), rangeEnd.slice(0, 7)]))
+      .filter((k) => monthsWithClasses.has(k));
+    const previews = await Promise.all(
+      candKeys.map((k) => supabase.rpc("publish_month_preview", { p_studio_id: ctx.studioId, p_month: `${k}-01` })));
+    pubMonths = previews
+      .map((p) => p.data as unknown as PubFacts | null)
+      .filter((f): f is PubFacts => !!f)
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+  const draftMonths = pubMonths.filter((m) => !m.published);
+  const publishedInView = pubMonths.filter((m) => m.published);
+  // "November" / "November and December" / "October, November and December".
+  const listAnd = (xs: string[]) =>
+    xs.length <= 1 ? (xs[0] ?? "")
+    : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
   const showAll = searchParams.all === "1";
   // THE ANCHOR DAY ONLY. The fetch deliberately spans a day either side, so
   // counting every event in `events` puts a column up for somebody who teaches
@@ -314,6 +351,58 @@ export default async function Schedule({
                 </>
               }>
       {everyone.length > 1 && <FillPanel />}
+
+      {/* PUBLICATION STATE — the most important thing to know about a month you
+          are looking at, so it sits above everything else. Draft is loud (coral):
+          a full calendar members cannot book is worse than one that is simply
+          empty. A range spanning two states names both. */}
+      {ctx.publicationEnabled && draftMonths.length > 0 && (
+        <div className="mb-4 max-w-[64ch] rounded border-l-[3px] px-3.5 py-3"
+             style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }} role="alert">
+          <p className="text-[13px] leading-[19px] text-ink">
+            <span className="font-semibold">
+              {listAnd(draftMonths.map((m) => m.label))}{" "}
+              {draftMonths.length === 1 ? "is" : "are"} not published
+            </span>{" "}
+            — members cannot see or book {draftMonths.length === 1 ? "these classes" : "any of these classes"}.
+          </p>
+          {publishedInView.length > 0 && (
+            <p className="mt-1 text-[12.5px] leading-[18px] text-ink-2">
+              This {view} also covers {listAnd(publishedInView.map((m) => m.label))}, which{" "}
+              {publishedInView.length === 1 ? "is" : "are"} published.
+            </p>
+          )}
+          {/* The publish control, on the same screen, for the month being viewed
+              — with the preview: how many classes, how many unstaffed, how many
+              instructors. Pressing it publishes and confirms on /publish. */}
+          <div className="mt-3 space-y-3">
+            {draftMonths.map((m) => (
+              <div key={m.month} className="rounded border border-line bg-surface p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <span className="text-[13px] font-medium leading-[18px] text-ink">{m.label}</span>
+                  <span className="num text-[12px] leading-4 text-ink-2">
+                    {m.classes} {m.classes === 1 ? "class" : "classes"}
+                    {m.open_shifts > 0 && ` · ${m.open_shifts} unstaffed`}
+                    {` · ${m.instructors.length} ${m.instructors.length === 1 ? "instructor" : "instructors"}`}
+                  </span>
+                </div>
+                <PublishForm month={m.month} label={m.label}
+                  openShifts={m.open_shifts}
+                  unreachable={m.instructors.filter((i) => !i.reachable).map((i) => i.name)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* All of what is on screen is published — a quiet confirmation, not a
+          demand for attention. */}
+      {ctx.publicationEnabled && draftMonths.length === 0 && publishedInView.length > 0 && (
+        <p className="mb-4 text-[12.5px] leading-[18px] text-ink-3">
+          {listAnd(publishedInView.map((m) => m.label))}{" "}
+          {publishedInView.length === 1 ? "is" : "are"} published — members can see and book{" "}
+          {publishedInView.length === 1 ? "it" : "them"}.
+        </p>
+      )}
 
       {/* Nobody teaching them — the count made visible without scanning the
           grid. Amber on a block is easy to miss across a week; a sentence with

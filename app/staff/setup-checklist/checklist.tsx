@@ -15,6 +15,9 @@ const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
   // /series, not /classes/new: a studio's week is recurring, and pointing this
   // at the one-off form asked people to add fifty-two classes by hand.
   { key: "schedule",       label: "Put your week on",     hint: "Your recurring classes, so members have something to book.", href: "/series/new" },
+  // Only outstanding when publication is on and the current month is a draft with
+  // classes on it (Decision 25) — otherwise the timetable is live as it is made.
+  { key: "publish",        label: "Publish this month",   hint: "Members can see and book only published months. This month has classes but is still a draft — publish it so they can book.", href: "/publish" },
   { key: "staff",          label: "Invite your team",     hint: "Front desk and managers, so you are not the only login." },
   // The three "fill a month" needs. A studio could tick everything above and
   // get an empty month back, with nothing on this list explaining why.
@@ -78,7 +81,10 @@ function Row({ item, state }: { item: (typeof ITEMS)[number]; state: { done: boo
 }
 
 export default function SetupChecklist({ state }: { state: SetupState }) {
-  const live = ITEMS.filter((i) => !state[i.key]?.dismissed);
+  // Only items the state actually carries. A key studio_setup_state omits — the
+  // `publish` step for a studio with publication off — must not render at all,
+  // neither ticked nor (via a missing entry) as outstanding.
+  const live = ITEMS.filter((i) => state[i.key] && !state[i.key]?.dismissed);
   // Optional items are shown while the list is up, but they do not keep it up:
   // a studio that will never connect a provider should still see the checklist
   // disappear when the work that actually matters is finished.
