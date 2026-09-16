@@ -91,6 +91,46 @@ export async function applyForShift(
   return { ok: "Applied. Staff approve it — you will hear back." };
 }
 
+export type ClaimState =
+  | { error: string }
+  | { ok: string }
+  | { overCap: { current: number; cap: number } }
+  | null;
+
+/**
+ * Claiming (migration 149): the instructor claims an open class; staff approve.
+ * apply_for_shift is the primitive — at a claiming studio it returns
+ * {ok:false, reason} rather than raising for the soft/hard gates, so this reads
+ * the payload rather than only `error`. Over the core cap it does not refuse
+ * outright: it comes back over_cap with the numbers, and the caller offers "ask
+ * anyway" (p_over_cap_ack), which records the flag for staff.
+ */
+export async function claimClass(_prev: ClaimState, form: FormData): Promise<ClaimState> {
+  const supabase = createClient();
+  const ack = String(form.get("over_cap_ack") ?? "") === "1";
+  const { data, error } = await supabase.rpc("apply_for_shift", {
+    p_occurrence_id: String(form.get("occurrence_id")),
+    p_note: String(form.get("note") ?? "") || undefined,
+    p_over_cap_ack: ack,
+  });
+  if (error) return { error: error.message };
+  const r = (data ?? {}) as {
+    ok?: boolean; reason?: string; current?: number; cap?: number; over_cap?: boolean;
+  };
+  if (r.ok) {
+    revalidatePath("/instructor/shifts");
+    return {
+      ok: r.over_cap
+        ? "Claimed — over your usual cap for the week, so the studio will see that. They decide."
+        : "Claimed. The studio approves it — you will hear back.",
+    };
+  }
+  if (r.reason === "over_cap") return { overCap: { current: r.current ?? 0, cap: r.cap ?? 0 } };
+  if (r.reason === "outside_validity")
+    return { error: "That is outside the availability you have given us for that month. Send it in and the class opens up." };
+  return { error: "That could not be claimed." };
+}
+
 export async function withdrawApplication(
   _prev: InstructorState, form: FormData,
 ): Promise<InstructorState> {

@@ -481,6 +481,39 @@ export async function savePublication(_prev: PlainState, fd: FormData): Promise<
  * studio that never turns it on is untouched. The deadline is the number of
  * days after an instructor is notified that silence begins to carry.
  */
+/**
+ * Claiming (migration 149): instructors claim open classes and staff approve,
+ * instead of staff assigning a roster to confirm. Per tenant, off by default.
+ *
+ * NO forced publication. Claiming needs no reveal step — month_published() is
+ * true when publication is off, so every open, future class is claimable — so
+ * turning claiming on changes only this switch and the studio's default core
+ * cap. A studio can run claiming with a rolling booking window, publication, or
+ * neither, without this touching either.
+ */
+export async function saveClaiming(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const enabled = String(fd.get("claiming_enabled") ?? "") === "on";
+  const capRaw = Number(fd.get("core_claim_default_cap") ?? 3);
+  const cap = Math.min(50, Math.max(0, Math.round(Number.isFinite(capRaw) ? capRaw : 3)));
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ claiming_enabled: enabled, core_claim_default_cap: cap })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/instructors");
+  revalidatePath("/instructor/shifts");
+  return {
+    ok: true,
+    message: enabled
+      ? `Saved. Instructors claim open classes and you approve them; core claims are capped at ${cap} a week by default.`
+      : "Saved. Claiming is off — you assign the roster and instructors confirm it.",
+  };
+}
+
 export async function saveCarryForward(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

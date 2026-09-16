@@ -146,6 +146,20 @@ select expect_text('...each class carries its configured tier',
   (select c ->> 'tier' from jsonb_array_elements(current_setting('t.cl')::jsonb -> 'classes') c
      where c ->> 'id' = 'c1a1c1a1-0000-0000-0000-000000f00001'), 'flex');
 
+-- THE HORIZON: instructors see the full occurrence horizon (further than members
+-- book), one block per month. The month X has availability for is claimable with
+-- its classes; a month X has NOT submitted is flagged no_availability, not blank.
+select set_config('t.hz', instructor_claim_horizon('c1a1c1a1-0000-0000-0000-0000000d00d1')::text, false);
+select expect_true('horizon: the month X has availability for is claimable',
+  (select (m ->> 'can_claim')::boolean from jsonb_array_elements(current_setting('t.hz')::jsonb -> 'months') m
+     where m ->> 'month' = to_char(date_trunc('month',(current_date+21)),'YYYY-MM')));
+select expect_true('...and carries that month''s open classes',
+  (select jsonb_array_length(m -> 'classes') > 0 from jsonb_array_elements(current_setting('t.hz')::jsonb -> 'months') m
+     where m ->> 'month' = to_char(date_trunc('month',(current_date+21)),'YYYY-MM')));
+select expect_true('horizon: a month with no availability is flagged (actionable), not blank',
+  exists(select 1 from jsonb_array_elements(current_setting('t.hz')::jsonb -> 'months') m
+          where m ->> 'reason' = 'no_availability'));
+
 -- =============================================================================
 -- 1. CORE CAP — cannot claim a 4th; pending counts; different caps
 -- =============================================================================

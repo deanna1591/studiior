@@ -3,8 +3,8 @@
 import { useFormState } from "react-dom";
 import { PrimaryButton, CardAction, CardActionOutline, QuietButton } from "@/components/member/ui";
 import {
-  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, withdrawApplication, checkInMember,
-  type InstructorState,
+  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, withdrawApplication, checkInMember,
+  type InstructorState, type ClaimState,
 } from "./actions";
 
 function Result({ state }: { state: InstructorState }) {
@@ -113,6 +113,35 @@ export function ApplyForShift({ occurrenceId }: { occurrenceId: string }) {
       <input type="hidden" name="occurrence_id" value={occurrenceId} />
       <CardAction>I can take it</CardAction>
       <Result state={state} />
+    </form>
+  );
+}
+
+/**
+ * Claiming (149). Claim it → staff approve. Over the core cap it does not
+ * refuse: the button becomes "Ask anyway" with the numbers, and the second
+ * press records the over-cap flag for the studio.
+ */
+export function ClaimClass({ occurrenceId }: { occurrenceId: string }) {
+  const [state, action] = useFormState<ClaimState, FormData>(claimClass, null);
+  const overCap = state && "overCap" in state ? state.overCap : null;
+  return (
+    <form action={action} className="mt-2">
+      <input type="hidden" name="occurrence_id" value={occurrenceId} />
+      {overCap ? (
+        <>
+          <p className="text-[12px] leading-[17px] text-ink"
+             style={{ borderLeft: "3px solid var(--accent)", paddingLeft: 8 }}>
+            That is your <span className="num">{overCap.cap}</span>{overCap.cap === 1 ? "" : ""} core
+            {" "}{overCap.cap === 1 ? "class" : "classes"} for the week already. You can still put your name forward — the studio decides.
+          </p>
+          <input type="hidden" name="over_cap_ack" value="1" />
+          <div className="mt-2"><CardActionOutline>Ask anyway</CardActionOutline></div>
+        </>
+      ) : (
+        <CardAction>Claim it</CardAction>
+      )}
+      {state && ("error" in state || "ok" in state) && <Result state={state as InstructorState} />}
     </form>
   );
 }

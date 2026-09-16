@@ -61,6 +61,28 @@ export default async function Applications() {
   }));
   const reliability = new Map(relEntries);
 
+  // Claiming (149): when the studio runs claiming, each claimant carries where
+  // they stand — "core · 1 of 3 this week", or "over cap · 3 of 3" — which is the
+  // fact that decides a core approval. Fetched per shift (the tier and cap are
+  // per occurrence). Absent for a studio on the assigned model.
+  type Claimant = {
+    instructor_id: string; core_this_week: number; core_cap: number;
+    flex_this_week: number; over_cap: boolean; qualified: boolean;
+  };
+  const { data: claimingOn } = await supabase.rpc("claiming_enabled", { p_studio_id: ctx.studioId });
+  const rankByOcc = new Map<string, { tier: string; byInstr: Map<string, Claimant> }>();
+  if (claimingOn) {
+    const entries = await Promise.all([...byOcc.keys()].map(async (occId) => {
+      const { data } = await supabase.rpc("claim_ranking", { p_occurrence_id: occId });
+      const r = data as unknown as { tier: string; claimants: Claimant[] } | null;
+      return [occId, {
+        tier: r?.tier ?? "core",
+        byInstr: new Map((r?.claimants ?? []).map((c) => [c.instructor_id, c])),
+      }] as const;
+    }));
+    for (const [k, v] of entries) rankByOcc.set(k, v);
+  }
+
   const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone)}`;
 
   return (
@@ -107,6 +129,24 @@ export default async function Applications() {
                                   {" "}· {r.short_notice} at short notice
                                 </span>
                               )}
+                            </span>
+                          );
+                        })()}
+                        {claimingOn && (() => {
+                          const rank = rankByOcc.get(occId);
+                          const c = rank?.byInstr.get(a.instructor_id);
+                          if (!c) return null;
+                          const core = rank!.tier === "core";
+                          return (
+                            <span className="mt-0.5 block text-[12px] leading-4 text-ink-3">
+                              {core ? (
+                                <>core · <span className="num">{c.core_this_week}</span> of{" "}
+                                  <span className="num">{c.core_cap}</span> this week
+                                  {c.over_cap && <span className="text-ink-2"> · over cap</span>}</>
+                              ) : (
+                                <>{rank!.tier === "flex" ? "flex" : "always"} · <span className="num">{c.flex_this_week}</span> flex this week</>
+                              )}
+                              {!c.qualified && <span className="text-ink-2"> · not down to teach this</span>}
                             </span>
                           );
                         })()}
