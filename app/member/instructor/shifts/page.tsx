@@ -1,27 +1,15 @@
-import Link from "next/link";
 import { instructorScreen, studioToday } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
-import { ApplyForShift, ClaimClass, WithdrawApplication } from "../actions-ui";
+import { ApplyForShift, WithdrawApplication } from "../actions-ui";
+import ClaimCalendar, { type MonthBlock, type Terms } from "@/components/instructor/claim-calendar";
 
 export const dynamic = "force-dynamic";
 
-type ClaimRow = {
-  id: string; starts_at: string; date: string; time: string;
-  class_name: string; duration_minutes: number; room: string | null;
-  spaces_left: number; capacity: number; tier: string;
-  qualified: boolean; available: boolean; valid: boolean; mine: boolean; clashes: boolean;
-};
-type MonthBlock = { month: string; can_claim: boolean; reason: string | null; classes: ClaimRow[] };
 type Horizon = {
   horizon_days: number; core_cap: number;
   standing: { core: number; flex: number };
   months: MonthBlock[];
 };
-
-// ● core, ○ flex, ◆ always — a shape, not a colour (the calendar's rule; colour
-// is already staffing there and the studio's own class colour on the grid).
-const tierMark = (t: string) => (t === "flex" ? "○" : t === "always" ? "◆" : "●");
-const tierWord = (t: string) => (t === "flex" ? "flex" : t === "always" ? "always runs" : "core");
 
 /**
  * SHIFTS — two models, decided by the studio's `claiming_enabled` switch.
@@ -43,115 +31,26 @@ export default async function ShiftsPage() {
 
   // ---- CLAIMING MODEL -------------------------------------------------------
   if (claimingOn) {
-    const { data } = await supabase.rpc("instructor_claim_horizon", { p_instructor_id: ctx.instructor_id });
+    const [{ data }, { data: t }] = await Promise.all([
+      supabase.rpc("instructor_claim_horizon", { p_instructor_id: ctx.instructor_id }),
+      supabase.rpc("claim_guarantee_terms", { p_instructor_id: ctx.instructor_id }),
+    ]);
     const hz = data as unknown as Horizon | null;
     const months = hz?.months ?? [];
     const mineCount = months.reduce((n, m) => n + m.classes.filter((c) => c.mine).length, 0);
 
-    const monthLabel = (m: string) =>
-      new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
-        .format(new Date(`${m}-01T12:00:00Z`));
-    const monthName = (m: string) =>
-      new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" })
-        .format(new Date(`${m}-01T12:00:00Z`));
-    const dayLabel = (iso: string) =>
-      new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
-        .format(new Date(`${iso}T12:00:00Z`));
-
     return (
-      <InstructorShell ctx={ctx} title="Claim classes" badges={{ "/instructor/shifts": mineCount }}>
-        {/* Where they stand this week — said once, at the top. */}
-        <div className="m-card mb-4 px-4 py-3">
-          <p className="text-[14px] leading-5 text-ink">
-            This week: <span className="num font-semibold">{hz?.standing.core ?? 0}</span> of{" "}
-            <span className="num">{hz?.core_cap ?? 0}</span> core{" "}
-            {(hz?.core_cap ?? 0) === 1 ? "class" : "classes"} claimed.
-            {(hz?.standing.flex ?? 0) > 0 && (
-              <> <span className="num">{hz?.standing.flex}</span> flex.</>
-            )}
-          </p>
-          <p className="m-sub mt-0.5 text-ink-3">
-            Core is capped per week; flex has no limit. The studio approves every claim.
-          </p>
-        </div>
-
-        {months.length === 0 && (
-          <div className="m-card px-4 py-6">
-            <p className="text-[15px] leading-6 text-ink">Nothing to claim just now.</p>
-          </div>
-        )}
-
-        {months.map((mb) => (
-          <section key={mb.month} className="mb-5">
-            <h2 className="m-sub mb-2 px-1 font-semibold text-ink-2">{monthLabel(mb.month)}</h2>
-
-            {!mb.can_claim ? (
-              // The actionable state — NOT a blank month. Same relationship the
-              // validity window enforces: no availability for that month, no
-              // claiming into it, so ask for the availability.
-              <div className="m-card px-4 py-3.5">
-                <p className="text-[15px] leading-[22px] text-ink">
-                  Send us your {monthName(mb.month)} availability and these open up.
-                </p>
-                <p className="m-sub mt-0.5 text-ink-3">
-                  We can only put you on classes in a month you have told us you can work.
-                </p>
-                <Link href="/instructor/availability"
-                      className="m-tap mt-3 inline-flex items-center text-[14px] font-medium text-[color:var(--accent-text)] underline underline-offset-4">
-                  Add {monthName(mb.month)} availability →
-                </Link>
-              </div>
-            ) : mb.classes.length === 0 ? (
-              <div className="m-card px-4 py-4">
-                <p className="text-[14px] leading-5 text-ink-2">Nothing open in {monthName(mb.month)} right now.</p>
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {mb.classes.map((c) => (
-                  <li key={c.id} className="m-card px-3 py-3">
-                    <div className="flex items-baseline gap-3">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] leading-5 text-ink">
-                          <span aria-hidden className="text-ink-2">{tierMark(c.tier)}</span>{" "}
-                          {c.class_name}
-                        </span>
-                        <span className="m-sub block text-ink-3">
-                          {dayLabel(c.date)} · <span className="num">{c.time}</span>
-                          {c.room ? ` · ${c.room}` : ""} · {tierWord(c.tier)}
-                        </span>
-                      </span>
-                      <span className="num shrink-0 text-[13px] leading-5 text-ink-2">
-                        {c.capacity - c.spaces_left}/{c.capacity}
-                      </span>
-                    </div>
-
-                    {/* Why it might not be a clean fit — labelled, never hidden. */}
-                    {(!c.qualified || !c.available || c.clashes) && !c.mine && (
-                      <p className="m-sub mt-1 text-ink-3">
-                        {[
-                          !c.qualified && "not one you are down to teach",
-                          c.clashes && "clashes with another you are taking",
-                          !c.available && "outside the hours you gave us",
-                        ].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-
-                    {c.mine ? (
-                      <>
-                        <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-                          You have claimed it. The studio decides.
-                        </p>
-                        <WithdrawApplication occurrenceId={c.id} />
-                      </>
-                    ) : (
-                      <ClaimClass occurrenceId={c.id} />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
+      <InstructorShell ctx={ctx} title="Claim" badges={{ "/instructor/shifts": mineCount }}>
+        <ClaimCalendar
+          months={months}
+          coreCap={hz?.core_cap ?? 0}
+          standingCore={hz?.standing.core ?? 0}
+          standingFlex={hz?.standing.flex ?? 0}
+          terms={t as unknown as Terms}
+          currency={ctx.currency}
+          today={studioToday(ctx.timezone)}
+          studioName={ctx.studio_name}
+        />
       </InstructorShell>
     );
   }

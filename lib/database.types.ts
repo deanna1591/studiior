@@ -6452,6 +6452,10 @@ export type Database = {
         Returns: string
       }
       choose_pay_at_desk: { Args: { p_booking_id: string }; Returns: Json }
+      claim_guarantee_terms: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
       claim_instructor_account: {
         Args: { p_full_name?: string; p_password: string; p_token: string }
         Returns: Json
