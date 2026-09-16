@@ -266,4 +266,20 @@ select expect_text('Delta (no classes) -> empty',
   public_schedule('ec40-delta', 7)::jsonb ->> 'state', 'empty');
 reset role;
 
+-- =============================================================================
+-- 9. THE WINDOW IS THE STUDIO'S BOOKING WINDOW (152), never a hardcoded fortnight
+-- =============================================================================
+reset role;
+update studio_settings set booking_window_days = 21
+  where studio_id = (select id from studios where slug = 'ec40-alpha');
+delete from public_schedule_cache where slug = 'ec40-alpha';  -- window changed
+set role anon;
+select expect_num('default window (no p_days) is the studio''s booking window',
+  (public_schedule('ec40-alpha')::jsonb ->> 'window_days')::int, 21);
+select expect_num('a larger p_days is clamped DOWN to the booking window',
+  (public_schedule('ec40-alpha', 90)::jsonb ->> 'window_days')::int, 21);
+select expect_num('a smaller p_days is honoured (a studio may show fewer days)',
+  (public_schedule('ec40-alpha', 3)::jsonb ->> 'window_days')::int, 3);
+reset role;
+
 select 'public_schedule_test: all assertions passed' as done;

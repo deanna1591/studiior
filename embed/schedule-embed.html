@@ -18,7 +18,10 @@
   var SUPABASE_URL      = "https://YOUR-PROJECT.supabase.co";
   var SUPABASE_ANON_KEY = "YOUR-PUBLISHABLE-KEY";
   var STUDIO_SLUG       = "your-studio-slug";
-  var DAYS              = 7;   // how many days ahead to show (1–14)
+  // How many days ahead to show. Leave null to show your full booking window —
+  // exactly as far ahead as members can book (set in the app). Set a smaller
+  // number to show fewer days; you cannot show more than the booking window.
+  var DAYS              = null;
   // -------------------------------------------------------------------------
 
   var mount = document.getElementById("studiior-schedule");
@@ -69,7 +72,7 @@
   fetch(SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/rpc/public_schedule", {
     method: "POST",
     headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-    body: JSON.stringify({ p_slug: STUDIO_SLUG, p_days: DAYS })
+    body: JSON.stringify({ p_slug: STUDIO_SLUG, p_days: DAYS })  // null -> the studio's booking window
   })
   // A bad key / project URL is an HTTP error, and a network failure rejects —
   // both must read "could not load", NEVER the same blank box as "no classes".
