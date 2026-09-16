@@ -104,6 +104,25 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
   ('ec40ec40-0000-0000-0000-0000bbbb00a1','ec40ec40-0000-0000-0000-0000000000a1','ec40ec40-0000-0000-0000-00000cccc0a1',
    'ec40ec40-0000-0000-0000-00000aaaa0a1'::uuid,'booked','drop_in', now());
 
+-- Charlie: a studio whose timetable starts 30 days out (opening / sparse), with
+-- the one class UNASSIGNED — proves the look-ahead (upcoming) AND that a null
+-- instructor is omitted, never advertised. Delta: no classes at all (empty).
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('ec40ec40-0000-0000-0000-0000000000c1','Charlie Studio','ec40-charlie','Europe/Prague','CZK','active'),
+  ('ec40ec40-0000-0000-0000-0000000000d1','Delta Studio','ec40-delta','Europe/Prague','CZK','active');
+insert into studio_settings (studio_id) values
+  ('ec40ec40-0000-0000-0000-0000000000c1'), ('ec40ec40-0000-0000-0000-0000000000d1');
+insert into locations (id, studio_id, name, is_primary) values
+  ('ec40ec40-0000-0000-0000-00000000000c','ec40ec40-0000-0000-0000-0000000000c1','Main',true);
+insert into class_types (id, studio_id, name, description, color, duration_minutes, default_capacity) values
+  ('ec40ec40-0000-0000-0000-0000cccc00c1','ec40ec40-0000-0000-0000-0000000000c1','Charlie Flow','Later.','#654321',50,10);
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
+values
+  ('ec40ec40-0000-0000-0000-00000cccc0c1','ec40ec40-0000-0000-0000-0000000000c1','ec40ec40-0000-0000-0000-00000000000c',
+   'ec40ec40-0000-0000-0000-0000cccc00c1', null, null, 'Charlie Flow', 10, 0,
+   ((current_date+30)+time '09:00') at time zone 'Europe/Prague', ((current_date+30)+time '09:50') at time zone 'Europe/Prague','scheduled');
+
 -- =============================================================================
 -- 1. THE ENDPOINT IS ANON-REACHABLE, and returns Alpha's own schedule
 -- =============================================================================
@@ -158,6 +177,10 @@ select expect_false('the bio never appears', current_setting('t.a') like '%BIOLE
 select set_config('t.b', public_schedule('ec40-bravo', 7)::text, false);
 select expect_num('Bravo (publication on, month unpublished) returns nothing',
   jsonb_array_length(current_setting('t.b')::jsonb -> 'classes'), 0);
+-- ...and SAYS it is unpublished, not merely empty — this is the case a studio
+-- pasting the embed before publishing must be able to read.
+select expect_text('...with state=unpublished',
+  current_setting('t.b')::jsonb ->> 'state', 'unpublished');
 
 reset role;
 -- Publish Bravo's month (the class's own local month), the way the studio would.
@@ -172,6 +195,7 @@ set role anon;
 select set_config('t.b2', public_schedule('ec40-bravo', 7)::text, false);
 select expect_num('once the month is published, Bravo returns its class',
   jsonb_array_length(current_setting('t.b2')::jsonb -> 'classes'), 1);
+select expect_text('...and state is in_window', current_setting('t.b2')::jsonb ->> 'state', 'in_window');
 
 -- =============================================================================
 -- 5. TWO STUDIOS RETURN DIFFERENT SCHEDULES
@@ -217,5 +241,29 @@ select expect_true('public_schedule is one of them',
 -- The cache table is closed to clients.
 select expect_false('anon cannot read the cache table directly',
   has_table_privilege('anon', 'public_schedule_cache', 'select'));
+
+-- =============================================================================
+-- 8. STATES — in_window / upcoming (look-ahead) / empty, and a null instructor
+--    is OMITTED, never "TBC"
+-- =============================================================================
+set role anon;
+select set_config('t.cha', public_schedule('ec40-charlie', 7)::text, false);
+select expect_text('Alpha this week -> in_window',
+  current_setting('t.a')::jsonb ->> 'state', 'in_window');
+select expect_text('Charlie (classes 30 days out) -> upcoming',
+  current_setting('t.cha')::jsonb ->> 'state', 'upcoming');
+select expect_true('...upcoming carries next_from',
+  (current_setting('t.cha')::jsonb ->> 'next_from') is not null);
+select expect_num('...and returns the next class rather than nothing',
+  jsonb_array_length(current_setting('t.cha')::jsonb -> 'classes'), 1);
+-- Charlie's class is unassigned: the instructor line is null (omitted by the
+-- embed), never advertised as "TBC" (Decision 17).
+select expect_true('an unassigned class exposes a NULL instructor (nothing to advertise)',
+  ((current_setting('t.cha')::jsonb -> 'classes') -> 0 ->> 'instructor_first_name') is null);
+select expect_true('...and no avatar either',
+  ((current_setting('t.cha')::jsonb -> 'classes') -> 0 ->> 'instructor_avatar_url') is null);
+select expect_text('Delta (no classes) -> empty',
+  public_schedule('ec40-delta', 7)::jsonb ->> 'state', 'empty');
+reset role;
 
 select 'public_schedule_test: all assertions passed' as done;
