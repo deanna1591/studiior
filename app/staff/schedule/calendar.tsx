@@ -88,7 +88,7 @@ type WallEvent = CalEvent & { start: Date; end: Date };
 
 export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
-  quietPct, quietWindowDays, fullPct, showTier,
+  quietPct, quietWindowDays, fullPct, showTier, coreEnabled, flexEnabled,
   anchor, today, view, minHour, maxHour, weekStartsOn,
 }: {
   events: CalEvent[];
@@ -96,6 +96,9 @@ export default function ScheduleCalendar({
   /** For the slot-click form. Empty means the studio has none yet. */
   classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
   rooms: { id: string; name: string; capacity: number }[];
+  /** The two guarantee switches, for the create form's tier control. */
+  coreEnabled: boolean;
+  flexEnabled: boolean;
   timeZone: string;
   deadlineHours: number;
   /**
@@ -566,6 +569,8 @@ export default function ScheduleCalendar({
           draft={slot}
           classTypes={classTypes}
           rooms={rooms}
+          coreEnabled={coreEnabled}
+          flexEnabled={flexEnabled}
           onCancel={() => setSlot(null)}
           onDone={() => { setSlot(null); startTransition(() => router.refresh()); }}
         />

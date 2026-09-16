@@ -40,6 +40,10 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
   const instructorId = String(fd.get("instructor_id") ?? "");
   const roomId = String(fd.get("room_id") ?? "");
   const capacity = String(fd.get("capacity") ?? "").trim();
+  // 144: the tier control is only present when the studio has guarantees/flex on;
+  // absent, nothing is sent and the class is created core.
+  const tier = String(fd.get("tier") ?? "").trim();
+  const minBookings = String(fd.get("min_bookings") ?? "").trim();
   if (!classTypeId) return { ok: false, message: "Pick what kind of class this is." };
   if (!startsAt || !endsAt) return { ok: false, message: "That slot has no time on it." };
 
@@ -54,6 +58,8 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
     p_instructor_id: instructorId || undefined,
     p_room_id: roomId || undefined,
     p_capacity: capacity === "" ? undefined : Number(capacity),
+    p_tier: tier === "" ? undefined : (tier as "core" | "flex" | "always"),
+    p_min_bookings: minBookings === "" ? undefined : Number(minBookings),
   });
   if (error) return { ok: false, message: say(error.message) };
 
@@ -92,6 +98,9 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
     occurrenceId: r.occurrence_id!,
     warnings,
     message: `Added, ${r.local_when}.`
+      + (warnings.includes("standalone_flex")
+          ? " It is a standalone flex class — no other class of that instructor beside it — so it carries a standby fee."
+          : "")
       + (warnings.includes("outside_availability")
           ? " It is outside the hours they have said they work — they have not been told."
           : ""),

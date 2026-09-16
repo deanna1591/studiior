@@ -344,6 +344,8 @@ export default async function Schedule({
           // control. A studio using neither sees no mark and no extra sentence
           // in the legend.
           showTier={(settings?.guarantees_enabled ?? false) || (settings?.flex_enabled ?? false)}
+          coreEnabled={settings?.guarantees_enabled ?? false}
+          flexEnabled={settings?.flex_enabled ?? false}
           anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
         />

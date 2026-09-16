@@ -9,11 +9,13 @@ export default async function NewClass() {
   const screen = await staffScreen("/classes/new");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
-  const [{ data: classTypes }, { data: instructors }, { data: rooms }] = await Promise.all([
+  const [{ data: classTypes }, { data: instructors }, { data: rooms }, { data: settings }] = await Promise.all([
     supabase.from("class_types").select("id, name, default_capacity, duration_minutes")
       .eq("status", "active").order("name"),
     supabase.from("instructors").select("id, display_name").eq("status", "active").order("display_name"),
     supabase.from("rooms").select("id, name, capacity").eq("status", "active").order("name"),
+    supabase.from("studio_settings").select("guarantees_enabled, flex_enabled")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
   return (
@@ -27,6 +29,8 @@ export default async function NewClass() {
         classTypes={classTypes ?? []}
         instructors={instructors ?? []}
         rooms={rooms ?? []}
+        coreEnabled={settings?.guarantees_enabled ?? false}
+        flexEnabled={settings?.flex_enabled ?? false}
       />
     </AppShell>
   );

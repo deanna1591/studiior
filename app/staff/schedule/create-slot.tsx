@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createOnSlot, type CreateState } from "./create-actions";
+import TierField from "@/components/tier-field";
 
 function Add() {
   const { pending } = useFormStatus();
@@ -35,11 +36,13 @@ export type SlotDraft = {
  * the time and the instructor come from where the click landed.
  */
 export default function CreateOnSlot({
-  draft, classTypes, rooms, onDone, onCancel,
+  draft, classTypes, rooms, coreEnabled, flexEnabled, onDone, onCancel,
 }: {
   draft: SlotDraft;
   classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
   rooms: { id: string; name: string; capacity: number }[];
+  coreEnabled: boolean;
+  flexEnabled: boolean;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -137,6 +140,10 @@ export default function CreateOnSlot({
           <input name="capacity" type="number" min={1} max={200}
                  className="w-28 rounded border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
         </label>
+
+        <div className="mt-4">
+          <TierField coreEnabled={coreEnabled} flexEnabled={flexEnabled} />
+        </div>
 
         <div className="mt-4 flex items-center gap-3">
           <Add />

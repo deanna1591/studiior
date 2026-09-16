@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { createClassOccurrence } from "../../actions";
+import { createClassOccurrence, type CreateClassState } from "../../actions";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import TierField from "@/components/tier-field";
 
 type ClassType = { id: string; name: string; default_capacity: number; duration_minutes: number };
 
@@ -13,18 +15,36 @@ function Submit() {
 }
 
 export default function CreateClassForm({
-  classTypes, instructors, rooms,
+  classTypes, instructors, rooms, coreEnabled, flexEnabled,
 }: {
   classTypes: ClassType[];
   instructors: { id: string; display_name: string }[];
   rooms: { id: string; name: string; capacity: number }[];
+  coreEnabled: boolean;
+  flexEnabled: boolean;
 }) {
-  const [error, action] = useFormState(createClassOccurrence, null);
+  const [state, action] = useFormState<CreateClassState, FormData>(createClassOccurrence, null);
   const [capacity, setCapacity] = useState(classTypes[0]?.default_capacity ?? 8);
+
+  // A clean create redirects to the dashboard; a success we still see here
+  // carries a warning worth reading (a standalone flex, or outside hours).
+  if (state && state.ok) {
+    return (
+      <div className="max-w-md space-y-4">
+        <Notice kind="ok">{state.message}</Notice>
+        <div className="flex gap-3">
+          <Link href="/" className={buttonClass}>Back to the dashboard</Link>
+          <Link href="/schedule" className="text-[13px] text-ink-2 underline underline-offset-4 self-center">
+            See it on the schedule
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form action={action} className="max-w-md space-y-4">
-      {error && <Notice kind="error">{error}</Notice>}
+      {state && !state.ok && <Notice kind="error">{state.message}</Notice>}
 
       <Field label="Class type">
         <select
@@ -67,6 +87,10 @@ export default function CreateClassForm({
           value={capacity} onChange={(e) => setCapacity(Number(e.target.value))}
         />
       </Field>
+
+      {/* Only shown when the studio has guarantees or flex on; absent otherwise,
+          and the class is created core exactly as before. */}
+      <TierField coreEnabled={coreEnabled} flexEnabled={flexEnabled} />
 
       <p className="text-xs text-ink-3">
         The date and time are studio-local. They are converted to UTC at the instant

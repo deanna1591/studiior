@@ -6471,6 +6471,19 @@ export type Database = {
         }
         Returns: Json
       }
+      co: {
+        Args: {
+          ct: string
+          instr: string
+          minb: number
+          room: string
+          startt: string
+          studio: string
+          tier: string
+          uid: string
+        }
+        Returns: Json
+      }
       commitment_pending: {
         Args: { p_studio_id: string }
         Returns: {
@@ -6577,9 +6590,11 @@ export type Database = {
           p_class_type_id: string
           p_ends_at: string
           p_instructor_id?: string
+          p_min_bookings?: number
           p_room_id?: string
           p_starts_at: string
           p_studio_id: string
+          p_tier?: Database["public"]["Enums"]["guarantee_tier"]
         }
         Returns: Json
       }
@@ -6688,12 +6703,12 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
       expect_true: {
         Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_txt: {
+        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       extend_trial: {
@@ -7400,7 +7415,6 @@ export type Database = {
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
-      run_sweep: { Args: { label: string; sql: string }; Returns: undefined }
       say_count: { Args: { n: number }; Returns: string }
       schedule_range: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
@@ -7850,6 +7864,7 @@ export type Database = {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
+      warns: { Args: { res: Json; w: string }; Returns: boolean }
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
