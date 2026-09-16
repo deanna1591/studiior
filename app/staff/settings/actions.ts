@@ -114,9 +114,14 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
   const flex = on("flex_enabled");
   const coreMin = int("core_min_bookings");
   const coreCut = int("core_cutoff_hours");
-  const corePct = int("core_unmet_pay_pct");
-  // A FLAT slot-holding amount (whole units -> cents). Blank means null, which
-  // is what makes the percentage the fallback; a flat amount wins where set.
+  // The holding fee is a PAIR of alternatives, and EITHER half may be blank:
+  // a percentage of base, a flat amount, or both (flat wins). Blank pct means
+  // null — "no percentage", the mirror of a null flat — not zero, and not a
+  // value the field forces. The only thing refused is both blank at once, and
+  // only when guarantees is on (below).
+  const corePctRaw = String(fd.get("core_unmet_pay_pct") ?? "").trim();
+  const corePct = corePctRaw === "" ? null : Number(corePctRaw);
+  // A FLAT slot-holding amount (whole units -> cents). Blank means null.
   const coreFlatRaw = String(fd.get("core_unmet_pay_flat") ?? "").trim();
   const coreFlat = coreFlatRaw === "" ? null : Math.round(Number(coreFlatRaw) * 100);
   const flexMin = int("flex_min_bookings");
@@ -130,10 +135,17 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
   const bad =
     !Number.isFinite(coreMin) || coreMin < 0 ? "A core minimum cannot be negative."
     : !Number.isFinite(coreCut) || coreCut < 0 ? "A cutoff cannot be negative."
-    : !Number.isFinite(corePct) || corePct < 0 || corePct > 100
+    // The percentage is validated only when it is given — blank is allowed and
+    // means null, so long as the flat is set (checked below).
+    : corePct !== null && (!Number.isFinite(corePct) || corePct < 0 || corePct > 100)
       ? "The holding rate is a percentage between 0 and 100."
     : coreFlat !== null && (!Number.isFinite(coreFlat) || coreFlat < 0)
       ? "A flat holding fee cannot be negative."
+    // The pair: at least one half must be set, and only when guarantees is on —
+    // with it off nothing reads either, and the collapsed panel posts whatever
+    // was stored (which may be two nulls for a studio that never set core).
+    : guarantees && corePct === null && coreFlat === null
+      ? "Set a holding fee when it does not run — a percentage of base, a flat amount, or both. A flat amount wins where you set one."
     : !Number.isFinite(flexMin) || flexMin < 0 ? "A flex minimum cannot be negative."
     : mode === "hours_before" && (!Number.isFinite(flexHours) || flexHours < 0)
       ? "A flex cutoff in hours cannot be negative."
@@ -153,7 +165,7 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
       flex_enabled: flex,
       core_min_bookings: Math.floor(coreMin),
       core_cutoff_hours: Math.floor(coreCut),
-      core_unmet_pay_pct: Math.floor(corePct),
+      core_unmet_pay_pct: corePct === null ? null : Math.floor(corePct),
       core_unmet_pay_cents: coreFlat,
       flex_min_bookings: Math.floor(flexMin),
       flex_deadline_mode: mode,

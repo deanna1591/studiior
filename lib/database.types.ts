@@ -5631,7 +5631,7 @@ export type Database = {
           core_cutoff_hours: number
           core_min_bookings: number
           core_unmet_pay_cents: number | null
-          core_unmet_pay_pct: number
+          core_unmet_pay_pct: number | null
           cover_escalation_hours: number
           created_at: string
           dropin_payment_window_minutes: number
@@ -5711,7 +5711,7 @@ export type Database = {
           core_cutoff_hours?: number
           core_min_bookings?: number
           core_unmet_pay_cents?: number | null
-          core_unmet_pay_pct?: number
+          core_unmet_pay_pct?: number | null
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
@@ -5791,7 +5791,7 @@ export type Database = {
           core_cutoff_hours?: number
           core_min_bookings?: number
           core_unmet_pay_cents?: number | null
-          core_unmet_pay_pct?: number
+          core_unmet_pay_pct?: number | null
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
@@ -6702,6 +6702,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
       }
       expect_true: {
         Args: { actual: boolean; label: string }

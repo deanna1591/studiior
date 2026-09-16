@@ -26,7 +26,7 @@ export default async function GuaranteesSettings() {
           flex_enabled: settings?.flex_enabled ?? false,
           core_min_bookings: settings?.core_min_bookings ?? 1,
           core_cutoff_hours: settings?.core_cutoff_hours ?? 12,
-          core_unmet_pay_pct: settings?.core_unmet_pay_pct ?? 50,
+          core_unmet_pay_pct: settings?.core_unmet_pay_pct ?? null,
           core_unmet_pay_cents: settings?.core_unmet_pay_cents ?? null,
           flex_min_bookings: settings?.flex_min_bookings ?? 1,
           flex_deadline_mode: settings?.flex_deadline_mode ?? "previous_day_at",

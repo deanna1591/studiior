@@ -10,16 +10,16 @@ function Save() {
   return <button className={buttonQuietClass} disabled={pending}>{pending ? "Saving…" : "Save"}</button>;
 }
 
-function Num({ name, label, value, min, max, suffix, w = "w-24" }: {
+function Num({ name, label, value, min, max, suffix, w = "w-24", req = true, placeholder }: {
   name: string; label: string; value: number | string; min?: number; max?: number;
-  suffix?: string; w?: string;
+  suffix?: string; w?: string; req?: boolean; placeholder?: string;
 }) {
   return (
     <label className="text-[13px] leading-[20px] text-ink-2">
       <span className="mb-1 block">{label}</span>
       <span className="flex items-baseline gap-1.5">
-        <input name={name} type="number" min={min} max={max} step="any" required
-               defaultValue={value} className={`${inputClass} ${w}`} />
+        <input name={name} type="number" min={min} max={max} step="any" required={req}
+               defaultValue={value} placeholder={placeholder} className={`${inputClass} ${w}`} />
         {suffix && <span className="text-[12px] text-ink-3">{suffix}</span>}
       </span>
     </label>
@@ -38,7 +38,7 @@ function Num({ name, label, value, min, max, suffix, w = "w-24" }: {
 export default function GuaranteesPanel({ s, currency }: {
   s: {
     guarantees_enabled: boolean; flex_enabled: boolean;
-    core_min_bookings: number; core_cutoff_hours: number; core_unmet_pay_pct: number;
+    core_min_bookings: number; core_cutoff_hours: number; core_unmet_pay_pct: number | null;
     core_unmet_pay_cents: number | null;
     flex_min_bookings: number; flex_deadline_mode: string; flex_deadline_time: string;
     flex_deadline_hours: number; flex_unmet_pay_cents: number;
@@ -84,7 +84,8 @@ export default function GuaranteesPanel({ s, currency }: {
             <Num name="core_cutoff_hours" label="Decided" value={s.core_cutoff_hours}
                  min={0} max={336} suffix="hours before the class" />
             <Num name="core_unmet_pay_pct" label="If it does not run, pay"
-                 value={s.core_unmet_pay_pct} min={0} max={100} suffix="% of base" />
+                 value={s.core_unmet_pay_pct ?? ""} min={0} max={100} suffix="% of base"
+                 req={false} placeholder="—" />
             <label className="text-[13px] leading-[20px] text-ink-2">
               <span className="mb-1 block">or a flat amount</span>
               <span className="inline-flex items-center gap-1.5">
@@ -98,9 +99,10 @@ export default function GuaranteesPanel({ s, currency }: {
             <p className="w-full max-w-[58ch] text-[12px] leading-[18px] text-ink-3">
               Counted back from each class, deliberately: it mirrors the
               cancellation window, and by then the headcount is effectively final.
-              A flat amount wins where you set one; leave it blank to use the
-              percentage — &ldquo;pay 400 regardless&rdquo; is not a percentage of
-              a rate that changes.
+              Set a percentage of base, a flat amount, or both — a flat amount
+              wins where you set one, so &ldquo;pay 400 regardless&rdquo; needs no
+              percentage. Set at least one; leaving both blank is the one thing
+              this will not save.
             </p>
           </div>
         )}
@@ -175,7 +177,11 @@ export default function GuaranteesPanel({ s, currency }: {
         <>
           <input type="hidden" name="core_min_bookings" value={s.core_min_bookings} />
           <input type="hidden" name="core_cutoff_hours" value={s.core_cutoff_hours} />
-          <input type="hidden" name="core_unmet_pay_pct" value={s.core_unmet_pay_pct} />
+          <input type="hidden" name="core_unmet_pay_pct" value={s.core_unmet_pay_pct ?? ""} />
+          {/* Post the flat too, or collapsing the panel would null a flat fee the
+              studio had set — the same wipe the other hidden fields prevent. */}
+          <input type="hidden" name="core_unmet_pay_flat"
+                 value={s.core_unmet_pay_cents == null ? "" : s.core_unmet_pay_cents / 100} />
         </>
       )}
       {!flex && (
