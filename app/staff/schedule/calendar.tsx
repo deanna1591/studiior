@@ -688,6 +688,7 @@ export default function ScheduleCalendar({
               weekday: "long", day: "numeric", month: "long",
               hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
             }).format(new Date(selected.startsAt)),
+            instructorId: selected.resourceId === UNASSIGNED ? null : selected.resourceId,
             instructorName: selected.resourceId === UNASSIGNED
               ? null : instructorNames[selected.resourceId] ?? null,
             bookedCount: selected.bookedCount,
@@ -698,12 +699,22 @@ export default function ScheduleCalendar({
           }}
           onClose={() => setSelected(null)}
           onAssigned={(instructorId) => {
-            // Instant feedback: the class becomes assigned in place. The
-            // assignInstructor action also revalidates /schedule, so the
-            // server's own fresh events land right after and agree.
+            // Instant feedback: the class becomes assigned in place — whether it
+            // was unstaffed (assign) or already had someone (a swap). The action
+            // also revalidates /schedule, so the server's own fresh events land
+            // right after and agree.
             setEvents((prev) => prev.map((e) =>
               e.id === selected.id
                 ? { ...e, resourceId: instructorId, staffing: "assigned" }
+                : e));
+            setSelected(null);
+            startTransition(() => router.refresh());
+          }}
+          onUnassigned={() => {
+            // Opened as a shift: nobody on it, back in the Unassigned column.
+            setEvents((prev) => prev.map((e) =>
+              e.id === selected.id
+                ? { ...e, resourceId: UNASSIGNED, staffing: "open" }
                 : e));
             setSelected(null);
             startTransition(() => router.refresh());

@@ -2697,6 +2697,7 @@ export type Database = {
           bio: string | null
           certifications: Json
           color: string | null
+          core_weekly_cap: number | null
           created_at: string
           display_name: string
           id: string
@@ -2711,6 +2712,7 @@ export type Database = {
           bio?: string | null
           certifications?: Json
           color?: string | null
+          core_weekly_cap?: number | null
           created_at?: string
           display_name: string
           id?: string
@@ -2725,6 +2727,7 @@ export type Database = {
           bio?: string | null
           certifications?: Json
           color?: string | null
+          core_weekly_cap?: number | null
           created_at?: string
           display_name?: string
           id?: string
@@ -5311,6 +5314,7 @@ export type Database = {
           instructor_id: string
           note: string | null
           occurrence_id: string
+          over_cap: boolean
           status: string
           studio_id: string
           updated_at: string
@@ -5327,6 +5331,7 @@ export type Database = {
           instructor_id: string
           note?: string | null
           occurrence_id: string
+          over_cap?: boolean
           status?: string
           studio_id: string
           updated_at?: string
@@ -5343,6 +5348,7 @@ export type Database = {
           instructor_id?: string
           note?: string | null
           occurrence_id?: string
+          over_cap?: boolean
           status?: string
           studio_id?: string
           updated_at?: string
@@ -5644,11 +5650,13 @@ export type Database = {
           checkin_opens_minutes_before: number
           checkin_secret: string
           checkin_window_enforced: boolean
+          claiming_enabled: boolean
           commitment_shortfall_weeks: number
           conversion_attribution: string
           conversion_bonus_cents: number
           conversion_bonus_enabled: boolean
           conversion_window_days: number
+          core_claim_default_cap: number
           core_cutoff_hours: number
           core_min_bookings: number
           core_unmet_pay_cents: number | null
@@ -5724,11 +5732,13 @@ export type Database = {
           checkin_opens_minutes_before?: number
           checkin_secret?: string
           checkin_window_enforced?: boolean
+          claiming_enabled?: boolean
           commitment_shortfall_weeks?: number
           conversion_attribution?: string
           conversion_bonus_cents?: number
           conversion_bonus_enabled?: boolean
           conversion_window_days?: number
+          core_claim_default_cap?: number
           core_cutoff_hours?: number
           core_min_bookings?: number
           core_unmet_pay_cents?: number | null
@@ -5804,11 +5814,13 @@ export type Database = {
           checkin_opens_minutes_before?: number
           checkin_secret?: string
           checkin_window_enforced?: boolean
+          claiming_enabled?: boolean
           commitment_shortfall_weeks?: number
           conversion_attribution?: string
           conversion_bonus_cents?: number
           conversion_bonus_enabled?: boolean
           conversion_window_days?: number
+          core_claim_default_cap?: number
           core_cutoff_hours?: number
           core_min_bookings?: number
           core_unmet_pay_cents?: number | null
@@ -6299,7 +6311,11 @@ export type Database = {
       }
       anthropic_api_key: { Args: never; Returns: string }
       apply_for_shift: {
-        Args: { p_note?: string; p_occurrence_id: string }
+        Args: {
+          p_note?: string
+          p_occurrence_id: string
+          p_over_cap_ack?: boolean
+        }
         Returns: Json
       }
       approve_availability_submission: {
@@ -6460,6 +6476,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_ranking: { Args: { p_occurrence_id: string }; Returns: Json }
+      claiming_enabled: { Args: { p_studio_id: string }; Returns: boolean }
       claw_back_conversion_bonus: {
         Args: { p_member_id: string; p_reason: string }
         Returns: Json
@@ -6711,20 +6729,12 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
       expect_text: {
         Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
         Returns: undefined
       }
       extend_trial: {
@@ -6804,9 +6814,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_can_claim_month: {
+        Args: { p_instructor_id: string; p_month: string }
+        Returns: boolean
+      }
+      instructor_claimable: {
+        Args: { p_instructor_id: string; p_month: string }
+        Returns: Json
+      }
       instructor_confirm_class: {
         Args: { p_occurrence_id: string }
         Returns: Json
+      }
+      instructor_core_cap: {
+        Args: { p_instructor_id: string }
+        Returns: number
       }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
@@ -6870,6 +6892,10 @@ export type Database = {
             Args: { p_instructor_id: string; p_week_start?: string }
             Returns: Json
           }
+      instructor_week_claim_load: {
+        Args: { p_at: string; p_instructor_id: string }
+        Returns: Json
+      }
       instructor_weekly_load: {
         Args: { p_instructor_id: string; p_weeks?: number }
         Returns: {
@@ -6902,6 +6928,7 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_announcements: { Args: { p_studio_id: string }; Returns: Json }
@@ -7073,6 +7100,10 @@ export type Database = {
         Returns: boolean
       }
       notify_open_shifts: { Args: never; Returns: Json }
+      occurrence_claim_tier: {
+        Args: { p_occurrence_id: string }
+        Returns: string
+      }
       occurrence_guarantee: {
         Args: { p_occurrence_id: string }
         Returns: {
@@ -7305,6 +7336,10 @@ export type Database = {
       queue_waitlist_missed: { Args: { p_booking_id: string }; Returns: number }
       queue_waitlist_offer: { Args: { p_offer_id: string }; Returns: number }
       rank_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
+      reassign_occurrence: {
+        Args: { p_instructor_id: string; p_occurrence_id: string }
+        Returns: Json
+      }
       rebuild_member_timeline: {
         Args: { p_member_id: string }
         Returns: number

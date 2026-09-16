@@ -27,8 +27,9 @@ export async function assignCandidates(
       .eq("occurrence_id", occurrenceId).eq("status", "pending"),
   ]);
   if (!occ) return { error: "That class no longer exists." };
-  // Only an unstaffed, still-scheduled class has candidates to offer.
-  if (occ.status !== "scheduled" || occ.instructor_id) {
+  // A still-scheduled class has candidates — to fill it when unstaffed, or to
+  // swap the instructor when it is assigned. A cancelled class has none.
+  if (occ.status !== "scheduled") {
     return { candidates: [], pendingApplications: count ?? 0 };
   }
   const candidates = await computeAssignCandidates(supabase, occ, ctx.timeZone);

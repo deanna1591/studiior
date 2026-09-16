@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { assignInstructor, republishShift } from "@/app/staff/roster/actions";
+import { assignInstructor, reassignInstructor, republishShift, openShift } from "@/app/staff/roster/actions";
 import { assignCandidates } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
 
@@ -9,6 +9,7 @@ export type BlockFacts = {
   id: string;
   title: string;
   when: string;
+  instructorId: string | null;
   instructorName: string | null;
   bookedCount: number;
   capacity: number;
@@ -18,33 +19,39 @@ export type BlockFacts = {
 };
 
 /**
- * The Assign control, inline over the calendar block — the same control the
+ * The staffing control, inline over the calendar block — the same actions the
  * roster carries, in a second place. Clicking a block opens this rather than
- * navigating, so a gap can be filled without leaving the week.
+ * navigating, so a class can be staffed, swapped or opened without leaving the
+ * week.
  *
- * A bottom SHEET below 768 (the width the rail fix addressed — a floating panel
- * anchored to a block is fiddly and overflows there), a floating PANEL at 768+.
- * Both sit over a backdrop that closes on click or Escape.
+ * UNSTAFFED: assign someone, or email qualified instructors again.
+ * ASSIGNED: change the instructor (a swap), or unassign (open it as a shift).
+ * Both the assign and the swap go through move_occurrence() (the roster's
+ * actions), so the validity window, room/double-booking clashes and the
+ * availability warning apply identically to a drag. Candidates load on demand
+ * when the panel opens, ordered qualified-and-available first with the rest
+ * behind "show all", labelled rather than hidden.
  *
- * Candidates load on demand when the panel opens for an unstaffed class, so an
- * assigned class pays for none of it. Assigning goes through move_occurrence()
- * (the roster's `assignInstructor` action), and the calendar updates from the
- * success without a navigation.
+ * A bottom SHEET below 768, a floating PANEL at 768+; both over a backdrop that
+ * closes on click or Escape.
  */
 export default function BlockPanel({
-  facts, canManage, rosterHref, onAssigned, onClose,
+  facts, canManage, rosterHref, onAssigned, onUnassigned, onClose,
 }: {
   facts: BlockFacts;
   canManage: boolean;
   rosterHref: string;
   onAssigned: (instructorId: string, instructorName: string) => void;
+  onUnassigned: () => void;
   onClose: () => void;
 }) {
-  const unstaffed = facts.staffing !== "assigned";
+  const assigned = facts.staffing === "assigned";
   const [candidates, setCandidates] = useState<AssignCandidate[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [who, setWho] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [showUnassign, setShowUnassign] = useState(false);
+  const [reason, setReason] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
@@ -55,9 +62,10 @@ export default function BlockPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Load candidates only for an unstaffed class the caller can staff.
+  // Candidates for any class the caller can staff — to fill an unstaffed one or
+  // to swap the instructor on an assigned one.
   useEffect(() => {
-    if (!unstaffed || !canManage) return;
+    if (!canManage) return;
     let alive = true;
     assignCandidates(facts.id).then((r) => {
       if (!alive) return;
@@ -65,10 +73,13 @@ export default function BlockPanel({
       else setCandidates(r.candidates);
     });
     return () => { alive = false; };
-  }, [facts.id, unstaffed, canManage]);
+  }, [facts.id, canManage]);
 
-  const primary = (candidates ?? []).filter((c) => c.qualified && c.free);
-  const rest = (candidates ?? []).filter((c) => !(c.qualified && c.free));
+  // The current instructor is not a target to change TO, so they are dropped
+  // from the choices (and marked in the sentence above instead).
+  const choices = (candidates ?? []).filter((c) => c.id !== facts.instructorId);
+  const primary = choices.filter((c) => c.qualified && c.free);
+  const rest = choices.filter((c) => !(c.qualified && c.free));
   // Nobody both qualified and free → open the full list so the dropdown is not empty.
   useEffect(() => {
     if (candidates && primary.length === 0 && rest.length > 0) setShowAll(true);
@@ -81,20 +92,33 @@ export default function BlockPanel({
     return bits.length ? ` — ${bits.join(", ")}` : "";
   };
 
-  const doAssign = () => {
-    if (!who) { setMsg({ ok: false, text: "Pick who is teaching it." }); return; }
+  const runAssign = (action: typeof assignInstructor) => {
+    if (!who) { setMsg({ ok: false, text: assigned ? "Pick who to change it to." : "Pick who is teaching it." }); return; }
     const fd = new FormData();
     fd.set("occurrence_id", facts.id);
     fd.set("instructor_id", who);
     setMsg(null);
     start(async () => {
-      const r = await assignInstructor(null, fd);
+      const r = await action(null, fd);
       if (r?.ok) {
-        const name = candidates?.find((c) => c.id === who)?.display_name ?? "them";
+        const name = choices.find((c) => c.id === who)?.display_name ?? "them";
         onAssigned(who, name);
       } else {
-        setMsg({ ok: false, text: r?.message ?? "That could not be assigned." });
+        setMsg({ ok: false, text: r?.message ?? "That could not be done." });
       }
+    });
+  };
+
+  const doUnassign = () => {
+    if (!reason.trim()) { setMsg({ ok: false, text: "Say why — the instructor being taken off gets this." }); return; }
+    const fd = new FormData();
+    fd.set("occurrence_id", facts.id);
+    fd.set("reason", reason.trim());
+    setMsg(null);
+    start(async () => {
+      const r = await openShift(null, fd);
+      if (r?.ok) onUnassigned();
+      else setMsg({ ok: false, text: r?.message ?? "That could not be done." });
     });
   };
 
@@ -107,6 +131,44 @@ export default function BlockPanel({
       if (r) setMsg({ ok: r.ok, text: r.message });
     });
   };
+
+  // The shared instructor dropdown, used for both assign and change.
+  const Picker = ({ placeholder }: { placeholder: string }) => (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={who} onChange={(e) => setWho(e.target.value)}
+                aria-label={placeholder}
+                className="min-w-0 flex-1 rounded-lg border border-line-2 bg-paper px-2.5 py-1.5 text-[13px] text-ink">
+          <option value="">{placeholder}</option>
+          {primary.length > 0 && (
+            <optgroup label="Qualified and available">
+              {primary.map((c) => <option key={c.id} value={c.id}>{c.display_name}</option>)}
+            </optgroup>
+          )}
+          {showAll && rest.length > 0 && (
+            <optgroup label="Everyone else">
+              {rest.map((c) => <option key={c.id} value={c.id}>{c.display_name}{label(c)}</option>)}
+            </optgroup>
+          )}
+        </select>
+        <button onClick={() => runAssign(assigned ? reassignInstructor : assignInstructor)} disabled={pending}
+                className="shrink-0 rounded-lg bg-lime px-3 py-1.5 text-[13px] font-medium text-ink disabled:opacity-60">
+          {pending ? "…" : assigned ? "Change" : "Assign"}
+        </button>
+      </div>
+      {!showAll && rest.length > 0 && (
+        <button type="button" onClick={() => setShowAll(true)}
+                className="mt-1.5 text-[12px] text-ink-3 underline underline-offset-4 hover:text-ink">
+          Show all {choices.length}
+        </button>
+      )}
+      {choices.length === 0 && (
+        <p className="mt-1 text-[12px] leading-[18px] text-ink-2">
+          No other instructor is working on this date.
+        </p>
+      )}
+    </>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
@@ -130,7 +192,7 @@ export default function BlockPanel({
         </div>
 
         <p className="mt-2 text-[13px] leading-[19px] text-ink-2">
-          {facts.staffing === "assigned"
+          {assigned
             ? <>{facts.instructorName ?? "An instructor"} is teaching it.</>
             : <span className="font-medium text-ink">Nobody is teaching it.</span>}
           {" · "}
@@ -141,7 +203,7 @@ export default function BlockPanel({
           )}
         </p>
 
-        {unstaffed && canManage && (
+        {canManage && (
           <div className="mt-3 border-t border-line pt-3">
             {msg && (
               <p className={`mb-2 text-[12.5px] leading-[18px] ${msg.ok ? "text-ink-2" : "text-coral-deep"}`}>
@@ -152,40 +214,44 @@ export default function BlockPanel({
               <p className="text-[12.5px] leading-[18px] text-coral-deep">{loadError}</p>
             ) : candidates === null ? (
               <p className="text-[12.5px] leading-[18px] text-ink-3">Finding who could teach it…</p>
+            ) : assigned ? (
+              <>
+                {/* CHANGE the instructor — same ordering as assigning; the
+                    current one is dropped from the choices and named above. */}
+                <Picker placeholder="Change to someone else…" />
+                {/* UNASSIGN: open as a shift, per migration 114 — notifies the
+                    instructor removed and re-solicits qualified ones. Needs the
+                    reason they will be sent. */}
+                <div className="mt-3 border-t border-line pt-3">
+                  {!showUnassign ? (
+                    <button type="button" onClick={() => { setShowUnassign(true); setMsg(null); }}
+                            className="text-[12.5px] text-ink-2 underline underline-offset-4 hover:text-ink">
+                      Unassign — open it as a shift
+                    </button>
+                  ) : (
+                    <div>
+                      <label className="block text-[12.5px] leading-[18px] text-ink-2">
+                        {facts.instructorName ?? "The instructor"} will be taken off and told. Why?
+                      </label>
+                      <input value={reason} onChange={(e) => setReason(e.target.value)}
+                             placeholder="e.g. off sick"
+                             className="mt-1.5 w-full rounded-lg border border-line-2 bg-paper px-2.5 py-1.5 text-[13px] text-ink" />
+                      <div className="mt-2 flex items-center gap-2">
+                        <button onClick={doUnassign} disabled={pending}
+                                className="rounded-lg border border-coral bg-coral-tint px-3 py-1.5 text-[12.5px] font-medium text-ink disabled:opacity-60"
+                                style={{ borderColor: "var(--coral)" }}>
+                          {pending ? "…" : "Unassign"}
+                        </button>
+                        <button type="button" onClick={() => { setShowUnassign(false); setReason(""); }}
+                                className="text-[12px] text-ink-3 hover:text-ink">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             ) : (
               <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <select value={who} onChange={(e) => setWho(e.target.value)}
-                          aria-label="Who is teaching it"
-                          className="min-w-0 flex-1 rounded-lg border border-line-2 bg-paper px-2.5 py-1.5 text-[13px] text-ink">
-                    <option value="">Assign someone…</option>
-                    {primary.length > 0 && (
-                      <optgroup label="Qualified and available">
-                        {primary.map((c) => <option key={c.id} value={c.id}>{c.display_name}</option>)}
-                      </optgroup>
-                    )}
-                    {showAll && rest.length > 0 && (
-                      <optgroup label="Everyone else">
-                        {rest.map((c) => <option key={c.id} value={c.id}>{c.display_name}{label(c)}</option>)}
-                      </optgroup>
-                    )}
-                  </select>
-                  <button onClick={doAssign} disabled={pending}
-                          className="shrink-0 rounded-lg bg-lime px-3 py-1.5 text-[13px] font-medium text-ink disabled:opacity-60">
-                    {pending ? "…" : "Assign"}
-                  </button>
-                </div>
-                {!showAll && rest.length > 0 && (
-                  <button type="button" onClick={() => setShowAll(true)}
-                          className="mt-1.5 text-[12px] text-ink-3 underline underline-offset-4 hover:text-ink">
-                    Show all {candidates.length}
-                  </button>
-                )}
-                {candidates.length === 0 && (
-                  <p className="mt-1 text-[12px] leading-[18px] text-ink-2">
-                    No instructor is working on this date. Put it out to instructors instead.
-                  </p>
-                )}
+                <Picker placeholder="Assign someone…" />
                 <div className="mt-2.5">
                   <button onClick={doRepublish} disabled={pending}
                           className="rounded-lg border border-line-2 bg-surface px-3 py-1.5 text-[12.5px] text-ink-2 disabled:opacity-60">

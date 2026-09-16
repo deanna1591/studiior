@@ -106,6 +106,62 @@ export async function assignInstructor(_prev: AssignState, fd: FormData): Promis
   return { ok: true, message: "Assigned. They are teaching this class now." };
 }
 
+/**
+ * Swap a class's instructor for another, from the calendar's popover.
+ *
+ * reassign_occurrence() goes through move_occurrence() — the same gate as a drag
+ * (validity window hard, room/double-booking, availability warning) — and tells
+ * BOTH instructors: the one swapped in (move_occurrence's assigned notice) and
+ * the one swapped out (its own removal notice), both publication-gated.
+ */
+export async function reassignInstructor(_prev: AssignState, fd: FormData): Promise<AssignState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const instructorId = String(fd.get("instructor_id") ?? "");
+  if (!instructorId) return { ok: false, message: "Pick who is teaching it." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("reassign_occurrence", {
+    p_occurrence_id: occurrenceId, p_instructor_id: instructorId,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers change the timetable."
+        : /PT402/.test(m) ? "This studio's Studiior subscription is not active."
+        : m,
+    };
+  }
+
+  const r = data as unknown as {
+    ok: boolean; reason?: string; new_instructor?: string;
+    removed_instructor?: string | null; removed_uncontactable?: boolean;
+    blocked_by?: { who?: string | null; on?: string | null; name?: string | null; at?: string | null } | null;
+  };
+  if (!r.ok) {
+    const b = r.blocked_by;
+    const msg =
+      r.reason === "outside_availability_dates"
+        ? `${b?.who ?? "They"} have not agreed to work on ${b?.on ?? "that date"} — that is dates they never agreed to, not hours, so it cannot be assigned here.`
+      : r.reason === "instructor_busy"
+        ? `They are already teaching ${b?.name ?? "another class"}${b?.at ? ` at ${b.at}` : ""}.`
+      : r.reason === "room_busy"
+        ? "The room is in use then."
+      : "That could not be reassigned.";
+    return { ok: false, message: msg };
+  }
+
+  revalidatePath(`/roster/${occurrenceId}`);
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  const tail = r.removed_uncontactable
+    ? ` ${r.removed_instructor} has no login, so tell them yourself.`
+    : r.removed_instructor ? ` ${r.removed_instructor} has been told.` : "";
+  return { ok: true, message: `${r.new_instructor} is teaching it now.${tail}` };
+}
+
 export type RepublishState = { ok: boolean; message: string } | null;
 
 /**
