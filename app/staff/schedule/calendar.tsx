@@ -8,6 +8,7 @@ import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enGB } from "date-fns/locale";
 import { moveClass } from "./actions";
 import CreateOnSlot, { type SlotDraft } from "./create-slot";
+import BlockPanel, { type BlockFacts } from "@/components/schedule/block-panel";
 import { TierMark } from "@/components/tier-mark";
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -90,9 +91,16 @@ export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct, showTier, coreEnabled, flexEnabled,
   anchor, today, view, minHour, maxHour, weekStartsOn,
+  instructorNames, canManage,
 }: {
   events: CalEvent[];
   resources: Resource[];
+  /** id -> display name for EVERY active instructor, so the block panel can
+   *  name whoever teaches a class even in week view or when their column is
+   *  hidden. */
+  instructorNames: Record<string, string>;
+  /** Manager-up — whether the Assign controls in the block panel are offered. */
+  canManage: boolean;
   /** For the slot-click form. Empty means the studio has none yet. */
   classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
   rooms: { id: string; name: string; capacity: number }[];
@@ -184,12 +192,12 @@ export default function ScheduleCalendar({
     end: toStudioWall(new Date(e.endsAt), timeZone),
   })), [events, timeZone]);
 
-  // The roster is built and knows about photos, pinned notes and check-in
-  // state; the calendar links to it rather than growing a second one. A drag
-  // does not fire this — react-big-calendar's DnD addon separates the two.
-  const openRoster = useCallback((e: CalEvent) => {
-    router.push(`/roster/${e.id}`);
-  }, [router]);
+  // Clicking a block opens a panel OVER the calendar — the Assign control
+  // inline, so a gap can be filled without leaving the week. The full roster is
+  // one link away inside it. A drag does not fire this — react-big-calendar's
+  // DnD addon separates the two.
+  const [selected, setSelected] = useState<CalEvent | null>(null);
+  const openPanel = useCallback((e: CalEvent) => { setSelected(e); }, []);
 
   // Optimistic, and reverted the moment the database says no. The calendar is
   // a view of what move_occurrence() allows, never a second opinion about it.
@@ -575,6 +583,39 @@ export default function ScheduleCalendar({
           onDone={() => { setSlot(null); startTransition(() => router.refresh()); }}
         />
       )}
+      {selected && (
+        <BlockPanel
+          canManage={canManage}
+          rosterHref={`/roster/${selected.id}`}
+          facts={{
+            id: selected.id,
+            title: selected.title,
+            when: new Intl.DateTimeFormat("en-GB", {
+              weekday: "long", day: "numeric", month: "long",
+              hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
+            }).format(new Date(selected.startsAt)),
+            instructorName: selected.resourceId === UNASSIGNED
+              ? null : instructorNames[selected.resourceId] ?? null,
+            bookedCount: selected.bookedCount,
+            capacity: selected.capacity,
+            waitlistCount: selected.waitlistCount,
+            staffing: selected.staffing,
+            pendingApplications: selected.pendingApplications,
+          }}
+          onClose={() => setSelected(null)}
+          onAssigned={(instructorId) => {
+            // Instant feedback: the class becomes assigned in place. The
+            // assignInstructor action also revalidates /schedule, so the
+            // server's own fresh events land right after and agree.
+            setEvents((prev) => prev.map((e) =>
+              e.id === selected.id
+                ? { ...e, resourceId: instructorId, staffing: "assigned" }
+                : e));
+            setSelected(null);
+            startTransition(() => router.refresh());
+          }}
+        />
+      )}
       {notice && (
         <p className="mb-3 border-l-[3px] px-3 py-2 text-[13px] leading-[18px] text-ink"
            style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}
@@ -673,20 +714,20 @@ export default function ScheduleCalendar({
           onSelectSlot={onSelectSlot}
           eventPropGetter={eventPropGetter}
           components={components}
-          onSelectEvent={openRoster}
+          onSelectEvent={openPanel}
           tooltipAccessor={(e: WallEvent) =>
             `${e.title} — ${e.room ?? "no room"} — ${e.bookedCount}/${e.capacity} booked`
             + (e.waitlistCount > 0 ? ` — ${e.waitlistCount} waiting` : "")
             + (e.staffing !== "assigned" ? " — nobody assigned" : "")
             + (e.flexPending ? " — flex, undecided" : "")
-            + " — click to open the roster"}
+            + " — click for options"}
         />
         </div>
       </div>
       <p className="mt-3 text-[12px] leading-4 text-ink-3">
-        Times shown in {timeZone}. Click a class to open its roster. Drag to move
-        one between times or instructors; drag its edge to change how long it
-        runs. A ring means full, a plain block means quiet with the class close
+        Times shown in {timeZone}. Click a class for its details, to assign an
+        unstaffed one, or to open its roster. Drag to move one between times or
+        instructors; drag its edge to change how long it runs. A ring means full, a plain block means quiet with the class close
         enough to do something about, amber means nobody is teaching it, and a
         dashed edge means a flex class still waiting on its deadline.
         {showTier ? (

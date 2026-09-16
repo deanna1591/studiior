@@ -3,6 +3,37 @@
 import { revalidatePath } from "next/cache";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { computeAssignCandidates, type AssignCandidate } from "@/lib/assign";
+
+/**
+ * Who could take an unstaffed class — loaded on demand when the calendar's
+ * Assign popover opens, so an assigned class (the common case) pays for none of
+ * it and the whole week's candidates are not computed up front. Same helper as
+ * the roster's Assign panel.
+ */
+export async function assignCandidates(
+  occurrenceId: string,
+): Promise<{ candidates: AssignCandidate[]; pendingApplications: number } | { error: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "You are not signed in." };
+
+  const supabase = createClient();
+  const [{ data: occ }, { count }] = await Promise.all([
+    supabase.from("class_occurrences")
+      .select("id, class_type_id, starts_at, ends_at, status, instructor_id")
+      .eq("id", occurrenceId).maybeSingle(),
+    supabase.from("shift_applications")
+      .select("id", { count: "exact", head: true })
+      .eq("occurrence_id", occurrenceId).eq("status", "pending"),
+  ]);
+  if (!occ) return { error: "That class no longer exists." };
+  // Only an unstaffed, still-scheduled class has candidates to offer.
+  if (occ.status !== "scheduled" || occ.instructor_id) {
+    return { candidates: [], pendingApplications: count ?? 0 };
+  }
+  const candidates = await computeAssignCandidates(supabase, occ, ctx.timeZone);
+  return { candidates, pendingApplications: count ?? 0 };
+}
 
 export type BlockedBy = {
   occurrenceId: string; name: string; at: string;

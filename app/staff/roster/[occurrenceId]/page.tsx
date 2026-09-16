@@ -7,7 +7,7 @@ import AssignShift from "../assign-shift";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { HealthChip, bandOf } from "@/components/health-band";
 import { fmtDayLong, fmtTime, relativeDayName } from "@/lib/time";
-import { studioDateKey } from "@/lib/tz";
+import { computeAssignCandidates } from "@/lib/assign";
 import CheckInButton from "./check-in-button";
 import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
@@ -35,41 +35,19 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
   // labelled — only when there is actually a gap, so an assigned class pays for
   // none of it.
   const unstaffed = isManagerUp(ctx.role) && occ.status === "scheduled" && !occ.instructor_id;
-  let candidates: { id: string; display_name: string; qualified: boolean; free: boolean }[] = [];
+  let candidates: Awaited<ReturnType<typeof computeAssignCandidates>> = [];
   let pendingApplications = 0;
   if (unstaffed) {
-    const day = studioDateKey(new Date(occ.starts_at), ctx.timeZone);
-    const [{ data: instructors }, { count }] = await Promise.all([
-      supabase.from("instructors").select("id, display_name").eq("status", "active").order("display_name"),
+    // The same candidate list the calendar's Assign popover uses — one helper,
+    // so the two places this control lives cannot disagree.
+    const [cands, { count }] = await Promise.all([
+      computeAssignCandidates(supabase, occ, ctx.timeZone),
       supabase.from("shift_applications")
         .select("id", { count: "exact", head: true })
         .eq("occurrence_id", occ.id).eq("status", "pending"),
     ]);
+    candidates = cands;
     pendingApplications = count ?? 0;
-    const rows = await Promise.all((instructors ?? []).map(async (x) => {
-      // Three questions, the same the person deciding would get from the
-      // scheduler. valid_on (the DATE) is a hard gate — move_occurrence refuses
-      // outside it — so an instructor not working that week is not offered at
-      // all. qualified and free only order and label.
-      const [{ data: valid }, { data: qualified }, { data: free }] = await Promise.all([
-        supabase.rpc("instructor_valid_on", { p_instructor_id: x.id, p_on: day }),
-        occ.class_type_id
-          ? supabase.rpc("instructor_qualified", { p_instructor_id: x.id, p_class_type_id: occ.class_type_id })
-          : Promise.resolve({ data: false }),
-        supabase.rpc("instructor_available_at", {
-          p_instructor_id: x.id, p_starts_at: occ.starts_at, p_ends_at: occ.ends_at,
-        }),
-      ]);
-      return { id: x.id, display_name: x.display_name,
-               valid: valid !== false, qualified: qualified === true, free: free !== false };
-    }));
-    candidates = rows
-      .filter((r) => r.valid)
-      .map(({ id, display_name, qualified, free }) => ({ id, display_name, qualified, free }))
-      // Qualified-and-available first so the top of the list is the safe pick;
-      // the component splits them into the primary group and "show all".
-      .sort((a, b) => Number(b.qualified && b.free) - Number(a.qualified && a.free)
-        || a.display_name.localeCompare(b.display_name));
   }
 
   const [{ data: bookings }, { data: checkIns }] =

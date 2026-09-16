@@ -409,6 +409,12 @@ export default async function Schedule({
           flexEnabled={settings?.flex_enabled ?? false}
           anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
+          // id -> name for EVERY active instructor, so the block panel can name
+          // whoever teaches a class even in week view or with a hidden column.
+          instructorNames={Object.fromEntries((instructors ?? []).map((i) => [i.id, i.display_name]))}
+          // This screen is owner/manager-only (gated above), so the caller can
+          // always staff a class from the panel.
+          canManage
         />
       )}
     </AppShell>
