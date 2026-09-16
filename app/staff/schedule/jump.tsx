@@ -11,8 +11,8 @@ import { useRouter } from "next/navigation";
  * the control whose absence made a correct empty day read as a broken calendar.
  */
 export default function JumpToDate({
-  anchor, view,
-}: { anchor: string; view: "day" | "week" }) {
+  anchor, view, instructor = "",
+}: { anchor: string; view: "day" | "week" | "month"; instructor?: string }) {
   const router = useRouter();
   return (
     <label className="flex items-center gap-2 text-[12.5px] leading-4 text-ink-2">
@@ -22,7 +22,8 @@ export default function JumpToDate({
         value={anchor}
         onChange={(e) => {
           const v = e.target.value;
-          if (/^\d{4}-\d{2}-\d{2}$/.test(v)) router.push(`/schedule?d=${v}&view=${view}`);
+          const f = instructor ? `&instructor=${encodeURIComponent(instructor)}` : "";
+          if (/^\d{4}-\d{2}-\d{2}$/.test(v)) router.push(`/schedule?d=${v}&view=${view}${f}`);
         }}
         className="rounded-lg border border-line-2 bg-surface px-2 py-1 text-[13px] text-ink"
       />

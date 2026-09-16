@@ -10,6 +10,19 @@ import { moveClass } from "./actions";
 import CreateOnSlot, { type SlotDraft } from "./create-slot";
 import BlockPanel, { type BlockFacts } from "@/components/schedule/block-panel";
 import { TierMark } from "@/components/tier-mark";
+import StaffAvatar from "@/components/staff-avatar";
+
+/** "Bo Fictitious" -> "Bo F." — who is teaching, at a glance, in a week column. */
+function shortName(full: string): string {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return full;
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
+/** Up to two initials, for the month chip where even "Bo F." will not fit. */
+function initialsOf(full: string): string {
+  return full.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+}
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -91,16 +104,22 @@ export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct, showTier, coreEnabled, flexEnabled,
   anchor, today, view, minHour, maxHour, weekStartsOn,
-  instructorNames, canManage,
+  instructorNames, instructorAvatars, canManage, instructorParam,
 }: {
   events: CalEvent[];
   resources: Resource[];
-  /** id -> display name for EVERY active instructor, so the block panel can
-   *  name whoever teaches a class even in week view or when their column is
-   *  hidden. */
+  /** id -> display name for EVERY active instructor, so the block panel and the
+   *  week/month blocks can name whoever teaches a class even when their column
+   *  is hidden. */
   instructorNames: Record<string, string>;
+  /** id -> public avatar URL (or null) for every active instructor. Instructor
+   *  photos are public (studio-published), so no signing — passed straight. */
+  instructorAvatars: Record<string, string | null>;
   /** Manager-up — whether the Assign controls in the block panel are offered. */
   canManage: boolean;
+  /** The active instructor filter ("" all, an id, or "unassigned"), carried
+   *  through every navigation so it survives Back/Next and the view toggle. */
+  instructorParam: string;
   /** For the slot-click form. Empty means the studio has none yet. */
   classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
   rooms: { id: string; name: string; capacity: number }[];
@@ -122,7 +141,7 @@ export default function ScheduleCalendar({
   /** The studio-local day being shown, and the studio's own today. */
   anchor: string;
   today: string;
-  view: "day" | "week";
+  view: "day" | "week" | "month";
   /** 0 = Sunday .. 6 = Saturday, the studio's own. The grid and the query
    *  behind it must not disagree about which seven days a week is. */
   weekStartsOn: number;
@@ -166,21 +185,28 @@ export default function ScheduleCalendar({
   // what stops a populated day ever flashing as an empty one.
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
-  const go = useCallback((d: string, v: "day" | "week") => {
+  const go = useCallback((d: string, v: "day" | "week" | "month") => {
+    // The instructor filter travels with every navigation, so Back/Next/Today,
+    // the view toggle and drilling into a day all keep whoever you filtered to.
+    const f = instructorParam ? `&instructor=${encodeURIComponent(instructorParam)}` : "";
     startTransition(() => {
-      router.push(`/schedule?d=${d}&view=${v}`);
+      router.push(`/schedule?d=${d}&view=${v}${f}`);
     });
-  }, [router]);
+  }, [router, instructorParam]);
 
   // Back and Next are one round trip away, so pay for them before they are
   // pressed. Measured first: server work for a whole day is ~14 ms and a round
   // trip from here is ~58 ms, so the wait is latency and nothing else — which
   // is exactly the kind a prefetch removes and a faster query would not.
   useEffect(() => {
+    // Day and week step by a fixed number of days; a month is a variable jump,
+    // so it is not prefetched (the adjacent month is a bigger, rarer fetch).
+    if (view === "month") return;
     const step = view === "week" ? 7 : 1;
-    router.prefetch(`/schedule?d=${shiftDateKey(anchor, -step)}&view=${view}`);
-    router.prefetch(`/schedule?d=${shiftDateKey(anchor, step)}&view=${view}`);
-  }, [router, anchor, view]);
+    const f = instructorParam ? `&instructor=${encodeURIComponent(instructorParam)}` : "";
+    router.prefetch(`/schedule?d=${shiftDateKey(anchor, -step)}&view=${view}${f}`);
+    router.prefetch(`/schedule?d=${shiftDateKey(anchor, step)}&view=${view}${f}`);
+  }, [router, anchor, view, instructorParam]);
 
   // THE ONE PLACE THE ZONE IS APPLIED. react-big-calendar lays out Dates by
   // their browser-local fields, so it is handed Dates whose local fields have
@@ -409,6 +435,46 @@ export default function ScheduleCalendar({
           </div>
         );
       }
+      // WEEK VIEW: WHO is teaching, then staffed-or-not, then how full — one
+      // legible line. A 50-minute block is too narrow for the day layout's two
+      // rows, so "REFORME…" with no instructor is all a week ever showed. The
+      // time is dropped (the gutter says it), and the class NAME gives way to
+      // the instructor, because most classes in a week are the same few formats
+      // and who is teaching is the question. Colour treatment is unchanged
+      // (staffing: amber for unstaffed); an unassigned class shows a gap marker.
+      if (view === "week") {
+        const name = event.resourceId === UNASSIGNED
+          ? null : (instructorNames[event.resourceId] ?? null);
+        return (
+          <div className="wk-block flex items-center gap-1.5 text-[12px] leading-4">
+            {showTier && event.tier && (
+              <TierMark tier={event.tier as "core" | "flex" | "always"}
+                        effective={event.effectiveTier as "core" | "flex" | "always" | null}
+                        minimum={event.minimum ?? null} />
+            )}
+            {unstaffed ? (
+              // A gap marker rather than an avatar — a dashed empty ring, the
+              // amber already carried by the block's own fill and border.
+              <span aria-hidden title="Nobody is teaching this"
+                    style={{ width: 20, height: 20, borderColor: "var(--ink-3)" }}
+                    className="flex shrink-0 items-center justify-center rounded-full border border-dashed text-[11px] text-ink-2">
+                ⚠
+              </span>
+            ) : (
+              // The avatar is legible at 20px where a truncated name is not, so
+              // at the narrowest widths the name drops (container query) and the
+              // face carries it.
+              <StaffAvatar name={name ?? "?"} url={instructorAvatars[event.resourceId] ?? null} size={20} />
+            )}
+            <span className="wk-name min-w-0 flex-1 truncate font-medium text-ink">
+              {unstaffed ? "Nobody assigned" : shortName(name ?? event.title)}
+            </span>
+            <span className="wk-fill num shrink-0 text-[12.5px] font-semibold tabular-nums text-ink">
+              {event.bookedCount}/{event.capacity}
+            </span>
+          </div>
+        );
+      }
       return (
         <div className="text-[12px] leading-4">
           <div className="flex items-baseline justify-between gap-1.5">
@@ -507,7 +573,35 @@ export default function ScheduleCalendar({
         </div>
       );
     },
-  }), [fullness, loadByResource]);
+    // MONTH: a chip per class in a day cell — no time-positioned blocks, which
+    // at real scale are unreadable. Time, class, who (initials) or a gap marker,
+    // and the fill. Unstaffed reads as unstaffed at a glance: the amber fill
+    // (eventPropGetter) plus the marker, which is the main reason to open a month.
+    month: {
+      event: ({ event }: { event: WallEvent }) => {
+        const unstaffed = event.staffing !== "assigned";
+        const name = event.resourceId === UNASSIGNED
+          ? null : (instructorNames[event.resourceId] ?? null);
+        return (
+          <span className="flex items-center gap-1 text-[11px] leading-4">
+            {showTier && event.tier && (
+              <TierMark tier={event.tier as "core" | "flex" | "always"}
+                        effective={event.effectiveTier as "core" | "flex" | "always" | null}
+                        minimum={event.minimum ?? null} />
+            )}
+            <span className="num shrink-0">{format(event.start, "HH:mm")}</span>
+            <span className="min-w-0 flex-1 truncate">{event.title}</span>
+            {unstaffed
+              ? <span aria-hidden title="Nobody is teaching this" className="shrink-0">⚠</span>
+              : <span className="num shrink-0" title={name ?? undefined}>{name ? initialsOf(name) : "—"}</span>}
+            <span className="num shrink-0 font-semibold tabular-nums">
+              {event.bookedCount}/{event.capacity}
+            </span>
+          </span>
+        );
+      },
+    },
+  }), [fullness, loadByResource, view, showTier, instructorNames, instructorAvatars]);
 
   // CLICKING AN EMPTY SLOT CREATES A CLASS THERE.
   //
@@ -650,7 +744,7 @@ export default function ScheduleCalendar({
             </span>
           </div>
         )}
-        <div ref={wrapRef} className="relative"
+        <div ref={wrapRef} className={`relative ${view === "week" ? "sched-week" : ""}`}
              style={{ height: "100%", opacity: isPending ? 0.45 : 1,
                       transition: "opacity 120ms ease" }}>
         {/* Painted OVER the grid's own edge, inside the rounded corner, and
@@ -687,9 +781,16 @@ export default function ScheduleCalendar({
               + `-${String(d.getDate()).padStart(2, "0")}`;
             go(key, view);
           }}
-          view={view === "week" ? Views.WEEK : Views.DAY}
-          onView={(v: View) => go(anchor, v === Views.WEEK ? "week" : "day")}
-          views={[Views.DAY, Views.WEEK]}
+          view={view === "week" ? Views.WEEK : view === "month" ? Views.MONTH : Views.DAY}
+          onView={(v: View) =>
+            go(anchor, v === Views.WEEK ? "week" : v === Views.MONTH ? "month" : "day")}
+          views={[Views.DAY, Views.WEEK, Views.MONTH]}
+          // Month: clicking a day's number drills into that day's view.
+          onDrillDown={(d: Date) => {
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+              + `-${String(d.getDate()).padStart(2, "0")}`;
+            go(key, "day");
+          }}
           step={15}
           timeslots={4}
           // A studio does not run at 3am, and twenty-four rows of empty night

@@ -4,6 +4,7 @@ import { staffScreen } from "@/lib/screen";
 import { shiftDateKey, studioDateKey, studioToday } from "@/lib/tz";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
 import JumpToDate from "./jump";
+import InstructorFilter from "./instructor-filter";
 import FillPanel from "./fill/panel";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function Schedule({
   searchParams,
-}: { searchParams: { d?: string; view?: string; all?: string } }) {
+}: { searchParams: { d?: string; view?: string; all?: string; instructor?: string } }) {
   const screen = await staffScreen("/schedule");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -38,7 +39,11 @@ export default async function Schedule({
     );
   }
 
-  const view = searchParams.view === "week" ? "week" : "day";
+  const view = searchParams.view === "week" ? "week"
+    : searchParams.view === "month" ? "month" : "day";
+  // The instructor filter: "" = all, an id, or "unassigned". It applies across
+  // all three views and travels with every navigation.
+  const instructorFilter = typeof searchParams.instructor === "string" ? searchParams.instructor : "";
 
   // The studio's today, not the server's — `now()` where this runs is a
   // different day from Manila's for most of the world's hours. COMPUTED rather
@@ -63,13 +68,31 @@ export default async function Schedule({
   const weekStartsOn = ctx.weekStartsOn;
   const [y, m, d] = anchor.split("-").map(Number);
   const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  // A day either side of what is shown, so a class that runs past midnight and
-  // the arrows both have something to land on.
-  const weekStart = view === "week"
-    ? shiftDateKey(anchor, -(((dow - weekStartsOn) + 7) % 7))
-    : anchor;
-  const from = shiftDateKey(weekStart, -1);
-  const to = shiftDateKey(weekStart, view === "week" ? 7 : 1);
+  // The fetch window and the banner's range, per view. `from`/`to` cover what
+  // the grid draws — a day either side for day/week so a class past midnight and
+  // the arrows have something to land on, the whole six-week grid for month.
+  // `rangeStart`/`rangeEnd` is what the unstaffed banner counts over: the day,
+  // the week, or the calendar month.
+  let from: string, to: string, weekStart: string, rangeStart: string, rangeEnd: string;
+  if (view === "month") {
+    const monthFirst = `${y}-${String(m).padStart(2, "0")}-01`;
+    const firstDow = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const gridStart = shiftDateKey(monthFirst, -(((firstDow - weekStartsOn) + 7) % 7));
+    weekStart = gridStart;
+    from = shiftDateKey(gridStart, -1);
+    to = shiftDateKey(gridStart, 42);
+    rangeStart = monthFirst;
+    rangeEnd = `${y}-${String(m).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+  } else {
+    weekStart = view === "week"
+      ? shiftDateKey(anchor, -(((dow - weekStartsOn) + 7) % 7))
+      : anchor;
+    from = shiftDateKey(weekStart, -1);
+    to = shiftDateKey(weekStart, view === "week" ? 7 : 1);
+    rangeStart = weekStart;
+    rangeEnd = shiftDateKey(weekStart, view === "week" ? 6 : 0);
+  }
 
   const [{ data: classTypes }, { data: rooms },
          { data: instructors }, { data: rows, error: rangeError }, { data: pending },
@@ -83,7 +106,7 @@ export default async function Schedule({
     supabase.from("rooms")
       .select("id, name, capacity").eq("status", "active").order("name"),
     supabase.from("instructors")
-        .select("id, display_name").eq("status", "active").order("display_name"),
+        .select("id, display_name, avatar_url").eq("status", "active").order("display_name"),
       // One reader, and the day boundary resolved inside it. Comparing UTC
       // instants against a date here would lose every class either side of
       // local midnight — which for Manila is every 07:00 class there is.
@@ -176,6 +199,16 @@ export default async function Schedule({
     notRunning: o.occ_status === "cancelled" && o.occ_cancellation_cause === "unmet_minimum",
   }));
 
+  // The instructor filter narrows what the calendar DRAWS — a specific
+  // instructor keeps their classes, "Unassigned only" keeps the gaps (the view
+  // a studio uses to fill a month), "" keeps everything. Day view also narrows
+  // the columns (below). The unstaffed banner is NOT filtered by instructor — it
+  // is a range-level fact (see below).
+  const filteredEvents =
+    instructorFilter === "" ? events
+    : instructorFilter === "unassigned" ? events.filter((e) => e.staffing !== "assigned")
+    : events.filter((e) => e.resourceId === instructorFilter);
+
   // THE VISIBLE HOURS COME FROM WHAT IS ON THE SCHEDULE, not from a constant.
   // A studio whose first class is 05:30 or whose last ends at 21:40 had them
   // silently outside the grid, and 06:00-22:00 was a guess about somebody
@@ -221,19 +254,20 @@ export default async function Schedule({
   // `?all=1` puts everyone back, and it has to exist: dragging a class onto
   // somebody who is not teaching yet is how a class gets assigned, and a column
   // that is not there cannot be dropped on.
-  // CLASSES IN THE VISIBLE WEEK WITH NOBODY TEACHING THEM, said once at the top
-  // rather than left to be found by scanning amber blocks. It AGREES with the
-  // Morning Brief's `unstaffed_class` insight rather than counting differently:
-  // same definition (scheduled, staffing not assigned, still in the future),
-  // and the members-booked subset — which is exactly what the brief raises
-  // however far away — is called out. The brief looks 14 days ahead; this is
-  // scoped to the week on screen, which is where somebody is about to act.
-  const weekEnd = shiftDateKey(weekStart, view === "week" ? 6 : 0);
+  // CLASSES IN THE VISIBLE RANGE WITH NOBODY TEACHING THEM, said once at the top
+  // rather than left to be found by scanning amber blocks — in every view,
+  // scoped to whatever range is showing (the day, the week, or the calendar
+  // month). It AGREES with the Morning Brief's `unstaffed_class` insight rather
+  // than counting differently: same definition (scheduled, staffing not
+  // assigned, still in the future), and the members-booked subset — which is
+  // what the brief raises however far away — is called out. It is a range-level
+  // fact and is NOT narrowed by the instructor filter, so "where are my gaps"
+  // stays answered even while looking at one person.
   const unstaffed = occurrences
     .filter((o) =>
       o.occ_status === "scheduled" &&
       (o.occ_staffing ?? "assigned") !== "assigned" &&
-      o.local_date >= weekStart && o.local_date <= weekEnd &&
+      o.local_date >= rangeStart && o.local_date <= rangeEnd &&
       new Date(o.starts_at).getTime() > now)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const unstaffedBooked = unstaffed.filter((o) => o.occ_booked > 0).length;
@@ -253,7 +287,15 @@ export default async function Schedule({
       .filter((e) => studioDateKey(new Date(e.startsAt), ctx.timeZone) === anchor)
       .map((e) => e.resourceId),
   );
-  const shown: Resource[] = showAll ? everyone : everyone.filter((r) => busy.has(r.resourceId));
+  // A filter decides the day columns directly: one instructor is their column,
+  // "unassigned" is the Unassigned column, and only then does the busy/show-all
+  // logic apply.
+  const shown: Resource[] =
+    instructorFilter && instructorFilter !== "unassigned"
+      ? everyone.filter((r) => r.resourceId === instructorFilter)
+    : instructorFilter === "unassigned"
+      ? everyone.filter((r) => r.resourceId === UNASSIGNED)
+    : showAll ? everyone : everyone.filter((r) => busy.has(r.resourceId));
   const hiddenCount = everyone.length - shown.length;
 
 
@@ -261,7 +303,11 @@ export default async function Schedule({
     <AppShell {...shell} title="Schedule"
               actions={
                 <>
-                  <JumpToDate anchor={anchor} view={view} />
+                  {everyone.length > 1 && (
+                    <InstructorFilter anchor={anchor} view={view} value={instructorFilter}
+                                      instructors={instructors ?? []} />
+                  )}
+                  <JumpToDate anchor={anchor} view={view} instructor={instructorFilter} />
                   <NavLink href="/schedule/flex">Flex</NavLink>
                   <NavLink href="/shifts/applications">Applications</NavLink>
                   <NavLink href="/classes/new">Add a class</NavLink>
@@ -280,7 +326,7 @@ export default async function Schedule({
             <span className="font-medium">
               <span className="num">{unstaffed.length}</span>{" "}
               {unstaffed.length === 1 ? "class" : "classes"}{" "}
-              {view === "week" ? "this week" : "this day"}{" "}
+              {view === "week" ? "this week" : view === "month" ? "this month" : "this day"}{" "}
               {unstaffed.length === 1 ? "has" : "have"} nobody teaching {unstaffed.length === 1 ? "it" : "them"}.
             </span>
             {unstaffedBooked > 0 && (
@@ -308,9 +354,26 @@ export default async function Schedule({
         </div>
       )}
 
-      {events.length === 0 && (
+      {filteredEvents.length === 0 && instructorFilter && (
+        // A filter narrowed the range to nothing — a real state, distinct from
+        // the studio having no classes. The elsewhere guidance below is about
+        // the whole timetable and would mislead here, so it is not shown.
         <p className="mb-4 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
-          Nothing on {view === "week" ? "this week" : "this day"} in{" "}
+          No classes for{" "}
+          {instructorFilter === "unassigned"
+            ? "unassigned slots"
+            : (instructors ?? []).find((i) => i.id === instructorFilter)?.display_name ?? "that instructor"}{" "}
+          {view === "week" ? "this week" : view === "month" ? "this month" : "on this day"}.{" "}
+          <Link href={`/schedule?d=${anchor}&view=${view}`}
+                className="text-lime-text underline underline-offset-4">
+            Show all instructors
+          </Link>
+        </p>
+      )}
+
+      {events.length === 0 && !instructorFilter && (
+        <p className="mb-4 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
+          Nothing on {view === "week" ? "this week" : view === "month" ? "this month" : "this day"} in{" "}
           {ctx.timeZone.replace("_", " ")} — the studio&rsquo;s own clock, not yours.
           {view === "day" && everyone.length > 1 && (
             <>
@@ -355,7 +418,7 @@ export default async function Schedule({
       {/* WHO IS SHOWING, and how to see the rest. A day view whose columns are
           only the people teaching is unreadable in a different way if it never
           says so: an owner would think the others had been removed. */}
-      {view === "day" && everyone.length > 1 && shown.length > 0 && (
+      {view === "day" && everyone.length > 1 && shown.length > 0 && !instructorFilter && (
         <p className="mb-3 text-[12.5px] leading-[18px] text-ink-2">
           {showAll ? (
             <>
@@ -395,7 +458,7 @@ export default async function Schedule({
         null
       ) : (
         <ScheduleCalendar
-          events={events} resources={shown}
+          events={filteredEvents} resources={shown}
           classTypes={classTypes ?? []} rooms={rooms ?? []}
           timeZone={ctx.timeZone} deadlineHours={deadlineHours}
           quietPct={Number(quietPct ?? 0.4)}
@@ -409,9 +472,14 @@ export default async function Schedule({
           flexEnabled={settings?.flex_enabled ?? false}
           anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
-          // id -> name for EVERY active instructor, so the block panel can name
-          // whoever teaches a class even in week view or with a hidden column.
+          // id -> name and id -> avatar for EVERY active instructor, so the week
+          // block and the panel can show whoever teaches a class even when their
+          // column is hidden. Instructor avatars are public URLs (no signing).
           instructorNames={Object.fromEntries((instructors ?? []).map((i) => [i.id, i.display_name]))}
+          instructorAvatars={Object.fromEntries((instructors ?? []).map((i) => [i.id, i.avatar_url ?? null]))}
+          // The active instructor filter, carried through the calendar's own
+          // navigations (Back/Next/Today, the view toggle, drilling into a day).
+          instructorParam={instructorFilter}
           // This screen is owner/manager-only (gated above), so the caller can
           // always staff a class from the panel.
           canManage

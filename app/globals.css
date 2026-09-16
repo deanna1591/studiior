@@ -484,6 +484,31 @@ body {
 .rbc-day-slot .rbc-time-slot { border-top-color: color-mix(in srgb, var(--line) 55%, transparent); }
 .rbc-calendar .rbc-current-time-indicator { background-color: var(--coral); height: 2px; }
 
+/* WEEK BLOCK: the instructor avatar is legible at 20px where a truncated name
+   ("Christi…") is not, so below a width the name drops and the face carries the
+   block; below a narrower one the fill drops too and the avatar alone answers
+   "who". The block is its own query container — its width is the column width
+   less the event's padding. */
+.rbc-calendar .wk-block { container-type: inline-size; width: 100%; }
+@container (max-width: 92px) { .wk-block .wk-name { display: none; } }
+@container (max-width: 52px) { .wk-block .wk-fill { display: none; } }
+/* Drop react-big-calendar's own time label in WEEK view — the gutter already
+   says the time and it is the least useful line at this size, stealing the row
+   the instructor needs. Day view keeps it (wider blocks, the label helps). The
+   content fills the height the label vacated. */
+.sched-week .rbc-event-label { display: none; }
+.sched-week .rbc-event-content { height: 100%; display: flex; align-items: center; }
+
+/* MONTH VIEW: rounded like the time view, the studio's own surface, and the
+   library's off-range/"+ more"/date chrome brought into the palette. Density is
+   handled by react-big-calendar's own "+N more" popup rather than by clipping a
+   cell — a month you can open is better than one crammed flat. */
+.rbc-calendar .rbc-month-view { border-radius: 14px; overflow: hidden; background: var(--surface); }
+.rbc-calendar .rbc-month-view .rbc-off-range-bg { background: var(--paper); }
+.rbc-calendar .rbc-date-cell { padding: 2px 5px; font-size: 12px; color: var(--ink-2); }
+.rbc-calendar .rbc-month-view .rbc-event { padding: 1px 4px; }
+.rbc-calendar .rbc-show-more { color: var(--ink-2); font-size: 11px; background: transparent; }
+
 /* A studio with six instructors is seven columns counting Unassigned, and at
    that width react-big-calendar squeezes them until the names are unreadable.
    Each column keeps a floor and the view scrolls sideways instead.
