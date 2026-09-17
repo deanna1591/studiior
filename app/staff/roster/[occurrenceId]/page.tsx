@@ -180,7 +180,9 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                   {guestOf.has(b.member_id) && (
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
                           style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>
-                      Guest · first time
+                      {/* A host-null pass is a Decision 30 free first class — the
+                          member booked their own, nobody brought them. */}
+                      {guestOf.get(b.member_id) ? "Guest · first time" : "First class (free)"}
                     </span>
                   )}
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
@@ -199,7 +201,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                     roster before a class is reading down the list, and a note
                     about a shoulder has to be in the column their eye is
                     already in. */}
-                {guestOf.has(b.member_id) && (
+                {guestOf.get(b.member_id) && (
                   <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
                     Brought by {nameOf.get(guestOf.get(b.member_id) ?? "") || "a member"}
                   </p>

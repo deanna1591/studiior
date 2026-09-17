@@ -18,7 +18,7 @@ export default async function Plan() {
   // three reads that actually need a query: the ledger, the active-guest count
   // (only when guest passes are on), and the peak slots.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ data: ledger }, { count: activeGuests }, { data: peak }] =
+  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }] =
     await Promise.all([
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
@@ -28,7 +28,10 @@ export default async function Plan() {
             .eq("host_member_id", ctx.memberId).in("status", ["invited", "confirmed"])
         : Promise.resolve({ count: 0 }),
       supabase.rpc("member_peak_slots", { p_studio_id: ctx.studioId, p_from: from.toISOString(), p_to: to.toISOString() }),
+      // Decision 30: a first-timer owed a free class sees why to book before buying.
+      supabase.rpc("free_first_eligibility", { p_studio_id: ctx.studioId, p_member_id: ctx.memberId }),
     ]);
+  const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
 
   const d = (iso: string) => {
@@ -51,6 +54,15 @@ export default async function Plan() {
       </Link>
       <h1 className="m-title mb-4 text-ink">Your plan</h1>
 
+      {freeFirstEligible && (
+        <div className="m-card mb-3 p-4">
+          <p className="text-[15px] font-semibold leading-5 text-ink">Your first class is on us</p>
+          <p className="m-sub mt-1 text-ink-2">
+            Try a class free before you pick a plan — no card needed.{" "}
+            <Link href="/book" className="text-lime-text underline underline-offset-4">Book your free class</Link>.
+          </p>
+        </div>
+      )}
       {!live ? (
         <div className="m-card p-5 text-center">
           <p className="m-body text-ink">No plan yet.</p>

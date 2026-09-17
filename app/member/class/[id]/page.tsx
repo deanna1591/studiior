@@ -18,7 +18,7 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
-  const data = await loadClassDetail(supabase, ctx.memberId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
+  const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
   if (!data) notFound();
 
   return (
@@ -29,7 +29,7 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
       </Link>
 
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} />
+                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} />
     </MemberShell>
   );
 }

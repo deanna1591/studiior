@@ -563,3 +563,32 @@ export async function saveCarryForward(_prev: PlainState, fd: FormData): Promise
       : "Saved. Carry-forward is off — a silent roster stays unstaffed until you fill it.",
   };
 }
+
+/**
+ * Decision 30's switch — a new member's first class is free. Off by default; the
+ * peak sub-setting defaults to allowed. Turning it off hides the offer and stops
+ * new free bookings; anyone who already booked one keeps their free place, since
+ * that booking is an ordinary comp seat that stands on its own.
+ */
+export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = String(fd.get("free_first_class_enabled") ?? "") === "on";
+  const peak = String(fd.get("free_first_peak_allowed") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ free_first_class_enabled: on, free_first_peak_allowed: peak })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings"); revalidatePath("/");
+  return {
+    ok: true,
+    message: on
+      ? `Saved. A new member's first class is free${peak ? "" : " — except at peak times"}.`
+      : "Saved. The free first class is off. Anyone already booked one keeps their place.",
+  };
+}

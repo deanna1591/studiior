@@ -124,6 +124,39 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
   return { ok: true, message: `Booked — ${paid}.` };
 }
 
+// Decision 30 — a new member's first class is free. Its own action (not
+// book_class): the seat is a comp booking recorded in the guest-pass ledger, so
+// the waiver is chased at check-in, not gated at booking.
+const FREE_FIRST_REASONS: Record<string, string> = {
+  not_enabled: "This studio isn't offering a free first class right now.",
+  already_had_free: "You've already had your free class here.",
+  not_first: "This isn't your first class — it's a drop-in or covered by your plan.",
+  peak_not_allowed: "Free classes aren't offered at peak times. You can still book this one paying.",
+  class_full: "That class is full.",
+  class_not_bookable: "That class can't be booked.",
+  class_in_past: "That class has already started.",
+  month_not_published: "That month's timetable isn't published yet.",
+  outside_booking_window: "That class is further ahead than you can book yet.",
+  past_booking_cutoff: "Booking has closed for that class.",
+  not_authorised: "Please sign in to book.",
+  not_found: "That class could not be found.",
+};
+
+export async function bookFirstFree(_prev: BookResult, formData: FormData): Promise<BookResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("book_first_free", {
+    p_occurrence_id: String(formData.get("occurrence_id") ?? ""),
+  });
+  if (error) return { ok: false, message: error.message };
+  const r = data as unknown as { ok: boolean; reason?: string } | null;
+  if (!r) return { ok: false, message: "No response." };
+  if (!r.ok) return { ok: false, message: FREE_FIRST_REASONS[r.reason ?? ""] ?? "That didn't work — please try again." };
+  revalidateMember();
+  return { ok: true, message: "Booked — your first class is on us. See you there." };
+}
+
 // Decision 26 — the host brings a guest. Refusals are sentences.
 const GUEST_REASONS: Record<string, string> = {
   not_enabled: "This studio doesn't offer guest passes.",

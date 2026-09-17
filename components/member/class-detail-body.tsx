@@ -3,8 +3,10 @@ import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
 import IconChip from "@/components/member/icon-chip";
 import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/components/member/ui";
-import { bookClass, cancelBooking } from "@/app/member/actions";
+import Link from "next/link";
+import { bookClass, bookFirstFree, cancelBooking } from "@/app/member/actions";
 import GuestInvite from "@/components/member/guest-invite";
+import type { FreeFirst } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong } from "@/lib/time";
 
 /**
@@ -43,7 +45,7 @@ export type DetailType = {
 export type DetailBooking = { id: string; status: string; waitlist_position: number | null } | null;
 
 export default function ClassDetailBody({
-  occ, type, booking, timeZone, waitlistEnabled, guest,
+  occ, type, booking, timeZone, waitlistEnabled, guest, freeFirst,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -51,6 +53,7 @@ export default function ClassDetailBody({
   timeZone: string;
   waitlistEnabled: boolean;
   guest?: { enabled: boolean; canInvite: boolean };
+  freeFirst?: FreeFirst;
 }) {
   const booked = booking?.status === "booked";
   const waiting = booking?.status === "waitlisted";
@@ -109,6 +112,17 @@ export default function ClassDetailBody({
             <input type="hidden" name="booking_id" value={booking!.id} />
             <CardActionOutline>{booked ? "Cancel booking" : "Leave the list"}</CardActionOutline>
           </ActionForm>
+        ) : freeFirst?.eligible ? (
+          // Decision 30: this member's first class is free. Said plainly right
+          // where they decide, and the Book books it at zero — no plan, no card.
+          <BookForm action={bookFirstFree}>
+            <input type="hidden" name="occurrence_id" value={occ.id} />
+            <p className="mb-2.5 rounded-xl px-3 py-2 text-[13px] leading-[18px] text-ink"
+               style={{ background: "var(--accent-chip)" }}>
+              <span className="font-semibold">Your first class is on us.</span> No card, no plan — just book it.
+            </p>
+            <PrimaryButton>Book — first class free</PrimaryButton>
+          </BookForm>
         ) : full ? (
           waitlistEnabled ? (
             <BookForm action={bookClass}>
@@ -128,6 +142,20 @@ export default function ClassDetailBody({
           </BookForm>
         )}
       </div>
+
+      {/* Decision 30's conversion moment: they've booked their free class, so
+          tell them what comes next rather than leaving the space empty. */}
+      {freeFirst?.isFreeBooking && booked && !past && (
+        <Link href="/account/plan" className="m-card m-press mt-3 flex items-center gap-3 p-4">
+          <span className="flex-1">
+            <span className="block text-[15px] font-medium leading-5 text-ink">This one&rsquo;s on us 🎉</span>
+            <span className="m-sub mt-0.5 block text-ink-2">
+              Come along, and if you like it, see what a class costs after — the plans are here.
+            </span>
+          </span>
+          <span className="shrink-0 text-ink-3">›</span>
+        </Link>
+      )}
 
       {guest?.canInvite && !past && !waiting && (
         <GuestInvite occurrenceId={occ.id} />

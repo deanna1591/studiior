@@ -158,6 +158,16 @@ select expect_true('the guest KPI is null (absent from the dashboard, not zero)'
   dashboard_guest_kpi(:'S') is null);
 select expect_true('the challenge KPI is null (absent, not zero)',
   dashboard_challenge_kpi(:'S') is null);
+-- Decision 30 (free first class): off by default, no trace. Eligibility refuses
+-- with not_enabled before anything else, the KPI is absent (not zero), and no
+-- free-first ledger row (a host-null guest pass) exists for a studio that never
+-- turned it on.
+select expect_true('free_first_eligibility refuses with not_enabled',
+  free_first_eligibility(:'S', '0ff00ff0-0000-0000-0000-0000000ba002') ->> 'reason' = 'not_enabled');
+select expect_true('the free-first KPI is null (absent, not zero)',
+  dashboard_free_first_kpi(:'S') is null);
+select expect_num('no free-first ledger row (host-null guest pass) exists',
+  (select count(*) from guest_passes where studio_id = :'S' and host_member_id is null), 0);
 
 -- =============================================================================
 -- Teeth: the switch is the only thing holding the silence. Turn guarantees ON,

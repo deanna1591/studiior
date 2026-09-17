@@ -473,6 +473,26 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 30 — A new member's first class is free
+
+**Built: migration `20260831630000` (free first class).** Optional per studio, **off by default** (`studio_settings.free_first_class_enabled`), toggleable at any time and leaving no trace when off. A stranger signs up on the studio's own subdomain, books a class, and it costs nothing — no host, no invite, no card, no credits. Reform Collective opens with no card provider (Stripe does not serve the Philippines), so this is how a first-timer gets in the door at all. A per-studio `free_first_peak_allowed` (default true) lets a studio keep free seats out of its peak hours.
+
+**It shares Decision 26's once-ever ledger rather than adding a parallel one.** `guest_passes` is already "who has had their one free class here". A self-signup free class is recorded as a `guest_passes` row with **no host** (`host_member_id` becomes nullable) — so the free-once key spans both doors automatically, and a person is refused `already_had_free` whether they came as a guest first or a signup first. One free class per person, whichever route. The waiver-at-check-in gate, the host-cancel/attend sync and the conversion derivation are all Decision 26's, reused unchanged.
+
+**Turning it off never charges anyone retroactively.** The seat is `payment_source = 'comp'` — nothing consumed, nothing charged, ever — so an existing free booking stands on its own after the switch flips.
+
+### The once-ever key is a normalized email, and normalization is for the KEY ALONE
+
+The free-once rule is keyed on email, and two addresses that reach the same inbox must count as one person. `normalize_email_key(email)` is a single **immutable** function, **shared by Decision 26 and Decision 30**. It does: lowercase, trim, **strip the `+tag`** from the local part for every provider, and **strip dots** from the local part for `gmail.com` / `googlemail.com` (folding `googlemail.com` to `gmail.com`, the same inbox). So `A.B+promo@gmail.com`, `ab@gmail.com` and `a.b@googlemail.com` are one person; `a.b@example.com` and `ab@example.com` are two.
+
+**The key answers exactly one question — "has this person had their free class, or are they already a member here" — and it answers it in exactly these places:** the free-once unique index on `guest_passes`, and the two eligibility refusals `already_had_free` and `already_member`, in both `guest_pass_eligibility` (the guest door) and `free_first_eligibility` (the signup door). Both refusals must use it: `already_member` on raw `lower(email)` let an existing member `a@gmail.com` take a free class as `a+1@gmail.com`, because the variant matched no member row and no pass yet existed to trip the index.
+
+**It is used for NOTHING that links or addresses a person** — not sending, not display, not login, not account claiming or member linking. The raw address the person typed lives on their `members` row and is what mail is addressed to and what claiming and login match on. `guest_passes.guest_email` is a ledger column, **stored lowercased and trimmed at both doors (`book_guest` and `book_first_free`), never plus- or dot-mangled**, and read ONLY through `normalize_email_key` — the once-ever key is **computed, never stored**, and the unique index is a *functional* index over that column. Dot- and plus-stripping decide who has already had their free class; they must never decide who receives an email or which account someone signs into.
+
+**Where:** migration `20260831630000`; extends Decision 26's `guest_passes` ledger. **Status:** settled. **Reuses:** Decision 26 (once-ever ledger, waiver-at-check-in, conversion). **Off by default**, asserted inert by the `all_off` canary.
+
+---
+
 ## 28 — The instructor checks themselves in for pay, and a held record blocks the period from closing
 
 **Built: migrations 134–137.** Decision 22 computed what a studio owes each instructor and wrote a pay record at the class's terminal transition — but nothing recorded that the instructor was actually in the room. This closes that gap without turning it into surveillance: **the instructor checks themselves in**, in the portal on their My week screen, one tap on the class, and only within a window.

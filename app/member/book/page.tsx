@@ -73,7 +73,7 @@ export default async function Book({
   const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
-         { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }] =
+         { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -132,7 +132,11 @@ export default async function Book({
         p_from: from.toISOString(),
         p_to: to.toISOString(),
       }),
+      // Decision 30. Is this member owed a free first class — so the list can
+      // say so up top, where they decide. Same batch, no extra hop.
+      supabase.rpc("free_first_eligibility", { p_studio_id: ctx.studioId, p_member_id: ctx.memberId }),
     ]);
+  const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
 
   const horizon = horizonRaw as unknown as
     { enabled: boolean; published_through?: string | null; next_unpublished?: string | null;
@@ -316,6 +320,11 @@ export default async function Book({
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+      {freeFirstEligible && (
+        <p className="m-card mb-4 px-4 py-3 text-[14px] leading-5 text-ink">
+          <span className="font-semibold">Your first class is on us.</span> Pick any class below — no card, no plan.
+        </p>
+      )}
       <section aria-label="Choose a day" className="mb-4">
         <div className="mb-2.5 flex items-center gap-2">
           <h2 className="m-head flex-1 truncate text-[17px] leading-6 text-ink">{monthLabel}</h2>

@@ -51,9 +51,17 @@ export default async function Signup({
   return (
     <main className="mx-auto max-w-lg px-5 py-10">
       <h1 className="m-head text-[24px] leading-8 text-ink">Join {studio?.name ?? "the studio"}</h1>
-      <p className="m-body mt-2 text-ink-2">
-        Make an account and you can book a class straight away.
-      </p>
+      {/* Decision 30: the reason to sign up, where they decide. */}
+      {studio?.free_first_class_enabled ? (
+        <p className="m-body mt-2 rounded-lg px-3 py-2.5 text-ink"
+           style={{ background: "var(--accent-chip)" }}>
+          <span className="font-semibold">Your first class is on us.</span> Make an account and book it — no card needed.
+        </p>
+      ) : (
+        <p className="m-body mt-2 text-ink-2">
+          Make an account and you can book a class straight away.
+        </p>
+      )}
       {searchParams.sent && (
         <p className="m-sub mt-4 border-l-[3px] px-3 py-2 text-ink"
            style={{ borderLeftColor: "var(--lime-text)", background: "var(--lime-tint)" }}>

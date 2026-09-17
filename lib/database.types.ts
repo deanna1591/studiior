@@ -1885,7 +1885,7 @@ export type Database = {
           guest_email: string
           guest_member_id: string
           host_booking_id: string | null
-          host_member_id: string
+          host_member_id: string | null
           id: string
           occurrence_id: string
           status: string
@@ -1898,7 +1898,7 @@ export type Database = {
           guest_email: string
           guest_member_id: string
           host_booking_id?: string | null
-          host_member_id: string
+          host_member_id?: string | null
           id?: string
           occurrence_id: string
           status?: string
@@ -1911,7 +1911,7 @@ export type Database = {
           guest_email?: string
           guest_member_id?: string
           host_booking_id?: string | null
-          host_member_id?: string
+          host_member_id?: string | null
           id?: string
           occurrence_id?: string
           status?: string
@@ -5675,6 +5675,8 @@ export type Database = {
           flex_min_bookings: number
           flex_standby_pay_cents: number
           flex_unmet_pay_cents: number
+          free_first_class_enabled: boolean
+          free_first_peak_allowed: boolean
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
           late_cancel_consumes_credit: boolean
@@ -5758,6 +5760,8 @@ export type Database = {
           flex_min_bookings?: number
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
+          free_first_class_enabled?: boolean
+          free_first_peak_allowed?: boolean
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
           late_cancel_consumes_credit?: boolean
@@ -5841,6 +5845,8 @@ export type Database = {
           flex_min_bookings?: number
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
+          free_first_class_enabled?: boolean
+          free_first_peak_allowed?: boolean
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
           late_cancel_consumes_credit?: boolean
@@ -6414,6 +6420,7 @@ export type Database = {
         Args: { p_status: Database["public"]["Enums"]["member_status"] }
         Returns: boolean
       }
+      book_first_free: { Args: { p_occurrence_id: string }; Returns: Json }
       book_guest: {
         Args: {
           p_guest_email: string
@@ -6658,6 +6665,7 @@ export type Database = {
         Returns: number
       }
       dashboard_forecast_min_months: { Args: never; Returns: number }
+      dashboard_free_first_kpi: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_guest_kpi: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_health: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_heatmap: {
@@ -6768,6 +6776,11 @@ export type Database = {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
       }
+      free_first_eligibility: {
+        Args: { p_member_id: string; p_studio_id: string }
+        Returns: Json
+      }
+      free_first_report: { Args: { p_studio_id: string }; Returns: Json }
       generate_all_occurrences: { Args: never; Returns: Json }
       generate_all_occurrences_for: {
         Args: { p_studio_id: string }
@@ -7772,6 +7785,7 @@ export type Database = {
         Returns: {
           accent_color: string
           currency: string
+          free_first_class_enabled: boolean
           id: string
           login_image_focus_x: number
           login_image_focus_y: number
