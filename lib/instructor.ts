@@ -37,6 +37,8 @@ export type InstructorContext = {
   email: string;
   role: string;
   usesPayroll: boolean;
+  /** Unread in-app notifications, for the bell. Resolved once per screen. */
+  unread: number;
 };
 
 /**
@@ -52,9 +54,15 @@ export async function instructorScreen() {
   if (!ctx?.instructor_id) redirect("/instructor/login");
   // Payroll is opt-in (migration 139): the Pay tab shows only when the studio
   // uses the guarantee system. A studio that pays in its own books shows the
-  // instructor no Pay tab at all — absent, not an empty screen.
-  const { data: uses } = await supabase.rpc("studio_uses_payroll", { p_studio_id: ctx.studio_id });
+  // instructor no Pay tab at all — absent, not an empty screen. The unread
+  // count rides alongside so the bell is right on every screen (limit 1 — only
+  // the count is wanted here, the list is fetched where it is shown).
+  const [{ data: uses }, { data: notif }] = await Promise.all([
+    supabase.rpc("studio_uses_payroll", { p_studio_id: ctx.studio_id }),
+    supabase.rpc("instructor_notifications", { p_instructor_id: ctx.instructor_id, p_limit: 1 }),
+  ]);
   ctx.usesPayroll = uses === true;
+  ctx.unread = Number((notif as { unread?: number } | null)?.unread ?? 0);
   return { ctx, supabase };
 }
 

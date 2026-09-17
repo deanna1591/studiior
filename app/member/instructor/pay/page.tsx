@@ -97,7 +97,7 @@ export default async function PayPage() {
             </p>
             {(p.held_cents ?? 0) > 0 && (
               <p className="m-sub mt-1.5 text-ink-2">
-                {money(p.held_cents ?? 0, p.currency)} is held until you check in — tap the class on My week.
+                {money(p.held_cents ?? 0, p.currency)} is held until you check in — tap the class on My schedule.
               </p>
             )}
             {/* F: the studio's committed payment date, until it is actually

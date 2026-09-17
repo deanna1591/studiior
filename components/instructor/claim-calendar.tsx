@@ -309,7 +309,17 @@ function ClaimSheet({
 
         {done ? (
           <>
-            <p className="mt-4 text-[14px] leading-5 text-ink">{(state as { ok: string }).ok}</p>
+            <div className="mt-4 rounded-2xl px-3.5 py-3" style={{ background: "var(--accent-chip)" }}>
+              <p className="text-[14px] leading-[20px] text-ink">
+                <span className="font-semibold">Asked to take {row.class_name}</span>, {whenLabel.split(" · ")[0]}.{" "}
+                {studioName} will confirm.
+              </p>
+              <p className="mt-1 text-[12.5px] leading-[18px] text-ink-2">
+                It&rsquo;s on your schedule now, marked pending.
+                {(state as { ok: string }).ok === "over_cap" &&
+                  " You’re over your usual core cap for that week, so they’ll see that too."}
+              </p>
+            </div>
             <button onClick={onClose} className="mt-4 w-full rounded-2xl py-3.5 text-center text-[15px] font-bold text-ink"
                     style={{ boxShadow: "inset 0 0 0 1.5px var(--line-2)" }}>Done</button>
           </>

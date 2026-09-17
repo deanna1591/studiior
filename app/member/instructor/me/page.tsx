@@ -83,33 +83,21 @@ export default async function MePage() {
         </SignOut>
       </div>
 
-      {/* Said rather than half-drawn. Three things an instructor might look for
-          are not here, and each is a rule rather than an omission. */}
-      <div className="m-card mt-4 px-4 py-4">
-        <p className="text-[15px] leading-6 text-ink">What is not here</p>
-        <ul className="m-sub mt-2 space-y-2 text-ink-2">
-          <li>
-            <span className="text-ink">Messaging members.</span> Staff write to
-            members, never instructors — §12. If somebody needs telling
-            something, tell the studio.
-          </li>
-          <li>
-            <span className="text-ink">Contact details.</span> §14 keeps a
-            member&rsquo;s email and phone with the office, including on your
-            rosters.
-          </li>
-          <li>
-            <span className="text-ink">Member progress and history.</span> You
-            see what you need to teach the class well — who is coming, whether
-            they are new, and anything the studio has pinned.
-          </li>
-        </ul>
-      </div>
+      {/* Availability is monthly, so it lives here rather than earning a tab. */}
+      <Link href="/instructor/availability" className="m-card mt-4 flex items-center gap-3 px-4 py-4">
+        <span className="flex-1">
+          <span className="block text-[15px] leading-5 text-ink">My availability</span>
+          <span className="m-sub mt-0.5 block text-ink-3">
+            The hours you have given the studio, and the months you have sent.
+          </span>
+        </span>
+        <span className="shrink-0 text-ink-3">›</span>
+      </Link>
 
       <p className="m-sub mt-5 text-ink-3">
         Add this to your home screen and it opens like an app. There is nothing
         to download.{" "}
-        <Link href="/instructor" className="underline underline-offset-4">Back to my week</Link>
+        <Link href="/instructor" className="underline underline-offset-4">Back to home</Link>
       </p>
     </InstructorShell>
   );

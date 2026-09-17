@@ -45,8 +45,8 @@ export default async function RosterPage({ params }: { params: { id: string } })
               : "This could not be read."}
           </p>
           {error && <p className="num mt-1 text-[11px] leading-4 text-ink-2">{error.message}</p>}
-          <Link href="/instructor" className="m-sub mt-2 inline-block text-ink-2 underline underline-offset-4">
-            Back to my week
+          <Link href="/instructor/schedule" className="m-sub mt-2 inline-block text-ink-2 underline underline-offset-4">
+            Back to my schedule
           </Link>
         </div>
       </InstructorShell>

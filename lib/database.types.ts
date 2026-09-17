@@ -4182,6 +4182,7 @@ export type Database = {
           net_request_id: number | null
           payload: Json
           provider_message_id: string | null
+          read_at: string | null
           recipient_type: string
           scheduled_for: string
           sent_at: string | null
@@ -4203,6 +4204,7 @@ export type Database = {
           net_request_id?: number | null
           payload?: Json
           provider_message_id?: string | null
+          read_at?: string | null
           recipient_type: string
           scheduled_for: string
           sent_at?: string | null
@@ -4224,6 +4226,7 @@ export type Database = {
           net_request_id?: number | null
           payload?: Json
           provider_message_id?: string | null
+          read_at?: string | null
           recipient_type?: string
           scheduled_for?: string
           sent_at?: string | null
@@ -6739,22 +6742,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -6854,7 +6841,15 @@ export type Database = {
       }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
+      instructor_notifications: {
+        Args: { p_instructor_id: string; p_limit?: number }
+        Returns: Json
+      }
       instructor_pay_summary: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
+      instructor_pending_claims: {
         Args: { p_instructor_id: string }
         Returns: Json
       }
@@ -6949,6 +6944,10 @@ export type Database = {
       join_challenge: {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
+      }
+      mark_instructor_notifications_read: {
+        Args: { p_instructor_id: string }
+        Returns: number
       }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }

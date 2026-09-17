@@ -106,13 +106,33 @@ export function AskForCover({ occurrenceId, compact = false }: { occurrenceId: s
   );
 }
 
-export function ApplyForShift({ occurrenceId }: { occurrenceId: string }) {
+/**
+ * Committing to an open shift flips the class to pending_approval, so it drops
+ * out of the open list. Rather than let it vanish behind a badge, the action
+ * does NOT revalidate this list — the row stays put and confirms in place what
+ * just happened, naming the class and where it has gone.
+ */
+export function ApplyForShift({
+  occurrenceId, name, when, studioName,
+}: { occurrenceId: string; name: string; when: string; studioName: string }) {
   const [state, action] = useFormState<InstructorState, FormData>(applyForShift, null);
+  if (state && "ok" in state) {
+    return (
+      <div className="mt-2 rounded-xl px-3 py-2.5" style={{ background: "var(--accent-chip)" }} role="status">
+        <p className="text-[13px] leading-[18px] text-ink">
+          <span className="font-semibold">Asked to take {name}</span>, {when}. {studioName} will confirm.
+        </p>
+        <p className="mt-0.5 text-[12px] leading-[17px] text-ink-2">
+          It&rsquo;s on your schedule now, marked pending.
+        </p>
+      </div>
+    );
+  }
   return (
     <form action={action} className="mt-2">
       <input type="hidden" name="occurrence_id" value={occurrenceId} />
-      <CardAction>I can take it</CardAction>
-      <Result state={state} />
+      <CardAction>Commit</CardAction>
+      {state && "error" in state && <Result state={state} />}
     </form>
   );
 }

@@ -20,7 +20,7 @@ type Roster = {
 /**
  * MY MONTH — Decision 25's roster, on the phone, with the one thing to do.
  *
- * Reached from the roster email and from the card on My week. The list is
+ * Reached from the roster email and from the card on Home. The list is
  * their own classes for the month, dates and times; the button confirms the
  * lot; "ask for cover" on a class is the flag, which raises Decision 18's
  * cover request and nothing else. Both confirmations stay: this is the
@@ -141,7 +141,7 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
       <div className="mt-6 flex items-center justify-between">
         <Link href={`/instructor/month?m=${shift(-1)}`}
               className="m-sub text-ink-2 underline underline-offset-4">← Earlier</Link>
-        <Link href="/instructor" className="m-sub text-ink-2 underline underline-offset-4">My week</Link>
+        <Link href="/instructor/schedule" className="m-sub text-ink-2 underline underline-offset-4">My schedule</Link>
         <Link href={`/instructor/month?m=${shift(1)}`}
               className="m-sub text-ink-2 underline underline-offset-4">Later →</Link>
       </div>

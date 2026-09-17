@@ -30,6 +30,7 @@ export async function confirmMyWeek(
   if (error) return { error: error.message };
   const r = (data ?? {}) as { confirmed?: number; skipped_cover?: number };
   revalidatePath("/instructor");
+  revalidatePath("/instructor/schedule");
   return {
     ok: `${r.confirmed ?? 0} confirmed.` +
       (r.skipped_cover
@@ -75,6 +76,7 @@ export async function askForCover(
   if (error) return { error: error.message };
   revalidatePath("/instructor");
   revalidatePath("/instructor/month");
+  revalidatePath("/instructor/schedule");
   return { ok: "Asked. The studio decides — you are still down to teach it until they do." };
 }
 
@@ -87,8 +89,13 @@ export async function applyForShift(
     p_note: String(form.get("note") ?? "") || undefined,
   });
   if (error) return { error: error.message };
-  revalidatePath("/instructor/shifts");
-  return { ok: "Applied. Staff approve it — you will hear back." };
+  // The class it applies to becomes 'pending_approval' and drops out of the
+  // open-shifts list — so the list is NOT revalidated here, or the row (and its
+  // confirmation) would unmount and the whole thing would read as "vanished".
+  // My schedule and the "waiting on the studio" section pick it up on next load.
+  revalidatePath("/instructor");
+  revalidatePath("/instructor/schedule");
+  return { ok: "asked" };
 }
 
 export type ClaimState =
@@ -119,11 +126,12 @@ export async function claimClass(_prev: ClaimState, form: FormData): Promise<Cla
   };
   if (r.ok) {
     revalidatePath("/instructor/shifts");
-    return {
-      ok: r.over_cap
-        ? "Claimed — over your usual cap for the week, so the studio will see that. They decide."
-        : "Claimed. The studio approves it — you will hear back.",
-    };
+    revalidatePath("/instructor/schedule");
+    revalidatePath("/instructor");
+    // The class name/day/studio are the sheet's to say — it names them. This
+    // flag only tells the sheet whether it went straight through or landed
+    // over-cap.
+    return { ok: r.over_cap ? "over_cap" : "asked" };
   }
   if (r.reason === "over_cap") return { overCap: { current: r.current ?? 0, cap: r.cap ?? 0 } };
   if (r.reason === "outside_validity")
@@ -151,6 +159,7 @@ export async function acceptCover(_prev: InstructorState, form: FormData): Promi
   if (!r.ok) return { error: r.reason === "instructor_busy" ? "You are already teaching then." : "Somebody else has just taken it." };
   revalidatePath("/instructor");
   revalidatePath("/instructor/shifts");
+  revalidatePath("/instructor/schedule");
   return { ok: "Taken — it is yours. The studio has been told." };
 }
 
@@ -166,7 +175,9 @@ export async function withdrawApplication(
   });
   if (error) return { error: error.message };
   revalidatePath("/instructor/shifts");
-  return { ok: "Withdrawn." };
+  revalidatePath("/instructor/schedule");
+  revalidatePath("/instructor");
+  return { ok: "Withdrawn — your name is off it." };
 }
 
 /**
@@ -192,6 +203,17 @@ export async function checkInMember(
 
 
 /**
+ * Marks the instructor's in-app notifications read. Called when they open the
+ * list; the bell counts what has arrived since. Idempotent.
+ */
+export async function markNotificationsRead(instructorId: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.rpc("mark_instructor_notifications_read", { p_instructor_id: instructorId });
+  revalidatePath("/instructor/notifications");
+  revalidatePath("/instructor");
+}
+
+/**
  * Decision 28: the instructor checks themselves in for a class, so their pay is
  * released. One tap; the window and "your class" checks are in the function.
  */
@@ -204,5 +226,6 @@ export async function confirmClass(_prev: InstructorState, form: FormData): Prom
   const r = (data ?? {}) as { ok?: boolean };
   if (!r.ok) return { error: "That could not be confirmed." };
   revalidatePath("/instructor");
+  revalidatePath("/instructor/schedule");
   return { ok: "Checked in — your pay for this class is released." };
 }
