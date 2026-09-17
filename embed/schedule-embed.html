@@ -1,15 +1,20 @@
 <!--
   Studiior schedule embed.
 
-  Paste this whole block into a Webflow "Embed" element. Fill in the three
-  CONFIG values below with your studio's own Supabase URL, anon (publishable)
-  key, and slug — the same URL and key the member app uses; they are public by
-  design. Nothing else needs changing.
+  Paste this ONE block into a Webflow "Embed" element (or any site). Fill in the
+  three CONFIG values below with your studio's own Supabase URL, anon
+  (publishable) key, and slug — the same URL and key the member app uses; they
+  are public by design. Nothing else needs changing.
 
-  It renders your OWN timetable, branded with your OWN accent, logo and
-  class-type colours (read live from Studiior, so changing your accent changes
-  the embed too). Every class links to your member app's booking page for that
-  class. There is no Studiior branding.
+  It renders your OWN timetable — a day strip and rows with your instructors'
+  photos — branded with your OWN accent and logo (read live from Studiior, so
+  changing your accent changes the embed too). There is no Studiior branding.
+
+  Clicking a class shows a short "reserve" hand-off page ON YOUR OWN SITE first,
+  then sends the visitor to your member app to log in or create an account and
+  finish the booking. It is ONE block: the hand-off is the same embed reacting to
+  a `?studiior_class=…` query parameter it sets itself (browser back/forward and
+  shared links work), so a studio pastes as little as possible.
 -->
 <div id="studiior-schedule" data-studiior></div>
 <script>
@@ -25,7 +30,9 @@
   // -------------------------------------------------------------------------
 
   var mount = document.getElementById("studiior-schedule");
-  if (!mount) return;
+  if (!mount || mount.getAttribute("data-sd-init")) return;  // never render twice into one mount
+  mount.setAttribute("data-sd-init", "1");
+  var PARAM = "studiior_class";
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -33,41 +40,131 @@
     if (text != null) e.textContent = text;
     return e;
   }
-  function esc(s) { return (s == null ? "" : String(s)); }
 
-  // Scoped styles, injected once. Everything is prefixed .sd- so it cannot
-  // collide with the studio's Webflow styles. The accent is a CSS variable set
-  // from the studio's own branding.
+  // Scoped styles, injected once. THE EMBED LANDS IN SOMEBODY ELSE'S STYLESHEET
+  // and must inherit nothing: every rule is hard-scoped under the mount's id
+  // (`#studiior-schedule ...`), which beats a host's class/element selectors on
+  // specificity, and a full reset neutralises every text property a host page
+  // commonly sets (font, weight, letter-spacing, line-height, transform) on every
+  // descendant. Each text rule then re-asserts its own typography explicitly, so
+  // the design cannot be reshaped by the host's serif body or condensed headings.
+  // Colour comes from --sd-accent / --sd-accent-ink, set from branding at render.
+  var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
   if (!document.getElementById("sd-styles")) {
     var css = document.createElement("style");
     css.id = "sd-styles";
+    var P = "#studiior-schedule ";        // an id beats host class/element rules
     css.textContent = [
-      ".sd-wrap{--sd-accent:#111827;font-family:inherit;max-width:640px;margin:0 auto;color:#1a1a1a;}",
-      ".sd-head{display:flex;align-items:center;gap:12px;margin:0 0 14px;}",
-      ".sd-logo{height:36px;width:auto;display:block;}",
-      ".sd-name{font-size:18px;font-weight:700;margin:0;}",
-      ".sd-days{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch;}",
-      ".sd-day{flex:0 0 auto;border:1px solid #e4e4e4;background:#fff;border-radius:999px;padding:7px 12px;font-size:13px;line-height:1;cursor:pointer;color:#444;white-space:nowrap;}",
-      ".sd-day[aria-selected='true']{background:var(--sd-accent);border-color:var(--sd-accent);color:#fff;font-weight:600;}",
-      ".sd-day .sd-dow{font-weight:600;}",
-      ".sd-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;}",
-      ".sd-row{display:flex;align-items:center;gap:12px;border:1px solid #ececec;border-left-width:4px;border-radius:12px;padding:10px 12px;text-decoration:none;color:inherit;background:#fff;}",
-      ".sd-row:hover{border-color:#dcdcdc;}",
-      ".sd-time{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;width:48px;}",
-      ".sd-mid{flex:1 1 auto;min-width:0;}",
-      ".sd-class{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
-      ".sd-meta{font-size:12.5px;color:#666;margin-top:2px;display:flex;align-items:center;gap:6px;}",
-      ".sd-av{width:18px;height:18px;border-radius:999px;object-fit:cover;background:#eee;display:inline-block;vertical-align:middle;}",
-      ".sd-end{flex:0 0 auto;text-align:right;}",
-      ".sd-spaces{font-size:13px;font-weight:600;color:var(--sd-accent);white-space:nowrap;}",
-      ".sd-full{font-size:12.5px;font-weight:600;color:#8a8a8a;white-space:nowrap;}",
-      ".sd-book{font-size:11.5px;color:#888;white-space:nowrap;}",
-      ".sd-empty{color:#777;font-size:14px;padding:16px 2px;}",
-      ".sd-note{font-size:13px;font-weight:600;color:var(--sd-accent);margin:0 0 10px;}",
-      "@media (max-width:420px){.sd-time{width:44px;font-size:14px;}.sd-class{font-size:14px;}}"
+      // ---- hard reset: strip everything a host page could set ----
+      "#studiior-schedule,#studiior-schedule *,#studiior-schedule *::before,#studiior-schedule *::after{",
+        "box-sizing:border-box;margin:0;padding:0;border:0;background:none;box-shadow:none;float:none;",
+        "font-family:", FONT, ";font-weight:400;font-style:normal;font-size:100%;",
+        "letter-spacing:normal;line-height:1.4;text-transform:none;text-decoration:none;text-align:left;",
+        "text-shadow:none;color:inherit;vertical-align:baseline;list-style:none;position:static;",
+        "-webkit-font-smoothing:antialiased;-webkit-appearance:none;appearance:none;}",
+      P+"button{cursor:pointer;}", P+"a{cursor:pointer;}", P+"img{display:block;max-width:100%;}",
+      // ---- wrapper ----
+      P+".sd-wrap{--sd-accent:#E9D400;--sd-accent-ink:#111;color:#161311;max-width:1000px;width:100%;",
+        "margin:0 auto;padding:0 4px;font-size:16px;}",
+      // ---- header ----
+      P+".sd-head{display:flex;align-items:center;gap:12px;margin:0 0 18px;flex-wrap:wrap;}",
+      P+".sd-logo{height:38px;width:auto;}",
+      P+".sd-name{font-family:",FONT,";font-size:26px;font-weight:800;letter-spacing:-.02em;",
+        "line-height:1.1;text-transform:none;}",
+      // ---- day strip ----
+      P+".sd-strip{display:flex;align-items:stretch;gap:2px;margin:0 0 4px;}",
+      P+".sd-arrow{flex:0 0 auto;width:34px;font-size:22px;line-height:1;color:#161311;}",
+      P+".sd-arrow:disabled{opacity:.25;cursor:default;}",
+      P+".sd-cells{display:flex;flex:1 1 auto;min-width:0;}",
+      P+".sd-cell{flex:1 1 0;min-width:0;cursor:pointer;padding:8px 2px 12px;text-align:center;",
+        "color:#6a605a;border-bottom:3px solid transparent;}",
+      P+".sd-cell .sd-dnum{font-family:",FONT,";font-size:11px;font-weight:500;line-height:1.2;",
+        "letter-spacing:normal;text-transform:none;white-space:nowrap;}",
+      P+".sd-cell .sd-dow{font-family:",FONT,";font-size:16px;font-weight:800;letter-spacing:.01em;",
+        "line-height:1.2;text-transform:none;color:#6a605a;}",
+      P+".sd-cell[aria-pressed='true']{border-bottom-color:var(--sd-accent);}",
+      P+".sd-cell[aria-pressed='true'] .sd-dow,"+P+".sd-cell.sd-today .sd-dow{color:#161311;}",
+      P+".sd-cell.sd-today .sd-dnum{color:var(--sd-accent-ink);font-weight:700;}",
+      // ---- day header bar (the date that overlapped: explicit spacing + no transform) ----
+      P+".sd-daybar{display:flex;align-items:center;justify-content:space-between;gap:12px;",
+        "background:#f4f0ec;border-radius:12px;padding:12px 16px;margin:8px 0 4px;}",
+      P+".sd-daybar h2{font-family:",FONT,";font-size:15px;font-weight:700;letter-spacing:normal;",
+        "line-height:1.3;text-transform:none;margin:0;color:#161311;}",
+      P+".sd-todaybtn{border:1px solid #ddd6d0;background:#fff;border-radius:8px;padding:7px 14px;",
+        "font-family:",FONT,";font-size:13px;font-weight:600;letter-spacing:normal;text-transform:none;",
+        "color:#161311;white-space:nowrap;cursor:pointer;}",
+      // ---- rows ----
+      P+".sd-list{margin-top:2px;}",
+      P+".sd-row{display:flex;align-items:center;gap:14px;padding:16px 6px;border-bottom:1px solid #ece7e2;",
+        "color:#161311;background:none;width:100%;text-align:left;cursor:pointer;}",
+      P+".sd-row:hover{background:#faf7f4;}",
+      P+".sd-time{flex:0 0 auto;width:74px;}",
+      P+".sd-time b{display:block;font-family:",FONT,";font-size:15px;font-weight:700;letter-spacing:-.01em;",
+        "line-height:1.25;text-transform:none;}",
+      P+".sd-time span{display:block;font-family:",FONT,";font-size:12px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;color:#6a605a;margin-top:2px;}",
+      P+".sd-loc{flex:0 0 auto;width:120px;font-family:",FONT,";font-size:13.5px;font-weight:400;",
+        "letter-spacing:normal;text-transform:none;color:#6a605a;}",
+      P+".sd-photo{flex:0 0 auto;width:56px;height:56px;border-radius:50%;overflow:hidden;",
+        "display:flex;align-items:center;justify-content:center;background:#fff;",
+        "box-shadow:inset 0 0 0 1.5px #cfc7c0;font-family:",FONT,";color:#6a605a;font-size:15px;",
+        "font-weight:700;letter-spacing:.02em;text-transform:none;}",
+      P+".sd-photo img{width:100%;height:100%;object-fit:cover;}",
+      P+".sd-info{flex:1 1 auto;min-width:0;}",
+      P+".sd-cname{font-family:",FONT,";font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.3;",
+        "text-transform:none;border-bottom:2px solid var(--sd-accent);display:inline;padding-bottom:1px;}",
+      P+".sd-csub{font-family:",FONT,";font-size:13.5px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;color:#6a605a;margin-top:5px;line-height:1.35;}",
+      P+".sd-act{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right;}",
+      P+".sd-state{font-family:",FONT,";font-size:13px;font-weight:600;letter-spacing:normal;",
+        "text-transform:none;color:#6a605a;white-space:nowrap;}",
+      P+".sd-btn{display:inline-block;border:1.5px solid var(--sd-accent);background:#fff;color:#161311;",
+        "font-family:",FONT,";font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;",
+        "line-height:1.2;padding:11px 18px;border-radius:4px;white-space:nowrap;cursor:pointer;}",
+      // ---- hand-off ----
+      P+".sd-back{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:",FONT,";",
+        "font-size:15px;font-weight:400;letter-spacing:normal;text-transform:none;color:#161311;margin:0 0 22px;}",
+      P+".sd-back u{color:var(--sd-accent-ink);text-decoration:underline;}",
+      P+".sd-h1{font-family:",FONT,";font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.05;",
+        "text-transform:none;margin:0 0 26px;}",
+      P+".sd-ho-name{font-family:",FONT,";font-size:22px;font-weight:800;letter-spacing:-.02em;",
+        "text-transform:none;line-height:1.2;margin:0 0 8px;}",
+      P+".sd-ho-when{font-family:",FONT,";font-size:16px;font-weight:700;letter-spacing:normal;",
+        "text-transform:none;line-height:1.35;margin:0 0 6px;}",
+      P+".sd-ho-meta{font-family:",FONT,";font-size:15px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;color:#6a605a;margin:0 0 16px;}",
+      P+".sd-ho-details{font-family:",FONT,";font-size:15px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;color:#161311;text-decoration:underline;text-underline-offset:3px;}",
+      P+".sd-rule{border:0;border-top:1px solid #e7e0da;margin:26px 0;}",
+      P+".sd-cta{text-align:center;padding:22px 0 40px;}",
+      P+".sd-cta h3{font-family:",FONT,";font-size:30px;font-weight:800;letter-spacing:-.02em;",
+        "text-transform:none;line-height:1.15;margin:0 0 10px;}",
+      P+".sd-cta p{font-family:",FONT,";font-size:16px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;line-height:1.5;color:#4a423d;margin:0 auto 22px;max-width:34em;}",
+      P+".sd-login{display:inline-block;background:var(--sd-btn-fill);color:#fff;font-family:",FONT,";",
+        "font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;line-height:1.2;",
+        "padding:16px 60px;border-radius:4px;text-decoration:none;}",
+      P+".sd-create{font-family:",FONT,";font-size:15px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;color:#4a423d;margin-top:22px;}",
+      P+".sd-create a{color:#161311;text-decoration:underline;text-underline-offset:3px;}",
+      // ---- shared ----
+      P+".sd-empty{font-family:",FONT,";font-size:15px;font-weight:400;letter-spacing:normal;",
+        "text-transform:none;line-height:1.5;color:#6a605a;padding:20px 4px;}",
+      P+".sd-note{font-family:",FONT,";font-size:14px;font-weight:600;letter-spacing:normal;",
+        "text-transform:none;color:var(--sd-accent-ink);margin:0 0 10px;}",
+      // ---- narrow ----
+      "@media (max-width:640px){",
+        P+".sd-name{font-size:22px;}"+P+".sd-loc{display:none;}"+P+".sd-time{width:58px;}",
+        P+".sd-photo{width:46px;height:46px;font-size:13px;}"+P+".sd-row{gap:10px;padding:14px 2px;}",
+        P+".sd-btn{padding:10px 12px;font-size:11px;}"+P+".sd-h1{font-size:30px;}"+P+".sd-cell .sd-dow{font-size:14px;}",
+        P+".sd-login{padding:16px 40px;}"+P+".sd-daybar h2{font-size:13.5px;}",
+      "}",
+      "@media (max-width:400px){"+P+".sd-time{width:50px;}"+P+".sd-time b{font-size:14px;}"+P+".sd-cell .sd-dow{font-size:13px;}}"
     ].join("");
     document.head.appendChild(css);
   }
+
+  var DATA = null;   // the fetched payload, kept so the hand-off can read a class
 
   fetch(SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/rpc/public_schedule", {
     method: "POST",
@@ -77,8 +174,77 @@
   // A bad key / project URL is an HTTP error, and a network failure rejects —
   // both must read "could not load", NEVER the same blank box as "no classes".
   .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
-  .then(render)
+  .then(function (d) { DATA = d; route(); })
   .catch(function () { fail("Could not load the schedule. Please try again later."); });
+
+  window.addEventListener("popstate", function () { if (DATA) route(); });
+
+  // ---- helpers --------------------------------------------------------------
+  function tz() { return (DATA && DATA.studio && DATA.studio.timezone) || undefined; }
+  function rgbOf(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+    if (!m) return null;
+    var n = parseInt(m[1], 16);
+    return [n >> 16, (n >> 8) & 255, n & 255];
+  }
+  function lum(c) {
+    var s = c.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2];
+  }
+  function ratio(a, b) { var x = lum(a) + 0.05, y = lum(b) + 0.05; return x > y ? x / y : y / x; }
+  function rgbStr(c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
+  function accentInk(hex) {
+    // The accent as a TEXT/small-mark colour on white — darkened only as far as
+    // it must be to clear 4.5:1, so a deep accent keeps its hue and a pale one
+    // (lime, mint) still reads. Used for the "Today" number and the back link.
+    var c = rgbOf(hex);
+    if (!c) return "#161311";
+    var white = [255, 255, 255], k = 1;
+    while (ratio(c, white) < 4.5 && k > 0.05) {
+      k -= 0.05;
+      c = [Math.round((c[0]) * 0.95), Math.round((c[1]) * 0.95), Math.round((c[2]) * 0.95)];
+    }
+    return rgbStr(c);
+  }
+  function buttonFill(hex) {
+    // The LOG IN button's fill, darkened until WHITE text on it clears 4.5:1 —
+    // so the studio's colour drives it but the label is always legible, whatever
+    // accent they pick. (accentInk pairs with white/tint; this pairs with white
+    // text ON the fill, a different measurement.)
+    var c = rgbOf(hex);
+    if (!c) return "#161311";
+    var white = [255, 255, 255];
+    while (ratio(c, white) < 4.5 && (c[0] + c[1] + c[2]) > 12) {
+      c = [Math.round(c[0] * 0.92), Math.round(c[1] * 0.92), Math.round(c[2] * 0.92)];
+    }
+    return rgbStr(c);
+  }
+  function initials(str, max) {
+    var parts = String(str || "").trim().split(/\s+/).filter(Boolean);
+    return parts.slice(0, max || 1).map(function (p) { return p[0].toUpperCase(); }).join("");
+  }
+  function photoNode(c, studioName) {
+    var box = el("div", "sd-photo");
+    if (c.instructor_avatar_url) {
+      var img = el("img"); img.src = c.instructor_avatar_url; img.alt = ""; img.loading = "lazy";
+      box.appendChild(img);
+    } else {
+      // An UNASSIGNED class shows the studio's initials, not "instructor TBC"
+      // (Decision 17 — we never advertise uncertainty).
+      box.textContent = c.instructor_first_name ? initials(c.instructor_first_name, 1)
+        : initials(studioName, 2) || "•";
+    }
+    return box;
+  }
+  function paramURL(id) {
+    var u = new URL(window.location.href);
+    if (id) u.searchParams.set(PARAM, id); else u.searchParams.delete(PARAM);
+    return u.pathname + u.search + u.hash;
+  }
+  // Do NOT move the scroll. The hand-off should appear where the visitor already
+  // is, and browser-back should land them back at the same place — the default
+  // scroll restoration handles that because popstate re-renders synchronously.
+  function open(id) { history.pushState({}, "", paramURL(id)); route(); }
 
   function fail(msg) {
     var wrap = el("div", "sd-wrap");
@@ -86,120 +252,212 @@
     mount.innerHTML = ""; mount.appendChild(wrap);
   }
 
-  function dayLabel(dateStr) {
-    var d = new Date(dateStr + "T12:00:00");
-    return {
-      dow: d.toLocaleDateString(undefined, { weekday: "short" }),
-      day: d.toLocaleDateString(undefined, { day: "numeric", month: "short" })
-    };
-  }
-  function longDate(dateStr) {
-    return new Date(dateStr + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  function route() {
+    if (!DATA || !DATA.found) { fail("Could not load the schedule. Please try again later."); return; }
+    var id = new URL(window.location.href).searchParams.get(PARAM);
+    var cls = id && (DATA.classes || []).filter(function (c) { return c.id === id; })[0];
+    if (cls) renderHandoff(cls); else renderSchedule();
   }
 
-  function render(data) {
-    // found:false is a config problem (wrong slug) — a visitor cannot act on it,
-    // but it is NOT "no classes". Say could-not-load, distinct from every state.
-    if (!data || !data.found) { fail("Could not load the schedule. Please try again later."); return; }
-    var studio = data.studio || {};
-    var classes = data.classes || [];
-
+  function baseWrap() {
     var wrap = el("div", "sd-wrap");
-    wrap.style.setProperty("--sd-accent", studio.accent_color || "#111827");
+    var s = (DATA && DATA.studio) || {};
+    wrap.style.setProperty("--sd-accent", s.accent_color || "#E9D400");
+    wrap.style.setProperty("--sd-accent-ink", accentInk(s.accent_color));
+    wrap.style.setProperty("--sd-btn-fill", buttonFill(s.accent_color));
+    return wrap;
+  }
+
+  // ---- SCHEDULE -------------------------------------------------------------
+  function renderSchedule() {
+    var s = DATA.studio || {}, classes = DATA.classes || [];
+    var wrap = baseWrap();
 
     var head = el("div", "sd-head");
-    if (studio.logo_url) {
-      var img = el("img", "sd-logo"); img.src = studio.logo_url; img.alt = esc(studio.name);
-      head.appendChild(img);
-    }
-    head.appendChild(el("p", "sd-name", studio.name || "This week"));
+    if (s.logo_url) { var img = el("img", "sd-logo"); img.src = s.logo_url; img.alt = s.name || ""; head.appendChild(img); }
+    head.appendChild(el("h1", "sd-name", s.name || "Schedule"));
     wrap.appendChild(head);
 
-    // The four states each say WHICH empty it is, in copy a studio owner can act
-    // on (this is why the endpoint distinguishes them).
-    if (data.state === "unpublished") {
+    if (DATA.state === "unpublished") {
       wrap.appendChild(el("div", "sd-empty", "This studio has not published a timetable yet."));
-      mount.innerHTML = ""; mount.appendChild(wrap); return;
+      return mountNode(wrap);
     }
-    if (data.state === "empty" || classes.length === 0) {
+    if (DATA.state === "empty" || classes.length === 0) {
       wrap.appendChild(el("div", "sd-empty", "No classes scheduled just now — check back soon."));
-      mount.innerHTML = ""; mount.appendChild(wrap); return;
+      return mountNode(wrap);
     }
-    // `upcoming`: nothing this week, but classes start later — show them, with
-    // the date above, rather than pretending there is no timetable.
-    if (data.state === "upcoming" && data.next_from) {
-      wrap.appendChild(el("div", "sd-note", "Classes start " + longDate(data.next_from)));
+    if (DATA.state === "upcoming" && DATA.next_from) {
+      wrap.appendChild(el("div", "sd-note", "Classes start " + longDate(DATA.next_from)));
     }
 
-    // Group by local date, in order.
-    var byDay = {}; var order = [];
-    classes.forEach(function (c) {
-      if (!byDay[c.date]) { byDay[c.date] = []; order.push(c.date); }
-      byDay[c.date].push(c);
-    });
+    var byDay = {};
+    classes.forEach(function (c) { (byDay[c.date] || (byDay[c.date] = [])).push(c); });
 
-    var days = el("div", "sd-days");
+    var todayKey = localKey(new Date());
+    // The first day the strip lands on: today if it has classes, else the first
+    // day that does (so an "upcoming" studio opens on its opening week).
+    var firstWithClasses = Object.keys(byDay).sort()[0];
+    var selected = byDay[todayKey] ? todayKey : firstWithClasses;
+    var weekStart = mondayOf(selected);
+
+    var strip = el("div", "sd-strip");
+    var prev = el("button", "sd-arrow"); prev.type = "button"; prev.setAttribute("aria-label", "Previous week"); prev.textContent = "‹";
+    var cells = el("div", "sd-cells");
+    var next = el("button", "sd-arrow"); next.type = "button"; next.setAttribute("aria-label", "Next week"); next.textContent = "›";
+    strip.appendChild(prev); strip.appendChild(cells); strip.appendChild(next);
+
+    var daybar = el("div", "sd-daybar");
+    var dayTitle = el("h2");
+    var todayBtn = el("button", "sd-todaybtn", "Today"); todayBtn.type = "button";
+    daybar.appendChild(dayTitle); daybar.appendChild(todayBtn);
+
     var list = el("div", "sd-list");
-    var selected = order[0];
 
-    function paintList() {
+    function paintCells() {
+      cells.innerHTML = "";
+      for (var i = 0; i < 7; i++) {
+        var key = addDays(weekStart, i);
+        var d = new Date(key + "T12:00:00Z");
+        var cell = el("button", "sd-cell"); cell.type = "button";
+        var isToday = key === todayKey;
+        if (isToday) cell.className += " sd-today";
+        cell.setAttribute("aria-pressed", key === selected ? "true" : "false");
+        cell.appendChild(el("div", "sd-dnum", isToday ? "Today"
+          : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" }).format(d)));
+        cell.appendChild(el("div", "sd-dow",
+          new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(d).toUpperCase()));
+        (function (k) { cell.addEventListener("click", function () { selected = k; paintCells(); paintDay(); }); })(key);
+        cells.appendChild(cell);
+      }
+      prev.disabled = false; next.disabled = false;
+    }
+    function paintDay() {
+      dayTitle.textContent = new Date(selected + "T12:00:00Z").toLocaleDateString(undefined,
+        { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
       list.innerHTML = "";
-      (byDay[selected] || []).forEach(function (c) {
-        var row = el("a", "sd-row");
-        row.href = c.book_url; row.target = "_blank"; row.rel = "noopener";
-        row.style.borderLeftColor = c.color || "var(--sd-accent)";
+      var rows = byDay[selected] || [];
+      if (!rows.length) { list.appendChild(el("div", "sd-empty", "No classes on this day.")); return; }
+      rows.forEach(function (c) {
+        var row = el("button", "sd-row"); row.type = "button";
+        (function (id) { row.addEventListener("click", function () { open(id); }); })(c.id);
 
-        row.appendChild(el("div", "sd-time", c.time));
+        var t = el("div", "sd-time");
+        t.appendChild(el("b", null, ampm(c)));
+        t.appendChild(el("span", null, (c.duration_minutes || 0) + " min."));
+        row.appendChild(t);
 
-        var mid = el("div", "sd-mid");
-        mid.appendChild(el("div", "sd-class", c.class_name));
-        var meta = el("div", "sd-meta");
-        if (c.instructor_avatar_url) {
-          var av = el("img", "sd-av"); av.src = c.instructor_avatar_url; av.alt = ""; meta.appendChild(av);
-        }
-        var bits = [];
-        if (c.instructor_first_name) bits.push(c.instructor_first_name);
-        if (c.room) bits.push(c.room);
-        meta.appendChild(el("span", null, bits.join(" · ")));
-        mid.appendChild(meta);
-        row.appendChild(mid);
+        row.appendChild(el("div", "sd-loc", c.room || ""));
+        row.appendChild(photoNode(c, s.name));
 
-        var end = el("div", "sd-end");
+        var info = el("div", "sd-info");
+        var nm = el("div"); var cn = el("span", "sd-cname", c.class_name); nm.appendChild(cn); info.appendChild(nm);
+        var sub = [];
+        if (c.instructor_first_name) sub.push(c.instructor_first_name);
+        if (c.room) sub.push(c.room);          // shown here at narrow widths (sd-loc hidden)
+        info.appendChild(el("div", "sd-csub", sub.join(" · ")));
+        row.appendChild(info);
+
+        var act = el("div", "sd-act");
         if (c.full) {
-          end.appendChild(el("div", "sd-full", "Full"));
-          end.appendChild(el("div", "sd-book", "Join the waitlist"));
+          act.appendChild(el("div", "sd-state", "Waitlist Only"));
+          act.appendChild(el("div", "sd-btn", "Join Waitlist"));
         } else {
-          end.appendChild(el("div", "sd-spaces", c.spaces_left + (c.spaces_left === 1 ? " space" : " spaces")));
-          end.appendChild(el("div", "sd-book", "Book"));
+          act.appendChild(el("div", "sd-btn", "Reserve"));
         }
-        row.appendChild(end);
+        row.appendChild(act);
         list.appendChild(row);
       });
     }
 
-    order.forEach(function (date) {
-      var lab = dayLabel(date);
-      var btn = el("button", "sd-day");
-      btn.type = "button";
-      btn.setAttribute("aria-selected", date === selected ? "true" : "false");
-      var dow = el("span", "sd-dow", lab.dow + " "); btn.appendChild(dow);
-      btn.appendChild(document.createTextNode(lab.day));
-      btn.addEventListener("click", function () {
-        selected = date;
-        Array.prototype.forEach.call(days.children, function (b, i) {
-          b.setAttribute("aria-selected", order[i] === selected ? "true" : "false");
-        });
-        paintList();
-      });
-      days.appendChild(btn);
+    prev.addEventListener("click", function () { weekStart = addDays(weekStart, -7); paintCells(); });
+    next.addEventListener("click", function () { weekStart = addDays(weekStart, 7); paintCells(); });
+    todayBtn.addEventListener("click", function () {
+      selected = byDay[todayKey] ? todayKey : firstWithClasses;
+      weekStart = mondayOf(selected); paintCells(); paintDay();
     });
 
-    wrap.appendChild(days);
-    wrap.appendChild(list);
-    paintList();
+    wrap.appendChild(strip); wrap.appendChild(daybar); wrap.appendChild(list);
+    paintCells(); paintDay();
+    mountNode(wrap);
+  }
 
-    mount.innerHTML = "";
-    mount.appendChild(wrap);
+  // ---- HAND-OFF -------------------------------------------------------------
+  function renderHandoff(c) {
+    var s = DATA.studio || {};
+    var app = s.app_origin || "";
+    var wrap = baseWrap();
+
+    var back = el("button", "sd-back"); back.type = "button";
+    back.appendChild(document.createTextNode("‹ "));
+    back.appendChild(el("u", null, "Back to Schedule"));
+    back.addEventListener("click", function () { open(null); });
+    wrap.appendChild(back);
+
+    wrap.appendChild(el("h1", "sd-h1", "Reserve Class"));
+    wrap.appendChild(el("div", "sd-ho-name", c.class_name));
+
+    var when = new Date(c.starts_at);
+    wrap.appendChild(el("div", "sd-ho-when",
+      when.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: tz() })
+      + " at " + when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz(), timeZoneName: "short" })));
+
+    // location · class · duration · instructor — instructor OMITTED when unassigned.
+    var meta = [];
+    if (c.room) meta.push(c.room);
+    meta.push(c.class_name);
+    if (c.duration_minutes) meta.push(c.duration_minutes + " min.");
+    if (c.instructor_first_name) meta.push(c.instructor_first_name);
+    wrap.appendChild(el("div", "sd-ho-meta", meta.join(" · ")));
+
+    var details = el("a", "sd-ho-details", "View class details");
+    details.href = c.book_url || (app + "/class/" + c.id); details.target = "_blank"; details.rel = "noopener";
+    wrap.appendChild(details);
+
+    wrap.appendChild(el("hr", "sd-rule"));
+
+    var cta = el("div", "sd-cta");
+    cta.appendChild(el("h3", null, "Log in to continue"));
+    cta.appendChild(el("p", null, "Please log in or create an account to make a reservation."));
+    var next = encodeURIComponent("/class/" + c.id);
+    var login = el("a", "sd-login", "Log in");
+    login.href = app + "/login?next=" + next; login.target = "_top"; login.rel = "noopener";
+    cta.appendChild(login);
+    var create = el("div", "sd-create");
+    create.appendChild(document.createTextNode("Don't have an account? "));
+    var mk = el("a", null, "Create one now."); mk.href = app + "/signup?next=" + next; mk.target = "_top"; mk.rel = "noopener";
+    create.appendChild(mk);
+    cta.appendChild(create);
+    wrap.appendChild(cta);
+
+    mountNode(wrap);
+  }
+
+  function mountNode(node) { mount.innerHTML = ""; mount.appendChild(node); }
+
+  // ---- date helpers (studio-local dates come as YYYY-MM-DD strings) ----------
+  function ampm(c) {
+    // c.time is HH:MM in the studio's own clock; render it 12-hour without a zone.
+    var p = String(c.time || "").split(":"), h = +p[0], m = p[1] || "00";
+    var ap = h < 12 ? "AM" : "PM", hh = h % 12; if (hh === 0) hh = 12;
+    return hh + ":" + m + " " + ap;
+  }
+  function longDate(dateStr) {
+    return new Date(dateStr + "T12:00:00Z").toLocaleDateString(undefined,
+      { day: "numeric", month: "long", timeZone: "UTC" });
+  }
+  function localKey(d) {
+    // today's key in the STUDIO's zone, so "today" on the strip is the studio's.
+    return new Intl.DateTimeFormat("en-CA", { timeZone: tz(), year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  }
+  function addDays(key, n) {
+    var p = key.split("-").map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function mondayOf(key) {
+    var p = key.split("-").map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+    var dow = d.getUTCDay(); // 0=Sun..6=Sat
+    return addDays(key, -((dow + 6) % 7)); // back to Monday
   }
 })();
 </script>
