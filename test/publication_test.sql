@@ -208,7 +208,9 @@ values
   ('9b159b15-0000-0000-0000-00000000a103','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a',
    '9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-00000000ee01','Reformer',10,'9b159b15-0000-0000-0000-00000000d101',
    t_at('Europe/Prague', current_setting('t.a_week')::date + 3, '07:00'), t_at('Europe/Prague', current_setting('t.a_week')::date + 3, '07:50'), 'scheduled'),
-  -- Bo: the NEAR class (day 5, inside a 45-day window) and the FAR one (day 28, outside it)
+  -- Bo: the NEAR class (day 5, inside the window) and a later draft-month class.
+  -- The booking-WINDOW test is a108 in the month-after-next (see below); a class
+  -- in NEXT month cannot be reliably outside a 45-day window on every run date.
   ('9b159b15-0000-0000-0000-00000000a104','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a',
    '9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-00000000ee01','Reformer Near',10,'9b159b15-0000-0000-0000-00000000d102',
    t_at('Europe/Prague', current_setting('t.a_m1')::date + 4, '18:00'), t_at('Europe/Prague', current_setting('t.a_m1')::date + 4, '18:50'), 'scheduled'),
@@ -227,6 +229,14 @@ values
   ('9b159b15-0000-0000-0000-00000000a201','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a',
    '9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-00000000ee01','Reformer Later',10,'9b159b15-0000-0000-0000-00000000d101',
    t_at('Europe/Prague', current_setting('t.a_m2')::date + 2, '09:00'), t_at('Europe/Prague', current_setting('t.a_m2')::date + 2, '09:50'), 'scheduled'),
+  -- The FAR class for the booking-window test. In the month-AFTER-next, which is
+  -- already auto-published (Mia is booked into a201 there), and day 20 of it, so
+  -- it is > 45 days out on ANY run date — a class in NEXT month cannot be: late
+  -- in the month all of next month is inside a 45-day window. Anchoring to a_m2,
+  -- not to a fixed day of a_m1, is what makes this stop being date-dependent.
+  ('9b159b15-0000-0000-0000-00000000a108','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a',
+   '9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-00000000ee01','Reformer Far Window',10,'9b159b15-0000-0000-0000-00000000d102',
+   t_at('Europe/Prague', current_setting('t.a_m2')::date + 20, '18:00'), t_at('Europe/Prague', current_setting('t.a_m2')::date + 20, '18:50'), 'scheduled'),
   -- Studio B, the month after next: Bel
   ('9b159b15-0000-0000-0000-00000000b201','9b159b15-0000-0000-0000-000000000002','9b159b15-0000-0000-0000-00000000000b',
    '9b159b15-0000-0000-0000-00000000cc02','9b159b15-0000-0000-0000-00000000ee02','Manila Mat',10,'9b159b15-0000-0000-0000-00000000d201',
@@ -490,7 +500,7 @@ select expect_num('Mia now sees the month',
 select expect_text('the NEAR class books',
   (book_class('9b159b15-0000-0000-0000-00000000a104','9b159b15-0000-0000-0000-00000000f001','member')).status::text, 'booked');
 select expect_text('the FAR class is refused by the WINDOW now, which is the true reason left',
-  (book_class('9b159b15-0000-0000-0000-00000000a105','9b159b15-0000-0000-0000-00000000f001','member')).failure_reason,
+  (book_class('9b159b15-0000-0000-0000-00000000a108','9b159b15-0000-0000-0000-00000000f001','member')).failure_reason,
   'outside_booking_window');
 select expect_text('...and the horizon now runs to the end of the month after next',
   timetable_horizon('9b159b15-0000-0000-0000-000000000001') ->> 'published_through',
