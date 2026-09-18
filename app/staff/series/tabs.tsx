@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * List or Grid, remembered.
@@ -12,10 +12,15 @@ import { useRouter } from "next/navigation";
  */
 export default function ViewTabs({ view }: { view: "list" | "grid" }) {
   const router = useRouter();
+  const sp = useSearchParams();
   const pick = (v: "list" | "grid") => {
     // A year, path-scoped, lax: it is a display preference, not a session.
     document.cookie = `series_view=${v}; path=/; max-age=31536000; samesite=lax`;
-    router.push(`/series?view=${v}`);
+    // Preserve the filter (?tier/?type/?ended) across the view toggle — the view
+    // is a display choice, the filter is what you are looking at.
+    const p = new URLSearchParams(sp.toString());
+    p.set("view", v);
+    router.push(`/series?${p.toString()}`);
   };
   return (
     <div className="inline-flex rounded-lg border border-line-2 p-0.5" role="tablist">

@@ -46,12 +46,18 @@ const hhmm = (mins: number) =>
  * actually asking when it opens this screen.
  */
 export default function SeriesGrid({
-  series, weekStartsOn, today,
+  series, weekStartsOn, today, hoursFrom, hoursTo, filterLabel,
 }: {
   series: GridSeries[];
   /** 0 = Sunday. The studio's own setting, not date-fns' idea of a week. */
   weekStartsOn: number;
   today: string;
+  /** The hour range, computed by the page from the UNFILTERED series so the
+   *  shape of the week does not change as you filter — fewer blocks, same rows. */
+  hoursFrom?: number;
+  hoursTo?: number;
+  /** "Flex", "Reformer", "Flex · Reformer" — appended to the weekly total. */
+  filterLabel?: string | null;
 }) {
   // A series appears in EVERY day its rule names — one series, several cells.
   type Block = GridSeries & { day: number; start: number; end: number; isEnded: boolean };
@@ -76,10 +82,13 @@ export default function SeriesGrid({
   // The hours actually used, an hour either side. Cropping to the busy band is
   // what hides the middle of the day, and the middle of the day is the whole
   // reason to draw this.
-  const from = blocks.length
-    ? Math.max(0, Math.floor(Math.min(...blocks.map((b) => b.start)) / 60) - 1) : 6;
-  const to = blocks.length
-    ? Math.min(24, Math.ceil(Math.max(...blocks.map((b) => b.end)) / 60) + 1) : 20;
+  // The range is handed in (from the unfiltered week) so filtering draws fewer
+  // blocks without collapsing the grid's hours; only when it is not supplied do
+  // we derive it from the blocks in hand.
+  const from = hoursFrom ?? (blocks.length
+    ? Math.max(0, Math.floor(Math.min(...blocks.map((b) => b.start)) / 60) - 1) : 6);
+  const to = hoursTo ?? (blocks.length
+    ? Math.min(24, Math.ceil(Math.max(...blocks.map((b) => b.end)) / 60) + 1) : 20);
   const hours = Array.from({ length: to - from }, (_, i) => from + i);
   const span = (to - from) * 60;
   const ROW = 52; // px per hour
@@ -118,6 +127,9 @@ export default function SeriesGrid({
           {series.length - endedCount > 0 && (
             <> from <span className="num text-ink">{series.length - endedCount}</span>{" "}
               series</>
+          )}
+          {filterLabel && (
+            <span className="text-ink-3"> · filtered: <span className="text-ink">{filterLabel}</span></span>
           )}
           {endedCount > 0 && (
             <span className="text-ink-3">
