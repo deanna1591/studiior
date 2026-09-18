@@ -388,6 +388,35 @@ select expect_raises('they cannot invite the first studio''s instructor',
   $$ select invite_instructor('beefbeef-0000-0000-0000-00000000e002','x@example.com') $$, 'PT403');
 reset role;
 
+-- =============================================================================
+-- Instructor RATES (Decision 22) — set through set_instructor_rate, immutable
+-- and effective-dated. A manager sets one; a second version supersedes from its
+-- own date; the same date is refused; front desk cannot set a rate at all.
+-- =============================================================================
+insert into auth.users (id) values ('beefbeef-0000-0000-0000-0000000000a2');
+insert into profiles (id, email) values ('beefbeef-0000-0000-0000-0000000000a2','beef-a-desk@example.com');
+insert into studio_staff (studio_id, user_id, email, role) values
+  ('beefbeef-0000-0000-0000-00000000000a','beefbeef-0000-0000-0000-0000000000a2','beef-a-desk@example.com','front_desk');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','beefbeef-0000-0000-0000-0000000000a1',false);  -- owner/manager
+select expect_text('a manager sets a rate through the function',
+  set_instructor_rate('beefbeef-0000-0000-0000-00000000e001', date '2026-11-01', 90000, 7500, 2, 140000) ->> 'ok', 'true');
+select expect_num('...and instructor_rate_at reads it back in force',
+  (instructor_rate_at('beefbeef-0000-0000-0000-00000000e001', date '2026-11-15')).base_rate_cents, 90000);
+select expect_text('a second version is ADDED, not an edit',
+  set_instructor_rate('beefbeef-0000-0000-0000-00000000e001', date '2026-12-01', 100000, 7500, 2, 140000) ->> 'ok', 'true');
+select expect_num('...in force from its own effective date',
+  (instructor_rate_at('beefbeef-0000-0000-0000-00000000e001', date '2026-12-15')).base_rate_cents, 100000);
+select expect_num('...while the day before still pays the earlier rate',
+  (instructor_rate_at('beefbeef-0000-0000-0000-00000000e001', date '2026-11-30')).base_rate_cents, 90000);
+select expect_raises('a second version on the SAME date is refused — a version is history',
+  $$ select set_instructor_rate('beefbeef-0000-0000-0000-00000000e001', date '2026-12-01', 111111) $$, 'PT409');
+select set_config('request.jwt.claim.sub','beefbeef-0000-0000-0000-0000000000a2',false);  -- front desk
+select expect_raises('front desk cannot set a rate',
+  $$ select set_instructor_rate('beefbeef-0000-0000-0000-00000000e001', date '2027-01-01', 90000) $$, 'PT403');
+reset role;
+
 -- anon reaches the two pre-login surfaces and nothing else. These are the
 -- eighth and ninth in the codebase and the count is deliberate.
 set role anon;

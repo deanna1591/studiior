@@ -53,3 +53,39 @@ for table in ("studio_settings", "membership_plans"):
     print("\n--- HAS A WRITE PATH (%d)" % len(written))
     print("    " + ", ".join(n for n, *_ in written))
     print()
+
+# ---------------------------------------------------------------------------
+# The other half of this class of gap: a SECURITY DEFINER *writer* that a client
+# can call (granted to authenticated, not anon) but that nothing in app/ ever
+# calls. That is exactly the shape set_instructor_rate was in — a working,
+# guarded function to set an instructor's pay, with no screen, so a studio's
+# contract could not be entered. A trigger or a pure reader is not this; an
+# unreachable writer with a live grant is.
+# ---------------------------------------------------------------------------
+def secdef_writers():
+    q = ("select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace "
+         "where n.nspname='public' and p.prosecdef "
+         "and p.prorettype <> 'trigger'::regtype "
+         "and has_function_privilege('authenticated', p.oid, 'execute') "
+         "and not has_function_privilege('anon', p.oid, 'execute') "
+         "and p.prosrc ~* '(insert into|update |delete from)' "
+         "group by p.proname order by p.proname")
+    out = subprocess.run(["psql", PG, "-tAc", q], capture_output=True, text=True).stdout.strip().split("\n")
+    return [l.strip() for l in out if l.strip()]
+
+def referenced(name):
+    # A real app call names the function as a quoted string (an RPC), so look for
+    # it quoted — crude, but a false "referenced" is the safe direction.
+    needles = ('"%s"' % name, "'%s'" % name)
+    return any(nd in s for s in BLOB.values() for nd in needles)
+
+print("=" * 78)
+print("SECURITY DEFINER WRITERS THE APP NEVER CALLS")
+print("=" * 78)
+orphans = [n for n in secdef_writers() if not referenced(n)]
+print("\n--- CLIENT-CALLABLE WRITER, NO SCREEN: not named in app/ (%d)" % len(orphans))
+print("    (each is granted to authenticated and writes, yet nothing calls it —")
+print("     either it needs a screen, or its grant should be revoked. Check each.)")
+for n in orphans:
+    print("    %s" % n)
+print()
