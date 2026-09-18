@@ -255,21 +255,65 @@ export async function savePayFrequency(_prev: PlainState, fd: FormData): Promise
   // weekly/fortnightly also drive pay_period_days so the days-based engine and
   // the mode agree; monthly/semimonthly ignore days.
   const days = mode === "weekly" ? 7 : mode === "fortnightly" ? 14 : undefined;
-  // F: the settle day. Blank ("") means the studio has not set one, so no
-  // payment date is shown — null, not a default day.
-  const dowRaw = String(fd.get("pay_settle_dow") ?? "").trim();
-  const settleDow = dowRaw === "" ? null : Math.min(6, Math.max(0, Math.round(Number(dowRaw))));
+
+  // Decision 31: the settle rule is ONE of three shapes. Exactly one column is
+  // set (or neither), which is what the CHECK enforces — never both.
+  const shape = String(fd.get("settle_shape") ?? "none");
+  let settleDow: number | null = null;
+  let settleOffset: number | null = null;
+  if (shape === "weekday") {
+    const dowRaw = String(fd.get("pay_settle_dow") ?? "").trim();
+    settleDow = dowRaw === "" ? null : Math.min(6, Math.max(0, Math.round(Number(dowRaw))));
+  } else if (shape === "offset") {
+    const offRaw = String(fd.get("pay_settle_offset_days") ?? "").trim();
+    settleOffset = offRaw === "" ? null : Math.min(31, Math.max(0, Math.round(Number(offRaw))));
+  }
+
+  // pay_period_anchor only means anything for weekly/fortnightly (which day the
+  // cycle turns on); cleared for monthly/semimonthly, which don't need it.
+  const anchorRaw = String(fd.get("pay_period_anchor") ?? "").trim();
+  const anchor = (mode === "weekly" || mode === "fortnightly") && anchorRaw !== "" ? anchorRaw : null;
 
   const supabase = createClient();
-  const patch = days
-    ? { pay_period_mode: mode, pay_period_second_day: second, pay_period_days: days, pay_settle_dow: settleDow }
-    : { pay_period_mode: mode, pay_period_second_day: second, pay_settle_dow: settleDow };
+  const base = {
+    pay_period_mode: mode, pay_period_second_day: second,
+    pay_settle_dow: settleDow, pay_settle_offset_days: settleOffset,
+    pay_period_anchor: anchor,
+  };
+  const patch = days ? { ...base, pay_period_days: days } : base;
   const { data, error } = await supabase.from("studio_settings").update(patch)
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
   revalidatePath("/settings/payroll");
   return { ok: true, message: "Saved. Periods created from here on use the new frequency." };
+}
+
+/**
+ * Decision 31 / migration 083: the conversion bonus configuration. Attribution
+ * is fixed to the member's FIRST-EVER class (Decision 22) and never written from
+ * here — last-class attribution rewards whoever taught the day a card cleared.
+ * Off writes enabled=false and leaves nothing behind (the all_off canary).
+ */
+export async function saveConversion(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const enabled = fd.get("conversion_bonus_enabled") === "on";
+  const amountRaw = Number(fd.get("conversion_bonus_amount") ?? 0); // whole currency units
+  const cents = Math.max(0, Math.round((Number.isFinite(amountRaw) ? amountRaw : 0) * 100));
+  const windowRaw = Number(fd.get("conversion_window_days") ?? 30);
+  const windowDays = Math.min(365, Math.max(1, Math.round(Number.isFinite(windowRaw) ? windowRaw : 30)));
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings").update({
+    conversion_bonus_enabled: enabled,
+    conversion_bonus_cents: cents,
+    conversion_window_days: windowDays,
+  }).eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/payroll");
+  return { ok: true, message: enabled ? "Saved. The conversion bonus is on." : "Saved. The conversion bonus is off." };
 }
 
 export async function saveGuestPasses(_prev: PlainState, fd: FormData): Promise<PlainState> {

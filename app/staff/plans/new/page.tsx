@@ -17,7 +17,7 @@ const BLANK: PlanDraft = {
   credits: null, credits_per_period: null, validity_days: null,
   commitment_months: 0, cancellation_notice_days: 0,
   freeze_allowed: true, max_freeze_days: null,
-  booking_window_days: null, max_bookings_per_day: null, restrictions: null,
+  booking_window_days: null, max_bookings_per_day: null, restrictions: null, counts_for_conversion: false,
 };
 
 export default async function NewPlan({
@@ -42,7 +42,7 @@ export default async function NewPlan({
       .select("id, name, description, type, billing_interval, billing_interval_count, credits, credits_per_period, validity_days, signup_fee_cents, commitment_months, cancellation_notice_days, freeze_allowed, max_freeze_days, booking_window_days, max_bookings_per_day, restrictions, visibility")
       .order("sort_order"),
     supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
-    supabase.from("studio_settings").select("peak_allowance_enabled")
+    supabase.from("studio_settings").select("peak_allowance_enabled, conversion_bonus_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     // 142: whether seat caps are on at all is one predicate, not a per-plan null.
     supabase.rpc("studio_uses_seat_caps", { p_studio_id: ctx.studioId }),
@@ -53,6 +53,7 @@ export default async function NewPlan({
   // begins with no limit, like every other plan.
   const seatCaps = usesSeatCaps ?? false;
   const peakHours = settings?.peak_allowance_enabled ?? false;
+  const conversionOn = settings?.conversion_bonus_enabled ?? false;
   const blank = searchParams.template === "blank";
   const chosen = (templates ?? []).find((t) => t.id === searchParams.template);
 
@@ -62,7 +63,7 @@ export default async function NewPlan({
                 actions={<NavLink href="/plans/new">Start from a template instead</NavLink>}>
         <PlanForm draft={BLANK} classTypes={classTypes ?? []} currency={ctx.currency}
                   activeMemberships={0} mode="create"
-                seatCaps={seatCaps} taken={null} peakHours={peakHours} />
+                seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} />
       </AppShell>
     );
   }
@@ -119,6 +120,7 @@ export default async function NewPlan({
     booking_window_days: chosen.booking_window_days,
     max_bookings_per_day: chosen.max_bookings_per_day,
     restrictions: (chosen.restrictions as PlanDraft["restrictions"]) ?? null,
+    counts_for_conversion: false,
     visibility: chosen.visibility,
   };
 
@@ -130,7 +132,7 @@ export default async function NewPlan({
       </p>
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={ctx.currency}
                 activeMemberships={0} mode="create"
-                seatCaps={seatCaps} taken={null} peakHours={peakHours} />
+                seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} />
     </AppShell>
   );
 }

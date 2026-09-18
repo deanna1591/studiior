@@ -46,19 +46,20 @@ of these decides whether somebody loses a credit or pays a fee.
 | `sub_late_free_cancel` | true |
 | `significant_move_hours` | 2 |
 
-### Decision 22's pay half (6)
-Built and tested, with no way to configure it. A studio can be owed money on
-terms it cannot see.
+### Decision 22's pay half — NOW REACHABLE (Decision 31, migration 640)
 
-| column | default |
-|---|---|
-| `pay_period_days` | 14 |
-| `pay_period_anchor` | null |
-| `conversion_bonus_enabled` | false |
-| `conversion_bonus_cents` | 0 |
-| `conversion_window_days` | 30 |
-| `conversion_attribution` | `first_class` |
-| `membership_plans.counts_for_conversion` | false |
+The payroll and plan UI built for Decision 31 closes this. `pay_period_anchor`
+(shown for weekly/fortnightly only), `conversion_bonus_enabled`,
+`conversion_bonus_cents`, `conversion_window_days` are on `/settings/payroll`;
+`membership_plans.counts_for_conversion` is on the plan form (shown only while
+the bonus is on); `pay_period_days` is written by the frequency control. The
+audit confirms all of these now have a write path.
+
+**`conversion_attribution` stays unreachable ON PURPOSE**, like `checkin_secret`
+below. Decision 22 fixes attribution to the member's FIRST-EVER class — offering
+it as a choice would let a studio pick last-class attribution, which rewards
+whoever taught the day a card cleared, close to random. The payroll screen shows
+it read-only ("Attributed to: the first class") and never writes it. Not a gap.
 
 ### The instructor week — Decision 18 (5)
 `week_confirm_escalate_days` has a control at `/settings`; the rest of the cycle

@@ -475,6 +475,42 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 31 — The settle date gains a second shape, and Reform's payroll contract is expressible
+
+**Not yet built — this entry is the decision, approved before the migration.** Migration 140 (Decision 22's follow-on) gave the settle date one shape: a **weekday** rule, `pay_settle_dow`, resolving to the first such weekday strictly after the period's `ends_on` ("the Friday after close"). Reform Collective's instructor agreement pays **on the 15th and the last day of the month** — a semimonthly cycle whose pay date IS each period's own end — and no weekday rule can say that. So the settle rule gains a second shape and the weekday example in earlier notes is superseded for this tenant.
+
+### A fixed offset in days after the period closes, beside the weekday rule
+
+`studio_settings.pay_settle_offset_days` (nullable int) is the number of days after `ends_on` that pay lands — **0 means the close date itself**. It sits beside `pay_settle_dow`, and **exactly one may be set**: a CHECK enforces `pay_settle_dow is null OR pay_settle_offset_days is null`, and the offset is **bounded** — `pay_settle_offset_days is null OR (pay_settle_offset_days between 0 and 31)`, so a fat-fingered 300 cannot push the pay date a year out. **Both null means no date is shown**, exactly as today (the feature stays off by default, per tenant). `pay_settle_on()` gains the offset branch and stays **pure and immutable** — it takes `ends_on` plus whichever shape is set and returns a date, reading no tenant state and guarding nothing, so it can be computed anywhere a statement is rendered. Both shapes are pinned to `ends_on`, never to when a manager actually closed the period, so the promised date is stable whether the period is closed on time or late.
+
+### "The 30th" is rendered as "the last day of the month", because that is what the period end is
+
+The contract says "the last day of the month"; a semimonthly studio with `pay_period_second_day = 16` runs a second period of `16..month-end`, so its `ends_on` already **is** the last day — the 28th, 29th, 30th or 31st, whichever the month has. With `pay_settle_offset_days = 0` the pay date is that same last day, and February resolves to the 28th or 29th with no special case, because the date comes from the period boundary, not from a stored "30". The first period (`1..15`) ends on the 15th and pays the 15th. This is exactly "the 15th and the last day", expressed as `semimonthly + second_day 16 + settle offset 0`, not as a new rule.
+
+### The trade-off of offset 0, and why the screen recommends a small offset
+
+Paying **on** the close date is the tightest promise, and Decision 28 is the reason it can bite: a class that ran is written **held** until the instructor checks themselves in, and `close_pay_period()` refuses while any record is held (PT409). Only records confirmed by then are payable, so a period cannot be closed — and therefore cannot be paid — while a check-in is outstanding. With `offset 0`, an unconfirmed class on the 15th means the pay date and the close both slip until it is confirmed or a manager releases it. So the settings screen **recommends a small offset** (a day or two), which leaves room to chase or release held records before the promised pay date arrives, while `offset 0` stays available for a studio whose check-ins are always in on time. This does not contradict Decision 28; it is Decision 28's held-record rule seen from the pay-date end.
+
+### The conversion bonus, recorded as configured (not changed)
+
+Decision 22 already settled the mechanism: the bonus is attributed to the instructor of the member's **first ever class** (`conversion_attribution = 'first_class'`, migration 083 — attribution is **read-only** in the UI, because last-class attribution rewards whoever taught the day a card cleared, close to random), **one per member ever** (unique index), fired from the membership insert so cash and Stripe behave identically, and **clawed back as an adjustment** in the next open period on refund. What Decision 31 makes reachable is the **configuration**: `conversion_bonus_enabled` (off by default — no bonus, no trace, the `all_off` canary must stay at zero), `conversion_bonus_cents`, `conversion_window_days` (the member must buy within this many days of that first class; Reform's is 30), and **`membership_plans.counts_for_conversion`** per plan (which purchases qualify — Reform's paid plans yes, the drop-in no). None of these had a screen, so Reform's contract could not be entered at all.
+
+### `pay_period_anchor` is weekly/fortnightly only
+
+The period **mode** (`pay_period_mode`) already exists with four values. `monthly` uses the calendar month and `semimonthly` uses `pay_period_second_day`; neither needs an anchor. `weekly` and `fortnightly` need a reference date to know which day the cycle turns on — that is `pay_period_anchor`, and the settings screen shows it **only for those two modes**, absent for the mode Reform runs.
+
+### Contradiction check — none
+
+Read against Decisions 22, 28 and 140: Decision 31 **extends** 140 (a second settle shape beside the weekday one, same `ends_on` pin, same off-by-default posture) rather than replacing it; it **relies on** 28 (the held-record rule is what makes the offset-0 trade-off real) rather than working around it; and it **exposes** Decision 22's conversion mechanism as configuration without altering the attribution, the once-ever rule, or the clawback. The only thing superseded is the illustrative "fortnightly on Friday" in earlier notes, which was an example, not a commitment.
+
+### Open — per head at the cutoff, or per attending head
+
+Per-head pay is computed from **`booked_at_cutoff`** — the headcount snapshotted at the core cutoff — **not** from who actually attends. Verified from `compute_class_pay_run` (migration `20260831430000`): `v_heads := coalesce(o.booked_at_cutoff, 0)`, and the group ran/committed branch is `base + greatest(0, v_heads − per_head_threshold) × per_head + (v_heads ≥ capacity ? full_house_bonus : 0)` — so the **full-house bonus uses the same cutoff count**. A member who books *after* the cutoff and turns up is a real body in the room who earns the instructor **no** per-head and cannot tip the class into the full-house bonus; conversely a booked no-show still pays. This is Decision 22's "committed is terminal, never from attendance", and it cuts both ways. **Whether Reform's contract means "₱75 per head at the cutoff" or "₱75 per attending head" is UNRESOLVED, and the two diverge exactly for a late booker — it must be answered before the first period is paid.** The build only records which count is used; it does not change the behaviour.
+
+**Where:** a new migration adding `pay_settle_offset_days` + the CHECK and the `pay_settle_on()` offset branch; UI for the settle rule, `pay_period_anchor` (weekly/fortnightly), the conversion block, and the per-plan `counts_for_conversion`. **Reuses:** migration 140 (`pay_settle_on`), 134 (period modes), 083 (conversion attribution), Decision 28 (held records). **Status:** approved as a decision; build pending. **Off by default** — asserted inert by the `all_off` canary.
+
+---
+
 ## 30 — A new member's first class is free
 
 **Built: migration `20260831630000` (free first class).** Optional per studio, **off by default** (`studio_settings.free_first_class_enabled`), toggleable at any time and leaving no trace when off. A stranger signs up on the studio's own subdomain, books a class, and it costs nothing — no host, no invite, no card, no credits. Reform Collective opens with no card provider (Stripe does not serve the Philippines), so this is how a first-timer gets in the door at all. A per-studio `free_first_peak_allowed` (default true) lets a studio keep free seats out of its peak hours.

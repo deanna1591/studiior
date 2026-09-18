@@ -31,6 +31,7 @@ export type PlanDraft = {
   booking_window_days: number | null;
   max_bookings_per_day: number | null;
   restrictions: { class_type_ids?: string[] } | null;
+  counts_for_conversion: boolean;
   max_active_members: number | null;
   show_remaining_below: number | null;
   on_limit_reached: string;
@@ -61,7 +62,7 @@ function Submit({ label }: { label: string }) {
 const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
 export default function PlanForm({
-  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken, peakHours,
+  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken, peakHours, conversionOn,
 }: {
   draft: PlanDraft;
   classTypes: { id: string; name: string }[];
@@ -74,6 +75,8 @@ export default function PlanForm({
   taken: number | null;
   /** Decision 24's peak switch. Off, and this form must show no trace of peak hours. */
   peakHours: boolean;
+  /** Decision 22/31's conversion switch. Off, and this form shows no conversion field. */
+  conversionOn: boolean;
 }) {
   const [state, action] = useFormState<PlanFormState, FormData>(
     mode === "create" ? createPlan : updatePlan,
@@ -314,6 +317,24 @@ export default function PlanForm({
               twice for it.
             </p>
           )}
+        </Section>
+      )}
+
+      {/* Decision 22/31: which purchases earn the instructor the conversion
+          bonus. Shown only while the studio runs the bonus (all_off = no trace). */}
+      {conversionOn && (
+        <Section title="Conversion bonus">
+          <Field label="Qualifying purchase">
+            <label className="flex items-center gap-2 pt-2 text-sm">
+              <input type="checkbox" name="counts_for_conversion" defaultChecked={draft.counts_for_conversion} />
+              Buying this plan counts toward the conversion bonus
+            </label>
+            <p className="mt-1 text-xs text-ink-3">
+              When a new member buys this plan within the window, the instructor of their
+              first-ever class earns the bonus. Leave off for plans that should not qualify
+              (a drop-in, say).
+            </p>
+          </Field>
         </Section>
       )}
 

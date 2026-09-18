@@ -5693,6 +5693,7 @@ export type Database = {
           pay_period_mode: string
           pay_period_second_day: number
           pay_settle_dow: number | null
+          pay_settle_offset_days: number | null
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
@@ -5778,6 +5779,7 @@ export type Database = {
           pay_period_mode?: string
           pay_period_second_day?: number
           pay_settle_dow?: number | null
+          pay_settle_offset_days?: number | null
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
@@ -5863,6 +5865,7 @@ export type Database = {
           pay_period_mode?: string
           pay_period_second_day?: number
           pay_settle_dow?: number | null
+          pay_settle_offset_days?: number | null
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
@@ -6750,6 +6753,11 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      exp_settle: { Args: { per: string; uid: string }; Returns: string }
+      expect_txt: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7126,6 +7134,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      normalize_email_key: { Args: { p_email: string }; Returns: string }
       notification_api_key: { Args: never; Returns: string }
       notification_setting: { Args: { p_key: string }; Returns: string }
       notification_wanted: {
@@ -7196,7 +7205,7 @@ export type Database = {
       }
       pay_period_export: { Args: { p_period_id: string }; Returns: Json }
       pay_settle_on: {
-        Args: { p_dow: number; p_ends_on: string }
+        Args: { p_dow: number; p_ends_on: string; p_offset_days: number }
         Returns: string
       }
       pay_statement: {
@@ -7734,6 +7743,10 @@ export type Database = {
       stamp_open_shift: {
         Args: { p_occurrence_id: string }
         Returns: undefined
+      }
+      stmt_settle: {
+        Args: { inst: string; per: string; uid: string }
+        Returns: string
       }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }

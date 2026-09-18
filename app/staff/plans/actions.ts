@@ -23,17 +23,18 @@ type ReadResult =
   | { ok: false; error: string }
   | { ok: true; row: PlanFields };
 
-async function studioSwitches(studioId: string): Promise<{ seatCaps: boolean; peakHours: boolean }> {
+async function studioSwitches(studioId: string): Promise<{ seatCaps: boolean; peakHours: boolean; conversionOn: boolean }> {
   const supabase = createClient();
   const { data } = await supabase.from("studio_settings")
-    .select("seat_caps_enabled, peak_allowance_enabled").eq("studio_id", studioId).maybeSingle();
+    .select("seat_caps_enabled, peak_allowance_enabled, conversion_bonus_enabled").eq("studio_id", studioId).maybeSingle();
   return {
     seatCaps: data?.seat_caps_enabled ?? false,
     peakHours: data?.peak_allowance_enabled ?? false,
+    conversionOn: data?.conversion_bonus_enabled ?? false,
   };
 }
 
-function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: boolean): ReadResult {
+function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: boolean, conversionOn: boolean): ReadResult {
   const type = String(fd.get("type") ?? "") as PlanType;
   const f = FIELDS[type];
   if (!f) return { ok: false, error: "Pick a plan type." };
@@ -80,6 +81,10 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
       cancellation_notice_days: f.commitment ? (num("cancellation_notice_days") ?? 0) : 0,
       freeze_allowed: f.freeze ? fd.get("freeze_allowed") === "on" : false,
       max_freeze_days: f.freeze ? num("max_freeze_days") : null,
+
+      // Decision 22/31: written only while the studio runs the bonus, so an
+      // edit with the switch off leaves the plan's stored value untouched.
+      ...(conversionOn ? { counts_for_conversion: fd.get("counts_for_conversion") === "on" } : {}),
 
       booking_window_days: num("booking_window_days"),
       max_bookings_per_day: num("max_bookings_per_day"),
@@ -158,7 +163,7 @@ export async function createPlan(_prev: PlanFormState, fd: FormData): Promise<Pl
   if (!ctx) return { error: "Not signed in." };
 
   const sw = await studioSwitches(ctx.studioId);
-  const parsed = readForm(fd, ctx.currency, sw.seatCaps, sw.peakHours);
+  const parsed = readForm(fd, ctx.currency, sw.seatCaps, sw.peakHours, sw.conversionOn);
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = createClient();
@@ -182,7 +187,7 @@ export async function updatePlan(_prev: PlanFormState, fd: FormData): Promise<Pl
 
   const id = String(fd.get("id") ?? "");
   const sw = await studioSwitches(ctx.studioId);
-  const parsed = readForm(fd, ctx.currency, sw.seatCaps, sw.peakHours);
+  const parsed = readForm(fd, ctx.currency, sw.seatCaps, sw.peakHours, sw.conversionOn);
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = createClient();

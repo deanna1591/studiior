@@ -40,7 +40,7 @@ export default async function EditPlan({
         .select("id", { count: "exact", head: true })
         .eq("plan_id", params.id)
         .not("status", "in", "(cancelled,expired)"),
-      supabase.from("studio_settings").select("peak_allowance_enabled")
+      supabase.from("studio_settings").select("peak_allowance_enabled, conversion_bonus_enabled")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       // Decision 24: the seat count comes from plan_seats(), never from the
       // count above. The two happen to agree — "not cancelled and not expired"
@@ -55,6 +55,7 @@ export default async function EditPlan({
   const active = liveCount ?? 0;
   const seatCaps = usesSeatCaps ?? false;
   const peakHours = settings?.peak_allowance_enabled ?? false;
+  const conversionOn = settings?.conversion_bonus_enabled ?? false;
   const taken = (seats ?? []).find((r) => r.plan_id === params.id)?.taken ?? null;
 
   const draft: PlanDraft = {
@@ -78,6 +79,7 @@ export default async function EditPlan({
     booking_window_days: plan.booking_window_days,
     max_bookings_per_day: plan.max_bookings_per_day,
     restrictions: (plan.restrictions as PlanDraft["restrictions"]) ?? null,
+    counts_for_conversion: plan.counts_for_conversion ?? false,
     peak_allowance: plan.peak_allowance,
     peak_allowance_period: plan.peak_allowance_period,
     max_active_members: plan.max_active_members,
@@ -97,7 +99,7 @@ export default async function EditPlan({
       {searchParams.saved && <Notice kind="ok">Saved.</Notice>}
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
                 activeMemberships={active} mode="edit"
-                seatCaps={seatCaps} taken={taken} peakHours={peakHours} />
+                seatCaps={seatCaps} taken={taken} peakHours={peakHours} conversionOn={conversionOn} />
       <PlanLifecycle id={plan.id} status={plan.status} activeMemberships={active} />
     </AppShell>
   );

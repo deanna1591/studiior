@@ -37,18 +37,31 @@ end $$;
 -- The date arithmetic, with teeth. 2026-09-17 is a Thursday (dow 4),
 -- 2026-09-18 a Friday (5), 2026-09-19 a Saturday (6).
 -- =============================================================================
+-- The WEEKDAY shape is unchanged (now the 3-arg form, offset null).
 select expect_txt('Thursday end, Friday settle -> the very next day',
-  pay_settle_on(date '2026-09-17', 5)::text, '2026-09-18');
+  pay_settle_on(date '2026-09-17', 5, null)::text, '2026-09-18');
 select expect_txt('Friday end, Friday settle -> the NEXT Friday, never the same day (strictly after)',
-  pay_settle_on(date '2026-09-18', 5)::text, '2026-09-25');
+  pay_settle_on(date '2026-09-18', 5, null)::text, '2026-09-25');
 select expect_txt('Saturday end, Friday settle -> the following Friday',
-  pay_settle_on(date '2026-09-19', 5)::text, '2026-09-25');
+  pay_settle_on(date '2026-09-19', 5, null)::text, '2026-09-25');
 select expect_txt('Thursday end, Sunday settle -> that Sunday',
-  pay_settle_on(date '2026-09-17', 0)::text, '2026-09-20');
+  pay_settle_on(date '2026-09-17', 0, null)::text, '2026-09-20');
 select expect_txt('no settle day set -> no date (off)',
-  coalesce(pay_settle_on(date '2026-09-18', null)::text, 'null'), 'null');
+  coalesce(pay_settle_on(date '2026-09-18', null, null)::text, 'null'), 'null');
 select expect_txt('an out-of-range day -> no date',
-  coalesce(pay_settle_on(date '2026-09-18', 9)::text, 'null'), 'null');
+  coalesce(pay_settle_on(date '2026-09-18', 9, null)::text, 'null'), 'null');
+
+-- Decision 31: the OFFSET shape. 0 = the close date itself.
+select expect_txt('offset 0 on a 15th close pays the 15th',
+  pay_settle_on(date '2026-03-15', null, 0)::text, '2026-03-15');
+select expect_txt('offset 0 on a month-end close pays that last day (February, no special case)',
+  pay_settle_on(date '2026-02-28', null, 0)::text, '2026-02-28');
+select expect_txt('a leap February end pays the 29th',
+  pay_settle_on(date '2028-02-29', null, 0)::text, '2028-02-29');
+select expect_txt('offset 2 lands two days after close',
+  pay_settle_on(date '2026-03-15', null, 2)::text, '2026-03-17');
+select expect_txt('offset crossing a month boundary is a real date',
+  pay_settle_on(date '2026-03-31', null, 3)::text, '2026-04-03');
 
 -- =============================================================================
 -- Per tenant, through the statement. Three studios, same period ends_on
@@ -94,5 +107,49 @@ select expect_txt('export names the settle date at period level',
   exp_settle('5e775e77-0000-0000-0000-0000000000a1','5e775e77-0000-0000-0000-0000000f0001'), '2026-09-25');
 select expect_txt('export shows no date for a studio with no settle day',
   exp_settle('5e775e77-0000-0000-0000-0000000000a1','5e775e77-0000-0000-0000-0000000f0003'), 'null');
+
+-- =============================================================================
+-- Decision 31: exactly one shape (the CHECK), the offset bounded, and the offset
+-- carried through the statement. Studio A has dow=5, B has dow=3 (from above).
+-- =============================================================================
+do $$
+begin
+  begin
+    update studio_settings set pay_settle_offset_days = 0
+      where studio_id = '5e775e77-0000-0000-0000-000000000001';   -- already has dow=5
+    raise exception 'NO_REFUSAL';
+  exception
+    when check_violation then raise notice 'PASS  both settle shapes at once is refused by the CHECK (23514)';
+    when others then raise exception 'FAIL  expected check_violation, got %', sqlstate;
+  end;
+end $$;
+do $$
+begin
+  begin
+    update studio_settings set pay_settle_dow = null, pay_settle_offset_days = 32
+      where studio_id = '5e775e77-0000-0000-0000-000000000002';
+    raise exception 'NO_REFUSAL';
+  exception
+    when check_violation then raise notice 'PASS  an offset of 32 is refused by the bounds CHECK';
+    when others then raise exception 'FAIL  expected check_violation for offset 32, got %', sqlstate;
+  end;
+end $$;
+
+-- A studio on the OFFSET shape (0 = close date), semimonthly second period ending
+-- on a month-end: the statement names that last day. Proves the re-issued reader
+-- passes the offset into pay_settle_on.
+insert into studios (id,name,slug,timezone,currency,status) values
+  ('5e775e77-0000-0000-0000-000000000004','Set D','5e77-d','Asia/Manila','PHP','active');
+insert into studio_settings (studio_id, pay_settle_offset_days) values
+  ('5e775e77-0000-0000-0000-000000000004', 0);
+insert into studio_staff (id,studio_id,user_id,email,role) values
+  ('5e775e77-0000-0000-0000-0000000a0004','5e775e77-0000-0000-0000-000000000004','5e775e77-0000-0000-0000-0000000000a1','5e77-o4@example.com','owner');
+insert into instructors (id,studio_id,display_name,status) values
+  ('5e775e77-0000-0000-0000-0000000d0004','5e775e77-0000-0000-0000-000000000004','I4','active');
+insert into pay_periods (id,studio_id,starts_on,ends_on,status) values
+  ('5e775e77-0000-0000-0000-0000000f0004','5e775e77-0000-0000-0000-000000000004', date '2026-02-16', date '2026-02-28','open');
+select expect_txt('offset-0 studio: the statement pays on the period end (Feb month-end)',
+  stmt_settle('5e775e77-0000-0000-0000-0000000000a1','5e775e77-0000-0000-0000-0000000d0004','5e775e77-0000-0000-0000-0000000f0004'),
+  '2026-02-28');
 
 do $$ begin raise notice 'pay_settle_test: all assertions passed'; end $$;
