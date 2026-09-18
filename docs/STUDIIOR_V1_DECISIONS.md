@@ -4,6 +4,8 @@
 
 **Source of truth above this file:** `docs/STUDIIOR_PRODUCT_BIBLE.md`. Note its per-chapter **MVP Scope** sections — Ch. 4, Ch. 5, 6.23, Ch. 7, 8.18, Ch. 10, Ch. 12 — which is where scope actually lives. The earlier citation here ("Ch. 8 seven modules, Ch. 7 exclusions, Ch. 9 roles, Ch. 20 scope test") pointed at chapters that either say something else or do not exist; roles are in `STUDIIOR_V1_PERMISSIONS.md`.
 
+**On the numbering:** the entries are not contiguous. **13** is real — the community-feed exclusion — but it lives in *Excluded from V1* below rather than as its own `## 13`. **19** and **20** were never assigned; checked against git history (`git log -S "Decision 19" --all` and 20 return nothing, no doc references), they are skipped numbers, not lost entries. Recent decisions (25–30) sit just below Decision 18, newest first.
+
 ---
 
 ## 1 — Payment source resolution: soonest expiry first
@@ -490,6 +492,30 @@ The free-once rule is keyed on email, and two addresses that reach the same inbo
 **It is used for NOTHING that links or addresses a person** — not sending, not display, not login, not account claiming or member linking. The raw address the person typed lives on their `members` row and is what mail is addressed to and what claiming and login match on. `guest_passes.guest_email` is a ledger column, **stored lowercased and trimmed at both doors (`book_guest` and `book_first_free`), never plus- or dot-mangled**, and read ONLY through `normalize_email_key` — the once-ever key is **computed, never stored**, and the unique index is a *functional* index over that column. Dot- and plus-stripping decide who has already had their free class; they must never decide who receives an email or which account someone signs into.
 
 **Where:** migration `20260831630000`; extends Decision 26's `guest_passes` ledger. **Status:** settled. **Reuses:** Decision 26 (once-ever ledger, waiver-at-check-in, conversion). **Off by default**, asserted inert by the `all_off` canary.
+
+---
+
+## 29 — Instructor claiming: inverting how a month gets staffed, per tenant
+
+**Built: migrations 149–156 (`20260831540000`–`20260831610000`), on hosted.** The assigned model staffs a month top-down: staff assign a roster, publish it (Decision 25), instructors **confirm** what they were given, and carry-forward fills gaps on silence. Claiming **inverts** it, **per tenant, off by default** (`studio_settings.claiming_enabled`): the studio publishes a month of **unassigned** classes — each already marked core or flex by its series — and instructors **claim** the ones they want, with staff **approving every claim**. The tier is fixed by the series; the claim button does not ask which tier, it tells the instructor which it is and where they stand this week.
+
+### It is Decision 17's apply-and-approve, and it does not break 17/18
+
+The spine is Decision 17 unchanged: `apply_for_shift` flips a class `open → pending_approval` and notifies staff; `approve_shift_application` assigns via `move_occurrence` (which hard-gates the validity window and the double-booking exclusion), auto-declines every other pending application, and notifies each. **Instructors apply, staff approve every claim, and there is no self-release** — a claim is an application, approval is the studio's act, and nothing lets an instructor assign or unassign themselves. So Decision 17 (instructors apply for open shifts) and Decision 18 (cover is always granted by staff, no self-release however urgent) both still hold; claiming is those mechanics pointed at a whole published month rather than at one opened shift. What is new is only the eligibility a *claim* is held to (a cover apply is looser): published month, the instructor's stated availability for it, and the core cap below.
+
+### Superseded, not run alongside
+
+When claiming is on, roster confirmation (Decision 25) and carry-forward are **superseded, not additionally run**: a claim IS the confirmation, and carry-forward has no assigned baseline to carry. `publish_month` already emails nobody for unassigned classes (its inner join to `instructors`), and a claiming studio keeps `carry_forward_enabled` off, so those flows go inert without being re-issued. A studio uses **either** the assigned roster **or** claiming, never both.
+
+### The soft core cap, and how it squares with "commitments never affect scheduling"
+
+A per-instructor **soft ceiling** on how many **core** classes they may self-claim in a studio week (`instructors.core_weekly_cap`, null → `studio_settings.core_claim_default_cap`, default 3). Flex and `always` claims are uncapped. It is **soft**: past the cap `apply_for_shift` refuses the self-claim with the numbers and offers "ask anyway", which sets `shift_applications.over_cap` and proceeds; staff see the flag on the approval screen and approve or not. **The cap guides, never blocks.**
+
+This does **not** contradict Decision 65's rule that *the commitment never affects scheduling*, and the reconciliation is structural rather than verbal. The commitment (`instructor_commitments.min/target_per_week`) is a **floor and a reporting measure**, and Decision 65 forbids it from touching **assignment-engine eligibility** — that is unchanged here: the engine still ignores it, and it is not read by claiming either. The cap is a **different number with the opposite job** (a ceiling on self-claiming), on its **own column**, and it is deliberately kept off the assignment engine: staff assigning through the engine are never held to it, and even in the claiming flow it is overridable. So the commitment rule holds literally, and the two never share a lever.
+
+**The residual, recorded honestly:** the cap *is* a scheduling-adjacent lever — it softly shapes which core classes an instructor self-claims, which the commitment is explicitly not allowed to do. The distinction that keeps it clean is that the cap is (a) not the commitment, (b) soft and staff-overridable, and (c) never an input to the assignment engine — so it guides self-service without ever *deciding* the roster. If a future change makes the cap hard, or feeds it to the engine, this reconciliation breaks and Decision 65 would have to be revisited.
+
+**Where:** migrations 149–156; `claiming_enabled`, `core_claim_default_cap`, `instructors.core_weekly_cap`, `shift_applications.over_cap`; `instructor_core_cap`, `instructor_claimable`, `claim_ranking`, claiming-aware `apply_for_shift`. **Status:** settled and on hosted. **Extends:** Decision 17 (apply/approve), Decision 25 (publication). **Coexists with:** Decision 22/65 (the commitment as a measure). **Off by default**, inert on the `all_off` canary.
 
 ---
 
