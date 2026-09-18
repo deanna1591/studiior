@@ -108,10 +108,18 @@ export default function ClassDetailBody({
         </p>
 
         {past ? null : booked || waiting ? (
-          <ActionForm action={cancelBooking}>
-            <input type="hidden" name="booking_id" value={booking!.id} />
-            <CardActionOutline>{booked ? "Cancel booking" : "Leave the list"}</CardActionOutline>
-          </ActionForm>
+          <>
+            <ActionForm action={cancelBooking}>
+              <input type="hidden" name="booking_id" value={booking!.id} />
+              <CardActionOutline>{booked ? "Cancel booking" : "Leave the list"}</CardActionOutline>
+            </ActionForm>
+            {booked && (
+              <a href={`/class/${occ.id}/ics`}
+                 className="m-press mt-2 block text-center text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
+                Add to calendar
+              </a>
+            )}
+          </>
         ) : freeFirst?.eligible ? (
           // Decision 30: this member's first class is free. Said plainly right
           // where they decide, and the Book books it at zero — no plan, no card.

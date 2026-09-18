@@ -1034,6 +1034,7 @@ export type Database = {
         Row: {
           assigned_by: string | null
           booked_at_cutoff: number | null
+          booked_at_start: number | null
           booked_count: number
           cancellation_cause:
             | Database["public"]["Enums"]["cancellation_cause"]
@@ -1079,6 +1080,7 @@ export type Database = {
         Insert: {
           assigned_by?: string | null
           booked_at_cutoff?: number | null
+          booked_at_start?: number | null
           booked_count?: number
           cancellation_cause?:
             | Database["public"]["Enums"]["cancellation_cause"]
@@ -1124,6 +1126,7 @@ export type Database = {
         Update: {
           assigned_by?: string | null
           booked_at_cutoff?: number | null
+          booked_at_start?: number | null
           booked_count?: number
           cancellation_cause?:
             | Database["public"]["Enums"]["cancellation_cause"]
@@ -2700,6 +2703,7 @@ export type Database = {
           core_weekly_cap: number | null
           created_at: string
           display_name: string
+          email_each_booking: boolean
           id: string
           is_demo: boolean
           staff_id: string | null
@@ -2715,6 +2719,7 @@ export type Database = {
           core_weekly_cap?: number | null
           created_at?: string
           display_name: string
+          email_each_booking?: boolean
           id?: string
           is_demo?: boolean
           staff_id?: string | null
@@ -2730,6 +2735,7 @@ export type Database = {
           core_weekly_cap?: number | null
           created_at?: string
           display_name?: string
+          email_each_booking?: boolean
           id?: string
           is_demo?: boolean
           staff_id?: string | null
@@ -6753,9 +6759,12 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      exp_settle: { Args: { per: string; uid: string }; Returns: string }
-      expect_txt: {
-        Args: { actual: string; label: string; want: string }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
         Returns: undefined
       }
       extend_trial: {
@@ -6812,6 +6821,43 @@ export type Database = {
         Returns: Json
       }
       guest_pass_report: { Args: { p_studio_id: string }; Returns: Json }
+      ics_calendar: {
+        Args: { p_method: string; p_vevents: string }
+        Returns: string
+      }
+      ics_dt: { Args: { p_ts: string }; Returns: string }
+      ics_escape: { Args: { p: string }; Returns: string }
+      ics_fold: { Args: { p: string }; Returns: string }
+      ics_instructor_vevent: {
+        Args: { p_cancelled: boolean; p_occurrence_id: string }
+        Returns: string
+      }
+      ics_member_vevent: {
+        Args: {
+          p_cancelled: boolean
+          p_member_id: string
+          p_occurrence_id: string
+        }
+        Returns: string
+      }
+      ics_of: { Args: { p_dedupe: string }; Returns: string }
+      ics_prop: { Args: { p_name: string; p_value: string }; Returns: string }
+      ics_seq: { Args: { p_ics: string }; Returns: number }
+      ics_studio_location: { Args: { p_studio_id: string }; Returns: string }
+      ics_vevent: {
+        Args: {
+          p_cancelled: boolean
+          p_description: string
+          p_end: string
+          p_location: string
+          p_seq: number
+          p_start: string
+          p_summary: string
+          p_uid: string
+          p_url: string
+        }
+        Returns: string
+      }
       import_commit: { Args: { p_import_id: string }; Returns: Json }
       import_dry_run: { Args: { p_import_id: string }; Returns: Json }
       import_member_status: {
@@ -6852,6 +6898,10 @@ export type Database = {
         Args: { p_instructor_id: string; p_month: string }
         Returns: Json
       }
+      instructor_class_ics: {
+        Args: { p_occurrence_id: string }
+        Returns: string
+      }
       instructor_confirm_class: {
         Args: { p_occurrence_id: string }
         Returns: Json
@@ -6862,6 +6912,10 @@ export type Database = {
       }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
+      instructor_month_ics: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: string
+      }
       instructor_notifications: {
         Args: { p_instructor_id: string; p_limit?: number }
         Returns: Json
@@ -7015,6 +7069,7 @@ export type Database = {
           seconds_left: number
         }[]
       }
+      member_class_ics: { Args: { p_occurrence_id: string }; Returns: string }
       member_first_class: {
         Args: { p_member_id: string }
         Returns: {
@@ -7136,6 +7191,7 @@ export type Database = {
       }
       normalize_email_key: { Args: { p_email: string }; Returns: string }
       notification_api_key: { Args: never; Returns: string }
+      notification_ics: { Args: { p_notification_id: string }; Returns: string }
       notification_setting: { Args: { p_key: string }; Returns: string }
       notification_wanted: {
         Args: { p_member_id: string; p_template: string }
@@ -7571,6 +7627,7 @@ export type Database = {
         Args: {
           p_from_name: string
           p_html: string
+          p_ics?: string
           p_reply_to: string
           p_subject: string
           p_text: string
@@ -7610,6 +7667,10 @@ export type Database = {
       set_class_type_instructors: {
         Args: { p_class_type_id: string; p_instructor_ids: string[] }
         Returns: number
+      }
+      set_email_each_booking: {
+        Args: { p_on: boolean; p_studio_id: string }
+        Returns: Json
       }
       set_insight_status: {
         Args: {
@@ -7716,6 +7777,10 @@ export type Database = {
         Returns: Json
       }
       sign_waiver: { Args: { p_member_id: string }; Returns: Json }
+      snapshot_start_headcount: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
+      }
       staff_announcements: { Args: { p_studio_id: string }; Returns: Json }
       staff_bootstrap: {
         Args: never
@@ -7743,10 +7808,6 @@ export type Database = {
       stamp_open_shift: {
         Args: { p_occurrence_id: string }
         Returns: undefined
-      }
-      stmt_settle: {
-        Args: { inst: string; per: string; uid: string }
-        Returns: string
       }
       stripe_handle_charge_refunded: {
         Args: { p_obj: Json; p_studio_id: string }

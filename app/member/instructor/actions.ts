@@ -63,6 +63,20 @@ export async function confirmMyMonth(
   };
 }
 
+export async function setEachBooking(
+  _prev: InstructorState, form: FormData,
+): Promise<InstructorState> {
+  const on = form.get("on") === "on";
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_email_each_booking", {
+    p_studio_id: String(form.get("studio_id")),
+    p_on: on,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/instructor/me");
+  return { ok: on ? "On — you'll get an email for each booking." : "Off — no per-booking emails." };
+}
+
 export async function askForCover(
   _prev: InstructorState, form: FormData,
 ): Promise<InstructorState> {

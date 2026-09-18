@@ -120,6 +120,10 @@ export default async function MySchedule({
         </div>
       ) : (
         <div className="space-y-5">
+          <a href={`/instructor/ics/month/${from.slice(0, 7)}`}
+             className="m-press block text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
+            Add this month to your calendar
+          </a>
           {days.map((day) => (
             <section key={day}>
               <h2 className="m-sub mb-2 text-ink-3">
@@ -237,6 +241,12 @@ function ClassRow({ c }: { c: Klass }) {
       )}
       {!off && c.checked_in && (
         <p className="mt-1.5 text-[12px] font-medium" style={{ color: "var(--lime-text)" }}>Checked in for pay ✓</p>
+      )}
+      {!off && (
+        <a href={`/instructor/ics/class/${c.occurrence_id}`}
+           className="m-press mt-1.5 inline-block text-[12px] leading-[17px] text-ink-3 underline underline-offset-4">
+          Add to calendar
+        </a>
       )}
     </li>
   );

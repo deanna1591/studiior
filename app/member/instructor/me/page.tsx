@@ -2,6 +2,7 @@ import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { SignOut } from "@/components/member/sign-out";
+import { EachBookingToggle } from "../actions-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,12 @@ type Rec = {
  */
 export default async function MePage() {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data }, { data: relData }] = await Promise.all([
+  const [{ data }, { data: relData }, { data: me }] = await Promise.all([
     supabase.rpc("instructor_recognition", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("instructor_reliability", { p_instructor_id: ctx.instructor_id }),
+    supabase.from("instructors").select("email_each_booking").eq("id", ctx.instructor_id).maybeSingle(),
   ]);
+  const eachBooking = (me as { email_each_booking?: boolean } | null)?.email_each_booking ?? false;
   const r = data as Rec | null;
   const rel = relData as unknown as
     { applied: number; approved: number; withdrawn: number; short_notice: number } | null;
@@ -71,6 +74,9 @@ export default async function MePage() {
           </p>
         </div>
       )}
+
+      <p className="m-sub mb-2 mt-6 text-ink-3">Notifications</p>
+      <EachBookingToggle studioId={ctx.studio_id} on={eachBooking} />
 
       <div className="m-card mt-4 px-4 py-4">
         <p className="m-sub text-ink-3">Signed in as</p>
