@@ -801,6 +801,184 @@ select expect_raises('a member cannot set a tier',
   $$select set_series_guarantee('9a179a17-0000-0000-0000-00000000f1a1','core',1)$$, 'PT403');
 select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
 
+-- =============================================================================
+-- 20. DECISION 32 — THE PAID HEADCOUNT IS greatest(cutoff, start)
+-- =============================================================================
+-- A member can book after the 12h pay cutoff (the booking cutoff is closer to
+-- start) and attend; on a full class they can take the last seat and never
+-- trigger the full-house bonus. greatest(booked_at_cutoff, booked_at_start)
+-- pays for them, never earns less than the cutoff promised, and a late cancel
+-- after the cutoff cannot reduce pay. A NEW instructor (d103), staggered PAST
+-- classes with no room, so nothing clashes with the earlier fixtures.
+reset role;
+insert into instructors (id, studio_id, display_name) values
+  ('9a179a17-0000-0000-0000-00000000d104','9a179a17-0000-0000-0000-000000000001','Efa Coach');
+insert into members (id, studio_id, first_name, last_name, email, status) values
+  ('9a179a17-0000-0000-0000-0000000b1004','9a179a17-0000-0000-0000-000000000001','Ravi','Four','gp-d32-m4@example.com','active'),
+  ('9a179a17-0000-0000-0000-0000000b1005','9a179a17-0000-0000-0000-000000000001','Suki','Five','gp-d32-m5@example.com','active'),
+  ('9a179a17-0000-0000-0000-0000000b1006','9a179a17-0000-0000-0000-000000000001','Tomas','Six','gp-d32-m6@example.com','active');
+
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+set role authenticated;
+select set_instructor_rate('9a179a17-0000-0000-0000-00000000d104', current_date - 60,
+  80000, 7500, 2, 20000, null, null, null, 'd32');
+reset role;
+
+-- Committed (record written at insert), started, with a chosen cutoff snapshot.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name,
+                               instructor_id, capacity, starts_at, ends_at,
+                               booked_at_cutoff, committed_at)
+values
+ ('9a179a17-0000-0000-0000-00000000a301','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 late booker',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '1 hour', now() - interval '10 min', 2, now() - interval '3 hours'),
+ ('9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 fills last seat',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '3 hours', now() - interval '2 hours 10 min', 5, now() - interval '5 hours'),
+ ('9a179a17-0000-0000-0000-00000000a303','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 late cancel',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '5 hours', now() - interval '4 hours 10 min', 4, now() - interval '7 hours'),
+ ('9a179a17-0000-0000-0000-00000000a304','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 no-shows count',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '7 hours', now() - interval '6 hours 10 min', 4, now() - interval '9 hours'),
+ ('9a179a17-0000-0000-0000-00000000a305','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 start lower',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '9 hours', now() - interval '8 hours 10 min', 5, now() - interval '11 hours'),
+ ('9a179a17-0000-0000-0000-00000000a307','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 via sweep',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '11 hours', now() - interval '10 hours 10 min', 3, now() - interval '13 hours');
+
+-- Live rosters = the count AT START. a301: 3 (a body arrived after the cutoff
+-- count of 2). a302: 6 (fills the capacity-6 room). a303: 3 (one cancelled after
+-- the cutoff count of 4). a304: 4, all no_show. a305: 2 (below the cutoff of 5).
+-- a307: 4 (for the sweep).
+insert into bookings (id, studio_id, occurrence_id, member_id, status) values
+  ('9a179a17-0000-0000-0000-0000000cc301','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a301','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc302','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a301','9a179a17-0000-0000-0000-0000000b1002','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc303','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a301','9a179a17-0000-0000-0000-0000000b1003','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc311','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc312','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-0000000b1002','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc313','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-0000000b1003','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc314','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-0000000b1004','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc315','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-0000000b1005','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc316','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a302','9a179a17-0000-0000-0000-0000000b1006','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc321','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a303','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc322','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a303','9a179a17-0000-0000-0000-0000000b1002','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc323','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a303','9a179a17-0000-0000-0000-0000000b1003','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc331','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a304','9a179a17-0000-0000-0000-0000000b1001','no_show'),
+  ('9a179a17-0000-0000-0000-0000000cc332','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a304','9a179a17-0000-0000-0000-0000000b1002','no_show'),
+  ('9a179a17-0000-0000-0000-0000000cc333','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a304','9a179a17-0000-0000-0000-0000000b1003','no_show'),
+  ('9a179a17-0000-0000-0000-0000000cc334','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a304','9a179a17-0000-0000-0000-0000000b1004','no_show'),
+  ('9a179a17-0000-0000-0000-0000000cc341','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a305','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc342','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a305','9a179a17-0000-0000-0000-0000000b1002','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc371','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a307','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc372','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a307','9a179a17-0000-0000-0000-0000000b1002','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc373','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a307','9a179a17-0000-0000-0000-0000000b1003','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc374','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a307','9a179a17-0000-0000-0000-0000000b1004','booked');
+
+select expect_num('the record is written at the cutoff count first (a301 = base only)',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a301')::bigint, 80000);
+
+-- Snapshot each at start (postgres is a service context; the sweep does the same).
+select snapshot_start_headcount('9a179a17-0000-0000-0000-00000000a301');
+select snapshot_start_headcount('9a179a17-0000-0000-0000-00000000a302');
+select snapshot_start_headcount('9a179a17-0000-0000-0000-00000000a303');
+select snapshot_start_headcount('9a179a17-0000-0000-0000-00000000a304');
+select snapshot_start_headcount('9a179a17-0000-0000-0000-00000000a305');
+
+-- #1 A late booker after the cutoff pays per-head: 800 + (3-2)*75 = 875.
+select expect_num('#1 late booker after the cutoff pays per-head',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a301')::bigint, 87500);
+select expect_num('...and the start count is recorded',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-00000000a301')::bigint, 3);
+select expect_num('...as the count actually paid, in the basis',
+  ((select basis from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a301') ->> 'booked_paid')::bigint, 3);
+
+-- #2 A late booker filling the last seat triggers the full house: 800 + (6-2)*75 + 200 = 1300.
+select expect_num('#2 late booker fills the last seat and triggers full house',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a302')::bigint, 130000);
+select expect_true('...and the basis records a full house',
+  ((select basis from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a302') ->> 'full_house')::boolean);
+
+-- #3 A late cancel after the cutoff does not reduce pay: cutoff 4 wins over start 3.
+select expect_num('#3 late cancel after the cutoff does not reduce pay',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a303')::bigint, 95000);
+select expect_num('...and the lower start count is recorded, so the floor was a choice not an accident',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-00000000a303')::bigint, 3);
+
+-- #4 No-shows still count: the start snapshot uses the same statuses as the cutoff.
+select expect_num('#4 no-shows still count at the start snapshot',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-00000000a304')::bigint, 4);
+select expect_num('...so pay holds at four, not dropped to zero',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a304')::bigint, 95000);
+
+-- #5 A start count LOWER than the cutoff pays the cutoff count: 800 + (5-2)*75 = 1025.
+select expect_num('#5 start count lower than the cutoff pays the cutoff count',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a305')::bigint, 102500);
+select expect_num('...with the lower start recorded',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-00000000a305')::bigint, 2);
+
+-- The statement carries the note, and the export agrees with it line for line.
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+set role authenticated;
+select set_config('t.d32_period',
+  (select period_id::text from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a301'), false);
+select expect_text('the statement line says the start count raised it',
+  ((select l ->> 'headcount_note'
+      from jsonb_array_elements(
+        (pay_statement('9a179a17-0000-0000-0000-00000000d104', current_setting('t.d32_period')::uuid)) -> 'lines') l
+     where l ->> 'name' = 'D32 late booker')), '2 at cutoff, 3 at start');
+select expect_text('...and the export line reads identically',
+  ((select l ->> 'headcount_note'
+      from jsonb_array_elements(
+        (pay_period_export(current_setting('t.d32_period')::uuid)) -> 'rows') l
+     where l ->> 'name' = 'D32 late booker')), '2 at cutoff, 3 at start');
+reset role;
+
+-- ADDITION 1 — a CLOSED period is never re-touched: the difference is an
+-- adjustment in the next open period. a306 in its own past fortnight; the record
+-- written at the cutoff count of 2; the period closed; then a late booker (start
+-- 3) and the snapshot. 800 at cutoff, 875 at start → a +75 adjustment.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name,
+                               instructor_id, capacity, starts_at, ends_at,
+                               booked_at_cutoff, committed_at)
+values ('9a179a17-0000-0000-0000-00000000a306','9a179a17-0000-0000-0000-000000000001',
+  '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01','D32 closed period',
+  '9a179a17-0000-0000-0000-00000000d104',6, now() - interval '45 days', now() - interval '45 days' + interval '50 min', 2, now() - interval '45 days' - interval '2 hours');
+insert into bookings (id, studio_id, occurrence_id, member_id, status) values
+  ('9a179a17-0000-0000-0000-0000000cc361','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a306','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc362','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a306','9a179a17-0000-0000-0000-0000000b1002','booked'),
+  ('9a179a17-0000-0000-0000-0000000cc363','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000a306','9a179a17-0000-0000-0000-0000000b1003','booked');
+select set_config('t.d32_closed', (select period_id::text from instructor_pay_records
+  where occurrence_id='9a179a17-0000-0000-0000-00000000a306' and type='class'), false);
+update pay_periods set status = 'closed' where id = current_setting('t.d32_closed')::uuid;
+select snapshot_start_headcount('9a179a17-0000-0000-0000-00000000a306');
+
+select expect_num('a closed record is untouched by the true-up',
+  (select amount_cents from instructor_pay_records
+    where occurrence_id='9a179a17-0000-0000-0000-00000000a306' and type='class')::bigint, 80000);
+select expect_num('...and the difference is an adjustment for exactly the delta',
+  (select r.amount_cents from instructor_pay_records r join pay_periods p on p.id = r.period_id
+    where r.type='adjustment' and r.basis ->> 'true_up_of' = '9a179a17-0000-0000-0000-00000000a306'
+      and p.status = 'open')::bigint, 7500);
+select expect_true('...in the next OPEN period, naming the class and why',
+  (select note like '%late bookings after cutoff%' from instructor_pay_records
+    where type='adjustment' and basis ->> 'true_up_of' = '9a179a17-0000-0000-0000-00000000a306'));
+select expect_num('...and a second snapshot writes no second adjustment',
+  (select count(*) from instructor_pay_records
+    where type='adjustment' and basis ->> 'true_up_of' = '9a179a17-0000-0000-0000-00000000a306')::bigint, 1);
+
+-- ADDITION 2 is proven by #4 (no_show counted → booked_at_start = 4): the
+-- snapshot uses evaluate_commitment's exact status list.
+
+-- THE SWEEP DOES IT END TO END. a307 has no direct snapshot; sweep_commitments
+-- stamps it and trues it up (start 4 → 800 + (4-2)*75 = 950).
+select sweep_commitments() is not null as swept;
+select expect_num('the sweep stamps the start count on a class it finds started',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-00000000a307')::bigint, 4);
+select expect_num('...and trues up its pay',
+  (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a307')::bigint, 95000);
+
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'guarantee and pay suite finished' as done;
