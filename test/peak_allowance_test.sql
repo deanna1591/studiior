@@ -850,7 +850,17 @@ values
   ((now() at time zone 'Asia/Manila')::date + 1 + time '12:50') at time zone 'Asia/Manila','scheduled'),
  ('9eac9eac-0000-0000-0000-0000000009a2','9eac9eac-0000-0000-0000-000000000001',
   '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01', null,'Later today',10,
-  (now() + interval '3 hours'), (now() + interval '3 hours 50 minutes'),'scheduled');
+  -- SAME-DAY AND IN THE FUTURE WHATEVER THE RUN TIME. `now() + interval '3 hours'`
+  -- crosses into tomorrow's Manila date within three hours of local midnight, and
+  -- the suspension gate reads a tomorrow-date class as advance booking — so this
+  -- assertion failed for three hours a night. Clamped to today's last minute in
+  -- the studio zone (the way the Tomorrow class above pins its date), it stays on
+  -- today's Manila date while remaining ahead of now (booking_cutoff is 0 here).
+  least(now() + interval '3 hours',
+        ((now() at time zone 'Asia/Manila')::date + time '23:59') at time zone 'Asia/Manila'),
+  least(now() + interval '3 hours',
+        ((now() at time zone 'Asia/Manila')::date + time '23:59') at time zone 'Asia/Manila')
+    + interval '50 minutes','scheduled');
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
