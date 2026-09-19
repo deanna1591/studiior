@@ -6293,6 +6293,158 @@ export type Database = {
           },
         ]
       }
+      waiver_signatures: {
+        Row: {
+          content_hash: string
+          created_at: string
+          document_id: string | null
+          id: string
+          ip: unknown
+          member_id: string
+          method: string
+          signature_path: string | null
+          signed_at: string
+          signed_name: string
+          studio_id: string
+          user_agent: string | null
+          user_id: string | null
+          version_id: string
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          ip?: unknown
+          member_id: string
+          method?: string
+          signature_path?: string | null
+          signed_at?: string
+          signed_name: string
+          studio_id: string
+          user_agent?: string | null
+          user_id?: string | null
+          version_id: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          ip?: unknown
+          member_id?: string
+          method?: string
+          signature_path?: string | null
+          signed_at?: string
+          signed_name?: string
+          studio_id?: string
+          user_agent?: string | null
+          user_id?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waiver_signatures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "member_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_signatures_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_signatures_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_signatures_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_signatures_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_signatures_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "waiver_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waiver_versions: {
+        Row: {
+          body: string | null
+          content_hash: string
+          created_at: string
+          created_by: string | null
+          format: string
+          id: string
+          requires_resign: boolean
+          storage_path: string | null
+          studio_id: string
+        }
+        Insert: {
+          body?: string | null
+          content_hash: string
+          created_at?: string
+          created_by?: string | null
+          format: string
+          id?: string
+          requires_resign?: boolean
+          storage_path?: string | null
+          studio_id: string
+        }
+        Update: {
+          body?: string | null
+          content_hash?: string
+          created_at?: string
+          created_by?: string | null
+          format?: string
+          id?: string
+          requires_resign?: boolean
+          storage_path?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waiver_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_versions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_versions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       member_quick_view: {
@@ -6501,6 +6653,7 @@ export type Database = {
         Returns: Json
       }
       backfill_all_timelines: { Args: never; Returns: Json }
+      bc_reason: { Args: { mem: string; occ: string }; Returns: string }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
         Args: {
@@ -6751,6 +6904,7 @@ export type Database = {
         }
         Returns: Json
       }
+      current_waiver: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_absent_cards: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_activity: {
         Args: { p_limit?: number; p_studio_id: string }
@@ -6856,6 +7010,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -7112,6 +7278,7 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_instructor_notifications_read: {
         Args: { p_instructor_id: string }
         Returns: number
@@ -7883,7 +8050,32 @@ export type Database = {
         }
         Returns: Json
       }
+      set_waiver_version: {
+        Args: {
+          p_body?: string
+          p_content_hash?: string
+          p_format: string
+          p_requires_resign?: boolean
+          p_storage_path?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       sign_waiver: { Args: { p_member_id: string }; Returns: Json }
+      sign_waiver_document: {
+        Args: {
+          p_content_hash: string
+          p_document_filename: string
+          p_document_path: string
+          p_document_size: number
+          p_ip?: string
+          p_member_id: string
+          p_signature_path: string
+          p_user_agent?: string
+          p_version_id: string
+        }
+        Returns: Json
+      }
       snapshot_start_headcount: {
         Args: { p_occurrence_id: string }
         Returns: Json

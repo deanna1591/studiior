@@ -5,6 +5,7 @@ import ChallengesPanel from "../challenges";
 import GuestPassesPanel from "../guest-passes";
 import FreeFirstPanel from "../free-first";
 import HowToBuyPanel from "../how-to-buy";
+import WaiverPanel from "../waiver";
 import SettingsBack from "../back";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,10 @@ export default async function FeatureSettings() {
   const { ctx, supabase, shell } = screen;
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Member features"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
 
-  const [{ data: settings }, { count: challengeCount }] = await Promise.all([
+  const [{ data: settings }, { count: challengeCount }, { data: waiver }] = await Promise.all([
     supabase.from("studio_settings").select("challenges_enabled, guest_passes_enabled, free_first_class_enabled, free_first_peak_allowed, how_to_buy").eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("challenges").select("id", { count: "exact", head: true }).eq("studio_id", ctx.studioId).eq("audience", "member").limit(1),
+    supabase.from("waiver_versions").select("format, requires_resign, created_at, body").eq("studio_id", ctx.studioId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   return (
@@ -37,9 +39,13 @@ export default async function FeatureSettings() {
           enabled={settings?.free_first_class_enabled ?? false}
           peakAllowed={settings?.free_first_peak_allowed ?? true} /></div>
       </section>
-      <section>
+      <section className="mb-10">
         <SectionLabel>Buying a plan</SectionLabel>
         <div className="mt-3"><HowToBuyPanel value={settings?.how_to_buy ?? null} /></div>
+      </section>
+      <section>
+        <SectionLabel>Waiver</SectionLabel>
+        <div className="mt-3"><WaiverPanel current={waiver ?? null} /></div>
       </section>
     </AppShell>
   );

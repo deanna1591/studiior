@@ -652,3 +652,48 @@ export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<Pl
       : "Saved. The free first class is off. Anyone already booked one keeps their place.",
   };
 }
+
+// Decision 34: publish a new waiver version (text, or an uploaded PDF). The
+// guard is in set_waiver_version (manager-up); this relays and, for a PDF,
+// stores the file in studio-branding and passes its sha256.
+export async function saveWaiver(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const supabase = createClient();
+  const requires = String(fd.get("requires_resign") ?? "") === "on";
+  const format = String(fd.get("format") ?? "text");
+
+  if (format === "pdf") {
+    const file = fd.get("pdf") as File | null;
+    if (!file || file.size === 0) return { ok: false, message: "Choose a PDF first." };
+    if (file.type !== "application/pdf") return { ok: false, message: "That is not a PDF." };
+    if (file.size > 5_000_000) return { ok: false, message: "That PDF is over 5 MB." };
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const { createHash } = await import("crypto");
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    const path = `${ctx.studioId}/waiver-${Date.now()}.pdf`;
+    const up = await supabase.storage.from("studio-branding")
+      .upload(path, bytes, { contentType: "application/pdf", upsert: false });
+    if (up.error) return { ok: false, message: up.error.message };
+    const { error } = await supabase.rpc("set_waiver_version", {
+      p_studio_id: ctx.studioId, p_format: "pdf", p_body: undefined,
+      p_storage_path: path, p_content_hash: hash, p_requires_resign: requires,
+    });
+    if (error) return { ok: false, message: error.message };
+  } else {
+    const body = String(fd.get("body") ?? "").trim();
+    if (!body) return { ok: false, message: "The waiver text is empty." };
+    const { error } = await supabase.rpc("set_waiver_version", {
+      p_studio_id: ctx.studioId, p_format: "text", p_body: body,
+      p_storage_path: undefined, p_content_hash: undefined, p_requires_resign: requires,
+    });
+    if (error) return { ok: false, message: error.message };
+  }
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: requires
+      ? "New waiver published. Members will be asked to sign it again before booking."
+      : "New waiver published. Existing signatures still stand.",
+  };
+}
