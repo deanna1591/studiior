@@ -6653,7 +6653,6 @@ export type Database = {
         Returns: Json
       }
       backfill_all_timelines: { Args: never; Returns: Json }
-      bc_reason: { Args: { mem: string; occ: string }; Returns: string }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
         Args: {
@@ -7011,18 +7010,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7278,7 +7265,6 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_instructor_notifications_read: {
         Args: { p_instructor_id: string }
         Returns: number

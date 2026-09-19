@@ -42,9 +42,9 @@ insert into profiles (id, email) select id, id::text||'@example.com' from auth.u
 insert into studios (id, name, slug, timezone, currency, status) values
   ('a17ea17e-0000-0000-0000-000000000001','Waiver A','a17e-a','Europe/Prague','CZK','active'),
   ('a17ea17e-0000-0000-0000-000000000002','Waiver B','a17e-b','Europe/Prague','CZK','active');
-insert into studio_settings (studio_id, require_waiver, booking_window_days) values
-  ('a17ea17e-0000-0000-0000-000000000001', true, 30),
-  ('a17ea17e-0000-0000-0000-000000000002', true, 30);
+insert into studio_settings (studio_id, require_waiver, booking_window_days, checkin_window_enforced) values
+  ('a17ea17e-0000-0000-0000-000000000001', true, 30, false),
+  ('a17ea17e-0000-0000-0000-000000000002', true, 30, false);
 insert into locations (id, studio_id, name, is_primary) values
   ('a17ea17e-0000-0000-0000-00000000000a','a17ea17e-0000-0000-0000-000000000001','Main',true);
 insert into rooms (id, studio_id, location_id, name, capacity) values
@@ -186,5 +186,79 @@ end $$;
 select expect_num('a stranger sees none of another member''s signatures',
   (select count(*) from waiver_signatures where member_id='a17ea17e-0000-0000-0000-00000000ad01'), 0);
 select login(''); reset role;
+
+-- =============================================================================
+-- 8. PART B — the no-version state, the checklist item, the guest re-sign gate.
+-- =============================================================================
+-- Studio B requires a waiver and has published NONE. Give it a class and an
+-- owner; member N (ad02) is unsigned.
+insert into studio_staff (studio_id, user_id, email, role) values
+  ('a17ea17e-0000-0000-0000-000000000002','a17ea17e-0000-0000-0000-0000000000a1','owb@example.com','owner');
+insert into locations (id, studio_id, name, is_primary) values
+  ('a17ea17e-0000-0000-0000-00000000000b','a17ea17e-0000-0000-0000-000000000002','Main',true);
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('a17ea17e-0000-0000-0000-0000000000e2','a17ea17e-0000-0000-0000-000000000002','a17ea17e-0000-0000-0000-00000000000b','R1',10);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('a17ea17e-0000-0000-0000-0000000000ca','a17ea17e-0000-0000-0000-000000000002','Reformer',50,10);
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('a17ea17e-0000-0000-0000-00000000c0b1','a17ea17e-0000-0000-0000-000000000002','a17ea17e-0000-0000-0000-00000000000b','a17ea17e-0000-0000-0000-0000000000ca','a17ea17e-0000-0000-0000-0000000000e2',null,'Reformer',now()+interval '3 days', now()+interval '3 days'+interval '50 min', 10, 0, 'scheduled','open');
+
+-- (a) require_waiver on + no version => waiver_unavailable, not waiver_not_signed.
+set role authenticated; select login('a17ea17e-0000-0000-0000-0000000000b2');
+select expect_text('no published waiver => book_class says waiver_unavailable',
+  bc_reason('a17ea17e-0000-0000-0000-00000000c0b1','a17ea17e-0000-0000-0000-00000000ad02'), 'waiver_unavailable');
+select login(''); reset role;
+
+-- (b) the setup checklist item: present + outstanding for B (requires a waiver,
+--     none published), done once one is published, absent when off.
+set role authenticated; select login('a17ea17e-0000-0000-0000-0000000000a1');   -- owner of A and B
+select expect_true('setup: waiver item is present and NOT done for B',
+  (studio_setup_state('a17ea17e-0000-0000-0000-000000000002') -> 'waiver' ->> 'done') = 'false');
+select set_waiver_version('a17ea17e-0000-0000-0000-000000000002','text','B waiver.');
+select expect_true('setup: waiver item is DONE once B publishes one',
+  (studio_setup_state('a17ea17e-0000-0000-0000-000000000002') -> 'waiver' ->> 'done') = 'true');
+-- After publishing, an unsigned member is waiver_not_signed (there IS one to sign).
+select login('a17ea17e-0000-0000-0000-0000000000b2');
+select expect_text('...and now book_class asks them to sign it',
+  bc_reason('a17ea17e-0000-0000-0000-00000000c0b1','a17ea17e-0000-0000-0000-00000000ad02'), 'waiver_not_signed');
+-- require_waiver OFF => the waiver item disappears from the checklist entirely.
+select login('a17ea17e-0000-0000-0000-0000000000a1'); reset role;
+update studio_settings set require_waiver=false where studio_id='a17ea17e-0000-0000-0000-000000000002';
+set role authenticated; select login('a17ea17e-0000-0000-0000-0000000000a1');
+select expect_true('setup: with require_waiver off the waiver item is absent',
+  (studio_setup_state('a17ea17e-0000-0000-0000-000000000002') -> 'waiver') is null);
+select login(''); reset role;
+update studio_settings set require_waiver=true where studio_id='a17ea17e-0000-0000-0000-000000000002';
+
+-- (c) guest re-sign at check-in. Studio A's current version is v3 (requires_resign).
+-- A guest who signed only v1 is turned away at check-in until they sign v3.
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source, waiver_signed_at) values
+  ('a17ea17e-0000-0000-0000-00000000ad0f','a17ea17e-0000-0000-0000-000000000001',null,'Gina','Guest','gina@example.com','lead',current_date,'walk_in', now());
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source, source) values
+  ('a17ea17e-0000-0000-0000-0000000bb0f1','a17ea17e-0000-0000-0000-000000000001','a17ea17e-0000-0000-0000-00000000c001','a17ea17e-0000-0000-0000-00000000ad0f','booked','comp','member');
+insert into guest_passes (studio_id, host_member_id, guest_member_id, guest_email, occurrence_id, guest_booking_id, status, waiver_signed_at) values
+  ('a17ea17e-0000-0000-0000-000000000001', null, 'a17ea17e-0000-0000-0000-00000000ad0f','gina@example.com','a17ea17e-0000-0000-0000-00000000c001','a17ea17e-0000-0000-0000-0000000bb0f1','confirmed', now());
+-- Her only signature is on v1 (the old version).
+insert into waiver_signatures (studio_id, member_id, version_id, content_hash, signature_path, method, signed_name, user_id) values
+  ('a17ea17e-0000-0000-0000-000000000001','a17ea17e-0000-0000-0000-00000000ad0f', current_setting('t.v1')::uuid,
+   encode(digest('WAIVER V1: I accept the risks.','sha256'),'hex'), 'p/s.png','app','Gina Guest', null);
+
+do $$ begin
+  insert into check_ins (studio_id, member_id, occurrence_id, booking_id, method)
+  values ('a17ea17e-0000-0000-0000-000000000001','a17ea17e-0000-0000-0000-00000000ad0f',
+          'a17ea17e-0000-0000-0000-00000000c001','a17ea17e-0000-0000-0000-0000000bb0f1','staff');
+  raise exception 'FAIL a guest on a stale required version was checked in';
+exception when sqlstate 'PT422' then raise notice 'PASS  a guest who signed an older required version is refused check-in (PT422)';
+end $$;
+
+-- She signs v3; now check-in goes through.
+insert into waiver_signatures (studio_id, member_id, version_id, content_hash, signature_path, method, signed_name, user_id) values
+  ('a17ea17e-0000-0000-0000-000000000001','a17ea17e-0000-0000-0000-00000000ad0f', current_setting('t.v3')::uuid,
+   encode(digest('WAIVER V3: NEW LIABILITY TERMS.','sha256'),'hex'), 'p/s3.png','app','Gina Guest', null);
+insert into check_ins (studio_id, member_id, occurrence_id, booking_id, method)
+  values ('a17ea17e-0000-0000-0000-000000000001','a17ea17e-0000-0000-0000-00000000ad0f',
+          'a17ea17e-0000-0000-0000-00000000c001','a17ea17e-0000-0000-0000-0000000bb0f1','staff');
+select expect_num('after re-signing the current version, the guest checks in',
+  (select count(*) from check_ins where member_id='a17ea17e-0000-0000-0000-00000000ad0f'), 1);
 
 select 'ALL WAIVER TESTS PASSED' as done;

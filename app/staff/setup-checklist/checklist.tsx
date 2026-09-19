@@ -19,6 +19,7 @@ const ITEMS: { key: string; label: string; hint: string; href?: string }[] = [
   // classes on it (Decision 25) — otherwise the timetable is live as it is made.
   { key: "publish",        label: "Publish this month",   hint: "Members can see and book only published months. This month has classes but is still a draft — publish it so they can book.", href: "/publish" },
   { key: "staff",          label: "Invite your team",     hint: "Front desk and managers, so you are not the only login." },
+  { key: "waiver",         label: "Publish your waiver",  hint: "You require a waiver but haven't published one — members can't sign in the app until you do.", href: "/settings/features" },
   // The three "fill a month" needs. A studio could tick everything above and
   // get an empty month back, with nothing on this list explaining why.
   { key: "qualifications", label: "Say who teaches what", hint: "Nobody is assumed to teach everything — an unmapped instructor can be assigned nothing at all.", href: "/instructors" },

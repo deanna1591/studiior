@@ -60,6 +60,11 @@ insert into studios (id, name, slug, timezone, currency) values
   ('ffffffff-0000-0000-0000-000000000001','Gate Studio','gate','Europe/Prague','CZK');
 
 insert into studio_settings (studio_id) values ('ffffffff-0000-0000-0000-000000000001');
+-- Decision 34: require_waiver defaults on, so a version must exist for an
+-- unsigned member to be told "waiver_not_signed" (rather than "waiver_unavailable").
+insert into waiver_versions (studio_id, format, body, content_hash) values
+  ('ffffffff-0000-0000-0000-000000000001','text','Gate Studio waiver.',
+   encode(digest('Gate Studio waiver.','sha256'),'hex'));
 
 insert into locations (id, studio_id, name) values
   ('ffffffff-0000-0000-0000-00000000000c','ffffffff-0000-0000-0000-000000000001','Main');

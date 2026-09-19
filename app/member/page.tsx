@@ -35,7 +35,8 @@ export default async function MemberHome() {
   );
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
-         { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements }] =
+         { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
+         { data: waiver }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -71,13 +72,26 @@ export default async function MemberHome() {
     supabase.rpc("member_milestones", { p_studio_id: ctx.studioId }),
     // Decision 27. Empty array for a studio with none -> no section, no trace.
     supabase.rpc("member_announcements", { p_studio_id: ctx.studioId }),
+    // Decision 34: the waiver state — whether the studio requires one, has
+    // published one, and whether this member has signed the current version.
+    supabase.rpc("current_waiver", { p_studio_id: ctx.studioId }),
   ]);
 
   const ms = milestones as unknown as { total: number; next_target: number | null; to_go: number | null } | null;
 
-  const needsWaiver =
-    (meRow as { waiver_signed_at?: string | null } | null)?.waiver_signed_at == null &&
-    (guestPassCount ?? 0) > 0;
+  // Decision 34. A member (or a brought guest) is prompted when the studio
+  // requires a waiver and they have not satisfied it: never signed, OR signed
+  // only an older version the current one requires re-signing. When the studio
+  // requires one but has published none, the banner says THAT instead of
+  // offering a screen with nothing on it.
+  const w = waiver as {
+    exists?: boolean; require_waiver?: boolean; requires_resign?: boolean; signed?: boolean;
+  } | null;
+  const unsigned = (meRow as { waiver_signed_at?: string | null } | null)?.waiver_signed_at == null;
+  const staleResign = w?.exists === true && w.requires_resign === true && w.signed === false && !unsigned;
+  const requiresWaiver = w?.require_waiver === true || (guestPassCount ?? 0) > 0;
+  const needsWaiver = requiresWaiver && (unsigned || staleResign);
+  const waiverPublished = w?.exists === true;
 
   const mine = (bookings ?? [])
     .filter((b) => b.class_occurrences && new Date(b.class_occurrences.starts_at).getTime() > now - 3600e3)
@@ -122,7 +136,7 @@ export default async function MemberHome() {
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
-      {needsWaiver && <WaiverBanner memberId={ctx.memberId} />}
+      {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
       <Announcements items={(announcements ?? []) as unknown as Announcement[]} />
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}

@@ -56,6 +56,8 @@ const REASONS: Record<string, string> = {
   month_not_published: "That month's timetable has not been published yet.",
   past_booking_cutoff: "Booking has closed for that class.",
   waiver_not_signed: "Please sign the studio waiver before booking.",
+  // Decision 34 Part B: require_waiver is on but the studio hasn't published one.
+  waiver_unavailable: "This studio hasn't published its waiver yet — please ask the studio.",
   member_not_active: "Your membership is not active.",
   already_booked: "You are already on the list for that class.",
   daily_limit_reached: "You have reached your class limit for that day.",
