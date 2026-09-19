@@ -3,29 +3,10 @@
 import { useFormState } from "react-dom";
 import { PrimaryButton, CardAction, CardActionOutline, QuietButton } from "@/components/member/ui";
 import {
-  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, acceptCover, withdrawApplication, checkInMember, setEachBooking,
+  confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, acceptCover, withdrawApplication, checkInMember,
   type InstructorState, type ClaimState,
 } from "./actions";
 
-export function EachBookingToggle({ studioId, on }: { studioId: string; on: boolean }) {
-  const [state, action] = useFormState<InstructorState, FormData>(setEachBooking, null);
-  return (
-    <form action={action} className="m-card px-4 py-3.5">
-      <input type="hidden" name="studio_id" value={studioId} />
-      <label className="flex items-start gap-3">
-        <input type="checkbox" name="on" defaultChecked={on} className="mt-0.5"
-               onChange={(e) => e.currentTarget.form?.requestSubmit()} />
-        <span>
-          <span className="block text-[15px] leading-5 text-ink">Email me for each booking</span>
-          <span className="m-sub mt-0.5 block text-ink-2">
-            Off by default. Your calendar feed keeps the headcount up to date on its own — this is one email per booking on top.
-          </span>
-        </span>
-      </label>
-      <Result state={state} />
-    </form>
-  );
-}
 
 function Result({ state }: { state: InstructorState }) {
   if (!state) return null;

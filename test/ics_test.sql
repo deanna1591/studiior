@@ -156,26 +156,9 @@ values ('ca1eca1e-0000-0000-0000-00000000a002','ca1eca1e-0000-0000-0000-00000000
         'ca1eca1e-0000-0000-0000-0000000000e1','ca1eca1e-0000-0000-0000-0000000000d1',
         'Reformer Flow',8, now() + interval '5 days', now() + interval '5 days' + interval '50 min');
 
--- OFF (default): the booking-insert trigger queues no instructor email. (The
--- fixture booking bb001 was also inserted while off.)
-insert into bookings (id, studio_id, occurrence_id, member_id, status) values
-  ('ca1eca1e-0000-0000-0000-0000000bb002','ca1eca1e-0000-0000-0000-000000000001',
-   'ca1eca1e-0000-0000-0000-00000000a002','ca1eca1e-0000-0000-0000-0000000000b1','booked');
-select expect_num('opt-in OFF: no per-booking email to the instructor',
-  (select count(*) from notifications where template_key = 'booking_for_instructor')::bigint, 0);
-
--- ON: a second booking's trigger queues exactly one, to that instructor and no one else.
-update instructors set email_each_booking = true where id = 'ca1eca1e-0000-0000-0000-0000000000d1';
-insert into bookings (id, studio_id, occurrence_id, member_id, status) values
-  ('ca1eca1e-0000-0000-0000-0000000bb003','ca1eca1e-0000-0000-0000-000000000001',
-   'ca1eca1e-0000-0000-0000-00000000a002','ca1eca1e-0000-0000-0000-0000000000b2','booked');
-select expect_num('opt-in ON: exactly one per-booking email',
-  (select count(*) from notifications where template_key = 'booking_for_instructor')::bigint, 1);
-select expect_true('...to that instructor''s login, nobody else',
-  (select user_id = 'ca1eca1e-0000-0000-0000-0000000000c1' from notifications
-    where template_key = 'booking_for_instructor'));
-select expect_true('...and it carries an instructor .ics (headcount, occurrence UID)',
-  (select notification_ics(id) from notifications where template_key='booking_for_instructor')
-    ~ 'UID:ca1eca1e-0000-0000-0000-00000000a002');
+-- The instructor per-booking email was replaced by the coalesced per-class alert
+-- (Decision 33 amendment, migration 167) — email_each_booking and the
+-- booking_for_instructor path are gone. That behaviour is covered by
+-- test/instructor_alerts_test.sql (UUID `a1e7`).
 
 select 'ics part A suite finished' as done;

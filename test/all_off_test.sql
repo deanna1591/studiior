@@ -192,4 +192,25 @@ select run_sweep('week_confirmations (on)', 'select sweep_week_confirmations()')
 select expect_num('teeth: with weekly confirmation ON, the login instructor IS asked to confirm',
   (select count(*) from notifications where studio_id = :'S' and template_key = 'week_confirm_ask'), 1);
 
+-- =============================================================================
+-- Decision 33 amendment (167): the instructor booking alert. On defaults
+-- (instructor_booking_alerts OFF) a booking on the login instructor's in-window
+-- class queues NOTHING; a positive control flips it ON and gets exactly one.
+-- =============================================================================
+insert into members (id,studio_id,first_name,last_name,email,status,joined_on,source) values
+  ('0ff00ff0-0000-0000-0000-0000000bf001',:'S','Zoe','Off','0ff0-z1@example.com','active',current_date,'walk_in'),
+  ('0ff00ff0-0000-0000-0000-0000000bf002',:'S','Zed','Off','0ff0-z2@example.com','active',current_date,'walk_in');
+-- Defaults (switch off): a booking on Ada's in-window published class => no alert.
+insert into bookings (studio_id, occurrence_id, member_id, status) values
+  (:'S','0ff00ff0-0000-0000-0000-00000000c004','0ff00ff0-0000-0000-0000-0000000bf001','booked');
+select expect_num('defaults: a booking on the login instructor''s class queues no alert',
+  (select count(*) from notifications where template_key='instructor_booking_alert' and studio_id=:'S'), 0);
+-- Positive control: switch ON => exactly one alert for a new booking.
+update studio_settings set instructor_booking_alerts=true where studio_id=:'S';
+insert into bookings (studio_id, occurrence_id, member_id, status) values
+  (:'S','0ff00ff0-0000-0000-0000-00000000c004','0ff00ff0-0000-0000-0000-0000000bf002','booked');
+select expect_num('switch ON: exactly one instructor alert for a booking on their class',
+  (select count(*) from notifications where template_key='instructor_booking_alert' and studio_id=:'S'), 1);
+update studio_settings set instructor_booking_alerts=false where studio_id=:'S';
+
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;

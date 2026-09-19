@@ -2793,7 +2793,6 @@ export type Database = {
           core_weekly_cap: number | null
           created_at: string
           display_name: string
-          email_each_booking: boolean
           id: string
           is_demo: boolean
           staff_id: string | null
@@ -2809,7 +2808,6 @@ export type Database = {
           core_weekly_cap?: number | null
           created_at?: string
           display_name: string
-          email_each_booking?: boolean
           id?: string
           is_demo?: boolean
           staff_id?: string | null
@@ -2825,7 +2823,6 @@ export type Database = {
           core_weekly_cap?: number | null
           created_at?: string
           display_name?: string
-          email_each_booking?: boolean
           id?: string
           is_demo?: boolean
           staff_id?: string | null
@@ -5809,6 +5806,7 @@ export type Database = {
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
           how_to_buy: string | null
+          instructor_booking_alerts: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -5896,6 +5894,7 @@ export type Database = {
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
           how_to_buy?: string | null
+          instructor_booking_alerts?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -5983,6 +5982,7 @@ export type Database = {
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
           how_to_buy?: string | null
+          instructor_booking_alerts?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6753,6 +6753,10 @@ export type Database = {
       challenge_qualifies: {
         Args: { p_challenge_id: string; p_occurrence_id: string }
         Returns: boolean
+      }
+      change_line_text: {
+        Args: { p_booked: number; p_cancelled: number }
+        Returns: string
       }
       checkin_code_for: {
         Args: { p_bucket: number; p_member_id: string }
@@ -7670,6 +7674,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: string
       }
+      queue_instructor_booking_alert: {
+        Args: { p_gained: number; p_lost: number; p_occurrence_id: string }
+        Returns: undefined
+      }
       queue_milestone: {
         Args: { p_body: string; p_member_id: string; p_name: string }
         Returns: number
@@ -7960,10 +7968,6 @@ export type Database = {
       set_class_type_instructors: {
         Args: { p_class_type_id: string; p_instructor_ids: string[] }
         Returns: number
-      }
-      set_email_each_booking: {
-        Args: { p_on: boolean; p_studio_id: string }
-        Returns: Json
       }
       set_insight_status: {
         Args: {

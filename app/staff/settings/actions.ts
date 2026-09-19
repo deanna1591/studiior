@@ -697,3 +697,23 @@ export async function saveWaiver(_prev: PlainState, fd: FormData): Promise<Plain
       : "New waiver published. Existing signatures still stand.",
   };
 }
+
+// Decision 33 amendment: the per-tenant switch for instructor booking alerts.
+export async function saveBookingAlerts(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("instructor_booking_alerts") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ instructor_booking_alerts: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. Instructors are told when a booking lands on or leaves their class."
+      : "Off. Instructors are not emailed about bookings.",
+  };
+}
