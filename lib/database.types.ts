@@ -5775,6 +5775,7 @@ export type Database = {
           free_first_peak_allowed: boolean
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
+          how_to_buy: string | null
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -5861,6 +5862,7 @@ export type Database = {
           free_first_peak_allowed?: boolean
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
+          how_to_buy?: string | null
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -5947,6 +5949,7 @@ export type Database = {
           free_first_peak_allowed?: boolean
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
+          how_to_buy?: string | null
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6854,18 +6857,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7121,7 +7112,6 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
-      login: { Args: { uid: string }; Returns: undefined }
       mark_instructor_notifications_read: {
         Args: { p_instructor_id: string }
         Returns: number
@@ -7137,6 +7127,7 @@ export type Database = {
           billing_locked: boolean
           billing_status: Database["public"]["Enums"]["platform_status"]
           booking_cutoff_minutes: number
+          booking_window_days: number
           cancellation_cutoff_minutes: number
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
@@ -7144,6 +7135,7 @@ export type Database = {
           first_name: string
           guest_passes_enabled: boolean
           has_payment_provider: boolean
+          how_to_buy: string
           last_name: string
           lifetime_visits: number
           logo_url: string
@@ -7151,6 +7143,7 @@ export type Database = {
           open_offers: number
           preferred_name: string
           status: Database["public"]["Enums"]["member_status"]
+          studio_contact_email: string
           studio_id: string
           studio_name: string
           studio_timezone: string
@@ -7212,6 +7205,10 @@ export type Database = {
         }[]
       }
       member_milestones: { Args: { p_studio_id: string }; Returns: Json }
+      member_next_class_day: {
+        Args: { p_from?: string; p_studio_id: string }
+        Returns: Json
+      }
       member_peak_slots: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: {
@@ -7745,7 +7742,6 @@ export type Database = {
         }
         Returns: number
       }
-      seq_of: { Args: { p_feed: string; p_uid: string }; Returns: number }
       series_calendar_drift: {
         Args: { p_series_id: string }
         Returns: {
@@ -8135,7 +8131,6 @@ export type Database = {
         }
         Returns: Json
       }
-      ve_count: { Args: { p: string }; Returns: number }
       verify_stripe_signature: {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean

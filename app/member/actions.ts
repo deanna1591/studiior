@@ -63,6 +63,9 @@ const REASONS: Record<string, string> = {
   class_type_not_in_plan: "Your plan does not cover that class type.",
   class_full: "That class is full and has no waitlist.",
   waitlist_closed: "The waitlist has closed for that class.",
+  // Decision 30 belt: an eligible member's first class is free — the UI routes
+  // them to the free path, so this is only reached by a direct call.
+  use_free_first: "Your first class here is free — book it as your free class.",
 };
 
 export type BookResult = { ok: true; message: string } | { ok: false; message: string } | null;

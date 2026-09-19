@@ -161,6 +161,9 @@ export type MemberBootstrap = {
   open_offers: number;
   guest_passes_enabled: boolean;
   has_payment_provider: boolean;
+  booking_window_days: number;
+  how_to_buy: string | null;
+  studio_contact_email: string | null;
 };
 
 /** Who is making this request, on the member PWA. */

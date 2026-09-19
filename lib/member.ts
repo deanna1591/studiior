@@ -48,9 +48,12 @@ export async function memberScreen() {
       checkinClosesAfter: b?.checkin_closes_minutes_after ?? 30,
       cancellationCutoff: b?.cancellation_cutoff_minutes ?? 720,
       bookingCutoff: b?.booking_cutoff_minutes ?? 0,
+      bookingWindowDays: b?.booking_window_days ?? 30,
       waitlistEnabled: b?.waitlist_enabled ?? true,
       guestPassesEnabled: b?.guest_passes_enabled ?? false,
       hasPaymentProvider: b?.has_payment_provider ?? false,
+      howToBuy: b?.how_to_buy ?? null,
+      studioContactEmail: b?.studio_contact_email ?? null,
     },
   };
 }

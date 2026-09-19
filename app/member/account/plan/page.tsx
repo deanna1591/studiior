@@ -18,7 +18,7 @@ export default async function Plan() {
   // three reads that actually need a query: the ledger, the active-guest count
   // (only when guest passes are on), and the peak slots.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }] =
+  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }] =
     await Promise.all([
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
@@ -30,6 +30,12 @@ export default async function Plan() {
       supabase.rpc("member_peak_slots", { p_studio_id: ctx.studioId, p_from: from.toISOString(), p_to: to.toISOString() }),
       // Decision 30: a first-timer owed a free class sees why to book before buying.
       supabase.rpc("free_first_eligibility", { p_studio_id: ctx.studioId, p_member_id: ctx.memberId }),
+      // The studio's public plans, so "the plans are here" leads somewhere. RLS
+      // (plans_member_read) already limits this to this studio's visibility=
+      // 'public' plans — Permissions §9. Purchase is at the desk (Decision 16).
+      supabase.from("membership_plans")
+        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count")
+        .eq("visibility", "public").eq("status", "active").order("sort_order"),
     ]);
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
@@ -125,6 +131,57 @@ export default async function Plan() {
         <p className="m-micro mt-3 text-ink-3">
           You have had {all.length} plans with {studioName}. Older ones keep the price you paid at the time.
         </p>
+      )}
+
+      {/* The catalogue. Decision 16: no online checkout — the studio sells at the
+          desk — but "the plans are here" has to actually show the plans and their
+          prices, or the free-class conversion has nowhere to land. */}
+      {(catalogue ?? []).length > 0 && (
+        <section className="mt-8">
+          <h2 className="section-label text-ink-2">{live ? "Other plans" : "Plans"}</h2>
+          <ul className="mt-3 space-y-3">
+            {(catalogue ?? []).map((p) => {
+              const includes = p.type === "class_pack"
+                ? [p.credits != null ? `${p.credits} classes` : null,
+                   p.validity_days ? `use within ${p.validity_days} days` : null]
+                : p.type === "drop_in"
+                ? ["Single class"]
+                : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
+                   p.billing_interval
+                     ? `billed ${(p.billing_interval_count ?? 1) > 1
+                          ? `every ${p.billing_interval_count} ${p.billing_interval}s`
+                          : `per ${p.billing_interval}`}`
+                     : null];
+              return (
+                <li key={p.id} className="m-card p-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="text-[16px] font-semibold leading-5 text-ink">{p.name}</h3>
+                    <span className="num shrink-0 text-[16px] font-semibold text-ink">
+                      {formatMoney(p.price_cents, p.currency)}
+                    </span>
+                  </div>
+                  {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
+                  <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="m-card mt-3 p-4">
+            <p className="m-micro text-ink-3">How to buy</p>
+            <p className="m-sub mt-1 whitespace-pre-line text-ink-2">
+              {settings.howToBuy?.trim() || "Ask at the desk and we’ll set you up."}
+            </p>
+            {settings.studioContactEmail && (
+              <p className="m-sub mt-1 text-ink-2">
+                Or email{" "}
+                <a href={`mailto:${settings.studioContactEmail}`}
+                   className="text-lime-text underline underline-offset-4">
+                  {settings.studioContactEmail}
+                </a>.
+              </p>
+            )}
+          </div>
+        </section>
       )}
     </MemberShell>
   );

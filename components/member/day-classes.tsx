@@ -38,7 +38,7 @@ export type Row = {
   room: string | null;
   isPeak: boolean;
   /** The resolved state the server computed for this row. */
-  base: "none" | "booked" | "waiting" | "holding" | "full" | "past" | "peakBlocked";
+  base: "none" | "booked" | "waiting" | "holding" | "full" | "past" | "peakBlocked" | "future";
   spaces: number;
   waitlistPosition: number | null;
   waitlistEnabled: boolean;
@@ -49,6 +49,9 @@ export type Row = {
   confirmLast: boolean;
   /** For a booked peak class: what cancelling costs, said before they tap it. */
   peakCancelNote: string | null;
+  /** Decision 30 / booking window: for a class too far ahead to book yet, the
+   *  date it opens for booking — shown instead of a Book button. */
+  opensOn: string | null;
 };
 
 type Override = "booked" | "waiting" | "cancelled" | null;
@@ -56,12 +59,16 @@ type Override = "booked" | "waiting" | "cancelled" | null;
 export default function DayClasses({
   rows,
   bookClass,
+  bookFirstFree,
+  freeFirstEligible,
   cancelBooking,
   startCheckout,
   payAtDesk,
 }: {
   rows: Row[];
   bookClass: (p: BookResult, f: FormData) => Promise<BookResult>;
+  bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
+  freeFirstEligible: boolean;
   cancelBooking: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
@@ -94,7 +101,12 @@ export default function DayClasses({
     startTransition(async () => {
       const fd = new FormData();
       fd.set("occurrence_id", r.id);
-      const res = await bookClass(null, fd);
+      // Decision 30: an eligible member's booking IS the free class — the same
+      // button, the free path. Never the paid drop-in that book_class would
+      // resolve for a lead. (Waitlisting a full class is never the free path.)
+      const res = await (freeFirstEligible && !asWaitlist
+        ? bookFirstFree(null, fd)
+        : bookClass(null, fd));
       if (res && res.ok === false) {
         // Snap back and say why.
         setOverride((s) => ({ ...s, [r.id]: null }));
@@ -154,6 +166,15 @@ export default function DayClasses({
 
         let action: React.ReactNode = null;
         if (state === "past") action = null;
+        else if (state === "future") {
+          // Too far ahead to book yet — say when it opens, rather than a Book
+          // button that would refuse on tap.
+          action = (
+            <span className="m-meta max-w-[8.5rem] text-right leading-[15px] text-ink-2">
+              Opens for booking {r.opensOn}
+            </span>
+          );
+        }
         else if (state === "peakBlocked") {
           action = (
             <span className="m-meta max-w-[7.5rem] text-right leading-[15px] text-ink-2">
@@ -211,6 +232,7 @@ export default function DayClasses({
             </button>
           ) : null;
         } else {
+          // Decision 30: for an eligible member, this book IS the free class.
           action = (
             <button
               type="button"
@@ -218,7 +240,7 @@ export default function DayClasses({
               style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
               className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
             >
-              Book
+              {freeFirstEligible ? "Book free" : "Book"}
             </button>
           );
         }

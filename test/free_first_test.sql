@@ -241,4 +241,95 @@ select expect_text('free-first door: the same variant is refused the same way',
   free_first_eligibility('f9eef9ee-0000-0000-0000-000000000001',
     'f9eef9ee-0000-0000-0000-00000000ad07') ->> 'reason', 'already_member');
 
+-- =============================================================================
+-- 9. THE BELT (migration 163). book_class refuses a self-serve, free-first
+--    eligible member with no active membership (use_free_first), so the free
+--    class cannot be spent on a paid drop-in. A member WITH a plan books
+--    normally; after the free class the ordinary path returns; the switch off
+--    disables the belt.
+-- =============================================================================
+insert into auth.users (id) values
+  ('f9eef9ee-0000-0000-0000-000000000e10'),   -- ACT  (active member, has a plan)
+  ('f9eef9ee-0000-0000-0000-000000000e11');   -- NEW3 (fresh lead, tests switch-off)
+insert into profiles (id, email)
+  select id, id::text||'@example.com' from auth.users where id in
+    ('f9eef9ee-0000-0000-0000-000000000e10','f9eef9ee-0000-0000-0000-000000000e11');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source, waiver_signed_at) values
+  ('f9eef9ee-0000-0000-0000-00000000ad10','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e10','Ada','Active','ada@example.com','active',current_date,'walk_in', now()),
+  ('f9eef9ee-0000-0000-0000-00000000ad11','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e11','Nia','Three','nia3@example.com','lead',current_date,'self_signup', now());
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits_per_period, billing_interval, billing_interval_count, visibility, status) values
+  ('f9eef9ee-0000-0000-0000-00000000c901','f9eef9ee-0000-0000-0000-000000000001','Unlimited','recurring',500000,'CZK',null,'month',1,'public','active');
+insert into memberships (studio_id, member_id, plan_id, status, price_cents, currency, starts_on) values
+  ('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad10','f9eef9ee-0000-0000-0000-00000000c901','active',500000,'CZK',current_date);
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
+    starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('f9eef9ee-0000-0000-0000-00000000c003','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '5 days', now()+interval '5 days'+interval '50 min', 10, 0, 'scheduled','open'),
+  ('f9eef9ee-0000-0000-0000-00000000c004','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee002',null,'Reformer',
+    now()+interval '6 days', now()+interval '6 days'+interval '50 min', 10, 0, 'scheduled','open');
+
+-- An eligible lead calling book_class directly is refused use_free_first.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e11',false);
+select set_config('t.belt_lead',
+  to_jsonb(book_class('f9eef9ee-0000-0000-0000-00000000c003','f9eef9ee-0000-0000-0000-00000000ad11','member'))->>'failure_reason', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('an eligible lead''s book_class is refused use_free_first',
+  current_setting('t.belt_lead'), 'use_free_first');
+
+-- A member WITH an active membership is NOT diverted — they book normally.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e10',false);
+select set_config('t.belt_act',
+  to_jsonb(book_class('f9eef9ee-0000-0000-0000-00000000c003','f9eef9ee-0000-0000-0000-00000000ad10','member'))->>'failure_reason', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('an active member with a plan is not diverted to the free path',
+  current_setting('t.belt_act') is distinct from 'use_free_first');
+
+-- After the free class, the ordinary path returns for that member.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e11',false);
+select book_first_free('f9eef9ee-0000-0000-0000-00000000c004');   -- NIA takes her free class
+select set_config('t.belt_after',
+  to_jsonb(book_class('f9eef9ee-0000-0000-0000-00000000c003','f9eef9ee-0000-0000-0000-00000000ad11','member'))->>'failure_reason', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('after the free class, book_class no longer returns use_free_first',
+  current_setting('t.belt_after') is distinct from 'use_free_first');
+
+-- With the switch OFF, the belt does not fire (a fresh eligible-shaped lead).
+update studio_settings set free_first_class_enabled=false where studio_id='f9eef9ee-0000-0000-0000-000000000001';
+insert into auth.users (id) values ('f9eef9ee-0000-0000-0000-000000000e12');
+insert into profiles (id, email) values ('f9eef9ee-0000-0000-0000-000000000e12','e12@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source, waiver_signed_at) values
+  ('f9eef9ee-0000-0000-0000-00000000ad12','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e12','Off','Lead','off@example.com','lead',current_date,'self_signup', now());
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e12',false);
+select set_config('t.belt_off',
+  to_jsonb(book_class('f9eef9ee-0000-0000-0000-00000000c003','f9eef9ee-0000-0000-0000-00000000ad12','member'))->>'failure_reason', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('switch off => book_class never returns use_free_first',
+  current_setting('t.belt_off') is distinct from 'use_free_first');
+update studio_settings set free_first_class_enabled=true where studio_id='f9eef9ee-0000-0000-0000-000000000001';
+
+-- THE BELT IS SELF-ONLY. Front desk booking a walk-in lead through book_class
+-- must still work — the desk cannot call book_first_free (self-scoped). A desk
+-- booking of a free-first-eligible lead is NOT diverted: the belt requires
+-- v_is_self and not is_desk, so it is skipped for the desk and the booking goes
+-- through as an ordinary (drop-in) seat.
+insert into auth.users (id) values ('f9eef9ee-0000-0000-0000-000000000e13');
+insert into profiles (id, email) values ('f9eef9ee-0000-0000-0000-000000000e13','e13@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source, waiver_signed_at) values
+  ('f9eef9ee-0000-0000-0000-00000000ad13','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e13','Desk','Lead','desklead@example.com','lead',current_date,'walk_in', now());
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
+    starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('f9eef9ee-0000-0000-0000-00000000c005','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '7 days', now()+interval '7 days'+interval '50 min', 10, 0, 'scheduled','open');
+-- Confirm the lead really is free-first eligible (so a SELF call would divert).
+select expect_true('the walk-in lead is free-first eligible',
+  (free_first_eligibility('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad13') ->> 'ok')::boolean);
+-- The owner (desk-up for A) books them.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-0000000000a1',false);
+select set_config('t.desk', to_jsonb(book_class('f9eef9ee-0000-0000-0000-00000000c005','f9eef9ee-0000-0000-0000-00000000ad13','front_desk'))::jsonb::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('a desk booking of an eligible lead is NOT refused use_free_first',
+  (current_setting('t.desk')::jsonb->>'failure_reason') is distinct from 'use_free_first');
+select expect_text('...it books as an ordinary seat',
+  current_setting('t.desk')::jsonb->>'status', 'booked');
+
 select 'ALL FREE-FIRST TESTS PASSED' as done;

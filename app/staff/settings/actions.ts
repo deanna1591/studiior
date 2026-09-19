@@ -614,6 +614,22 @@ export async function saveCarryForward(_prev: PlainState, fd: FormData): Promise
  * new free bookings; anyone who already booked one keeps their free place, since
  * that booking is an ordinary comp seat that stands on its own.
  */
+export async function saveHowToBuy(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const raw = String(fd.get("how_to_buy") ?? "").trim();
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ how_to_buy: raw || null })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings");
+  return { ok: true, message: raw ? "Saved. Members see this under your plans." : "Saved. Members see the default." };
+}
+
 export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

@@ -6,7 +6,7 @@ import { MonthGrid, type MonthDay } from "@/components/member/week-strip";
 import DateStrip from "@/components/member/date-strip";
 import DayView from "@/components/member/day-view";
 import DayClasses, { type Row } from "@/components/member/day-classes";
-import { bookClass, cancelBooking, startCheckout, payAtDesk } from "../actions";
+import { bookClass, bookFirstFree, cancelBooking, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -257,6 +257,15 @@ export default async function Book({
   const minutes = (a: string, b: string | null) =>
     b ? Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000) : null;
 
+  // Decision 30 / booking window. A class further ahead than booking_window_days
+  // cannot be booked yet — so it renders "Opens for booking on {date}" (the
+  // start minus the window) rather than a Book button that would refuse on tap.
+  const windowMs = settings.bookingWindowDays * 86_400_000;
+  const dayLabel = (iso: string) =>
+    new Intl.DateTimeFormat("en-GB", {
+      weekday: "long", day: "numeric", month: "long", timeZone: ctx.timeZone,
+    }).format(new Date(iso));
+
   // The rules stay here, in SQL and the reader; the client only flips the card.
   // Every state a row can be in is resolved on the server and handed over as a
   // plain descriptor — peak-blocked, holding a paid seat, the free-cancellation
@@ -289,10 +298,17 @@ export default async function Book({
           : "Cancelling now still uses your peak class"
         : null;
 
+    const outOfWindow = !past && !booked && !waiting && !holding
+      && new Date(o.starts_at).getTime() > now + windowMs;
+    const opensOn = outOfWindow
+      ? dayLabel(new Date(new Date(o.starts_at).getTime() - windowMs).toISOString())
+      : null;
+
     const base: Row["base"] = past ? "past"
       : holding ? "holding"
       : booked ? "booked"
       : waiting ? "waiting"
+      : outOfWindow ? "future"
       : peakBlocked ? "peakBlocked"
       : full ? "full"
       : "none";
@@ -315,8 +331,26 @@ export default async function Book({
       heldSeats: held,
       confirmLast: isPeak && remaining === 1,
       peakCancelNote,
+      opensOn,
     };
   });
+
+  // Decision 30: an empty day before the timetable opens should point at where
+  // it starts, not offer "Try tomorrow" one day at a time. Only when the day is
+  // genuinely empty (not a closure or a draft month) and there is a next class.
+  const noRealClasses = shown.length === 0 && !closedToday && !draftMonth && !typeFilter && !instFilter;
+  const { data: nextDayRaw } = noRealClasses
+    ? await supabase.rpc("member_next_class_day", {
+        p_studio_id: ctx.studioId, p_from: selectedKey,
+      })
+    : { data: null };
+  const nextDay = nextDayRaw as { date: string; count: number } | null;
+  // The offset (days from today) of that date, so the empty state can link to it.
+  const nextDayOffset = nextDay
+    ? Math.round(
+        (new Date(`${nextDay.date}T00:00:00Z`).getTime() -
+          new Date(`${todayKey}T00:00:00Z`).getTime()) / 86_400_000)
+    : null;
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
@@ -451,7 +485,9 @@ export default async function Book({
                 : closedToday.reason
               : draftMonth
               ? `${dateWord(selectedMonthKey, { month: "long" })}'s timetable is not published yet.`
-              : typeFilter || instFilter ? "Nothing matching on this day." : "No classes on this day."}
+              : typeFilter || instFilter ? "Nothing matching on this day."
+              : nextDay ? `Classes start ${dateWord(nextDay.date, { weekday: "long", day: "numeric", month: "long" })}.`
+              : "No classes on this day."}
           </p>
           <p className="m-sub mt-1 text-ink-2">
             {closedToday
@@ -463,6 +499,10 @@ export default async function Book({
               ? <>It opens for booking when the studio publishes it.{horizon?.published_through && <> You can book through {dateWord(horizon.published_through, { day: "numeric", month: "long" })}.</>}</>
               : typeFilter || instFilter
               ? <Link href={qs({ type: undefined, instructor: undefined })} className="text-lime-text underline underline-offset-4">Show everything</Link>
+              : nextDay && nextDayOffset !== null
+              ? <Link href={qs({ d: nextDayOffset })} className="text-lime-text underline underline-offset-4">
+                  See the {nextDay.count} {nextDay.count === 1 ? "class" : "classes"} on that day
+                </Link>
               : <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">Try tomorrow</Link>}
           </p>
         </div>
@@ -470,6 +510,8 @@ export default async function Book({
         <DayClasses
           rows={rows}
           bookClass={bookClass}
+          bookFirstFree={bookFirstFree}
+          freeFirstEligible={freeFirstEligible}
           cancelBooking={cancelBooking}
           startCheckout={startCheckout}
           payAtDesk={payAtDesk}
