@@ -3,6 +3,8 @@ import { Icon } from "@/components/member/icons";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { MonthGrid, type MonthDay } from "@/components/member/week-strip";
+import FreeFirstBanner from "@/components/member/free-first-banner";
+import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 import DateStrip from "@/components/member/date-strip";
 import DayView from "@/components/member/day-view";
 import DayClasses, { type Row } from "@/components/member/day-classes";
@@ -73,7 +75,8 @@ export default async function Book({
   const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
-         { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig }] =
+         { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig },
+         { data: announceRaw }, { data: freeDismiss }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -135,8 +138,19 @@ export default async function Book({
       // Decision 30. Is this member owed a free first class — so the list can
       // say so up top, where they decide. Same batch, no extra hop.
       supabase.rpc("free_first_eligibility", { p_studio_id: ctx.studioId, p_member_id: ctx.memberId }),
+      // Decision 27 on /book: the studio's pinned announcements as a compact
+      // strip. Same batch. Whether this member dismissed the free-first banner
+      // (a member_dismissals row, not localStorage) is one more read.
+      supabase.rpc("member_announcements", { p_studio_id: ctx.studioId }),
+      supabase.from("member_dismissals").select("key").eq("member_id", ctx.memberId).eq("key", "free_first_banner").maybeSingle(),
     ]);
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
+  // Pinned announcements only reach the Book strip; unpinned stay Home-only.
+  const pinnedAnnouncements = ((announceRaw ?? []) as unknown as
+    { id: string; title: string; body: string; pinned: boolean }[])
+    .filter((a) => a.pinned)
+    .map((a): StripItem => ({ id: a.id, title: a.title, body: a.body }));
+  const freeFirstDismissed = freeDismiss != null;
 
   const horizon = horizonRaw as unknown as
     { enabled: boolean; published_through?: string | null; next_unpublished?: string | null;
@@ -354,11 +368,10 @@ export default async function Book({
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
-      {freeFirstEligible && (
-        <p className="m-card mb-4 px-4 py-3 text-[14px] leading-5 text-ink">
-          <span className="font-semibold">Your first class is on us.</span> Pick any class below — no card, no plan.
-        </p>
-      )}
+      {/* The studio's pinned announcements, then the free-first offer — the
+          tenant's own text where members choose a class. */}
+      <AnnounceStrip items={pinnedAnnouncements} />
+      {freeFirstEligible && !freeFirstDismissed && <FreeFirstBanner />}
       <section aria-label="Choose a day" className="mb-4">
         <div className="mb-2.5 flex items-center gap-2">
           <h2 className="m-head flex-1 truncate text-[17px] leading-6 text-ink">{monthLabel}</h2>

@@ -173,4 +173,40 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_num('a re-publish does not email again',
   (select count(*) from notifications where template_key='announcement_posted' and studio_id='a11ca11c-0000-0000-0000-000000000001'), 1);
 
+-- =============================================================================
+-- The /book affordances (migration 166): the free-first dismissal is a row, and
+-- the Book announcement strip is pinned-only.
+-- =============================================================================
+-- Member A dismisses the free-first banner (a member_dismissals row, self-scoped).
+set role authenticated; select set_config('request.jwt.claim.sub','a11ca11c-0000-0000-0000-0000000000a2',false);
+insert into member_dismissals (member_id, key) values ('a11ca11c-0000-0000-0000-0000000d0a02','free_first_banner');
+select expect_num('the member sees their own dismissal row (it persists — a row, not localStorage)',
+  (select count(*) from member_dismissals where key='free_first_banner'), 1);
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+-- Member B (another studio, another person) sees none of A's dismissals.
+set role authenticated; select set_config('request.jwt.claim.sub','a11ca11c-0000-0000-0000-0000000000b2',false);
+select expect_num('a different member sees none of it (RLS self-scope)',
+  (select count(*) from member_dismissals), 0);
+-- ...and cannot dismiss on another member's behalf.
+do $$ begin
+  insert into member_dismissals (member_id, key) values ('a11ca11c-0000-0000-0000-0000000d0a02','sneaky');
+  raise exception 'FAIL a member wrote a dismissal for another member';
+exception when insufficient_privilege or check_violation then
+  raise notice 'PASS  a member cannot dismiss for another member (RLS with check)';
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+-- The Book strip is pinned-only: of member A's in-range announcements, exactly
+-- one is pinned (the "both/pinned" holiday note) — the unpinned intro offer
+-- stays Home-only.
+set role authenticated; select set_config('request.jwt.claim.sub','a11ca11c-0000-0000-0000-0000000000a2',false);
+select expect_num('exactly one pinned announcement reaches the Book strip',
+  (select count(*) from jsonb_array_elements(
+     current_setting('a11c.ann')::jsonb) e where (e->>'pinned')::boolean),
+  1)
+from (select set_config('a11c.ann',
+        member_announcements('a11ca11c-0000-0000-0000-000000000001')::text, false)) _;
+select set_config('request.jwt.claim.sub','',false); reset role;
+
 do $$ begin raise notice 'announcements_test: all assertions passed'; end $$;

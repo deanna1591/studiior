@@ -3007,6 +3007,39 @@ export type Database = {
           },
         ]
       }
+      member_dismissals: {
+        Row: {
+          dismissed_at: string
+          key: string
+          member_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          key: string
+          member_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          key?: string
+          member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_dismissals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_dismissals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_documents: {
         Row: {
           created_at: string
