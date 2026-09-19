@@ -2,6 +2,8 @@ import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { SignOut } from "@/components/member/sign-out";
+import { CalendarFeedControl } from "@/components/member/calendar-feed";
+import { mintFeed, revokeFeed } from "@/lib/feed-actions";
 import { EachBookingToggle } from "../actions-ui";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +29,13 @@ type Rec = {
  */
 export default async function MePage() {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data }, { data: relData }, { data: me }] = await Promise.all([
+  const [{ data }, { data: relData }, { data: me }, { data: feed }] = await Promise.all([
     supabase.rpc("instructor_recognition", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("instructor_reliability", { p_instructor_id: ctx.instructor_id }),
     supabase.from("instructors").select("email_each_booking").eq("id", ctx.instructor_id).maybeSingle(),
+    supabase.rpc("calendar_feed_state", { p_studio_id: ctx.studio_id, p_kind: "instructor" }),
   ]);
+  const feedState = (feed ?? {}) as { active?: boolean; last_used_at?: string | null };
   const eachBooking = (me as { email_each_booking?: boolean } | null)?.email_each_booking ?? false;
   const r = data as Rec | null;
   const rel = relData as unknown as
@@ -74,6 +78,17 @@ export default async function MePage() {
           </p>
         </div>
       )}
+
+      <p className="m-sub mb-2 mt-6 text-ink-3">Your calendar</p>
+      <CalendarFeedControl
+        active={feedState.active ?? false}
+        lastUsed={feedState.last_used_at ?? null}
+        what="your classes"
+        actions={{
+          mint:   async () => { "use server"; return mintFeed(ctx.studio_id, "instructor"); },
+          revoke: async () => { "use server"; return revokeFeed(ctx.studio_id, "instructor"); },
+        }}
+      />
 
       <p className="m-sub mb-2 mt-6 text-ink-3">Notifications</p>
       <EachBookingToggle studioId={ctx.studio_id} on={eachBooking} />

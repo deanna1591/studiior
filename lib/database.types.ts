@@ -583,6 +583,96 @@ export type Database = {
           },
         ]
       }
+      calendar_feed_cache: {
+        Row: {
+          computed_at: string
+          payload: string
+          token_hash: string
+        }
+        Insert: {
+          computed_at?: string
+          payload: string
+          token_hash: string
+        }
+        Update: {
+          computed_at?: string
+          payload?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      calendar_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          instructor_id: string | null
+          kind: string
+          last_used_at: string | null
+          member_id: string | null
+          revoked_at: string | null
+          studio_id: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructor_id?: string | null
+          kind: string
+          last_used_at?: string | null
+          member_id?: string | null
+          revoked_at?: string | null
+          studio_id: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructor_id?: string | null
+          kind?: string
+          last_used_at?: string | null
+          member_id?: string | null
+          revoked_at?: string | null
+          studio_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_tokens_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tokens_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tokens_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tokens_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tokens_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_participants: {
         Row: {
           audience: Database["public"]["Enums"]["challenge_audience"]
@@ -6443,6 +6533,11 @@ export type Database = {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
       }
+      calendar_feed: { Args: { p_token: string }; Returns: string }
+      calendar_feed_state: {
+        Args: { p_kind: string; p_studio_id: string }
+        Returns: Json
+      }
       cancel_booking: {
         Args: { p_booking_id: string }
         Returns: Database["public"]["CompositeTypes"]["cancel_result"]
@@ -6759,6 +6854,10 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
@@ -6840,9 +6939,7 @@ export type Database = {
         }
         Returns: string
       }
-      ics_of: { Args: { p_dedupe: string }; Returns: string }
       ics_prop: { Args: { p_name: string; p_value: string }; Returns: string }
-      ics_seq: { Args: { p_ics: string }; Returns: number }
       ics_studio_location: { Args: { p_studio_id: string }; Returns: string }
       ics_vevent: {
         Args: {
@@ -6914,6 +7011,10 @@ export type Database = {
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
       instructor_month_ics: {
         Args: { p_month: string; p_studio_id: string }
+        Returns: string
+      }
+      instructor_month_vevents: {
+        Args: { p_instructor_id: string; p_month: string; p_studio_id: string }
         Returns: string
       }
       instructor_notifications: {
@@ -7020,6 +7121,7 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      login: { Args: { uid: string }; Returns: undefined }
       mark_instructor_notifications_read: {
         Args: { p_instructor_id: string }
         Returns: number
@@ -7133,6 +7235,10 @@ export type Database = {
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
+      mint_calendar_feed: {
+        Args: { p_kind: string; p_studio_id: string }
+        Returns: string
+      }
       month_publication_facts: {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json
@@ -7549,6 +7655,10 @@ export type Database = {
       }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
       restore_series: { Args: { p_series_id: string }; Returns: Json }
+      revoke_calendar_feed: {
+        Args: { p_kind: string; p_studio_id: string }
+        Returns: Json
+      }
       roster_carry_due: {
         Args: { p_month: string; p_studio_id: string }
         Returns: string[]
@@ -7635,6 +7745,7 @@ export type Database = {
         }
         Returns: number
       }
+      seq_of: { Args: { p_feed: string; p_uid: string }; Returns: number }
       series_calendar_drift: {
         Args: { p_series_id: string }
         Returns: {
@@ -8024,6 +8135,7 @@ export type Database = {
         }
         Returns: Json
       }
+      ve_count: { Args: { p: string }; Returns: number }
       verify_stripe_signature: {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean

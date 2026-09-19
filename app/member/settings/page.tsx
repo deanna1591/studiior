@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
+import { CalendarFeedControl } from "@/components/member/calendar-feed";
+import { mintFeed, revokeFeed } from "@/lib/feed-actions";
 import PreferencesForm from "./form";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,11 @@ export default async function Settings() {
   // opted out of something they were never asked about.
   const on = (v: boolean | null | undefined) => v ?? true;
 
+  const { data: feed } = await supabase.rpc("calendar_feed_state", {
+    p_studio_id: ctx.studioId, p_kind: "member",
+  });
+  const feedState = (feed ?? {}) as { active?: boolean; last_used_at?: string | null };
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}
                  title="Email settings">
@@ -45,6 +52,19 @@ export default async function Settings() {
           milestone_email: on(prefs?.milestone_email),
         }}
       />
+
+      <section className="mt-8 border-t border-line pt-5">
+        <h2 className="section-label mb-3 text-ink-2">Your calendar</h2>
+        <CalendarFeedControl
+          active={feedState.active ?? false}
+          lastUsed={feedState.last_used_at ?? null}
+          what="your bookings"
+          actions={{
+            mint:   async () => { "use server"; return mintFeed(ctx.studioId, "member"); },
+            revoke: async () => { "use server"; return revokeFeed(ctx.studioId, "member"); },
+          }}
+        />
+      </section>
 
       <section className="mt-8 border-t border-line pt-5">
         <h2 className="section-label text-ink-2">Always sent</h2>

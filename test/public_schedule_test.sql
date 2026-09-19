@@ -224,20 +224,23 @@ select expect_text('a repeat hit is served from cache (same generated_at)',
 reset role;
 
 -- =============================================================================
--- 7. THE ANON SURFACE IS NOW EXACTLY TEN — public_schedule and no other new one
+-- 7. THE ANON SURFACE IS NOW EXACTLY ELEVEN — public_schedule + calendar_feed
 -- =============================================================================
--- Exactly ten pre-login surfaces — the nine plus public_schedule, and nothing
--- else. The `expect_%` helpers this suite defines are PUBLIC-executable by
--- Postgres default (harmless in a test DB), so they are excluded; every other
--- anon-executable function is a real surface and must be one of the ten. (The
+-- Eleven pre-login surfaces — the nine, plus public_schedule (147) and
+-- calendar_feed (162, Decision 33 Part B: the subscribable calendar feed), and
+-- nothing else. The `expect_%` helpers this suite defines are PUBLIC-executable
+-- by Postgres default (harmless in a test DB), so they are excluded; every other
+-- anon-executable function is a real surface and must be one of the eleven. (The
 -- hosted advisor is the true gate — local and hosted ACLs differ — but this
 -- catches a stray grant before it ships.)
-select expect_num('exactly ten real functions are executable by anon',
+select expect_num('exactly eleven real functions are executable by anon',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%')::bigint, 10);
+      and p.proname not like 'expect\_%')::bigint, 11);
 select expect_true('public_schedule is one of them',
   has_function_privilege('anon', 'public_schedule(text,int)'::regprocedure, 'execute'));
+select expect_true('calendar_feed is one of them',
+  has_function_privilege('anon', 'calendar_feed(text)'::regprocedure, 'execute'));
 -- The cache table is closed to clients.
 select expect_false('anon cannot read the cache table directly',
   has_table_privilege('anon', 'public_schedule_cache', 'select'));
