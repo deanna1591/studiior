@@ -71,12 +71,42 @@ insert into announcements (id, studio_id, title, body, starts_at, ends_at, statu
   ('a11ca11c-0000-0000-0000-00000000e005','a11ca11c-0000-0000-0000-000000000001','Old news','This has ended.', now()-interval '10 days', now()-interval '1 day','published','members',false),
   ('a11ca11c-0000-0000-0000-00000000e006','a11ca11c-0000-0000-0000-000000000001','Draft','Not published yet.', now()-interval '1 day', now()+interval '7 days','draft','members',false);
 
+-- Amendment (migration 168): two BANNERS in A — one for both audiences with a
+-- link (tap opens it), one members-only with no link. Title only, body empty.
+insert into announcements (id, studio_id, kind, title, body, starts_at, ends_at, status, audience, pinned, link_url, link_label) values
+  ('a11ca11c-0000-0000-0000-00000000e007','a11ca11c-0000-0000-0000-000000000001','banner','Studio closed Monday','', now()-interval '1 day', now()+interval '5 days','published','both',false,'https://reform.example.com/holiday','Details'),
+  ('a11ca11c-0000-0000-0000-00000000e008','a11ca11c-0000-0000-0000-000000000001','banner','New timetable is live','', now()-interval '1 day', now()+interval '5 days','published','members',false,null,null);
+
 -- =============================================================================
 -- Member A: members + both, pinned first, not instr/future/past/draft.
 -- =============================================================================
-select expect_num('member sees members + both audience only, in range',
+-- Two posts (intro, holiday) + two banners (closed, timetable) = 4.
+select expect_num('member sees members + both audience only, in range (2 posts + 2 banners)',
   jsonb_array_length(as_state('a11ca11c-0000-0000-0000-0000000000a2',
-    $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb), 2);
+    $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb), 4);
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+-- The kind field is carried, and the split is right: 2 posts, 2 banners.
+select expect_num('a post appears in the member payload as kind=post (2 of them)',
+  (select count(*) from jsonb_array_elements(as_state('a11ca11c-0000-0000-0000-0000000000a2',
+     $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb) e
+    where e->>'kind' = 'post'), 2);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_num('a banner appears in the member payload as kind=banner (2 of them)',
+  (select count(*) from jsonb_array_elements(as_state('a11ca11c-0000-0000-0000-0000000000a2',
+     $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb) e
+    where e->>'kind' = 'banner'), 2);
+select set_config('request.jwt.claim.sub','',false); reset role;
+-- A banner with a link carries link_url + a label; one without carries null.
+select expect_true('the linked banner carries its https link and label',
+  (as_state('a11ca11c-0000-0000-0000-0000000000a2',
+    $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb
+    @> '[{"kind":"banner","link_url":"https://reform.example.com/holiday","link_label":"Details"}]'::jsonb));
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('the unlinked banner carries a null link (tap does not open)',
+  (as_state('a11ca11c-0000-0000-0000-0000000000a2',
+    $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb
+    @> '[{"title":"New timetable is live","link_url":null}]'::jsonb));
 select set_config('request.jwt.claim.sub','',false); reset role;
 -- pinned first
 select expect_true('the pinned announcement is first',
@@ -88,9 +118,10 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 -- =============================================================================
 -- Instructor A: instructors + both, never a members-only one.
 -- =============================================================================
-select expect_num('instructor sees instructors + both audience only',
+-- instructors (cover), both (holiday post), both (closed banner) = 3.
+select expect_num('instructor sees instructors + both audience only (incl. a both-audience banner)',
   jsonb_array_length(as_state('a11ca11c-0000-0000-0000-0000000000a3',
-    $$ select instructor_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb), 2);
+    $$ select instructor_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb), 3);
 select set_config('request.jwt.claim.sub','',false); reset role;
 -- and specifically NOT the members-only intro offer
 select expect_false('the members-only announcement is not in the instructor portal',
@@ -105,9 +136,9 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 select as_state('a11ca11c-0000-0000-0000-0000000000a2',
   $$ select dismiss_announcement('a11ca11c-0000-0000-0000-00000000e001')::text $$);
 select set_config('request.jwt.claim.sub','',false); reset role;
-select expect_num('after dismissing one, the member sees one fewer',
+select expect_num('after dismissing one, the member sees one fewer (4 -> 3)',
   jsonb_array_length(as_state('a11ca11c-0000-0000-0000-0000000000a2',
-    $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb), 1);
+    $$ select member_announcements('a11ca11c-0000-0000-0000-000000000001') $$)::jsonb), 3);
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 -- =============================================================================
@@ -126,6 +157,22 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_true('a member cannot post an announcement',
   as_state('a11ca11c-0000-0000-0000-0000000000a2',
     $$ select create_announcement('a11ca11c-0000-0000-0000-000000000001','x','y',now(),null,'members',false)::text $$) = 'ERR:PT403');
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+-- =============================================================================
+-- Amendment (168): a banner over 120 chars is refused; a link must be https.
+-- =============================================================================
+select expect_true('a banner over 120 characters is refused (PT422)',
+  as_state('a11ca11c-0000-0000-0000-0000000000a1',
+    $$ select create_announcement('a11ca11c-0000-0000-0000-000000000001', repeat('x',121), '', now(), null, 'members', false, 'banner')::text $$) = 'ERR:PT422');
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('an http:// link is refused (PT422)',
+  as_state('a11ca11c-0000-0000-0000-0000000000a1',
+    $$ select create_announcement('a11ca11c-0000-0000-0000-000000000001','With a bad link','body',now(),null,'members',false,'post','http://insecure.example.com')::text $$) = 'ERR:PT422');
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('an https:// link is accepted (returns a uuid, not an error)',
+  as_state('a11ca11c-0000-0000-0000-0000000000a1',
+    $$ select create_announcement('a11ca11c-0000-0000-0000-000000000001','With a good link','body',now(),null,'members',false,'post','https://ok.example.com')::text $$) not like 'ERR:%');
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 -- =============================================================================
@@ -174,14 +221,13 @@ select expect_num('a re-publish does not email again',
   (select count(*) from notifications where template_key='announcement_posted' and studio_id='a11ca11c-0000-0000-0000-000000000001'), 1);
 
 -- =============================================================================
--- The /book affordances (migration 166): the free-first dismissal is a row, and
--- the Book announcement strip is pinned-only.
+-- member_dismissals persistence + RLS (migration 166; the free_first_banner key
+-- is retired by 168, so this exercises the table with a generic future key).
 -- =============================================================================
--- Member A dismisses the free-first banner (a member_dismissals row, self-scoped).
 set role authenticated; select set_config('request.jwt.claim.sub','a11ca11c-0000-0000-0000-0000000000a2',false);
-insert into member_dismissals (member_id, key) values ('a11ca11c-0000-0000-0000-0000000d0a02','free_first_banner');
+insert into member_dismissals (member_id, key) values ('a11ca11c-0000-0000-0000-0000000d0a02','saved_pref');
 select expect_num('the member sees their own dismissal row (it persists — a row, not localStorage)',
-  (select count(*) from member_dismissals where key='free_first_banner'), 1);
+  (select count(*) from member_dismissals where key='saved_pref'), 1);
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 -- Member B (another studio, another person) sees none of A's dismissals.
@@ -197,16 +243,20 @@ exception when insufficient_privilege or check_violation then
 end $$;
 select set_config('request.jwt.claim.sub','',false); reset role;
 
--- The Book strip is pinned-only: of member A's in-range announcements, exactly
--- one is pinned (the "both/pinned" holiday note) — the unpinned intro offer
--- stays Home-only.
+-- =============================================================================
+-- Amendment (168): the Book/Home strip is BANNER-only, not pinned. Of member
+-- A's in-range items (e001 was dismissed above), two are banners and the
+-- pinned holiday POST is not — it stays in What's on, never the strip.
+-- =============================================================================
 set role authenticated; select set_config('request.jwt.claim.sub','a11ca11c-0000-0000-0000-0000000000a2',false);
-select expect_num('exactly one pinned announcement reaches the Book strip',
-  (select count(*) from jsonb_array_elements(
-     current_setting('a11c.ann')::jsonb) e where (e->>'pinned')::boolean),
-  1)
-from (select set_config('a11c.ann',
-        member_announcements('a11ca11c-0000-0000-0000-000000000001')::text, false)) _;
+select set_config('a11c.ann',
+  member_announcements('a11ca11c-0000-0000-0000-000000000001')::text, false);
 select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_num('exactly two banners reach the strip (kind=banner)',
+  (select count(*) from jsonb_array_elements(current_setting('a11c.ann')::jsonb) e
+    where e->>'kind' = 'banner'), 2);
+select expect_num('the pinned holiday POST is NOT a strip banner (it is What''s on)',
+  (select count(*) from jsonb_array_elements(current_setting('a11c.ann')::jsonb) e
+    where (e->>'pinned')::boolean and e->>'kind' = 'banner'), 0);
 
 do $$ begin raise notice 'announcements_test: all assertions passed'; end $$;

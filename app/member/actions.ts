@@ -201,19 +201,11 @@ export async function bringGuest(_prev: BookResult, formData: FormData): Promise
   return { ok: true, message: "Your guest is booked. We've emailed them to set up and sign the waiver." };
 }
 
-// Decision 30/27: the member dismisses the free-first banner on /book. A
-// member_dismissals row (key 'free_first_banner'), not localStorage — it
-// persists per member across devices. The "Book — first class free" row buttons
-// keep carrying the offer while they are eligible, so nothing is lost.
-export async function dismissFreeFirst(): Promise<void> {
-  const ctx = await getMemberContext();
-  if (!ctx) return;
-  const supabase = createClient();
-  await supabase.from("member_dismissals")
-    .insert({ member_id: ctx.memberId, key: "free_first_banner" });
-  revalidatePath("/book");
-}
-
+// Decision 27 (amendment): the built-in free-first banner on /book is retired —
+// a studio's own BANNER announcement is the message now, and the "Book — first
+// class free" row buttons still carry the offer while a member is eligible. The
+// old dismissFreeFirst action and its 'free_first_banner' key are gone;
+// member_dismissals stays for future per-member keys.
 export async function dismissAnnouncement(id: string): Promise<void> {
   const ctx = await getMemberContext();
   if (!ctx) return;

@@ -16,7 +16,7 @@ export default async function NewAnnouncement() {
   return (
     <AppShell {...shell} title="New announcement">
       <Link href="/announcements" className="mb-3 inline-block text-[13px] text-ink-2 underline underline-offset-4">← All announcements</Link>
-      <AnnouncementForm mode="new" values={{ title: "", body: "", audience: "members", pinned: false, starts_on: today, ends_on: "" }} />
+      <AnnouncementForm mode="new" values={{ kind: "banner", title: "", body: "", audience: "members", pinned: false, starts_on: today, ends_on: "", link_url: "", link_label: "" }} />
     </AppShell>
   );
 }

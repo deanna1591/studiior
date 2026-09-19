@@ -627,6 +627,22 @@ This does **not** contradict Decision 65's rule that *the commitment never affec
 
 **Notifying is opt-in, off by default.** A studio that emails every announcement trains members to ignore them; a closure is the case where they genuinely should be told. So publishing offers a "notify" checkbox, and only then are members of the audience emailed — once, keyed on the announcement, never re-sent on a re-publish. Instructors are not emailed (they see it in the portal); that is a noted gap, not a decision to keep it that way forever.
 
+**AMENDMENT (migration 168): announcements are two TYPES, gain a link, and move down Home; the built-in free-first banner is retired in their favour.** Migration 166 added a dismissible one-line strip at the top of `/book` for *pinned* posts — but "pinned" was carrying two jobs at once (first-in-What's-on AND the strip), and a full What's-on post is the wrong shape for a one-line strip. This splits the concept cleanly.
+
+- **`announcements.kind` is `'post'` (default) or `'banner'`.** A **post** is what exists today — title, body, optional photo, dates, audience, pinned — rendered in the "What's on" section, pinned first. A **banner** is title only (≤ ~120 chars, enforced), no photo, no body, rendered as the dismissible one-line strip at the top of Home AND Book. **The strip now shows `kind='banner'` only; pinned no longer drives it.** Every existing row becomes `'post'` by the default, so nothing already published changes.
+
+- **An optional link on ANY announcement** — `link_url` (https only, validated in the writer and by a CHECK) and `link_label` (default "Learn more"). On a What's-on post it is a button under the body. On a banner, a link makes tapping the strip open the link (with a small arrow to signal it) instead of expanding; a banner with no link behaves as before. A same-host link (into the member app) opens in place; an external one opens in a new tab.
+
+- **Home order changes.** Banner strips sit at the very top, above everything. Then the existing Home content (next class / hero, waiver banner, coming up), then Challenges, then **What's on LAST, below Challenges** — it is for events and longer reads, not the first thing on the screen. Book shows banners only (no What's on).
+
+- **The banner strip is the one FILLED bar on the screen** — `accentRamp().solid` with its measured `onSolid` text (the primary-button pair), so it separates from the tinted cards on every preset and accent. No raw hex: a fixed green would be wrong on a green-accent studio and on Bold. The X and the arrow take `onSolid` too. Measured at 375 on all four presets.
+
+- **Dismissal is the existing `dismiss_announcement`**, so one X clears a banner on Home and Book together. Multiple live banners stack; the studio should keep it to one or two, but nothing is enforced.
+
+- **The built-in free-first banner on `/book` is REMOVED.** The studio's own banner announcement is the message now; free-first eligibility is still carried by the "Book — first class free" row buttons and the class-detail block, which stay. The `free_first_banner` dismissal key and its action are dropped; `member_dismissals` (166) stays for future per-member keys.
+
+- Instructor audience is unchanged: a banner with audience instructors/both shows as a strip in the portal too.
+
 ---
 
 ## 26 — A member may bring a guest, and the guest's first class is free

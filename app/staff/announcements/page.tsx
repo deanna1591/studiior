@@ -5,7 +5,7 @@ import { AppShell, Denied, Empty, SectionLabel } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-type Ann = { id: string; title: string; status: string; audience: string; pinned: boolean;
+type Ann = { id: string; kind: string; title: string; status: string; audience: string; pinned: boolean;
   starts_at: string; ends_at: string | null; notified_at: string | null };
 
 export default async function Announcements() {
@@ -25,13 +25,15 @@ export default async function Announcements() {
   const dateWord = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(iso));
   const audienceWord = (a: string) => a === "both" ? "Members + instructors" : a === "instructors" ? "Instructors" : "Members";
 
+  const typeWord = (a: Ann) => a.kind === "banner" ? "Banner" : "What’s on";
+
   const Row = ({ a }: { a: Ann }) => (
     <li>
       <Link href={`/announcements/${a.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-paper">
         <span className="min-w-0">
           <span className="text-[14px] text-ink">{a.pinned ? "📌 " : ""}{a.title}</span>
           <span className="block text-[12px] text-ink-3">
-            {audienceWord(a.audience)} · {dateWord(a.starts_at)}{a.ends_at ? `–${dateWord(a.ends_at)}` : ""}
+            {typeWord(a)} · {audienceWord(a.audience)} · {dateWord(a.starts_at)}{a.ends_at ? `–${dateWord(a.ends_at)}` : ""}
             {a.notified_at ? " · emailed" : ""}
           </span>
         </span>

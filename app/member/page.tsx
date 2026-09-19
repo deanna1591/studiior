@@ -11,6 +11,7 @@ import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts } from "@/lib/time"
 import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 import WaiverBanner from "@/components/member/waiver-banner";
 import Announcements, { type Announcement } from "@/components/member/announcements";
+import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,15 @@ export default async function MemberHome() {
 
   const ms = milestones as unknown as { total: number; next_target: number | null; to_go: number | null } | null;
 
+  // Decision 27 (amendment). Banners are the one filled bar, at the very top of
+  // the screen; What's-on posts move to the bottom, below Challenges. One
+  // member_announcements read feeds both — the strip takes kind='banner', the
+  // What's-on section takes the posts.
+  const annItems = (announcements ?? []) as unknown as Announcement[];
+  const banners: StripItem[] = annItems
+    .filter((a) => a.kind === "banner")
+    .map((a) => ({ id: a.id, title: a.title, linkUrl: a.link_url, linkLabel: a.link_label }));
+
   // Decision 34. A member (or a brought guest) is prompted when the studio
   // requires a waiver and they have not satisfied it: never signed, OR signed
   // only an older version the current one requires re-signing. When the studio
@@ -136,8 +146,10 @@ export default async function MemberHome() {
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+      {/* Banner announcements sit above everything — the one filled bar on the
+          screen (Decision 27 amendment). What's-on posts are at the bottom. */}
+      <AnnounceStrip items={banners} />
       {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
-      <Announcements items={(announcements ?? []) as unknown as Announcement[]} />
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}
       {/* Text only. The greeting had the member's photograph beside it and the
@@ -477,6 +489,11 @@ export default async function MemberHome() {
           We&rsquo;ll tell you if a place opens.
         </p>
       ))}
+
+      {/* What's on — events and longer reads, LAST on the screen and below
+          Challenges (Decision 27 amendment). Renders only posts; banners are
+          the strip at the top. Absent when there are none. */}
+      <Announcements items={annItems} />
     </MemberShell>
   );
 }

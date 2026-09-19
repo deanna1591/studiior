@@ -15,7 +15,7 @@ export default async function EditAnnouncement({ params }: { params: { id: strin
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="What’s on"><Denied what="Announcements" role={ctx.role} /></AppShell>;
 
   const { data: a } = await supabase.from("announcements")
-    .select("id, title, body, audience, pinned, starts_at, ends_at, status, image_url, image_focus_x, image_focus_y, notified_at")
+    .select("id, kind, title, body, audience, pinned, starts_at, ends_at, status, image_url, image_focus_x, image_focus_y, link_url, link_label, notified_at")
     .eq("id", params.id).maybeSingle();
   if (!a) return <AppShell {...shell} title="What’s on"><Empty>Announcement not found.</Empty></AppShell>;
 
@@ -42,20 +42,29 @@ export default async function EditAnnouncement({ params }: { params: { id: strin
           </form>
         )}
         <span className="text-[12px] text-ink-3">
-          {a.status === "draft" ? "Members can’t see it yet." : a.notified_at ? "Live · members were emailed." : "Live on members’ Home."}
+          {a.status === "draft"
+            ? "Members can’t see it yet."
+            : a.kind === "banner"
+            ? "Live as a banner on Home and Book."
+            : a.notified_at ? "Live in What’s on · members were emailed." : "Live in What’s on."}
         </span>
       </div>
 
-      <SectionLabel>Photo</SectionLabel>
-      <div className="mb-6 mt-2">
-        <AnnouncementCover id={a.id} imageUrl={a.image_url} focusX={a.image_focus_x} focusY={a.image_focus_y} />
-      </div>
+      {a.kind !== "banner" && (
+        <>
+          <SectionLabel>Photo</SectionLabel>
+          <div className="mb-6 mt-2">
+            <AnnouncementCover id={a.id} imageUrl={a.image_url} focusX={a.image_focus_x} focusY={a.image_focus_y} />
+          </div>
+        </>
+      )}
 
       <SectionLabel>Details</SectionLabel>
       <div className="mt-2">
         <AnnouncementForm mode="edit" values={{
-          id: a.id, title: a.title, body: a.body, audience: a.audience, pinned: a.pinned,
+          id: a.id, kind: a.kind, title: a.title, body: a.body, audience: a.audience, pinned: a.pinned,
           starts_on: dateVal(a.starts_at), ends_on: dateVal(a.ends_at),
+          link_url: a.link_url ?? "", link_label: a.link_label ?? "",
         }} />
       </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createAnnouncement, updateAnnouncement, type AnnFormState } from "./actions";
 import { Notice, buttonQuietClass } from "@/components/ui";
@@ -12,37 +13,77 @@ function Save({ label }: { label: string }) {
 const field = "w-full rounded border border-line-2 bg-surface px-3 py-2 text-[14px] text-ink outline-none";
 
 export type AnnValues = {
-  id?: string; title: string; body: string; audience: string;
+  id?: string; kind: string; title: string; body: string; audience: string;
   pinned: boolean; starts_on: string; ends_on: string;
+  link_url: string; link_label: string;
 };
 
 /**
- * Create or edit an announcement. Same fields either way; the id (if present)
- * routes it to update. A cover photo is offered only on create — on edit it
- * is set on the overview, where the focal point can be tuned against a preview.
+ * Create or edit an announcement (Decision 27 amendment). A Type choice picks
+ * Banner (a one-line filled strip at the top of Home and Book — title only,
+ * <=120 chars, no photo, no body) or What's-on post (title, body, optional
+ * photo, pinned). The form adapts to the choice; both offer an optional link.
+ * A cover photo is offered only on create for a post — on edit it is set on the
+ * overview, where the focal point can be tuned against a preview.
  */
 export default function AnnouncementForm({ mode, values }: {
   mode: "new" | "edit"; values: AnnValues;
 }) {
   const action = mode === "new" ? createAnnouncement : updateAnnouncement;
   const [state, formAction] = useFormState<AnnFormState, FormData>(action, null);
+  const [kind, setKind] = useState(values.kind || "post");
+  const banner = kind === "banner";
 
   return (
     <form action={formAction} className="max-w-2xl space-y-4">
       {state?.error && <Notice kind="error">{state.error}</Notice>}
       {values.id && <input type="hidden" name="announcement_id" value={values.id} />}
 
+      <fieldset>
+        <span className="mb-1 block text-[13px] font-medium text-ink">Type</span>
+        <div className="flex gap-2">
+          {([["banner", "Banner", "One line, at the top of Home and Book"],
+             ["post", "What’s on post", "Title, body and an optional photo"]] as const).map(([v, label, hint]) => (
+            <label key={v}
+              className={`flex-1 cursor-pointer rounded-lg border px-3 py-2.5 text-[13px] ${
+                kind === v ? "border-ink bg-paper text-ink" : "border-line-2 text-ink-2"}`}>
+              <input type="radio" name="kind" value={v} checked={kind === v}
+                     onChange={() => setKind(v)} className="sr-only" />
+              <span className="block font-semibold">{label}</span>
+              <span className="mt-0.5 block text-[12px] text-ink-3">{hint}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <label className="block">
         <span className="mb-1 block text-[13px] font-medium text-ink">Title</span>
         <input name="title" defaultValue={values.title} className={field}
-               placeholder="Closed for the holiday" required />
+               maxLength={banner ? 120 : undefined}
+               placeholder={banner ? "Closed Monday for the holiday" : "Workshop this Saturday"} required />
+        {banner && <span className="mt-1 block text-[12px] text-ink-3">Up to 120 characters — this is the whole banner.</span>}
       </label>
 
-      <label className="block">
-        <span className="mb-1 block text-[13px] font-medium text-ink">Body</span>
-        <textarea name="body" defaultValue={values.body} rows={5} className={field}
-                  placeholder="What members need to know." required />
-      </label>
+      {!banner && (
+        <label className="block">
+          <span className="mb-1 block text-[13px] font-medium text-ink">Body</span>
+          <textarea name="body" defaultValue={values.body} rows={5} className={field}
+                    placeholder="What members need to know." required={!banner} />
+        </label>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-[13px] font-medium text-ink">Link <span className="text-ink-3">(optional)</span></span>
+          <input name="link_url" defaultValue={values.link_url} className={field}
+                 type="url" inputMode="url" placeholder="https://…" />
+          <span className="mt-1 block text-[12px] text-ink-3">Must start with https://</span>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[13px] font-medium text-ink">Link label</span>
+          <input name="link_label" defaultValue={values.link_label} className={field} placeholder="Learn more" />
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
@@ -67,14 +108,16 @@ export default function AnnouncementForm({ mode, values }: {
         </span>
       </label>
 
-      <label className="flex items-start gap-2.5">
-        <input type="checkbox" name="pinned" defaultChecked={values.pinned} className="mt-1" />
-        <span className="text-[13px] leading-[19px] text-ink">
-          Pin it — it stays at the top and cannot be dismissed until it ends.
-        </span>
-      </label>
+      {!banner && (
+        <label className="flex items-start gap-2.5">
+          <input type="checkbox" name="pinned" defaultChecked={values.pinned} className="mt-1" />
+          <span className="text-[13px] leading-[19px] text-ink">
+            Pin it — it stays first in What’s on and cannot be dismissed until it ends.
+          </span>
+        </label>
+      )}
 
-      {mode === "new" && (
+      {mode === "new" && !banner && (
         <label className="block">
           <span className="mb-1 block text-[13px] font-medium text-ink">Photo <span className="text-ink-3">(optional)</span></span>
           <input name="cover" type="file" accept="image/png,image/jpeg,image/webp"

@@ -56,13 +56,16 @@ export async function saveAnnouncementCoverFocus(_prev: CoverState, fd: FormData
 }
 
 function fields(fd: FormData) {
+  const kind = String(fd.get("kind") ?? "post") === "banner" ? "banner" : "post";
   const title = String(fd.get("title") ?? "").trim();
   const body = String(fd.get("body") ?? "").trim();
   const audience = String(fd.get("audience") ?? "members");
   const pinned = fd.get("pinned") === "on";
   const starts = startISO(String(fd.get("starts_on") ?? ""));
   const ends = endISO(String(fd.get("ends_on") ?? ""));
-  return { title, body, audience, pinned, starts, ends };
+  const linkUrl = String(fd.get("link_url") ?? "").trim() || null;
+  const linkLabel = String(fd.get("link_label") ?? "").trim() || null;
+  return { kind, title, body, audience, pinned, starts, ends, linkUrl, linkLabel };
 }
 
 export async function createAnnouncement(_prev: AnnFormState, fd: FormData): Promise<AnnFormState> {
@@ -70,15 +73,18 @@ export async function createAnnouncement(_prev: AnnFormState, fd: FormData): Pro
   if (!ctx) return { error: "Not signed in." };
   const supabase = createClient();
   const f = fields(fd);
-  if (!f.title || !f.body) return { error: "An announcement needs a title and a body." };
+  if (!f.title) return { error: "An announcement needs a title." };
+  if (f.kind === "post" && !f.body) return { error: "A What’s-on post needs a body." };
   const { data, error } = await supabase.rpc("create_announcement", {
     p_studio_id: ctx.studioId, p_title: f.title, p_body: f.body,
     p_starts_at: f.starts ?? new Date().toISOString(), p_ends_at: f.ends as unknown as string,
     p_audience: f.audience, p_pinned: f.pinned,
+    p_kind: f.kind, p_link_url: f.linkUrl as unknown as string, p_link_label: f.linkLabel as unknown as string,
   });
   if (error) return { error: error.message };
+  // A banner has no photo; only a post's cover is stored.
   const cover = fd.get("cover") as File | null;
-  if (cover && cover.size > 0) await storeCover(data as string, ctx.studioId, cover);
+  if (f.kind === "post" && cover && cover.size > 0) await storeCover(data as string, ctx.studioId, cover);
   revalidatePath("/announcements");
   redirect(`/announcements/${data as string}`);
 }
@@ -89,10 +95,12 @@ export async function updateAnnouncement(_prev: AnnFormState, fd: FormData): Pro
   const supabase = createClient();
   const id = String(fd.get("announcement_id") ?? "");
   const f = fields(fd);
-  if (!f.title || !f.body) return { error: "An announcement needs a title and a body." };
+  if (!f.title) return { error: "An announcement needs a title." };
+  if (f.kind === "post" && !f.body) return { error: "A What’s-on post needs a body." };
   const { error } = await supabase.rpc("update_announcement", {
     p_id: id, p_title: f.title, p_body: f.body, p_starts_at: f.starts as unknown as string, p_ends_at: f.ends as unknown as string,
     p_audience: f.audience, p_pinned: f.pinned,
+    p_kind: f.kind, p_link_url: f.linkUrl as unknown as string, p_link_label: f.linkLabel as unknown as string,
   });
   if (error) return { error: error.message };
   revalidatePath("/announcements");

@@ -242,6 +242,9 @@ export type Database = {
           image_focus_x: number
           image_focus_y: number
           image_url: string | null
+          kind: string
+          link_label: string | null
+          link_url: string | null
           notified_at: string | null
           pinned: boolean
           starts_at: string
@@ -260,6 +263,9 @@ export type Database = {
           image_focus_x?: number
           image_focus_y?: number
           image_url?: string | null
+          kind?: string
+          link_label?: string | null
+          link_url?: string | null
           notified_at?: string | null
           pinned?: boolean
           starts_at?: string
@@ -278,6 +284,9 @@ export type Database = {
           image_focus_x?: number
           image_focus_y?: number
           image_url?: string | null
+          kind?: string
+          link_label?: string | null
+          link_url?: string | null
           notified_at?: string | null
           pinned?: boolean
           starts_at?: string
@@ -6639,6 +6648,7 @@ export type Database = {
         Args: { p_confirm?: boolean; p_series_id: string }
         Returns: Json
       }
+      as_state: { Args: { sql: string; uid: string }; Returns: string }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -6894,6 +6904,9 @@ export type Database = {
           p_audience: string
           p_body: string
           p_ends_at: string
+          p_kind?: string
+          p_link_label?: string
+          p_link_url?: string
           p_pinned?: boolean
           p_starts_at: string
           p_studio_id: string
@@ -7046,6 +7059,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -8305,6 +8330,9 @@ export type Database = {
           p_body: string
           p_ends_at: string
           p_id: string
+          p_kind?: string
+          p_link_label?: string
+          p_link_url?: string
           p_pinned: boolean
           p_starts_at: string
           p_title: string

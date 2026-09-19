@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
+import AnnounceStrip from "@/components/member/announce-strip";
 import { AcceptCover } from "./actions-ui";
 import { notifLabel, relTime, type NotifItem } from "@/lib/instructor-notify";
 
@@ -66,7 +67,15 @@ export default async function InstructorHome() {
     id: string; time: string; date: string; class_name: string; room: string | null; booked: number; capacity: number;
   }[] } | null)?.classes) ?? [];
   const notifs = ((notifData.data as { items?: NotifItem[] } | null)?.items ?? []).slice(0, 3);
-  const announcements = (anns.data ?? []) as unknown as { id: string; title: string; body: string }[];
+  const announcements = (anns.data ?? []) as unknown as
+    { id: string; kind: string; title: string; body: string; link_url: string | null; link_label: string | null }[];
+  // Decision 27 amendment: a banner shows as a strip in the portal too (audience
+  // instructors/both). No dismissal here — a roster-relevant notice is not
+  // something to swipe away, and an instructor has no member row to dismiss it.
+  const annBanners = announcements
+    .filter((a) => a.kind === "banner")
+    .map((a) => ({ id: a.id, title: a.title, linkUrl: a.link_url, linkLabel: a.link_label }));
+  const annPosts = announcements.filter((a) => a.kind !== "banner");
 
   const nextDay = (iso: string) => iso === today ? "Today"
     : new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "long", day: "numeric", month: "short" })
@@ -91,6 +100,9 @@ export default async function InstructorHome() {
 
   return (
     <InstructorShell ctx={ctx}>
+      {/* Banner announcements (audience instructors/both) — a filled strip at
+          the top, no dismiss in the portal. */}
+      <AnnounceStrip items={annBanners} dismissible={false} />
       {/* NEXT CLASS */}
       {next ? (
         <Link href={`/instructor/roster/${next.occurrence_id}`} className="m-card block px-4 py-4">
@@ -188,10 +200,10 @@ export default async function InstructorHome() {
         </section>
       )}
 
-      {/* ANNOUNCEMENTS */}
-      {announcements.length > 0 && (
+      {/* ANNOUNCEMENTS — What's-on posts as cards (banners are the strip above) */}
+      {annPosts.length > 0 && (
         <section className="mt-5 space-y-3">
-          {announcements.map((a) => (
+          {annPosts.map((a) => (
             <article key={a.id} className="m-card p-4">
               <p className="m-name text-ink">{a.title}</p>
               <p className="m-sub mt-1 whitespace-pre-line text-ink-2">{a.body}</p>
