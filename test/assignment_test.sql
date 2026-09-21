@@ -377,14 +377,25 @@ select expect_true('standing is measured against the minimum, not the target',
 -- rather than the absence of one. Complete weeks only: the current week is a
 -- number still going up, and counting it makes everybody look short on Monday.
 reset role;
+-- Anchor to the studio-zone Monday that commitment_report and
+-- instructor_weekly_load both bucket by (date_trunc('week', now() at tz)), so
+-- the measured window is EXACTLY the four complete weeks Ben taught, whatever
+-- weekday the suite runs on. A raw current_date-30 term start truncates to the
+-- week BEFORE the first class on a Monday/Tuesday run, adding an empty leading
+-- week that drags the average under the minimum and fails this by the calendar.
+update instructor_commitments
+   set starts_on = date_trunc('week',(now() at time zone 'Europe/Prague')::date)::date - 28,
+       ends_on   = date_trunc('week',(now() at time zone 'Europe/Prague')::date)::date - 1
+ where instructor_id = 'a55ea55e-0000-0000-0000-00000000d102'
+   and studio_id     = 'a55ea55e-0000-0000-0000-000000000001';
 insert into class_occurrences
   (studio_id, location_id, class_type_id, room_id, name, capacity, instructor_id,
    starts_at, ends_at, status, staffing)
 select 'a55ea55e-0000-0000-0000-000000000001','a55ea55e-0000-0000-0000-00000000000c',
        'a55ea55e-0000-0000-0000-00000000cc01','a55ea55e-0000-0000-0000-00000000ee01',
        'Reformer past', 10, 'a55ea55e-0000-0000-0000-00000000d102',
-       ((current_date - (7 * w)) + time '11:00') at time zone 'Europe/Prague',
-       ((current_date - (7 * w)) + time '11:50') at time zone 'Europe/Prague',
+       ((date_trunc('week',(now() at time zone 'Europe/Prague')::date)::date - (7 * w)) + time '11:00') at time zone 'Europe/Prague',
+       ((date_trunc('week',(now() at time zone 'Europe/Prague')::date)::date - (7 * w)) + time '11:50') at time zone 'Europe/Prague',
        'completed', 'assigned'
   from generate_series(1,4) w;
 set role authenticated;
