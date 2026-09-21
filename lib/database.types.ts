@@ -1032,10 +1032,12 @@ export type Database = {
       }
       check_ins: {
         Row: {
+          accuracy_m: number | null
           booking_id: string | null
           checked_in_at: string
           checked_in_by: string | null
           created_at: string
+          distance_m: number | null
           id: string
           import_id: string | null
           is_demo: boolean
@@ -1045,10 +1047,12 @@ export type Database = {
           studio_id: string
         }
         Insert: {
+          accuracy_m?: number | null
           booking_id?: string | null
           checked_in_at?: string
           checked_in_by?: string | null
           created_at?: string
+          distance_m?: number | null
           id?: string
           import_id?: string | null
           is_demo?: boolean
@@ -1058,10 +1062,12 @@ export type Database = {
           studio_id: string
         }
         Update: {
+          accuracy_m?: number | null
           booking_id?: string | null
           checked_in_at?: string
           checked_in_by?: string | null
           created_at?: string
+          distance_m?: number | null
           id?: string
           import_id?: string | null
           is_demo?: boolean
@@ -2902,7 +2908,12 @@ export type Database = {
           created_at: string
           id: string
           is_primary: boolean
+          latitude: number | null
+          longitude: number | null
           name: string
+          self_checkin_accuracy_cap_m: number
+          self_checkin_radius_m: number
+          self_checkin_requires_location: boolean
           status: string
           studio_id: string
           timezone: string | null
@@ -2913,7 +2924,12 @@ export type Database = {
           created_at?: string
           id?: string
           is_primary?: boolean
+          latitude?: number | null
+          longitude?: number | null
           name: string
+          self_checkin_accuracy_cap_m?: number
+          self_checkin_radius_m?: number
+          self_checkin_requires_location?: boolean
           status?: string
           studio_id: string
           timezone?: string | null
@@ -2924,7 +2940,12 @@ export type Database = {
           created_at?: string
           id?: string
           is_primary?: boolean
+          latitude?: number | null
+          longitude?: number | null
           name?: string
+          self_checkin_accuracy_cap_m?: number
+          self_checkin_radius_m?: number
+          self_checkin_requires_location?: boolean
           status?: string
           studio_id?: string
           timezone?: string | null
@@ -6648,7 +6669,6 @@ export type Database = {
         Args: { p_confirm?: boolean; p_series_id: string }
         Returns: Json
       }
-      as_state: { Args: { sql: string; uid: string }; Returns: string }
       assign_instructors: {
         Args: {
           p_dry_run?: boolean
@@ -7031,6 +7051,10 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
+      earth_distance_m: {
+        Args: { lat1: number; lat2: number; lng1: number; lng2: number }
+        Returns: number
+      }
       end_series: {
         Args: { p_confirm?: boolean; p_ends_on?: string; p_series_id: string }
         Returns: Json
@@ -7059,18 +7083,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -7436,6 +7448,10 @@ export type Database = {
         }[]
       }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
+      member_waiver_current: {
+        Args: { p_member_id: string; p_studio_id: string }
+        Returns: boolean
+      }
       membership_frozen_now: {
         Args: { p_membership_id: string }
         Returns: boolean
@@ -7924,6 +7940,15 @@ export type Database = {
           starts_at: string
         }[]
       }
+      self_check_in: {
+        Args: {
+          p_accuracy_m?: number
+          p_booking_id: string
+          p_lat?: number
+          p_lng?: number
+        }
+        Returns: Json
+      }
       send_due_notifications: { Args: never; Returns: Json }
       send_message: {
         Args: { p_message_id: string }
@@ -8405,7 +8430,13 @@ export type Database = {
       challenge_audience: "member" | "instructor"
       challenge_status: "draft" | "scheduled" | "active" | "ended" | "archived"
       challenge_type: "class_count" | "streak" | "class_type_count"
-      checkin_method: "qr" | "staff" | "kiosk" | "self"
+      checkin_method:
+        | "qr"
+        | "staff"
+        | "kiosk"
+        | "self"
+        | "instructor"
+        | "import"
       credit_reason:
         | "purchase"
         | "booking"
@@ -8663,7 +8694,7 @@ export const Constants = {
       challenge_audience: ["member", "instructor"],
       challenge_status: ["draft", "scheduled", "active", "ended", "archived"],
       challenge_type: ["class_count", "streak", "class_type_count"],
-      checkin_method: ["qr", "staff", "kiosk", "self"],
+      checkin_method: ["qr", "staff", "kiosk", "self", "instructor", "import"],
       credit_reason: [
         "purchase",
         "booking",

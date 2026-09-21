@@ -699,6 +699,48 @@ export async function saveWaiver(_prev: PlainState, fd: FormData): Promise<Plain
 }
 
 // Decision 33 amendment: the per-tenant switch for instructor booking alerts.
+// Decision 35 — the geofence lives on the studio's primary location.
+export async function saveLocationGeofence(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const numOrNull = (k: string) => {
+    const v = String(fd.get(k) ?? "").trim();
+    if (v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const lat = numOrNull("latitude");
+  const lng = numOrNull("longitude");
+  if ((lat === null) !== (lng === null)) {
+    return { ok: false, message: "Set both latitude and longitude, or leave both blank." };
+  }
+  if (lat !== null && (lat < -90 || lat > 90)) return { ok: false, message: "Latitude is between −90 and 90." };
+  if (lng !== null && (lng < -180 || lng > 180)) return { ok: false, message: "Longitude is between −180 and 180." };
+  const radius = Math.max(0, Math.floor(numOrNull("radius") ?? 200));
+  const cap = Math.max(0, Math.floor(numOrNull("accuracy_cap") ?? 150));
+  const requires = String(fd.get("requires_location") ?? "") === "on";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("locations")
+    .update({
+      latitude: lat, longitude: lng,
+      self_checkin_radius_m: radius, self_checkin_accuracy_cap_m: cap,
+      self_checkin_requires_location: requires,
+    })
+    .eq("studio_id", ctx.studioId).eq("is_primary", true).select("id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/location"); revalidatePath("/");
+  return {
+    ok: true,
+    message: lat === null
+      ? (requires
+          ? "Saved. With no coordinates and a location required, members check in at the desk."
+          : "Saved. Location isn't required, so members can check in from their phone anywhere (trust-based).")
+      : "Saved. Members can check in from their phone when they're at the studio.",
+  };
+}
+
 export async function saveBookingAlerts(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

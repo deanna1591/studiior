@@ -12,6 +12,7 @@ import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 import WaiverBanner from "@/components/member/waiver-banner";
 import Announcements, { type Announcement } from "@/components/member/announcements";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
+import SelfCheckIn from "@/components/member/self-check-in";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function MemberHome() {
     await Promise.all([
     supabase
       .from("bookings")
-      .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url, image_focus_x, image_focus_y), rooms(name))")
+      .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url, image_focus_x, image_focus_y), rooms(name), locations(latitude, longitude, self_checkin_requires_location))")
       .eq("member_id", ctx.memberId)
       .in("status", ["booked", "waitlisted"])
       .order("booked_at"),
@@ -111,6 +112,17 @@ export default async function MemberHome() {
 
   const next = mine.find((b) => b.status === "booked");
   const occ = next?.class_occurrences ?? null;
+
+  // Decision 35: self check-in is available when the class's own location has
+  // coordinates, or the studio does not require a location (trust-based). With a
+  // required location and no coordinates set, the button is absent and the
+  // member is sent to the desk (their rotating code). Computed server-side; the
+  // raw coordinates never reach the client — only this boolean.
+  const loc = (occ as { locations?: { latitude: number | null; longitude: number | null;
+    self_checkin_requires_location: boolean } | null } | null)?.locations ?? null;
+  const selfCheckinAvailable = loc
+    ? (loc.self_checkin_requires_location === false || (loc.latitude != null && loc.longitude != null))
+    : false;
 
   // The window is the studio's, read through studio_member_settings() — not a
   // 60 hard-coded here, because the setting exists so a studio can move it.
@@ -236,17 +248,21 @@ export default async function MemberHome() {
 
               {/* The check-in button lives INSIDE the hero, and only inside the
                   window. Outside it there is nothing to press: the card is
-                  telling you about a class, not asking for anything. */}
+                  telling you about a class, not asking for anything.
+
+                  Decision 35: where self check-in is available (the class's
+                  location has coordinates, or the studio does not require one)
+                  this is the phone check-in — geolocation on press, then
+                  self_check_in(). Where it is not, it falls back to the rotating
+                  code the desk scans. */}
               {inWindow && (
-                <Link href="/check-in"
-                      className="m-tap flex shrink-0 items-center rounded-full px-4 text-[13px] font-bold"
-                      // The accent's own measured pair. A white pill with
-                      // --ink on it measured 1.09 on Bold, whose ink is nearly
-                      // white; the pair is derived together and cannot come
-                      // apart like that.
-                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-                  Check in
-                </Link>
+                selfCheckinAvailable
+                  ? <SelfCheckIn bookingId={next!.id} />
+                  : <Link href="/check-in"
+                        className="m-tap flex shrink-0 items-center rounded-full px-4 text-[13px] font-bold"
+                        style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                      Check in
+                    </Link>
               )}
             </div>
           </div>

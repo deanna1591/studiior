@@ -26,6 +26,7 @@ export default async function Settings() {
     { href: "/settings/features", label: "Member features", sub: "Challenges and guest passes" },
     { href: "/settings/instructors", label: "Instructors", sub: "When the month is due, and when to chase confirmations" },
     { href: "/settings/payroll", label: "Payroll", sub: "How often instructors are paid, and when the period closes" },
+    { href: "/settings/location", label: "Location & self check-in", sub: "Where the studio is, so members can check in from their phone" },
     { href: "/settings/closures", label: "Closures", sub: "Days you are shut — nothing is generated, and members are told" },
     { href: "/settings/stripe", label: "Card payments", sub: "Take card payments online (optional — a studio can take cash)" },
   ];

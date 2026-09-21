@@ -206,6 +206,50 @@ export async function bringGuest(_prev: BookResult, formData: FormData): Promise
 // class free" row buttons still carry the offer while a member is eligible. The
 // old dismissFreeFirst action and its 'free_first_banner' key are gone;
 // member_dismissals stays for future per-member keys.
+// Decision 35 — member self check-in at the door. The client requests browser
+// geolocation on the button press and sends whatever it gets; the geofence,
+// window and waiver live in self_check_in(). Every refusal is a sentence.
+const SELF_CHECKIN_REASONS: Record<string, string> = {
+  not_found: "That booking no longer exists.",
+  not_booked: "You're not booked into this class.",
+  class_not_scheduled: "That class isn't running.",
+  month_not_published: "That class isn't open for check-in yet.",
+  window_closed: "Check-in isn't open for this class right now.",
+  no_location: "You need to be at the studio to check in — or show your code at the desk.",
+  too_far: "You need to be at the studio to check in — or show your code at the desk.",
+  low_accuracy: "Your phone can't place you closely enough — try again outside, or show your code at the desk.",
+  studio_has_no_location: "Self check-in isn't set up here — show your code at the desk.",
+};
+
+export type CheckInResult = { ok: boolean; message: string } | null;
+
+export async function selfCheckIn(
+  bookingId: string, lat: number | null, lng: number | null, accuracy: number | null,
+): Promise<CheckInResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const supabase = createClient();
+  // null coordinates are sent as undefined, so the RPC falls to its own null
+  // defaults; the server treats "no location supplied" as no_location.
+  const { data, error } = await supabase.rpc("self_check_in", {
+    p_booking_id: bookingId,
+    p_lat: lat ?? undefined, p_lng: lng ?? undefined, p_accuracy_m: accuracy ?? undefined,
+  });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "That's not your booking." };
+    // The waiver-at-the-door (Decision 35): PT422 like a guest, pointing at the app.
+    if (error.code === "PT422") return { ok: false, message: "Please sign the studio waiver in the app before checking in." };
+    return { ok: false, message: error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string; already?: boolean; distance_m?: number } | null;
+  if (!r) return { ok: false, message: "No response." };
+  if (!r.ok) {
+    return { ok: false, message: SELF_CHECKIN_REASONS[r.reason ?? ""] ?? "You couldn't be checked in — show your code at the desk." };
+  }
+  revalidateMember();
+  return { ok: true, message: r.already ? "You're already checked in." : "You're checked in. See you in there." };
+}
+
 export async function dismissAnnouncement(id: string): Promise<void> {
   const ctx = await getMemberContext();
   if (!ctx) return;

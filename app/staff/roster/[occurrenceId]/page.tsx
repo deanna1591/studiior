@@ -58,7 +58,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
         .eq("occurrence_id", params.occurrenceId)
         .order("waitlist_position", { ascending: true, nullsFirst: true })
         .order("booked_at"),
-      supabase.from("check_ins").select("booking_id").eq("occurrence_id", params.occurrenceId),
+      supabase.from("check_ins").select("booking_id, method, distance_m").eq("occurrence_id", params.occurrenceId),
     ]);
 
   // Decision 26: who on this roster is a GUEST, and who brought them — an
@@ -101,6 +101,17 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
   const avatars = await signAvatars(supabase, (bookings ?? []).map((b) => b.members?.avatar_url));
 
   const checkedIn = new Set((checkIns ?? []).map((c) => c.booking_id));
+  // Decision 35: how each person got checked in — self (with the distance),
+  // scanned by the instructor, or at the desk.
+  const checkinMeta = new Map((checkIns ?? [])
+    .filter((c) => c.booking_id)
+    .map((c) => [c.booking_id as string, { method: c.method as string, distance: c.distance_m as number | null }]));
+  const methodLabel = (m?: { method: string; distance: number | null }) => {
+    if (!m) return null;
+    if (m.method === "self") return m.distance != null ? `Self · ${m.distance} m` : "Self check-in";
+    if (m.method === "instructor") return "Scanned";
+    return "Desk";
+  };
   const booked = (bookings ?? []).filter((b) => ["booked", "attended", "no_show"].includes(b.status));
   const waitlisted = (bookings ?? []).filter((b) => b.status === "waitlisted");
   const inCount = booked.filter((b) => checkedIn.has(b.id) || b.status === "attended").length;
@@ -188,6 +199,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
                     {b.payment_source?.replace("_", " ") ?? "—"}
                     {b.override_reason ? ` · override: ${b.override_reason}` : ""}
+                    {checkedIn.has(b.id) && methodLabel(checkinMeta.get(b.id)) ? ` · ${methodLabel(checkinMeta.get(b.id))}` : ""}
                   </span>
                 </div>
                 <CheckInButton

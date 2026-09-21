@@ -261,4 +261,39 @@ insert into check_ins (studio_id, member_id, occurrence_id, booking_id, method)
 select expect_num('after re-signing the current version, the guest checks in',
   (select count(*) from check_ins where member_id='a17ea17e-0000-0000-0000-00000000ad0f'), 1);
 
+-- --- TEETH: the waiver_signing exemption is NARROW ---------------------------
+-- sign_waiver_document() stamps members.waiver_signed_at as the member under the
+-- studiior.waiver_signing flag. A client can never hold the flag, but if one
+-- leaked the exemption must let through ONLY waiver_signed_at (+ updated_at);
+-- any other column on the row still raises.
+do $$
+begin
+  perform set_config('request.jwt.claim.sub','a17ea17e-0000-0000-0000-0000000000b1', true);
+  set local role authenticated;
+  perform set_config('studiior.waiver_signing','1', true);
+  update members set preferred_name = 'hacked'
+    where id = 'a17ea17e-0000-0000-0000-00000000ad01';
+  reset role;
+  raise exception 'FAIL  waiver_signing let a member edit a non-waiver column';
+exception
+  when sqlstate 'PT403' then
+    reset role;
+    raise notice 'PASS  waiver_signing exempts only the signature timestamp (PT403 on a non-waiver write)';
+end $$;
+-- Positive control: the signature timestamp itself still goes through.
+do $$
+begin
+  perform set_config('request.jwt.claim.sub','a17ea17e-0000-0000-0000-0000000000b1', true);
+  set local role authenticated;
+  perform set_config('studiior.waiver_signing','1', true);
+  update members set waiver_signed_at = now()
+    where id = 'a17ea17e-0000-0000-0000-00000000ad01';
+  reset role;
+  raise notice 'PASS  waiver_signing still lets the signature timestamp through';
+exception
+  when others then
+    reset role;
+    raise exception 'FAIL  waiver_signing blocked the signature write (%)', sqlstate;
+end $$;
+
 select 'ALL WAIVER TESTS PASSED' as done;
