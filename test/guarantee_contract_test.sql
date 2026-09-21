@@ -168,8 +168,14 @@ select set_config('request.jwt.claim.sub','9c079c07-0000-0000-0000-0000000000a1'
 -- materialise trigger makes its own occurrences, so the assertions test the
 -- RELATIONSHIP (all standalone; one neighbour drops the count by one) rather
 -- than a fixed number.
+-- Start a week out, never current_date: set_series_flex only counts
+-- occurrences with starts_at > now(), and a BYDAY=MO series starting today
+-- lands its earliest occurrence at today 07:00 — already in the past on a
+-- Monday-afternoon run, so it drops out of the flexed set and the neighbour
+-- below would attach to a past occurrence nobody counts. A week out keeps the
+-- earliest occurrence strictly future on any weekday, time or studio zone.
 insert into class_series (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, rrule, time_of_day, duration_minutes, starts_on, status) values
-  ('9c079c07-0000-0000-0000-000000005e01','9c079c07-0000-0000-0000-000000000001','9c079c07-0000-0000-0000-00000000000a','9c079c07-0000-0000-0000-0000000cc001','9c079c07-0000-0000-0000-0000000ee001','9c079c07-0000-0000-0000-0000000d0001','Standalone series',6,'FREQ=WEEKLY;BYDAY=MO','07:00',50, current_date, 'active');
+  ('9c079c07-0000-0000-0000-000000005e01','9c079c07-0000-0000-0000-000000000001','9c079c07-0000-0000-0000-00000000000a','9c079c07-0000-0000-0000-0000000cc001','9c079c07-0000-0000-0000-0000000ee001','9c079c07-0000-0000-0000-0000000d0001','Standalone series',6,'FREQ=WEEKLY;BYDAY=MO','07:00',50, current_date + 7, 'active');
 
 select expect_true('every flexed class is standalone: standalone_count = occurrences_updated, and > 0',
   (select (r ->> 'standalone_count')::int = (r ->> 'occurrences_updated')::int
@@ -183,7 +189,8 @@ insert into class_occurrences (id, studio_id, location_id, class_type_id, room_i
 select '9c079c07-0000-0000-0000-00000000d0b1','9c079c07-0000-0000-0000-000000000001','9c079c07-0000-0000-0000-00000000000a',
        '9c079c07-0000-0000-0000-0000000cc001','9c079c07-0000-0000-0000-0000000ee001','9c079c07-0000-0000-0000-0000000d0001',
        'Neighbour core', o.ends_at, o.ends_at + interval '50 min', 6, 0, 'scheduled'
-  from class_occurrences o where o.series_id='9c079c07-0000-0000-0000-000000005e01' order by o.starts_at limit 1;
+  from class_occurrences o where o.series_id='9c079c07-0000-0000-0000-000000005e01'
+   and o.starts_at > now() order by o.starts_at limit 1;
 select expect_true('one neighbour of the same instructor makes exactly one class adjacent (count drops by one)',
   (select (r ->> 'standalone_count')::int = (r ->> 'occurrences_updated')::int - 1
      from (select set_series_flex('9c079c07-0000-0000-0000-000000005e01', true, 1) as r) x));
