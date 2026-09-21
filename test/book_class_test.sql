@@ -539,4 +539,88 @@ exception when others then
   end if;
 end $$;
 
+-- =============================================================================
+-- Decision 36 — the booking horizon the SCREEN shows is the member's real one.
+--
+-- member_booking_window_days() is the single definition of §2.1.2; book_class
+-- and member_bootstrap both read it, so "Opens for booking" can never say a
+-- class opens later than book_class would accept. Gate studio window = 30; a
+-- 60-day plan lifts its holder to 60, and an expired one falls back to 30.
+-- =============================================================================
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+update studio_settings set booking_window_days = 30
+ where studio_id = 'ffffffff-0000-0000-0000-000000000001';
+
+insert into auth.users (id) values
+  ('ffffffff-0000-0000-00bb-0000000000a6'),
+  ('ffffffff-0000-0000-00bb-0000000000a7'),
+  ('ffffffff-0000-0000-00bb-0000000000a0');
+insert into profiles (id, email) values
+  ('ffffffff-0000-0000-00bb-0000000000a6','win60@test'),
+  ('ffffffff-0000-0000-00bb-0000000000a7','win60exp@test'),
+  ('ffffffff-0000-0000-00bb-0000000000a0','winnp@test');
+
+insert into membership_plans
+  (id, studio_id, name, type, price_cents, currency, billing_interval,
+   credits, credits_per_period, booking_window_days, restrictions)
+values
+  ('ffffffff-0000-0000-00bb-0000000000b6','ffffffff-0000-0000-0000-000000000001',
+   '60-day horizon','recurring',280000,'CZK','month',null,null,60,'{}');
+
+insert into members (id, studio_id, user_id, first_name, last_name, email, waiver_signed_at) values
+  ('ffffffff-0000-0000-00bb-0000000000d6','ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-00bb-0000000000a6','Win','Sixty','win60@t',now()),
+  ('ffffffff-0000-0000-00bb-0000000000d7','ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-00bb-0000000000a7','Win','Expired','win60e@t',now()),
+  ('ffffffff-0000-0000-00bb-0000000000d0','ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-00bb-0000000000a0','Win','NoPlan','winnp@t',now());
+
+insert into memberships
+  (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, credits_remaining, expires_on)
+values
+  ('ffffffff-0000-0000-00bb-0000000000d6','ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-00bb-0000000000d6','ffffffff-0000-0000-00bb-0000000000b6','active',280000,'CZK',current_date,null,null),
+  ('ffffffff-0000-0000-00bb-0000000000d7','ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-00bb-0000000000d7','ffffffff-0000-0000-00bb-0000000000b6','active',280000,'CZK',current_date,null,current_date - 1);
+
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at)
+values
+  ('ffffffff-0000-0000-00bb-0000000000e5','ffffffff-0000-0000-0000-000000000001','ffffffff-0000-0000-0000-00000000000c','ffffffff-0000-0000-0000-0000000000c1','Day 45',5,now()+interval '45 days',now()+interval '45 days 50 min');
+
+-- The function: the plan window wins, the studio value is the fallback.
+select expect_num('a 60-day plan lifts the member to 60',
+  member_booking_window_days('ffffffff-0000-0000-00bb-0000000000d6'), 60);
+select expect_num('an EXPIRED plan falls back to the studio 30',
+  member_booking_window_days('ffffffff-0000-0000-00bb-0000000000d7'), 30);
+select expect_num('no plan is the studio 30',
+  member_booking_window_days('ffffffff-0000-0000-00bb-0000000000d0'), 30);
+
+-- The SCREEN reads the same function. TEETH: were member_bootstrap to read the
+-- studio value directly this would be 30, not 60, and this assertion would fail.
+set role authenticated;
+select login('ffffffff-0000-0000-00bb-0000000000a6');
+select expect_num('member_bootstrap shows the 60-day member 60, not the studio 30',
+  (select booking_window_days from member_bootstrap('gate')), 60);
+select expect_num('...and it equals what book_class resolves for the same member',
+  (select booking_window_days from member_bootstrap('gate')),
+  member_booking_window_days('ffffffff-0000-0000-00bb-0000000000d6'));
+-- book_class ACCEPTS the 45-day class for the 60-day member (books, null reason).
+-- TEETH: were book_class to read the studio 30 this would be 'outside_booking_window'.
+select expect_text('book_class books a 45-day class for the 60-day member',
+  (book_class('ffffffff-0000-0000-00bb-0000000000e5','ffffffff-0000-0000-00bb-0000000000d6','member')).failure_reason,
+  null);
+select login(''); reset role;
+
+-- The expired-plan member and the no-plan member both see the SAME
+-- 'outside_booking_window' the screen renders as "Opens for booking".
+set role authenticated;
+select login('ffffffff-0000-0000-00bb-0000000000a7');
+select expect_num('...and the expired member''s bootstrap agrees at 30',
+  (select booking_window_days from member_bootstrap('gate')), 30);
+select expect_text('the expired-plan member is refused the 45-day class at studio 30',
+  (book_class('ffffffff-0000-0000-00bb-0000000000e5','ffffffff-0000-0000-00bb-0000000000d7','member')).failure_reason,
+  'outside_booking_window');
+select login('ffffffff-0000-0000-00bb-0000000000a0');
+select expect_text('the no-plan member is refused it too',
+  (book_class('ffffffff-0000-0000-00bb-0000000000e5','ffffffff-0000-0000-00bb-0000000000d0','member')).failure_reason,
+  'outside_booking_window');
+select login(''); reset role;
+
 select 'ALL book_class BEHAVIOUR TESTS PASSED' as result;

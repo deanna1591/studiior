@@ -48,7 +48,12 @@ export async function memberScreen() {
       checkinClosesAfter: b?.checkin_closes_minutes_after ?? 30,
       cancellationCutoff: b?.cancellation_cutoff_minutes ?? 720,
       bookingCutoff: b?.booking_cutoff_minutes ?? 0,
-      bookingWindowDays: b?.booking_window_days ?? 30,
+      // Decision 36: the MEMBER's window, resolved server-side by
+      // member_booking_window_days() (highest-priority plan window, else the
+      // studio value). NEVER invent 30 here — a null means the studio has no
+      // settings row at all (a provisioning bug), and the book page fails loudly
+      // on it in dev rather than papering over it with a made-up horizon.
+      bookingWindowDays: b?.booking_window_days ?? null,
       waitlistEnabled: b?.waitlist_enabled ?? true,
       guestPassesEnabled: b?.guest_passes_enabled ?? false,
       hasPaymentProvider: b?.has_payment_provider ?? false,

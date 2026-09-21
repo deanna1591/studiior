@@ -270,7 +270,21 @@ export default async function Book({
   // Decision 30 / booking window. A class further ahead than booking_window_days
   // cannot be booked yet — so it renders "Opens for booking on {date}" (the
   // start minus the window) rather than a Book button that would refuse on tap.
-  const windowMs = settings.bookingWindowDays * 86_400_000;
+  // Decision 36: a null window means member_bootstrap returned no
+  // booking_window_days — the studio has no settings row (a provisioning bug),
+  // since the column is NOT NULL default 30 and a plan only ever raises it. The
+  // screen must NOT invent 30. Fail loudly in dev; in production fall back to
+  // book_class's own reading of a null window — no limit — never a made-up 30.
+  if (settings.bookingWindowDays == null && process.env.NODE_ENV !== "production") {
+    throw new Error(
+      "member booking window is null: member_bootstrap returned no booking_window_days " +
+        "(studio_settings missing?). The screen must not invent 30 — fix the data.",
+    );
+  }
+  const windowMs =
+    settings.bookingWindowDays == null
+      ? Number.POSITIVE_INFINITY
+      : settings.bookingWindowDays * 86_400_000;
   const dayLabel = (iso: string) =>
     new Intl.DateTimeFormat("en-GB", {
       weekday: "long", day: "numeric", month: "long", timeZone: ctx.timeZone,

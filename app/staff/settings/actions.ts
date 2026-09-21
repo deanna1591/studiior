@@ -630,6 +630,29 @@ export async function saveHowToBuy(_prev: PlainState, fd: FormData): Promise<Pla
   return { ok: true, message: raw ? "Saved. Members see this under your plans." : "Saved. Members see the default." };
 }
 
+// Decision 36: how far ahead members can book. studio_settings.booking_window_days
+// had no writer but the onboarding wizard, so a studio could never change it
+// after setup. A membership plan's own window overrides this (book_class 2.1.2 /
+// member_booking_window_days), which the help text says.
+export async function saveBookingWindow(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const n = Number(String(fd.get("booking_window_days") ?? "").trim());
+  if (!Number.isFinite(n) || n < 1 || n > 730) {
+    return { ok: false, message: "Give a number of days between 1 and 730." };
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ booking_window_days: Math.floor(n) })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings");
+  return { ok: true, message: "Saved. A membership plan's own window still overrides this." };
+}
+
 export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
