@@ -135,20 +135,42 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
   ('c8a1c8a1-0000-0000-0000-0000000b00c3','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000a00c3','c8a1c8a1-0000-0000-0000-0000000dd001','attended','class_pack', now()-interval '21 days'),
   ('c8a1c8a1-0000-0000-0000-0000000b0005','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000a0005','c8a1c8a1-0000-0000-0000-0000000dd001','booked','class_pack', now()-interval '2 days');
 
--- --- MEM_S streak occurrences (weeks -6..0 with a gap at -2) ------------------
+-- --- MEM_S streak occurrences, anchored to the studio's OWN week start and
+--     placed mid-week (noon) so no boundary crossing can move one into a
+--     neighbouring week. Weeks -5 (two classes) and -4 are the earlier cluster;
+--     a GAP at week -3; then weeks -2 and -1 are the trailing consecutive run.
+--     The streak counts only the trailing block, so the current run is 2
+--     whatever weekday or time the suite runs on. now()-2h / now()-7d landed a
+--     class on the wrong side of the Monday boundary in the ~2h after midnight,
+--     collapsing weeks -1 and 0 into one and dropping the run to 1. All five sit
+--     inside CH_STREAK's window [today-42, today+30]; the doff values are days
+--     before this week's start, so each lands squarely inside its week.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
-                               starts_at, ends_at, capacity, status) values
-  ('c8a1c8a1-0000-0000-0000-0000000f0001','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-00000000000a','c8a1c8a1-0000-0000-0000-0000000cc001','c8a1c8a1-0000-0000-0000-0000000ee003','w1', now()-interval '35 days', now()-interval '35 days'+interval '50 min',20,'completed'),
-  ('c8a1c8a1-0000-0000-0000-0000000f0002','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-00000000000a','c8a1c8a1-0000-0000-0000-0000000cc001','c8a1c8a1-0000-0000-0000-0000000ee003','w2', now()-interval '28 days', now()-interval '28 days'+interval '50 min',20,'completed'),
-  ('c8a1c8a1-0000-0000-0000-0000000f0003','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-00000000000a','c8a1c8a1-0000-0000-0000-0000000cc001','c8a1c8a1-0000-0000-0000-0000000ee003','w3', now()-interval '21 days', now()-interval '21 days'+interval '50 min',20,'completed'),
-  ('c8a1c8a1-0000-0000-0000-0000000f0005','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-00000000000a','c8a1c8a1-0000-0000-0000-0000000cc001','c8a1c8a1-0000-0000-0000-0000000ee003','w5', now()-interval '7 days',  now()-interval '7 days'+interval '50 min',20,'completed'),
-  ('c8a1c8a1-0000-0000-0000-0000000f0006','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-00000000000a','c8a1c8a1-0000-0000-0000-0000000cc001','c8a1c8a1-0000-0000-0000-0000000ee003','w6', now()-interval '2 hours',  now()-interval '2 hours'+interval '50 min',20,'completed');
-insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source, booked_at) values
-  ('c8a1c8a1-0000-0000-0000-0000000bf001','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000f0001','c8a1c8a1-0000-0000-0000-0000000dd004','attended','class_pack', now()-interval '36 days'),
-  ('c8a1c8a1-0000-0000-0000-0000000bf002','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000f0002','c8a1c8a1-0000-0000-0000-0000000dd004','attended','class_pack', now()-interval '29 days'),
-  ('c8a1c8a1-0000-0000-0000-0000000bf003','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000f0003','c8a1c8a1-0000-0000-0000-0000000dd004','attended','class_pack', now()-interval '22 days'),
-  ('c8a1c8a1-0000-0000-0000-0000000bf005','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000f0005','c8a1c8a1-0000-0000-0000-0000000dd004','attended','class_pack', now()-interval '8 days'),
-  ('c8a1c8a1-0000-0000-0000-0000000bf006','c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-0000000f0006','c8a1c8a1-0000-0000-0000-0000000dd004','attended','class_pack', now()-interval '3 hours');
+                               starts_at, ends_at, capacity, status)
+select v.id, 'c8a1c8a1-0000-0000-0000-000000000001','c8a1c8a1-0000-0000-0000-00000000000a',
+       'c8a1c8a1-0000-0000-0000-0000000cc001','c8a1c8a1-0000-0000-0000-0000000ee003', v.nm,
+       ((wk.d0 - v.doff) + time '12:00') at time zone 'Europe/Prague',
+       ((wk.d0 - v.doff) + time '12:50') at time zone 'Europe/Prague', 20, 'completed'
+  from (select studio_week_start('c8a1c8a1-0000-0000-0000-000000000001',
+                                 (now() at time zone 'Europe/Prague')::date) as d0) wk,
+       (values ('c8a1c8a1-0000-0000-0000-0000000f0001'::uuid, 32, 'w-5a'),   -- week -5
+               ('c8a1c8a1-0000-0000-0000-0000000f0002'::uuid, 31, 'w-5b'),   -- week -5
+               ('c8a1c8a1-0000-0000-0000-0000000f0003'::uuid, 25, 'w-4'),    -- week -4
+               ('c8a1c8a1-0000-0000-0000-0000000f0005'::uuid, 11, 'w-2'),    -- week -2 (run)
+               ('c8a1c8a1-0000-0000-0000-0000000f0006'::uuid,  4, 'w-1')     -- week -1 (run)
+       ) v(id, doff, nm);
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source, booked_at)
+select v.bid, 'c8a1c8a1-0000-0000-0000-000000000001', v.oid,
+       'c8a1c8a1-0000-0000-0000-0000000dd004', 'attended', 'class_pack',
+       ((wk.d0 - v.doff) + time '11:00') at time zone 'Europe/Prague'
+  from (select studio_week_start('c8a1c8a1-0000-0000-0000-000000000001',
+                                 (now() at time zone 'Europe/Prague')::date) as d0) wk,
+       (values ('c8a1c8a1-0000-0000-0000-0000000bf001'::uuid,'c8a1c8a1-0000-0000-0000-0000000f0001'::uuid,32),
+               ('c8a1c8a1-0000-0000-0000-0000000bf002'::uuid,'c8a1c8a1-0000-0000-0000-0000000f0002'::uuid,31),
+               ('c8a1c8a1-0000-0000-0000-0000000bf003'::uuid,'c8a1c8a1-0000-0000-0000-0000000f0003'::uuid,25),
+               ('c8a1c8a1-0000-0000-0000-0000000bf005'::uuid,'c8a1c8a1-0000-0000-0000-0000000f0005'::uuid,11),
+               ('c8a1c8a1-0000-0000-0000-0000000bf006'::uuid,'c8a1c8a1-0000-0000-0000-0000000f0006'::uuid, 4)
+       ) v(bid, oid, doff);
 
 -- =============================================================================
 -- 1. LATE JOINER: progress counts from the challenge start (§9.2). MEM1 joins
@@ -248,8 +270,8 @@ select expect_true('recompute re-derives completion',
       and member_id='c8a1c8a1-0000-0000-0000-0000000dd001'));
 
 -- =============================================================================
--- 5. STREAK RESETS TO THE CURRENT RUN (§9.5). Attended weeks -6,-5,-4 then a
---    gap then -1,0 → the current run is 2, not 5 and not zero.
+-- 5. STREAK RESETS TO THE CURRENT RUN (§9.5). Attended weeks -5,-4 then a
+--    gap at -3 then -2,-1 → the current run is the trailing block of 2, not 4.
 -- =============================================================================
 set role authenticated; select set_config('request.jwt.claim.sub','c8a1c8a1-0000-0000-0000-0000000000e4',false);
 select join_challenge('c8a1c8a1-0000-0000-0000-00000000c002');
