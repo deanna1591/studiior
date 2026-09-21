@@ -270,13 +270,20 @@ select expect_num('everything else moved to the new time',
 -- =============================================================================
 -- 4. Dropping a day: refused when somebody is booked, cancelled when nobody is
 -- =============================================================================
+-- Start TOMORROW in the studio zone, never current_date. update_series edits
+-- only occurrences on/after v_from = (now at tz)::date + 1, so a series starting
+-- today on a day the rule includes (today is Monday, BYDAY=MO,TH) leaves a
+-- today-slot that t.mon counts but the drop never touches — 53 counted, 52
+-- cancelled, and today's Monday stays scheduled — failing this by the calendar.
+-- Anchoring starts_on to v_from makes every occurrence editable, so t.mon is
+-- exactly the cancellable set on any weekday.
 insert into class_series
   (id, studio_id, location_id, class_type_id, name, room_id, capacity,
    duration_minutes, rrule, starts_on, time_of_day)
 values ('5e215e21-0000-0000-0000-00000000f003','5e215e21-0000-0000-0000-000000000001',
         '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc02',
         'Barre Express','5e215e21-0000-0000-0000-00000000ee02',
-        10, 45, 'FREQ=WEEKLY;BYDAY=MO,TH', current_date, '18:00');
+        10, 45, 'FREQ=WEEKLY;BYDAY=MO,TH', ((now() at time zone 'Europe/Prague')::date + 1), '18:00');
 
 select set_config('t.mon', (select count(*)::text from class_occurrences
   where series_id = '5e215e21-0000-0000-0000-00000000f003'
@@ -737,10 +744,14 @@ select expect_num('...and the result says how many it removed',
 select expect_true('...and tells the studio the booked one will still run',
   (select r->>'note' from _arch) like '%kept and will still run%');
 
--- Past classes are the history and archiving must not touch them.
+-- Past classes are the history and archiving must not touch them. "Already run"
+-- is the completed history (the four inserted classes); count by status, not by
+-- starts_at <= now(), or the live series' own generated class for TODAY (07:00,
+-- past by the afternoon on a Monday run) shows up as a fifth and fails this by
+-- the calendar. status = 'completed' still catches archiving deleting history.
 select expect_num('archiving a series does not touch what has already run',
   (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-00000000fa01'
-     and starts_at <= now()), 4);
+     and status = 'completed'), 4);
 
 -- --- The checklist agrees with the choice -----------------------------------
 -- studio_setup_state() derives 'schedule' from whether any class_occurrences
@@ -805,7 +816,7 @@ select expect_text('...and the end date is recorded',
   studio_today('5e215e21-0000-0000-0000-000000000001')::text);
 select expect_num('...while the four classes it already taught keep their place',
   (select count(*) from class_occurrences
-    where series_id='5e215e21-0000-0000-0000-00000000fa01' and starts_at <= now()), 4);
+    where series_id='5e215e21-0000-0000-0000-00000000fa01' and status = 'completed'), 4);
 select expect_text('...and the series is still readable rather than gone',
   (select name from class_series where id='5e215e21-0000-0000-0000-00000000fa01'), 'HISTORY BURN');
 
