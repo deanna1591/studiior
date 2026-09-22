@@ -611,32 +611,34 @@ export default function ScheduleCalendar({
   const [slot, setSlot] = useState<SlotDraft | null>(null);
   const onSelectSlot = useCallback(
     ({ start, end, resourceId }: { start: Date; end: Date; resourceId?: string | number }) => {
-      if (view !== "day") return;          // resources only exist on Day
+      // Decision 37: create from a slot on ANY view. react-big-calendar hands
+      // WALL Dates (their local fields ARE the studio clock — see lib/tz), so
+      // the date, time and weekday come straight off those fields; the form does
+      // the wall -> instant conversion, once, exactly as a drag does.
       if (!classTypes.length) return;      // nothing to create; the page says so
-      const startsAt = fromStudioWall(new Date(start), timeZone);
-      let endsAt = fromStudioWall(new Date(end), timeZone);
-      // A single click gives a zero- or one-slot range. Fall back to the first
-      // class type's own length rather than inventing a number.
-      if (endsAt.getTime() - startsAt.getTime() < 5 * 60_000) {
-        endsAt = new Date(startsAt.getTime() + (classTypes[0]?.duration_minutes ?? 50) * 60_000);
-      }
-      const id = resourceId === undefined ? null : String(resourceId);
+      const p = (n: number) => String(n).padStart(2, "0");
+      const wall = new Date(start);
+      const dateKey = `${wall.getFullYear()}-${p(wall.getMonth() + 1)}-${p(wall.getDate())}`;
+      const timeHHMM = `${p(wall.getHours())}:${p(wall.getMinutes())}`;
+      const slotLen = Math.round((new Date(end).getTime() - wall.getTime()) / 60_000);
+      // Day columns are instructors; Week/Month have none, so the form asks.
+      const id = view === "day" && resourceId !== undefined ? String(resourceId) : null;
       const instructorId = !id || id === UNASSIGNED ? null : id;
       setSlot({
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
+        view,
+        dateKey,
+        // Month cells carry no time (a day, not an instant), so the form asks
+        // for one; Day/Week carry the clicked time.
+        timeHHMM: view === "month" ? null : timeHHMM,
+        weekday: wall.getDay(),
+        slotMinutes: view !== "month" && slotLen >= 5 ? slotLen : null,
         instructorId,
         instructorName: instructorId
           ? resources.find((r) => r.resourceId === instructorId)?.resourceTitle ?? null
           : null,
-        when: new Intl.DateTimeFormat("en-GB", {
-          weekday: "long", day: "numeric", month: "long",
-          hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
-        }).format(startsAt),
-        minutes: Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000),
       });
     },
-    [view, classTypes, resources, timeZone],
+    [view, classTypes, resources],
   );
 
   // WHEN THE GRID IS WIDER THAN THE PANE, SAY SO.
@@ -671,8 +673,12 @@ export default function ScheduleCalendar({
           draft={slot}
           classTypes={classTypes}
           rooms={rooms}
+          // Every active instructor, so Week/Month (which have no columns) can
+          // still choose one; instructorNames is the id->name map for all.
+          instructors={Object.entries(instructorNames).map(([id, name]) => ({ id, name }))}
           coreEnabled={coreEnabled}
           flexEnabled={flexEnabled}
+          timeZone={timeZone}
           onCancel={() => setSlot(null)}
           onDone={() => { setSlot(null); startTransition(() => router.refresh()); }}
         />
@@ -822,7 +828,7 @@ export default function ScheduleCalendar({
           onEventDrop={onDrop}
           onEventResize={onResize}
           resizable
-          selectable={view === "day" && classTypes.length > 0}
+          selectable={classTypes.length > 0}
           onSelectSlot={onSelectSlot}
           eventPropGetter={eventPropGetter}
           components={components}

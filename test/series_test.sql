@@ -102,7 +102,13 @@ insert into class_series
 values ('5e215e21-0000-0000-0000-00000000f001','5e215e21-0000-0000-0000-000000000001',
         '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
         'Reformer Flow','5e215e21-0000-0000-0000-00000000ee01',
-        10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date, '07:00');
+        -- Start TOMORROW, never current_date: on a run where today is the BYDAY
+        -- (a Tuesday), a series starting today has a today occurrence the
+        -- effective-tomorrow edit leaves unmoved, so the new-time slot for today
+        -- is empty and the nightly regeneration fills it — "creates nothing"
+        -- then finds one. Starting a day out keeps every slot in the editable
+        -- future on any weekday.
+        10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date + 1, '07:00');
 
 select set_config('t.before',
   (select count(*)::text from class_occurrences
@@ -114,7 +120,7 @@ select expect_true('a new series materialises a year of classes',
 select set_config('t.prev',
   (select update_series('5e215e21-0000-0000-0000-00000000f001','Reformer Flow',
      '5e215e21-0000-0000-0000-00000000cc01','5e215e21-0000-0000-0000-00000000ee01',
-     null, 10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date, null, '08:00', null,
+     null, 10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date + 1, null, '08:00', null,
      null, false)::text), false);
 select expect_true('a preview asks for confirmation',
   (current_setting('t.prev')::jsonb ->> 'requires_confirmation')::boolean);
@@ -141,7 +147,7 @@ select expect_text('...not even to the series row',
 select set_config('t.app',
   (select update_series('5e215e21-0000-0000-0000-00000000f001','Reformer Flow',
      '5e215e21-0000-0000-0000-00000000cc01','5e215e21-0000-0000-0000-00000000ee01',
-     null, 10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date, null, '08:00', null,
+     null, 10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date + 1, null, '08:00', null,
      null, true)::text), false);
 select expect_true('applying reports ok', (current_setting('t.app')::jsonb ->> 'ok')::boolean);
 select expect_num('THE COUNT DOES NOT MOVE — the timetable was not duplicated',
@@ -184,7 +190,7 @@ select expect_num('a series edit marks no occurrence as an exception',
 -- stayed on 10, which looks exactly like nothing having happened.
 select update_series('5e215e21-0000-0000-0000-00000000f001','Reformer Flow',
   '5e215e21-0000-0000-0000-00000000cc01','5e215e21-0000-0000-0000-00000000ee01',
-  null, 12, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date, null, '08:00', null,
+  null, 12, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date + 1, null, '08:00', null,
   null, true);
 select expect_num('a capacity change reaches every future class',
   (select count(*) from class_occurrences
@@ -936,4 +942,56 @@ select expect_num('...and the calendar agrees',
 
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
+-- =============================================================================
+-- Decision 37 — a repeating class created from a calendar slot goes through the
+-- SAME mechanism /series/new uses: the class_series INSERT (materialised by the
+-- 057 trigger) plus set_series_guarantee() for the tier. The server contract:
+-- the days materialise on BYDAY, the instructor is set, the tier applies, and a
+-- non-manager is refused.
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a1',false);  -- owner
+
+-- Anchored to next Monday so every class is future and the count is the same on
+-- any weekday the suite runs. BYDAY=MO,TH from next Monday (+7) to +28: Mondays
+-- +7/+14/+21/+28 (4) and Thursdays +10/+17/+24 (3) = 7.
+insert into class_series
+  (id, studio_id, location_id, class_type_id, name, room_id, capacity,
+   duration_minutes, rrule, starts_on, ends_on, time_of_day, instructor_id)
+values
+  ('5e215e21-0000-0000-0000-0000000d3701','5e215e21-0000-0000-0000-000000000001',
+   '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
+   'Reformer','5e215e21-0000-0000-0000-00000000ee01',10,50,
+   'FREQ=WEEKLY;BYDAY=MO,TH',
+   (date_trunc('week', current_date)::date + 7),
+   (date_trunc('week', current_date)::date + 28),
+   '07:00','5e215e21-0000-0000-0000-00000000d101');
+
+select expect_true('a repeating slot materialises 7 classes (4 Mondays, 3 Thursdays)',
+  (select count(*) = 7 from class_occurrences where series_id='5e215e21-0000-0000-0000-0000000d3701'));
+select expect_true('BYDAY honoured — every class is a Monday or a Thursday at 07:00 studio time',
+  (select bool_and(extract(dow from starts_at at time zone 'Europe/Prague') in (1,4)
+                   and (starts_at at time zone 'Europe/Prague')::time = time '07:00')
+     from class_occurrences where series_id='5e215e21-0000-0000-0000-0000000d3701'));
+select expect_true('the instructor is set on every materialised class',
+  (select bool_and(instructor_id='5e215e21-0000-0000-0000-00000000d101')
+     from class_occurrences where series_id='5e215e21-0000-0000-0000-0000000d3701'));
+
+-- The tier, through the SAME set_series_guarantee() the calendar form calls.
+select set_series_guarantee('5e215e21-0000-0000-0000-0000000d3701','flex',1);
+select expect_text('set_series_guarantee sets the series tier to flex',
+  (select guarantee_tier::text from class_series where id='5e215e21-0000-0000-0000-0000000d3701'), 'flex');
+select expect_true('...and reaches the classes it already made',
+  (select bool_and(flex and minimum_bookings = 1)
+     from class_occurrences where series_id='5e215e21-0000-0000-0000-0000000d3701' and starts_at > now()));
+
+-- The block: a non-manager (front desk) cannot create a series (series_manager_write).
+set role authenticated;
+select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a2',false);  -- front desk
+select expect_raises('front desk is refused creating a repeating class (RLS)',
+  $$insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day)
+    values ('5e215e21-0000-0000-0000-0000000d3702','5e215e21-0000-0000-0000-000000000001','5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01','Reformer','5e215e21-0000-0000-0000-00000000ee01',10,50,'FREQ=WEEKLY;BYDAY=MO',(date_trunc('week', current_date)::date + 7),(date_trunc('week', current_date)::date + 28),'09:00')$$,
+  '42501');
+reset role;
+
 select 'series suite finished' as done;

@@ -5,6 +5,7 @@ import { shiftDateKey, studioDateKey, studioToday } from "@/lib/tz";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
 import JumpToDate from "./jump";
 import InstructorFilter from "./instructor-filter";
+import ShowAllToggle from "./show-all-toggle";
 import FillPanel from "./fill/panel";
 import PublishForm from "@/app/staff/publish/publish-form";
 
@@ -343,6 +344,12 @@ export default async function Schedule({
                   {everyone.length > 1 && (
                     <InstructorFilter anchor={anchor} view={view} value={instructorFilter}
                                       instructors={instructors ?? []} />
+                  )}
+                  {/* Decision 37: the teaching-today / everyone default, made a
+                      visible toggle. Only on Day (columns exist there) and only
+                      when a specific instructor is not already filtered to. */}
+                  {view === "day" && everyone.length > 1 && !instructorFilter && (
+                    <ShowAllToggle anchor={anchor} view={view} showAll={showAll} instructor={instructorFilter} />
                   )}
                   <JumpToDate anchor={anchor} view={view} instructor={instructorFilter} />
                   <NavLink href="/schedule/flex">Flex</NavLink>
