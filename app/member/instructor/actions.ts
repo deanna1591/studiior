@@ -16,8 +16,9 @@ export type InstructorState = { error: string } | { ok: string } | null;
  * WHAT IS DELIBERATELY ABSENT: there is no "release this class". Decision 18
  * overturned that edge of Decision 17 — staff always grant cover, however
  * urgent, and withdraw_from_shift() raises a cover request instead of clearing
- * the instructor. A button that looked like self-release would be a button
- * that lies.
+ * the instructor. Decision 38's "Can't make it" is exactly that same path: the
+ * class stays theirs until someone covers it; it never becomes open by itself.
+ * A button that looked like self-release would be a button that lies.
  */
 export async function confirmMyWeek(
   _prev: InstructorState, form: FormData,
@@ -229,4 +230,43 @@ export async function confirmClass(_prev: InstructorState, form: FormData): Prom
   revalidatePath("/instructor");
   revalidatePath("/instructor/schedule");
   return { ok: "Checked in — your pay for this class is released." };
+}
+
+/**
+ * Decision 38 — the instructor confirms a class the studio assigned them, or
+ * asks for cover. "Confirm" and "Confirm all" set the confirmation; "Can't make
+ * it" raises a cover request (Decision 18: the class stays theirs until someone
+ * covers it, it never becomes open by itself). Every guard is in the function —
+ * the wrong instructor is refused there, not here.
+ */
+export async function confirmAssignment(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("confirm_assignment", {
+    p_occurrence_id: String(form.get("occurrence_id")),
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/instructor"); revalidatePath("/instructor/schedule");
+  return { ok: "Confirmed." };
+}
+
+export async function confirmSeriesAssignments(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("confirm_series_assignments", {
+    p_series_id: String(form.get("series_id")),
+  });
+  if (error) return { error: error.message };
+  const r = (data ?? {}) as { confirmed?: number };
+  revalidatePath("/instructor"); revalidatePath("/instructor/schedule");
+  return { ok: `Confirmed ${r.confirmed ?? 0} ${r.confirmed === 1 ? "class" : "classes"}.` };
+}
+
+export async function declineAssignment(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  // Decision 18, unchanged: the class stays yours and a cover request is raised.
+  const { error } = await supabase.rpc("withdraw_from_shift", {
+    p_occurrence_id: String(form.get("occurrence_id")),
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/instructor"); revalidatePath("/instructor/schedule");
+  return { ok: "Cover requested — the studio will arrange it. The class stays yours until it's covered." };
 }

@@ -782,3 +782,24 @@ export async function saveBookingAlerts(_prev: PlainState, fd: FormData): Promis
       : "Off. Instructors are not emailed about bookings.",
   };
 }
+
+// Decision 38 — instructors confirm the classes the studio assigns them. Off by
+// default; unconfirmed classes stay on the timetable.
+export async function saveAssignmentConfirmations(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("assignment_confirmations") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ assignment_confirmations: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. Instructors are asked to confirm classes you assign them; unconfirmed classes stay on the timetable."
+      : "Off. Instructors are not asked to confirm assignments.",
+  };
+}

@@ -6,6 +6,7 @@ import CarryForwardPanel from "../carry-forward";
 import ClaimingPanel from "../claiming";
 import CoverPanel from "../cover";
 import BookingAlertsPanel from "../booking-alerts";
+import AssignmentConfirmationsPanel from "../assignment-confirmations";
 import SettingsBack from "../back";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function InstructorSettings() {
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Instructors"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
 
   const { data: settings } = await supabase.from("studio_settings")
-    .select("availability_due_day, week_confirm_escalate_days, week_confirm_enabled, availability_reminders_enabled, carry_forward_enabled, roster_confirm_days, claiming_enabled, core_claim_default_cap, cover_auto_accept_enabled, cover_escalation_hours, instructor_booking_alerts")
+    .select("availability_due_day, week_confirm_escalate_days, week_confirm_enabled, availability_reminders_enabled, carry_forward_enabled, roster_confirm_days, claiming_enabled, core_claim_default_cap, cover_auto_accept_enabled, cover_escalation_hours, instructor_booking_alerts, assignment_confirmations")
     .eq("studio_id", ctx.studioId).maybeSingle();
 
   return (
@@ -44,6 +45,10 @@ export default async function InstructorSettings() {
       <div className="mt-8"><SectionLabel>Booking alerts</SectionLabel></div>
       <div className="mt-3">
         <BookingAlertsPanel enabled={settings?.instructor_booking_alerts ?? false} />
+      </div>
+      <div className="mt-8"><SectionLabel>Assignment confirmations</SectionLabel></div>
+      <div className="mt-3">
+        <AssignmentConfirmationsPanel enabled={settings?.assignment_confirmations ?? false} />
       </div>
     </AppShell>
   );

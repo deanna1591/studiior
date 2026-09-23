@@ -4,6 +4,7 @@ import { useFormState } from "react-dom";
 import { PrimaryButton, CardAction, CardActionOutline, QuietButton } from "@/components/member/ui";
 import {
   confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, acceptCover, withdrawApplication, checkInMember,
+  confirmAssignment, confirmSeriesAssignments, declineAssignment,
   type InstructorState, type ClaimState,
 } from "./actions";
 
@@ -38,6 +39,46 @@ export function ConfirmWeek({
       <div className="mt-3"><PrimaryButton>{`Confirm all ${count}`}</PrimaryButton></div>
       <Result state={state} />
     </form>
+  );
+}
+
+/**
+ * Decision 38 — "Confirm all" for a whole series of assigned classes.
+ */
+export function ConfirmSeriesAssignments({
+  seriesId, count, label,
+}: { seriesId: string; count: number; label: string }) {
+  const [state, action] = useFormState<InstructorState, FormData>(confirmSeriesAssignments, null);
+  return (
+    <form action={action}>
+      <input type="hidden" name="series_id" value={seriesId} />
+      <PrimaryButton>{`Confirm all ${count} ${label}`}</PrimaryButton>
+      <Result state={state} />
+    </form>
+  );
+}
+
+/**
+ * Decision 38 — per-class Confirm / Can't make it, side by side.
+ */
+export function ConfirmOrDecline({ occurrenceId }: { occurrenceId: string }) {
+  const [cState, cAction] = useFormState<InstructorState, FormData>(confirmAssignment, null);
+  const [dState, dAction] = useFormState<InstructorState, FormData>(declineAssignment, null);
+  return (
+    <div>
+      <div className="flex gap-2">
+        <form action={cAction} className="flex-1">
+          <input type="hidden" name="occurrence_id" value={occurrenceId} />
+          <CardAction>Confirm</CardAction>
+        </form>
+        <form action={dAction} className="flex-1">
+          <input type="hidden" name="occurrence_id" value={occurrenceId} />
+          <CardActionOutline>Can&apos;t make it</CardActionOutline>
+        </form>
+      </div>
+      <Result state={cState} />
+      <Result state={dState} />
+    </div>
   );
 }
 

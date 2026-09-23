@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
-import { text, nullable, fields, invalid, insertSeriesRow, say, seriesSkipWarning } from "./shared";
+import { text, nullable, fields, invalid, insertSeriesRow, say, seriesSkipWarning, seriesAvailabilityWarning } from "./shared";
 
 export type SeriesState = { error: string } | null;
 
@@ -56,11 +56,35 @@ export async function createSeries(_prev: SeriesState, fd: FormData): Promise<Se
   // instructor or room is busy. Carry the shortfall to the series screen, which
   // banners it (the same warning the calendar modal shows).
   const skip = await seriesSkipWarning(ctx.studioId, ctx.timeZone, res.id, f);
+  // Decision 37 amendment (c): weeks outside the instructor's agreed dates.
+  const avail = await seriesAvailabilityWarning(res.id);
 
   revalidatePath("/series"); revalidatePath("/schedule"); revalidatePath("/");
-  redirect(skip
-    ? `/series/${res.id}?expected=${skip.expected}&made=${skip.created}`
-    : `/series/${res.id}`);
+  const params = new URLSearchParams();
+  if (skip) { params.set("expected", String(skip.expected)); params.set("made", String(skip.created)); }
+  if (avail) { params.set("avail", String(avail.count)); params.set("who", avail.instructor_name); }
+  const q = params.toString();
+  redirect(q ? `/series/${res.id}?${q}` : `/series/${res.id}`);
+}
+
+/**
+ * Decision 38 — "Ask {instructor} to confirm". Requests confirmation for the
+ * future unconfirmed occurrences of a series whose instructor has a login. The
+ * path for classes assigned BEFORE the setting was turned on (the trigger never
+ * fired for those).
+ */
+export async function askSeriesConfirmations(
+  _prev: SeriesState, fd: FormData,
+): Promise<SeriesState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("request_series_confirmations", {
+    p_series_id: String(fd.get("series_id")),
+  });
+  if (error) return { error: say(error.message) };
+  const r = (data ?? {}) as { ok?: boolean; reason?: string; requested?: number };
+  if (r.reason === "off") return { error: "Turn assignment confirmations on in Settings → Instructors first." };
+  revalidatePath(`/series/${String(fd.get("series_id"))}`);
+  return null;
 }
 
 async function edit(fd: FormData, confirm: boolean): Promise<EditState> {

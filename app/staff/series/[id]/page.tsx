@@ -7,6 +7,7 @@ import { parseRrule } from "@/lib/rrule";
 import SeriesForm from "../form";
 import SeriesLifecycle from "../lifecycle";
 import SeriesGuarantee from "../guarantee";
+import SeriesConfirmations from "../series-confirm";
 import { localDates, seriesOptions } from "../data";
 import { studioToday } from "@/lib/tz";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EditSeries({
   params, searchParams,
-}: { params: { id: string }; searchParams: { expected?: string; made?: string } }) {
+}: { params: { id: string }; searchParams: { expected?: string; made?: string; avail?: string; who?: string } }) {
   const screen = await staffScreen(`/series/${params.id}`);
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -38,7 +39,7 @@ export default async function EditSeries({
 
   // How much of the calendar this series is actually holding, so "twelve months
   // of classes" is a number on the screen rather than a claim in a sentence.
-  const [{ count: future }, { count: booked }, { data: cfg }] = await Promise.all([
+  const [{ count: future }, { count: booked }, { data: cfg }, { data: confSummary }] = await Promise.all([
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
       .eq("series_id", s.id).eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true })
@@ -47,7 +48,17 @@ export default async function EditSeries({
     supabase.from("studio_settings")
       .select("guarantees_enabled, flex_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
+    // Decision 38: "N of M confirmed" (null when nothing has been asked).
+    supabase.rpc("series_confirmation_summary", { p_series_id: s.id }),
   ]);
+  const summary = confSummary as unknown as { confirmed: number; total: number } | null;
+  const instructorName = s.instructor_id
+    ? (instructors.find((i) => i.id === s.instructor_id)?.name ?? null)
+    : null;
+
+  // Decision 37 amendment (c): weeks outside the assigned instructor's dates.
+  const availCount = Number(searchParams.avail);
+  const outsideDates = Number.isFinite(availCount) && availCount > 0;
 
   // Decision 37 follow-up: the create form carries here the count the generator
   // silently skipped because the instructor or room was busy at that week.
@@ -74,6 +85,19 @@ export default async function EditSeries({
           </p>
         </div>
       )}
+      {outsideDates && (
+        <div className="mb-6 max-w-xl rounded border-l-[3px] px-3.5 py-3"
+             style={{ borderLeftColor: "var(--amber-deep)", background: "var(--amber-tint)" }}
+             role="alert">
+          <p className="text-[13px] leading-[19px] text-ink">
+            <span className="num">{availCount}</span>{" "}
+            {availCount === 1 ? "week is" : "weeks are"} outside{" "}
+            {searchParams.who || "that instructor"}&apos;s agreed dates. The classes were
+            still created and assigned — nothing is blocked; this is just to let you know.
+          </p>
+        </div>
+      )}
+      <SeriesConfirmations seriesId={s.id} instructorName={instructorName} summary={summary} />
       <div className="mb-6 max-w-xl rounded border border-line bg-surface px-3.5 py-3">
         <SectionLabel>On the calendar now</SectionLabel>
         <p className="mt-1 text-[13px] leading-[19px] text-ink-2">

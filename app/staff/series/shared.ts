@@ -159,6 +159,29 @@ export async function seriesSkipWarning(
   return expected > c ? { expected, created: c } : null;
 }
 
+/**
+ * Decision 37 amendment (c) — a series stays fully assigned, but weeks outside
+ * the instructor's agreed dates (instructor_valid_on false) are surfaced as a
+ * warning on both create paths. No block, no diversion. Null (no warning) when
+ * the instructor has stated no dates (valid_on is true everywhere then) — the
+ * state of every studio's instructors until they submit a month.
+ */
+export async function seriesAvailabilityWarning(
+  seriesId: string,
+): Promise<{ count: number; instructor_name: string } | null> {
+  const supabase = createClient();
+  const { data } = await supabase.rpc("series_availability_warning", { p_series_id: seriesId });
+  const r = data as unknown as { count?: number; instructor_name?: string } | null;
+  return r && (r.count ?? 0) > 0
+    ? { count: r.count!, instructor_name: r.instructor_name ?? "that instructor" }
+    : null;
+}
+
+/** The availability warning as the sentence both paths show. */
+export function availabilityWarningText(s: { count: number; instructor_name: string }): string {
+  return `${s.count} ${s.count === 1 ? "week is" : "weeks are"} outside ${s.instructor_name}'s agreed dates.`;
+}
+
 /** The skip warning as the sentence both paths show. */
 export function skipWarningText(s: { expected: number; created: number }): string {
   const n = s.expected - s.created;

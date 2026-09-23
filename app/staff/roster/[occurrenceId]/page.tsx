@@ -24,7 +24,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
 
   const { data: occ } = await supabase
     .from("class_occurrences")
-    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, instructors!instructor_id(display_name), rooms(name)")
+    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, instructors!instructor_id(display_name), rooms(name)")
     .eq("id", params.occurrenceId)
     .maybeSingle();
   if (!occ) notFound();
@@ -134,6 +134,12 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
         <span className="num text-ink">{occ.booked_count}/{occ.capacity}</span> booked
         {inCount > 0 && <>, <span className="num text-ink">{inCount}</span> checked in</>}
         {occ.status === "cancelled" && " · this class is cancelled"}
+        {/* Decision 38: the assignment-confirmation state, when the class was asked. */}
+        {occ.assignment_confirmed_at
+          ? <span className="ml-1" style={{ color: "var(--lime-text)" }}> · confirmed ✓</span>
+          : occ.assignment_requested_at
+            ? <span className="ml-1 text-ink-3"> · awaiting confirmation</span>
+            : null}
       </p>
 
       {/* Take the instructor off and open the shift — from the class itself.

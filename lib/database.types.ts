@@ -1138,6 +1138,8 @@ export type Database = {
       class_occurrences: {
         Row: {
           assigned_by: string | null
+          assignment_confirmed_at: string | null
+          assignment_requested_at: string | null
           booked_at_cutoff: number | null
           booked_at_start: number | null
           booked_count: number
@@ -1184,6 +1186,8 @@ export type Database = {
         }
         Insert: {
           assigned_by?: string | null
+          assignment_confirmed_at?: string | null
+          assignment_requested_at?: string | null
           booked_at_cutoff?: number | null
           booked_at_start?: number | null
           booked_count?: number
@@ -1230,6 +1234,8 @@ export type Database = {
         }
         Update: {
           assigned_by?: string | null
+          assignment_confirmed_at?: string | null
+          assignment_requested_at?: string | null
           booked_at_cutoff?: number | null
           booked_at_start?: number | null
           booked_count?: number
@@ -5798,6 +5804,7 @@ export type Database = {
       studio_settings: {
         Row: {
           adjacency_minutes: number
+          assignment_confirmations: boolean
           availability_due_day: number
           availability_reminders_enabled: boolean
           booking_cutoff_minutes: number
@@ -5886,6 +5893,7 @@ export type Database = {
         }
         Insert: {
           adjacency_minutes?: number
+          assignment_confirmations?: boolean
           availability_due_day?: number
           availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
@@ -5974,6 +5982,7 @@ export type Database = {
         }
         Update: {
           adjacency_minutes?: number
+          assignment_confirmations?: boolean
           availability_due_day?: number
           availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
@@ -6901,6 +6910,7 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: Json
       }
+      confirm_assignment: { Args: { p_occurrence_id: string }; Returns: Json }
       confirm_class_for_pay: {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
@@ -6914,6 +6924,10 @@ export type Database = {
         Returns: Json
       }
       confirm_occurrence: { Args: { p_occurrence_id: string }; Returns: Json }
+      confirm_series_assignments: {
+        Args: { p_series_id: string }
+        Returns: Json
+      }
       confirm_week: {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
@@ -7031,6 +7045,7 @@ export type Database = {
         Args: { p_basis: string; p_now: number; p_prior: number }
         Returns: Json
       }
+      decline_assignment: { Args: { p_occurrence_id: string }; Returns: Json }
       decline_cover_request: {
         Args: { p_reason?: string; p_request_id: string }
         Returns: Json
@@ -7083,6 +7098,14 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -7189,6 +7212,19 @@ export type Database = {
         Returns: number
       }
       instructor_announcements: { Args: { p_studio_id: string }; Returns: Json }
+      instructor_assignment_requests: {
+        Args: { p_instructor_id: string }
+        Returns: {
+          local_date: string
+          local_end: string
+          local_start: string
+          name: string
+          occurrence_id: string
+          room_name: string
+          series_id: string
+          series_name: string
+        }[]
+      }
       instructor_availability_week: {
         Args: { p_instructor_id: string }
         Returns: Json
@@ -7346,6 +7382,10 @@ export type Database = {
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_announcements: { Args: { p_studio_id: string }; Returns: Json }
+      member_booking_window_days: {
+        Args: { p_member_id: string }
+        Returns: number
+      }
       member_bootstrap: {
         Args: { p_slug: string }
         Returns: {
@@ -7669,6 +7709,14 @@ export type Database = {
         Returns: Json
       }
       queue_all_credit_expiries: { Args: never; Returns: Json }
+      queue_assignment_declined: {
+        Args: { p_instructor_name: string; p_occurrence_id: string }
+        Returns: undefined
+      }
+      queue_assignment_request: {
+        Args: { p_occurrence_id: string }
+        Returns: undefined
+      }
       queue_availability_reminders: {
         Args: { p_studio_id: string }
         Returns: number
@@ -7872,6 +7920,10 @@ export type Database = {
         Args: { p_occurrence_id: string; p_reason?: string }
         Returns: Json
       }
+      request_series_confirmations: {
+        Args: { p_series_id: string }
+        Returns: Json
+      }
       resolve_checkin_code: {
         Args: { p_code: string }
         Returns: {
@@ -7911,6 +7963,7 @@ export type Database = {
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
+      run_sweep: { Args: { label: string; sql: string }; Returns: undefined }
       say_count: { Args: { n: number }; Returns: string }
       schedule_range: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
@@ -7920,6 +7973,8 @@ export type Database = {
           local_date: string
           local_end: string
           local_start: string
+          occ_assignment_confirmed: boolean
+          occ_assignment_requested: boolean
           occ_booked: number
           occ_cancellation_cause: string
           occ_capacity: number
@@ -7986,6 +8041,10 @@ export type Database = {
         }
         Returns: number
       }
+      series_availability_warning: {
+        Args: { p_series_id: string }
+        Returns: Json
+      }
       series_calendar_drift: {
         Args: { p_series_id: string }
         Returns: {
@@ -7994,6 +8053,10 @@ export type Database = {
           reason: string
           should_be: string
         }[]
+      }
+      series_confirmation_summary: {
+        Args: { p_series_id: string }
+        Returns: Json
       }
       series_counts: { Args: { p_series_id: string }; Returns: Json }
       series_impact: { Args: { p_series_id: string }; Returns: Json }

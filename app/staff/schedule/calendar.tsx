@@ -95,6 +95,9 @@ export type CalEvent = {
   /** A flex class the cutoff turned off — a DECIDED state, not the dashed
    *  "still waiting on its deadline". Kept apart on purpose. */
   notRunning?: boolean;
+  /** Decision 38: the assigned instructor confirmed / was asked and has not. */
+  assignmentConfirmed?: boolean;
+  assignmentAwaiting?: boolean;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -547,6 +550,13 @@ export default function ScheduleCalendar({
                 <span title="Runs only if it reaches its minimum">
                   Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}
                 </span>
+              )}
+              {/* Decision 38: assigned-class confirmation state, when asked. */}
+              {event.assignmentConfirmed && (
+                <span title="The instructor confirmed" style={{ color: "var(--lime-text)" }}>✓</span>
+              )}
+              {event.assignmentAwaiting && (
+                <span className="text-ink-3" title="Awaiting the instructor's confirmation">awaiting</span>
               )}
             </span>
           </div>

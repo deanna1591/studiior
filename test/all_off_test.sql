@@ -139,6 +139,14 @@ select expect_num('the silent instructor is not even DUE a carry (the switch is 
   (select count(*) from roster_carry_due(:'S', date '2026-12-01')), 0);
 select expect_num('the sweeps queued no notifications for this studio (a login instructor, an in-window class, and still nothing)',
   (select count(*) from notifications where studio_id = :'S') - (select c from _off_base), 0);
+-- Decision 38: assignment confirmations default OFF. Ada is a login instructor
+-- assigned to real classes, and still no request is recorded and no email queued.
+select expect_true('assignment_confirmations defaults off',
+  (select not assignment_confirmations from studio_settings where studio_id = :'S'));
+select expect_num('no assignment was requested (a login instructor assigned, switch off)',
+  (select count(*) from class_occurrences where studio_id = :'S' and assignment_requested_at is not null), 0);
+select expect_num('no assignment-confirmation email was queued',
+  (select count(*) from notifications where studio_id = :'S' and template_key = 'assignment_confirmation_request'), 0);
 
 -- The three gates 142 added, at their defaults for a studio that inserted only
 -- its studio_id.
@@ -212,5 +220,20 @@ insert into bookings (studio_id, occurrence_id, member_id, status) values
 select expect_num('switch ON: exactly one instructor alert for a booking on their class',
   (select count(*) from notifications where template_key='instructor_booking_alert' and studio_id=:'S'), 1);
 update studio_settings set instructor_booking_alerts=false where studio_id=:'S';
+
+-- =============================================================================
+-- Decision 38: assignment confirmations. Defaults => nothing; a positive control
+-- flips it ON and assigning the login instructor a class records a request and
+-- queues exactly one digest.
+-- =============================================================================
+update studio_settings set assignment_confirmations = true where studio_id = :'S';
+insert into class_occurrences (id,studio_id,location_id,class_type_id,room_id,instructor_id,name,starts_at,ends_at,capacity,booked_count,status) values
+  ('0ff00ff0-0000-0000-0000-00000000c038',:'S','0ff00ff0-0000-0000-0000-00000000000a','0ff00ff0-0000-0000-0000-0000000cc001','0ff00ff0-0000-0000-0000-0000000ee001','0ff00ff0-0000-0000-0000-0000000d0001','Confirm me', now()+interval '9 days', now()+interval '9 days'+interval '50 min',8,0,'scheduled');
+select expect_true('teeth: with assignment confirmations ON, assigning a login instructor records a request',
+  (select assignment_requested_at is not null from class_occurrences where id='0ff00ff0-0000-0000-0000-00000000c038'));
+select expect_num('teeth: and queues exactly one digest for that instructor',
+  (select count(*) from notifications where studio_id=:'S' and template_key='assignment_confirmation_request'
+     and user_id='0ff00ff0-0000-0000-0000-0000000000a1'), 1);
+update studio_settings set assignment_confirmations = false where studio_id = :'S';
 
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;

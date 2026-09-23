@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
-import { ConfirmWeek } from "../actions-ui";
+import { ConfirmWeek, ConfirmSeriesAssignments, ConfirmOrDecline } from "../actions-ui";
 import PayCheckIn from "../pay-checkin";
 
 export const dynamic = "force-dynamic";
@@ -43,13 +43,15 @@ export default async function MySchedule({
   const from = shiftDate(today, offset * 7);
   const to = shiftDate(from, 13);
 
-  const [week, pendingData] = await Promise.all([
+  const [week, pendingData, reqData] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
     }),
     // Claims awaiting approval — not on the calendar yet (instructor_id stays
     // null until staff approve), so instructor_week cannot see them.
     supabase.rpc("instructor_pending_claims", { p_instructor_id: ctx.instructor_id }),
+    // Decision 38: classes the studio assigned that need confirming.
+    supabase.rpc("instructor_assignment_requests", { p_instructor_id: ctx.instructor_id }),
   ]);
 
   const w = week.data as { state: string; classes: Klass[]; empty_hint: string } | null;
@@ -80,6 +82,24 @@ export default async function MySchedule({
   const unconfirmed = classes.filter(
     (c) => c.status === "scheduled" && !c.confirmed && !c.cover_requested);
 
+  // Decision 38: assigned classes needing confirmation, grouped by series.
+  type Req = {
+    occurrence_id: string; name: string; local_date: string; local_start: string;
+    room_name: string | null; series_id: string | null; series_name: string | null;
+  };
+  const requests = (reqData.data ?? []) as unknown as Req[];
+  const reqGroups = new Map<string, { key: string; seriesId: string | null; name: string; items: Req[] }>();
+  for (const r of requests) {
+    const key = r.series_id ?? r.occurrence_id;
+    if (!reqGroups.has(key)) {
+      reqGroups.set(key, { key, seriesId: r.series_id, name: r.series_name ?? r.name, items: [] });
+    }
+    reqGroups.get(key)!.items.push(r);
+  }
+  const reqDayLabel = (iso: string) =>
+    new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" })
+      .format(new Date(`${iso}T00:00:00Z`));
+
   const nothing = days.length === 0;
 
   return (
@@ -91,6 +111,45 @@ export default async function MySchedule({
             Your schedule could not be read — this is not an empty week.
           </p>
           <p className="num mt-1 text-[11px] leading-4 text-ink-2">{week.error.message}</p>
+        </div>
+      )}
+
+      {/* Decision 38: classes the studio ASSIGNED that are waiting on your
+          confirmation. Grouped by series: Confirm all, or per class Confirm /
+          Can't make it (which raises a cover request — Decision 18, the class
+          stays yours until someone covers it). */}
+      {requests.length > 0 && (
+        <div className="m-card mb-4 px-4 py-3.5">
+          <p className="text-[15px] leading-[22px] text-ink">
+            <span className="num font-semibold">{requests.length}</span>{" "}
+            {requests.length === 1 ? "class needs" : "classes need"} your confirmation.
+          </p>
+          <p className="m-sub mt-0.5 text-ink-3">
+            The studio put {requests.length === 1 ? "it" : "these"} on your schedule. Confirm, or hand back.
+          </p>
+          {[...reqGroups.values()].map((g) => (
+            <div key={g.key} className="mt-3 border-t border-line pt-3">
+              <p className="text-[13px] font-medium text-ink">{g.name}</p>
+              <ul className="mt-1.5 space-y-2">
+                {g.items.map((r) => (
+                  <li key={r.occurrence_id} className="flex flex-col gap-1.5">
+                    <span className="text-[12px] leading-[17px] text-ink-2">
+                      {reqDayLabel(r.local_date)} · {r.local_start}
+                      {r.room_name ? ` · ${r.room_name}` : ""}
+                    </span>
+                    <ConfirmOrDecline occurrenceId={r.occurrence_id} />
+                  </li>
+                ))}
+              </ul>
+              {g.seriesId && g.items.length > 1 && (
+                <div className="mt-2.5">
+                  <ConfirmSeriesAssignments
+                    seriesId={g.seriesId} count={g.items.length}
+                    label={g.items.length === 1 ? "class" : "classes"} />
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

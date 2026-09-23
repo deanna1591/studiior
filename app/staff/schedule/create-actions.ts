@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { fields, invalid, insertSeriesRow, seriesSkipWarning, skipWarningText } from "@/app/staff/series/shared";
+import { fields, invalid, insertSeriesRow, seriesSkipWarning, skipWarningText, seriesAvailabilityWarning, availabilityWarningText } from "@/app/staff/series/shared";
 
 /**
  * Creating a class from an empty slot on the calendar.
@@ -165,6 +165,10 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
   // Weeks the generator silently skipped because the instructor or room was busy.
   const skip = await seriesSkipWarning(ctx.studioId, ctx.timeZone, res.id, f);
   if (skip) warnings.push("skipped_weeks");
+  // Decision 37 amendment (c): weeks outside the assigned instructor's agreed
+  // dates — kept assigned, surfaced, never blocked.
+  const avail = await seriesAvailabilityWarning(res.id);
+  if (avail) warnings.push("outside_agreed_dates");
 
   revalidatePath("/series"); revalidatePath("/schedule"); revalidatePath("/");
   return {
@@ -174,6 +178,7 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
     message: (skip
         ? `Repeating class created. ${skipWarningText(skip)}`
         : "Repeating class created. Its year of classes is on the calendar now.")
+      + (avail ? ` ${availabilityWarningText(avail)}` : "")
       + (warnings.includes("standalone_flex")
           ? " Some are standalone flex classes — no other class of that instructor beside them — so they carry a standby fee."
           : ""),

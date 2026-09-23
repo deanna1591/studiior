@@ -475,6 +475,28 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 38 — Instructors confirm the classes the studio assigns them (assigned is not agreed)
+
+The owner builds the timetable and assigns instructors to classes. Today that assignment is **silent to the instructor** — a class lands on their week with no ask, and the studio has no signal whether the person who is meant to teach it has even seen it. **Assigned is not agreed.** The instructor should be able to see what they have been given, **confirm** it, or **hand it back** — in the app, with an email nudge — **without the owner's assignment ever being blocked or undone by the instructor's silence.** Silence changes nothing: the class stays on the timetable, assigned, unconfirmed.
+
+**Per-tenant, opt-in, OFF by default** (`studio_settings.assignment_confirmations`), so a studio that never turns it on sees no trace (the `all_off` canary proves it). Reform turns it on in Settings → Instructors, beside booking alerts, help text *"Instructors are asked to confirm classes you assign them. Unconfirmed classes stay on the timetable."*
+
+**A request is recorded, not a state machine.** `class_occurrences` gains `assignment_requested_at` and `assignment_confirmed_at` (both timestamptz, null = never asked / not confirmed). A request is stamped whenever an occurrence **becomes assigned to an instructor who has a login** while the setting is ON — through **any** path (series materialisation, one-off create, move/reassign, engine assignment), because it is a **trigger on `class_occurrences`** (the "a booking is made from four places" lesson), not a call bolted onto each writer. **Reassignment to a different instructor clears both and re-requests** for the new person; **unassigning clears both**. Classes assigned **before** the setting turned on are **not** retroactively requested — the trigger only fires on the assignment event; the series page carries an explicit **"Ask {instructor} to confirm"** action that requests all future unconfirmed occurrences of that series.
+
+**One email per instructor per day, coalesced**, through the existing notifications pipeline and the coalescing pattern Decision 33's booking alerts use (a per-instructor-per-day dedupe key, the pending list recomputed into the payload, scheduled for the end of the studio-local day so the day's assignments arrive as one digest), listing the classes **grouped by series** (*"Every Mon 07:00 Reformer Flow — 8 classes, 9 Nov to 20 Dec"*) with a link to My schedule. **Published months only**, same as booking alerts (an instructor cannot see a draft month, so it is not emailed about one; the request timestamp is still recorded, and the in-app ask appears when the month publishes). **No reminders, no deadline, no auto-unassign** — silence is a permanent, harmless state. A per-tenant deadline and reminders are **deferred**.
+
+**Confirm and decline.** The instructor's My schedule gains a **"Needs your confirmation"** section at the top — future occurrences assigned to them, requested, not yet confirmed, grouped by series, with **"Confirm all"** and per-class **"Confirm"** / **"Can't make it."** `confirm_assignment(occurrence)` (SECURITY DEFINER, guarded to the **assigned** instructor) stamps `assignment_confirmed_at`.
+
+**"Can't make it" = a cover request, per Decision 18, unchanged.** An instructor never releases a class themselves. "Can't make it" calls the **existing `withdraw_from_shift()`**: it raises a **cover request**, the owner/managers get the **existing cover notification**, and the class **stays assigned to the instructor** until someone covers it — it never becomes open by itself. Nothing about the confirmation state changes on decline: the class stays **requested-and-unconfirmed** until it is covered or confirmed. There is **no `decline_assignment` function** and no Decision 18 amendment.
+
+**Owner-side state, never a blocker.** The roster and the schedule calendar show a small state on assigned classes — a confirmed tick, "awaiting" when requested and unconfirmed, nothing when never asked. The series page shows **"6 of 8 confirmed."** None of it gates or reverses the assignment.
+
+**RLS and boundaries.** An instructor sees and confirms only their **own** requested classes; front desk cannot confirm or decline on anyone's behalf (the confirm/decline guards key on `auth_instructor_id` = the occurrence's instructor). Not anon; the anon surface stays **exactly eleven**. No new enum values.
+
+**Recorded before code.** It amends Decision 18's edge as set out above and adds a new per-tenant switch in the family of Decisions 24/25/33.
+
+---
+
 ## 37 — A class OR a repeating series is created from any empty slot on the Schedule calendar, all three views
 
 Migration 089 gave the calendar click-to-create, but **one-off only**, on **Day view alone**, and the form said in words "Repeating classes live in Recurring" — the deliberate narrowing recorded in migration 089's notes: "a calendar that silently created a year of classes from one click would be a bad surprise; recurring belongs at /series where the whole rule is visible." **Deanna has overridden that narrowing for the tenant.** The studio should be able to click any date/time on **Day, Week or Month** and create **either a single class or a weekly series** without leaving the calendar — provided the whole rule stays **visible inside the form** so nothing is hidden (which is the concern 089 raised, answered rather than dismissed: the surprise came from hiding the repeat, not from allowing it).
@@ -488,6 +510,10 @@ Migration 089 gave the calendar click-to-create, but **one-off only**, on **Day 
 **The instructor-column default gains a visible toggle.** Day view hides instructors not teaching that day (a column per instructor does not scale — the migration-that-added-columns lesson), switchable today only through a "Showing the N…" text link. That default stays, but a visible **"Teaching today / Everyone"** toggle joins the toolbar beside the instructor filter, carried in the URL (`?all=1`) like the filter, so it survives navigation.
 
 **Recorded before code, per this project's rule.** No decision-log entry contradicts this; it amends migration 089's stated narrowing, and 089's own reason (keep the whole rule visible) is honoured by the form rather than by forbidding the feature.
+
+### Amendment (c) — a series assigned to an instructor warns on weeks outside their agreed dates, and blocks nothing
+
+A one-off `create_occurrence()` **hard-blocks** an instructor outside their agreed availability dates (`instructor_valid_on` false → `outside_availability_dates`); the series-materialise path (the 057 trigger's `generate_occurrences`) does **not** consult `instructor_valid_on` at all, so a repeating series assigned to an instructor is created whatever their stated dates. Rather than teach the generator to block (which would refuse weeks and complicate building a month before anyone has submitted dates), a series **keeps every week assigned** and **warns**: both create paths (the calendar slot-create and `/series/new`) surface *"3 weeks are outside Rhon's agreed dates."* alongside the existing skipped-weeks warning. **No block, no diversion to open shifts** — the studio built it deliberately and is simply told. The count is the future scheduled occurrences of the series whose assigned instructor is not `valid_on` their local date; with **no availability rows** (the state of every Reform instructor today) `instructor_valid_on` is true everywhere, so there is **no warning** — the warning only appears once an instructor has submitted a month that excludes these weeks. **The one-off's hard `outside_availability_dates` block is to be revisited** once real instructors are submitting months (it may want to become a warning too, for consistency); recorded, not changed here.
 
 ---
 

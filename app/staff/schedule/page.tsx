@@ -159,6 +159,7 @@ export default async function Schedule({
     occ_tier: string | null; occ_standalone: boolean | null;
     occ_series_tier: string | null; occ_minimum: number | null;
     occ_status: string; occ_cancellation_cause: string | null;
+    occ_assignment_requested: boolean; occ_assignment_confirmed: boolean;
   }[];
 
   const appCount = new Map<string, number>();
@@ -199,6 +200,9 @@ export default async function Schedule({
     // keeps it (migration 116) so the slot that cancels week after week is
     // visible; the calendar draws it not-running with the count that decided it.
     notRunning: o.occ_status === "cancelled" && o.occ_cancellation_cause === "unmet_minimum",
+    // Decision 38: the assigned-class confirmation state (only when asked).
+    assignmentConfirmed: o.occ_assignment_confirmed,
+    assignmentAwaiting: o.occ_assignment_requested && !o.occ_assignment_confirmed,
   }));
 
   // The instructor filter narrows what the calendar DRAWS — a specific
