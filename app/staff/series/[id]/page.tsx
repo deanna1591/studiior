@@ -12,7 +12,9 @@ import { studioToday } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditSeries({ params }: { params: { id: string } }) {
+export default async function EditSeries({
+  params, searchParams,
+}: { params: { id: string }; searchParams: { expected?: string; made?: string } }) {
   const screen = await staffScreen(`/series/${params.id}`);
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -47,9 +49,31 @@ export default async function EditSeries({ params }: { params: { id: string } })
       .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
+  // Decision 37 follow-up: the create form carries here the count the generator
+  // silently skipped because the instructor or room was busy at that week.
+  const expected = Number(searchParams.expected);
+  const made = Number(searchParams.made);
+  const skipped = Number.isFinite(expected) && Number.isFinite(made) && expected > made;
+
   return (
     <AppShell {...shell} title={s.name}
               actions={<NavLink href="/series">Back to recurring classes</NavLink>}>
+      {skipped && (
+        <div className="mb-6 max-w-xl rounded border-l-[3px] px-3.5 py-3"
+             style={{ borderLeftColor: "var(--amber-deep)", background: "var(--amber-tint)" }}
+             role="alert">
+          <p className="text-[13px] leading-[19px] text-ink">
+            <span className="num">{expected}</span> expected,{" "}
+            <span className="num">{made}</span> created —{" "}
+            <span className="num">{expected - made}</span>{" "}
+            {expected - made === 1 ? "week was" : "weeks were"} skipped because the
+            instructor or room was already busy.{" "}
+            <Link href="/schedule" className="text-lime-text underline underline-offset-4">
+              See what was made on the schedule
+            </Link>.
+          </p>
+        </div>
+      )}
       <div className="mb-6 max-w-xl rounded border border-line bg-surface px-3.5 py-3">
         <SectionLabel>On the calendar now</SectionLabel>
         <p className="mt-1 text-[13px] leading-[19px] text-ink-2">

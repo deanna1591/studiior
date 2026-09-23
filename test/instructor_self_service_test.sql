@@ -262,10 +262,14 @@ select expect_true('an approved month REPLACES the standing pattern for its days
   not instructor_available_at('1f5e1f5e-0000-0000-0000-00000000d101',
     (current_setting('t.tue')::date + time '09:00') at time zone 'Europe/Prague',
     (current_setting('t.tue')::date + time '09:50') at time zone 'Europe/Prague'));
+-- A day unconditionally OUTSIDE the submitted month (t.period is the 1st of next
+-- month; +40 days lands in the month after, whatever today is). current_date + 8
+-- was fragile: near month-end it crosses into the submitted month, so the
+-- Mondays-only submission narrowed it and this read false on the 24th onward.
 select expect_true('...and the standing pattern is untouched outside that month',
   instructor_available_at('1f5e1f5e-0000-0000-0000-00000000d101',
-    (current_date + 8 + time '09:00') at time zone 'Europe/Prague',
-    (current_date + 8 + time '09:50') at time zone 'Europe/Prague'));
+    (current_setting('t.period')::date + 40 + time '09:00') at time zone 'Europe/Prague',
+    (current_setting('t.period')::date + 40 + time '09:50') at time zone 'Europe/Prague'));
 reset role;
 select expect_num('...and nothing was deleted to achieve it',
   (select count(*) from instructor_availability

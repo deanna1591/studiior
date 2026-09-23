@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { studioToday, shiftDateKey } from "@/lib/tz";
 
 // Shared between the /series form actions and the Schedule calendar's
 // click-to-create (Decision 37). Kept OUT of the "use server" actions file
@@ -96,4 +97,71 @@ export async function insertSeriesRow(
   }
   if (!data) return { ok: false, error: "Nothing was saved. Your role may not change the timetable." };
   return { ok: true, id: data.id };
+}
+
+const RRULE_DAY_NUM: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+/**
+ * Decision 37 follow-up — the 057 trigger's generator SILENTLY SKIPS a week
+ * where the instructor or room is already busy (it catches the exclusion and
+ * moves on), so from the calendar the tenant gets no hint that 22 classes were
+ * created instead of 24. Compare what the rule implies in the generator's OWN
+ * window against what was actually created; the shortfall is those busy-skips.
+ * Returns {expected, created} when short, else null. Both create paths call it.
+ *
+ * Three things keep the number honest rather than alarming:
+ *  - Bounded to the generator's window (today .. today+horizon, capped at
+ *    ends_on), NOT the full rule to ends_on: a series past the 60-day horizon
+ *    materialises in waves, and a wave not made yet is not a skip.
+ *  - PLAIN weekly BYDAY only. Replicating INTERVAL/COUNT would be a second copy
+ *    of series_rule_matches (revoked from clients); the calendar path always
+ *    builds this exact rule, and anything more complex from /series/new gets no
+ *    warning rather than a wrong one.
+ *  - Suppressed when a closure overlaps the window — the generator skips a
+ *    closed day without it being a busy-skip, and telling the two apart in TS is
+ *    that same second implementation. Rare; better a miss than a false alarm.
+ */
+export async function seriesSkipWarning(
+  studioId: string, tz: string, seriesId: string, f: ReturnType<typeof fields>,
+): Promise<{ expected: number; created: number } | null> {
+  const m = /^\s*FREQ=WEEKLY;BYDAY=([A-Z,]+)\s*$/.exec(f.p_rrule);
+  if (!m) return null;
+  const days = new Set(
+    m[1].split(",").map((d) => RRULE_DAY_NUM[d]).filter((n): n is number => n !== undefined));
+  if (!days.size) return null;
+
+  const supabase = createClient();
+  const today = studioToday(tz);
+  const { data: st } = await supabase.from("studio_settings")
+    .select("occurrence_horizon_days").eq("studio_id", studioId).maybeSingle();
+  const horizon = st?.occurrence_horizon_days ?? 60;
+
+  const from = f.p_starts_on > today ? f.p_starts_on : today;
+  const horizonEnd = shiftDateKey(today, horizon);
+  const to = f.p_ends_on && f.p_ends_on < horizonEnd ? f.p_ends_on : horizonEnd;
+  if (to < from) return null;
+
+  const { count: closures } = await supabase.from("studio_closures")
+    .select("id", { count: "exact", head: true })
+    .eq("studio_id", studioId).lte("starts_on", to).gte("ends_on", from);
+  if (closures && closures > 0) return null;
+
+  // A date's weekday is fixed (no timezone), so counting BYDAY matches over the
+  // date range is exactly what the generator's series_rule_matches does here.
+  let expected = 0;
+  for (let d = from; d <= to; d = shiftDateKey(d, 1)) {
+    if (days.has(new Date(`${d}T00:00:00Z`).getUTCDay())) expected++;
+  }
+
+  const { count: created } = await supabase.from("class_occurrences")
+    .select("id", { count: "exact", head: true }).eq("series_id", seriesId);
+  const c = created ?? 0;
+  return expected > c ? { expected, created: c } : null;
+}
+
+/** The skip warning as the sentence both paths show. */
+export function skipWarningText(s: { expected: number; created: number }): string {
+  const n = s.expected - s.created;
+  return `${s.expected} expected, ${s.created} created — ${n} skipped because `
+    + `the instructor or room was busy. Open the series to see which.`;
 }

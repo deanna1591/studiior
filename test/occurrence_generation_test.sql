@@ -285,7 +285,7 @@ insert into class_series
 values ('0ccc0ccc-0000-0000-0000-00000000f003','0ccc0ccc-0000-0000-0000-000000000001',
         '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01',
         'Clasher','0ccc0ccc-0000-0000-0000-00000000d101','0ccc0ccc-0000-0000-0000-00000000ee01',
-        10, 50, 'FREQ=WEEKLY;BYDAY=TH', current_date, '09:00');
+        10, 50, 'FREQ=WEEKLY;BYDAY=TH', current_date + 1, '09:00');
 
 -- The trigger has already run at INSERT and done exactly this work, conflicts
 -- and all, so a call now would truthfully report created:0. Clear what it made

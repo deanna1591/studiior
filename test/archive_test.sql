@@ -271,7 +271,7 @@ values ('0a110a11-0000-0000-0000-00000000f501','0a110a11-0000-0000-0000-00000000
         -- Mondays. The assertion below is scoped to the three original classes
         -- rather than counting everything of this type.
         'Reformer Flow','0a110a11-0000-0000-0000-00000000ee01', 10, 50,
-        'FREQ=WEEKLY;BYDAY=MO', current_date, '06:00');
+        'FREQ=WEEKLY;BYDAY=MO', current_date + 1, '06:00');
 
 select set_config('t.ct',
   (select archive_record('class_type','0a110a11-0000-0000-0000-00000000cc01', true)::text), false);

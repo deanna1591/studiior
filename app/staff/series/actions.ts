@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
-import { text, nullable, fields, invalid, insertSeriesRow, say } from "./shared";
+import { text, nullable, fields, invalid, insertSeriesRow, say, seriesSkipWarning } from "./shared";
 
 export type SeriesState = { error: string } | null;
 
@@ -52,8 +52,15 @@ export async function createSeries(_prev: SeriesState, fd: FormData): Promise<Se
   const res = await insertSeriesRow(ctx.studioId, f);
   if (!res.ok) return { error: res.error };
 
+  // Decision 37 follow-up: the generator silently skips a week where the
+  // instructor or room is busy. Carry the shortfall to the series screen, which
+  // banners it (the same warning the calendar modal shows).
+  const skip = await seriesSkipWarning(ctx.studioId, ctx.timeZone, res.id, f);
+
   revalidatePath("/series"); revalidatePath("/schedule"); revalidatePath("/");
-  redirect(`/series/${res.id}`);
+  redirect(skip
+    ? `/series/${res.id}?expected=${skip.expected}&made=${skip.created}`
+    : `/series/${res.id}`);
 }
 
 async function edit(fd: FormData, confirm: boolean): Promise<EditState> {

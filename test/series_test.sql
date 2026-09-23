@@ -985,6 +985,40 @@ select expect_true('...and reaches the classes it already made',
   (select bool_and(flex and minimum_bookings = 1)
      from class_occurrences where series_id='5e215e21-0000-0000-0000-0000000d3701' and starts_at > now()));
 
+-- Follow-up item 1: the generator SILENTLY SKIPS a week where the instructor is
+-- already busy, which the create path surfaces as "expected N, created N-1".
+-- Prove the underlying skip: a Monday series over an existing class for the same
+-- instructor materialises one fewer occurrence than the rule implies.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
+       starts_at, ends_at, capacity, booked_count, status)
+values ('5e215e21-0000-0000-0000-0000000d3820','5e215e21-0000-0000-0000-000000000001','5e215e21-0000-0000-0000-00000000000c',
+        '5e215e21-0000-0000-0000-00000000cc02','5e215e21-0000-0000-0000-00000000ee02','5e215e21-0000-0000-0000-00000000d102',
+        'Prebooked',
+        ((date_trunc('week', current_date)::date + 7) + time '05:30') at time zone 'Europe/Prague',
+        ((date_trunc('week', current_date)::date + 7) + time '05:30') at time zone 'Europe/Prague' + interval '50 min',
+        10, 0, 'scheduled');
+insert into class_series
+  (id, studio_id, location_id, class_type_id, name, room_id, capacity,
+   duration_minutes, rrule, starts_on, ends_on, time_of_day, instructor_id)
+values ('5e215e21-0000-0000-0000-0000000d3810','5e215e21-0000-0000-0000-000000000001',
+        '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000cc01',
+        'Ivo Mondays','5e215e21-0000-0000-0000-00000000ee01',10,50,
+        'FREQ=WEEKLY;BYDAY=MO',
+        (date_trunc('week', current_date)::date + 7),
+        (date_trunc('week', current_date)::date + 28),
+        '05:30','5e215e21-0000-0000-0000-00000000d102');
+select expect_num('a series over an existing class for the same instructor makes one fewer (created = expected - 1)',
+  (select count(*) from class_occurrences where series_id='5e215e21-0000-0000-0000-0000000d3810')::bigint,
+  ((select count(*) from generate_series(
+      (date_trunc('week', current_date)::date + 7)::timestamp,
+      (date_trunc('week', current_date)::date + 28)::timestamp,
+      interval '7 days')) - 1)::bigint);
+select expect_true('...the skipped week is the clashing one, and the existing class stands',
+  (select count(*) = 1 from class_occurrences where id='5e215e21-0000-0000-0000-0000000d3820')
+  and not exists (select 1 from class_occurrences
+    where series_id='5e215e21-0000-0000-0000-0000000d3810'
+      and (starts_at at time zone 'Europe/Prague')::date = date_trunc('week', current_date)::date + 7));
+
 -- The block: a non-manager (front desk) cannot create a series (series_manager_write).
 set role authenticated;
 select set_config('request.jwt.claim.sub','5e215e21-0000-0000-0000-0000000000a2',false);  -- front desk

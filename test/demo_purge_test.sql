@@ -80,7 +80,7 @@ insert into class_series
 values ('deeddeed-0000-0000-0000-00000000f501','deeddeed-0000-0000-0000-000000000001',
         'deeddeed-0000-0000-0000-00000000000c','deeddeed-0000-0000-0000-00000000cc01',
         'Real Series','deeddeed-0000-0000-0000-00000000d101','deeddeed-0000-0000-0000-00000000ee01',
-        10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date, '08:00');
+        10, 50, 'FREQ=WEEKLY;BYDAY=TU', current_date + 1, '08:00');
 
 -- THE CASE THAT DESTROYED PRODUCTION: migration 057's generator materialising
 -- REAL occurrences against a DEMO series, which is what the nightly job does to
