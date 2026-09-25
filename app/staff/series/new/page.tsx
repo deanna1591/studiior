@@ -21,6 +21,8 @@ export default async function NewSeries() {
 
   const { classTypes, rooms, instructors } = await seriesOptions(supabase);
   const { today, tomorrow } = localDates(ctx.timeZone);
+  const { data: cfg } = await supabase.from("studio_settings")
+    .select("assignment_confirmations").eq("studio_id", ctx.studioId).maybeSingle();
 
   return (
     <AppShell {...shell} title="Add a series"
@@ -33,6 +35,7 @@ export default async function NewSeries() {
         mode="create"
         timeZone={ctx.timeZone}
         tomorrow={tomorrow}
+        assignmentConfirmations={cfg?.assignment_confirmations ?? false}
         classTypes={classTypes} rooms={rooms} instructors={instructors}
         draft={{
           name: "", class_type_id: null, room_id: null, instructor_id: null,

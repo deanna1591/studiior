@@ -51,7 +51,8 @@ export default async function EditSeries({
     // Decision 38: "N of M confirmed" (null when nothing has been asked).
     supabase.rpc("series_confirmation_summary", { p_series_id: s.id }),
   ]);
-  const summary = confSummary as unknown as { confirmed: number; total: number } | null;
+  const summary = confSummary as unknown as
+    { confirmed: number; total: number; by_studio: number; by_instructor: number } | null;
   const instructorName = s.instructor_id
     ? (instructors.find((i) => i.id === s.instructor_id)?.name ?? null)
     : null;

@@ -116,7 +116,7 @@ export default async function Schedule({
       supabase.from("shift_applications")
         .select("occurrence_id").eq("status", "pending"),
       supabase.from("studio_settings")
-        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled")
+        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled, assignment_confirmations")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
@@ -570,6 +570,7 @@ export default async function Schedule({
           showTier={(settings?.guarantees_enabled ?? false) || (settings?.flex_enabled ?? false)}
           coreEnabled={settings?.guarantees_enabled ?? false}
           flexEnabled={settings?.flex_enabled ?? false}
+          assignmentConfirmations={settings?.assignment_confirmations ?? false}
           anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
           // id -> name and id -> avatar for EVERY active instructor, so the week

@@ -104,6 +104,7 @@ select run_sweep('peak_cutoff_reminders', 'select sweep_peak_cutoff_reminders()'
 select run_sweep('instructor_confirms',   'select sweep_instructor_confirmations()');
 select run_sweep('waitlist',              'select sweep_waitlist()');
 select run_sweep('cover_escalations',     'select sweep_cover_escalations()');
+select run_sweep('instructor_reminders',  'select sweep_instructor_class_reminders()');
 
 -- =============================================================================
 -- Inert: the whole opt-in surface wrote nothing for this studio.
@@ -156,6 +157,10 @@ select expect_true('availability reminders are OFF by default (their own new swi
   (select coalesce(availability_reminders_enabled, true) from studio_settings where studio_id = :'S') = false);
 select expect_true('studio_uses_seat_caps is false — no seat-cap UI',
   studio_uses_seat_caps(:'S') = false);
+-- Decision 39: instructor class reminders default OFF, so the reminders sweep
+-- (run above) queued nothing — folded into the aggregate "no notifications".
+select expect_true('instructor class reminders are OFF by default',
+  (select coalesce(instructor_class_reminders, true) from studio_settings where studio_id = :'S') = false);
 
 -- =============================================================================
 -- Invisible: reporting says nothing about the features it never turned on.
@@ -235,5 +240,19 @@ select expect_num('teeth: and queues exactly one digest for that instructor',
   (select count(*) from notifications where studio_id=:'S' and template_key='assignment_confirmation_request'
      and user_id='0ff00ff0-0000-0000-0000-0000000000a1'), 1);
 update studio_settings set assignment_confirmations = false where studio_id = :'S';
+
+-- =============================================================================
+-- Decision 39: instructor class reminders. Default OFF => the reminders sweep
+-- queued nothing above (folded into the aggregate assertion). A positive control
+-- flips it ON and fires the evening-before sweep the night before Ada's in-window
+-- class — she gets exactly one reminder, so the zero was the switch being off.
+-- =============================================================================
+update studio_settings set instructor_class_reminders = true where studio_id = :'S';
+select sweep_instructor_class_reminders(
+  ((((now() + interval '8 days') at time zone 'UTC')::date - 1) + time '19:00') at time zone 'UTC');
+select expect_num('teeth: with reminders ON, the evening-before sweep queues one reminder for the login instructor',
+  (select count(*) from notifications where studio_id = :'S' and template_key = 'instructor_tomorrow'
+     and user_id = '0ff00ff0-0000-0000-0000-0000000000a1'), 1);
+update studio_settings set instructor_class_reminders = false where studio_id = :'S';
 
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;

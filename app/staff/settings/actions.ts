@@ -783,6 +783,27 @@ export async function saveBookingAlerts(_prev: PlainState, fd: FormData): Promis
   };
 }
 
+// Decision 39 — instructor class reminders (their week ahead + the evening
+// before). Off by default; only reaches instructors with a login.
+export async function saveClassReminders(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("instructor_class_reminders") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ instructor_class_reminders: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. Instructors with a login get their week on Sunday evening and a reminder the night before each day."
+      : "Off. Instructors are not sent class reminders.",
+  };
+}
+
 // Decision 38 — instructors confirm the classes the studio assigns them. Off by
 // default; unconfirmed classes stay on the timetable.
 export async function saveAssignmentConfirmations(_prev: PlainState, fd: FormData): Promise<PlainState> {

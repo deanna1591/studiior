@@ -59,10 +59,20 @@ export async function createSeries(_prev: SeriesState, fd: FormData): Promise<Se
   // Decision 37 amendment (c): weeks outside the instructor's agreed dates.
   const avail = await seriesAvailabilityWarning(res.id);
 
+  // Decision 38 amendment: "already confirmed" bypass (default for paper-first
+  // studios) — stamp confirmed-by-studio so the instructor is not asked.
+  let confirmed = false;
+  if (String(fd.get("already_confirmed") ?? "") === "on") {
+    const supabase = createClient();
+    const { data: m } = await supabase.rpc("mark_series_confirmed", { p_series_id: res.id });
+    confirmed = ((m as unknown as { confirmed?: number } | null)?.confirmed ?? 0) > 0;
+  }
+
   revalidatePath("/series"); revalidatePath("/schedule"); revalidatePath("/");
   const params = new URLSearchParams();
   if (skip) { params.set("expected", String(skip.expected)); params.set("made", String(skip.created)); }
   if (avail) { params.set("avail", String(avail.count)); params.set("who", avail.instructor_name); }
+  if (confirmed) params.set("confirmed", "1");
   const q = params.toString();
   redirect(q ? `/series/${res.id}?${q}` : `/series/${res.id}`);
 }
@@ -82,6 +92,25 @@ export async function askSeriesConfirmations(
   });
   if (error) return { error: say(error.message) };
   const r = (data ?? {}) as { ok?: boolean; reason?: string; requested?: number };
+  if (r.reason === "off") return { error: "Turn assignment confirmations on in Settings → Instructors first." };
+  revalidatePath(`/series/${String(fd.get("series_id"))}`);
+  return null;
+}
+
+/**
+ * Decision 38 amendment — "Mark all confirmed" on the series page. Stamps the
+ * future unconfirmed occurrences confirmed-by-studio (for series created before
+ * the switch, or agreed on paper). Same writer the create-form tick uses.
+ */
+export async function markSeriesConfirmed(
+  _prev: SeriesState, fd: FormData,
+): Promise<SeriesState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("mark_series_confirmed", {
+    p_series_id: String(fd.get("series_id")),
+  });
+  if (error) return { error: say(error.message) };
+  const r = (data ?? {}) as { ok?: boolean; reason?: string };
   if (r.reason === "off") return { error: "Turn assignment confirmations on in Settings → Instructors first." };
   revalidatePath(`/series/${String(fd.get("series_id"))}`);
   return null;

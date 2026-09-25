@@ -475,6 +475,19 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 39 — Instructor class reminders (their week ahead, and the evening before)
+
+An instructor with a login should get their schedule pushed to them, not have to open the app — the same courtesy the member app gives. **Per-tenant, opt-in, OFF by default** (`studio_settings.instructor_class_reminders`), Settings → Instructors under booking alerts; Reform turns it on. Two emails, in **studio time**, through the existing notifications pipeline and templates, **only to instructors WITH A LOGIN**, **published months only**, **scheduled occurrences only**:
+
+1. **Weekly digest — Sunday 18:00 studio time.** *"Your classes this week"*, Monday to Sunday, grouped by day, each line: time, class type, room, headcount/capacity, plus the add-to-calendar/feed link that already exists (Decision 33). **Skipped when the instructor has no classes that week.**
+2. **Evening-before reminder — 19:00 studio time.** Tomorrow's classes for that instructor, same line format. **Skipped when none.**
+
+**Dedupe key per instructor per digest per date**, so a re-run never sends twice. Scheduling via the **existing sweep/cron mechanism** the booking alerts use (a 15-minute sweep that checks each studio's local clock and fires once past the threshold, the dedupe making it idempotent); a durable **`audit_logs` row per pass**. A class **cancelled after** the email is not re-sent — the booking-alert precedent already accepts this (the calendar feed is the live channel). Not anon; the anon surface stays **exactly eleven**. No new enum values.
+
+**Recorded before code**, in the family of Decisions 33/38 (per-tenant instructor communication switches, off by default).
+
+---
+
 ## 38 — Instructors confirm the classes the studio assigns them (assigned is not agreed)
 
 The owner builds the timetable and assigns instructors to classes. Today that assignment is **silent to the instructor** — a class lands on their week with no ask, and the studio has no signal whether the person who is meant to teach it has even seen it. **Assigned is not agreed.** The instructor should be able to see what they have been given, **confirm** it, or **hand it back** — in the app, with an email nudge — **without the owner's assignment ever being blocked or undone by the instructor's silence.** Silence changes nothing: the class stays on the timetable, assigned, unconfirmed.
@@ -493,7 +506,11 @@ The owner builds the timetable and assigns instructors to classes. Today that as
 
 **RLS and boundaries.** An instructor sees and confirms only their **own** requested classes; front desk cannot confirm or decline on anyone's behalf (the confirm/decline guards key on `auth_instructor_id` = the occurrence's instructor). Not anon; the anon surface stays **exactly eleven**. No new enum values.
 
-**Recorded before code.** It amends Decision 18's edge as set out above and adds a new per-tenant switch in the family of Decisions 24/25/33.
+**Recorded before code.** Decision 18 is **unchanged** — an instructor never releases a class themselves — and this adds a new per-tenant switch in the family of Decisions 24/25/33.
+
+### Amendment — the "already confirmed" bypass (paper-first studios)
+
+Studios usually agree the month with instructors **on paper first**, so asking again in the app is the exception, not the rule. When `assignment_confirmations` is ON and an instructor is selected, the calendar create form (one-off **and** repeating) and `/series/new` show a tick **"Already confirmed with {instructor} — don't ask them", DEFAULT TICKED**. Ticked → every occurrence created is stamped `assignment_requested_at = now()` **and** `assignment_confirmed_at = now()` **and** a new column `assignment_confirmed_by` (uuid, the staff user; **null when the instructor confirmed themselves**), so it reads as confirmed everywhere and **never enters the request digest**. Unticked → today's behaviour (request stamped, digest queued). The series page gains **"Mark all confirmed"** beside "Ask {instructor} to confirm" — the same stamping, for series created before this. Roster/schedule chips are unchanged (confirmed is confirmed); the **series page summary splits "confirmed by studio" vs "confirmed by instructor"** (by whether `assignment_confirmed_by` is set). **Reassignment to another instructor clears all three stamps and re-requests**, as before. When the setting is **OFF** the tick is hidden and nothing is stamped. The mechanism is one manager-up writer (`mark_series_confirmed` / `mark_assignment_confirmed`) that stamps and then **re-runs the digest queue, which cancels the now-empty scheduled digest** rather than sending a "please confirm" for classes already confirmed.
 
 ---
 

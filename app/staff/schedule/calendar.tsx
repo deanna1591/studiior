@@ -106,6 +106,7 @@ type WallEvent = CalEvent & { start: Date; end: Date };
 export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct, showTier, coreEnabled, flexEnabled,
+  assignmentConfirmations,
   anchor, today, view, minHour, maxHour, weekStartsOn,
   instructorNames, instructorAvatars, canManage, instructorParam,
 }: {
@@ -129,6 +130,8 @@ export default function ScheduleCalendar({
   /** The two guarantee switches, for the create form's tier control. */
   coreEnabled: boolean;
   flexEnabled: boolean;
+  /** Decision 38 amendment: show the "already confirmed" bypass tick on create. */
+  assignmentConfirmations: boolean;
   timeZone: string;
   deadlineHours: number;
   /**
@@ -688,6 +691,7 @@ export default function ScheduleCalendar({
           instructors={Object.entries(instructorNames).map(([id, name]) => ({ id, name }))}
           coreEnabled={coreEnabled}
           flexEnabled={flexEnabled}
+          assignmentConfirmations={assignmentConfirmations}
           timeZone={timeZone}
           onCancel={() => setSlot(null)}
           onDone={() => { setSlot(null); startTransition(() => router.refresh()); }}

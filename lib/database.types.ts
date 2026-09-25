@@ -1139,6 +1139,7 @@ export type Database = {
         Row: {
           assigned_by: string | null
           assignment_confirmed_at: string | null
+          assignment_confirmed_by: string | null
           assignment_requested_at: string | null
           booked_at_cutoff: number | null
           booked_at_start: number | null
@@ -1187,6 +1188,7 @@ export type Database = {
         Insert: {
           assigned_by?: string | null
           assignment_confirmed_at?: string | null
+          assignment_confirmed_by?: string | null
           assignment_requested_at?: string | null
           booked_at_cutoff?: number | null
           booked_at_start?: number | null
@@ -1235,6 +1237,7 @@ export type Database = {
         Update: {
           assigned_by?: string | null
           assignment_confirmed_at?: string | null
+          assignment_confirmed_by?: string | null
           assignment_requested_at?: string | null
           booked_at_cutoff?: number | null
           booked_at_start?: number | null
@@ -5844,6 +5847,7 @@ export type Database = {
           guest_passes_enabled: boolean
           how_to_buy: string | null
           instructor_booking_alerts: boolean
+          instructor_class_reminders: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -5933,6 +5937,7 @@ export type Database = {
           guest_passes_enabled?: boolean
           how_to_buy?: string | null
           instructor_booking_alerts?: boolean
+          instructor_class_reminders?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6022,6 +6027,7 @@ export type Database = {
           guest_passes_enabled?: boolean
           how_to_buy?: string | null
           instructor_booking_alerts?: boolean
+          instructor_class_reminders?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -7045,7 +7051,6 @@ export type Database = {
         Args: { p_basis: string; p_now: number; p_prior: number }
         Returns: Json
       }
-      decline_assignment: { Args: { p_occurrence_id: string }; Returns: Json }
       decline_cover_request: {
         Args: { p_reason?: string; p_request_id: string }
         Returns: Json
@@ -7098,14 +7103,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -7375,11 +7372,16 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      mark_assignment_confirmed: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
+      }
       mark_instructor_notifications_read: {
         Args: { p_instructor_id: string }
         Returns: number
       }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
+      mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_announcements: { Args: { p_studio_id: string }; Returns: Json }
       member_booking_window_days: {
@@ -7709,10 +7711,6 @@ export type Database = {
         Returns: Json
       }
       queue_all_credit_expiries: { Args: never; Returns: Json }
-      queue_assignment_declined: {
-        Args: { p_instructor_name: string; p_occurrence_id: string }
-        Returns: undefined
-      }
       queue_assignment_request: {
         Args: { p_occurrence_id: string }
         Returns: undefined
@@ -7963,7 +7961,6 @@ export type Database = {
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
-      run_sweep: { Args: { label: string; sql: string }; Returns: undefined }
       say_count: { Args: { n: number }; Returns: string }
       schedule_range: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
@@ -8393,6 +8390,7 @@ export type Database = {
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_guest_waivers: { Args: never; Returns: Json }
+      sweep_instructor_class_reminders: { Args: never; Returns: Json }
       sweep_instructor_confirmations: { Args: never; Returns: Json }
       sweep_membership_periods: { Args: never; Returns: Json }
       sweep_no_shows: { Args: never; Returns: Json }

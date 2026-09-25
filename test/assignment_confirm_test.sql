@@ -289,7 +289,166 @@ select expect_true('an instructor with no stated dates warns not at all',
   series_availability_warning('ac38ac38-0000-0000-0000-00000000f001') is null);
 
 -- =============================================================================
--- 9. Teeth on the confirm guard.
+-- 9. The "already confirmed" bypass (Decision 38 amendment). A dedicated login
+--    instructor D3, so "no request notification queued" is a clean 0.
+-- =============================================================================
+insert into auth.users (id) values ('ac38ac38-0000-0000-0000-000000000d33');
+insert into profiles (id, email) values ('ac38ac38-0000-0000-0000-000000000d33','ac38-d3@example.com');
+insert into studio_staff (id, studio_id, user_id, email, role) values
+  ('ac38ac38-0000-0000-0000-000000aa00d3','ac38ac38-0000-0000-0000-000000000001','ac38ac38-0000-0000-0000-000000000d33','ac38-d3@example.com','instructor');
+insert into instructors (id, studio_id, display_name, staff_id) values
+  ('ac38ac38-0000-0000-0000-0000000d00d3','ac38ac38-0000-0000-0000-000000000001','Cam Third','ac38ac38-0000-0000-0000-000000aa00d3');
+-- A dedicated room for the bypass fixtures, so the one-offs (06:00) and the
+-- "Mark All" series (12:00) never collide with each other or with S1's series.
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('ac38ac38-0000-0000-0000-0000000ee0a2','ac38ac38-0000-0000-0000-000000000001','ac38ac38-0000-0000-0000-00000000000a','R2',10);
+
+-- TICKED: a lone one-off is requested + queued on insert; the bypass then stamps
+-- confirmed + confirmed_by (by the studio) and the now-empty digest is cancelled.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id,
+   name, starts_at, ends_at, capacity, booked_count, status)
+values ('ac38ac38-0000-0000-0000-00000000c701','ac38ac38-0000-0000-0000-000000000001','ac38ac38-0000-0000-0000-00000000000a',
+        'ac38ac38-0000-0000-0000-0000000cc0a1','ac38ac38-0000-0000-0000-0000000ee0a2','ac38ac38-0000-0000-0000-0000000d00d3',
+        'Bypass One-off', (current_date + 3 + time '06:00') at time zone 'Europe/Prague',
+        (current_date + 3 + time '06:50') at time zone 'Europe/Prague', 10, 0, 'scheduled');
+select expect_true('a login-instructor one-off is REQUESTED on insert',
+  (select assignment_requested_at is not null and assignment_confirmed_at is null
+     from class_occurrences where id='ac38ac38-0000-0000-0000-00000000c701'));
+select expect_num('...and a digest is queued for D3',
+  (select count(*) from notifications where user_id='ac38ac38-0000-0000-0000-000000000d33'
+     and template_key='assignment_confirmation_request' and status='scheduled')::bigint, 1);
+
+set role authenticated; select set_config('request.jwt.claim.sub','ac38ac38-0000-0000-0000-0000000000a1',false);  -- owner
+select expect_true('the bypass marks the class confirmed',
+  (select (mark_assignment_confirmed('ac38ac38-0000-0000-0000-00000000c701') ->> 'ok')::boolean));
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_true('...confirmed_at set AND confirmed_by = the staff user (confirmed by the studio)',
+  (select assignment_confirmed_at is not null
+      and assignment_confirmed_by = 'ac38ac38-0000-0000-0000-0000000000a1'
+     from class_occurrences where id='ac38ac38-0000-0000-0000-00000000c701'));
+select expect_num('...and the now-empty digest for D3 is cancelled (no request queued)',
+  (select count(*) from notifications where user_id='ac38ac38-0000-0000-0000-000000000d33'
+     and template_key='assignment_confirmation_request' and status='scheduled')::bigint, 0);
+
+-- =============================================================================
+-- 10. UNTICKED: the plain create path leaves the request + digest in place.
+-- =============================================================================
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id,
+   name, starts_at, ends_at, capacity, booked_count, status)
+values ('ac38ac38-0000-0000-0000-00000000c702','ac38ac38-0000-0000-0000-000000000001','ac38ac38-0000-0000-0000-00000000000a',
+        'ac38ac38-0000-0000-0000-0000000cc0a1','ac38ac38-0000-0000-0000-0000000ee0a2','ac38ac38-0000-0000-0000-0000000d00d3',
+        'Unticked One-off', (current_date + 4 + time '06:00') at time zone 'Europe/Prague',
+        (current_date + 4 + time '06:50') at time zone 'Europe/Prague', 10, 0, 'scheduled');
+select expect_true('an unticked one-off stays REQUESTED and unconfirmed',
+  (select assignment_requested_at is not null and assignment_confirmed_at is null
+     from class_occurrences where id='ac38ac38-0000-0000-0000-00000000c702'));
+select expect_num('...and a request digest IS queued for D3',
+  (select count(*) from notifications where user_id='ac38ac38-0000-0000-0000-000000000d33'
+     and template_key='assignment_confirmation_request' and status='scheduled')::bigint, 1);
+
+-- =============================================================================
+-- 11. Setting OFF: the bypass writer stamps nothing and reports 'off'; and with
+--     the switch off the insert itself records no request. (The UI also hides the
+--     tick when the setting is off — the SQL guarantee is the two below.)
+-- =============================================================================
+update studio_settings set assignment_confirmations = false where studio_id = :S1;
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id,
+   name, starts_at, ends_at, capacity, booked_count, status)
+values ('ac38ac38-0000-0000-0000-00000000c703','ac38ac38-0000-0000-0000-000000000001','ac38ac38-0000-0000-0000-00000000000a',
+        'ac38ac38-0000-0000-0000-0000000cc0a1','ac38ac38-0000-0000-0000-0000000ee0a2','ac38ac38-0000-0000-0000-0000000d00d3',
+        'Off One-off', (current_date + 5 + time '06:00') at time zone 'Europe/Prague',
+        (current_date + 5 + time '06:50') at time zone 'Europe/Prague', 10, 0, 'scheduled');
+select expect_true('the switch off records no request on insert',
+  (select assignment_requested_at is null from class_occurrences where id='ac38ac38-0000-0000-0000-00000000c703'));
+set role authenticated; select set_config('request.jwt.claim.sub','ac38ac38-0000-0000-0000-0000000000a1',false);  -- owner
+select expect_text('the bypass reports off when the setting is off',
+  (mark_assignment_confirmed('ac38ac38-0000-0000-0000-00000000c703') ->> 'reason'), 'off');
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_true('...and stamps nothing',
+  (select assignment_confirmed_at is null and assignment_confirmed_by is null
+     from class_occurrences where id='ac38ac38-0000-0000-0000-00000000c703'));
+update studio_settings set assignment_confirmations = true where studio_id = :S1;
+
+-- =============================================================================
+-- 12. "Mark all confirmed" stamps only the FUTURE UNCONFIRMED occurrences of the
+--     series, and the summary splits studio- vs instructor-confirmed.
+-- =============================================================================
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('ac38ac38-0000-0000-0000-00000000f0a9','ac38ac38-0000-0000-0000-000000000001',
+        'ac38ac38-0000-0000-0000-00000000000a','ac38ac38-0000-0000-0000-0000000cc0a1','Mark All',
+        'ac38ac38-0000-0000-0000-0000000ee0a2','ac38ac38-0000-0000-0000-0000000d00d3',
+        10,50,'FREQ=WEEKLY;BYDAY=MO,TH', current_date + 1, '12:00');
+-- A PAST occurrence of the same series: it is requested (the trigger is
+-- time-agnostic) but "Mark all confirmed" must never touch it.
+insert into class_occurrences (id, studio_id, location_id, series_id, class_type_id, room_id, instructor_id,
+   name, starts_at, ends_at, capacity, booked_count, status)
+values ('ac38ac38-0000-0000-0000-00000000cc09','ac38ac38-0000-0000-0000-000000000001','ac38ac38-0000-0000-0000-00000000000a',
+        'ac38ac38-0000-0000-0000-00000000f0a9','ac38ac38-0000-0000-0000-0000000cc0a1','ac38ac38-0000-0000-0000-0000000ee0a2',
+        'ac38ac38-0000-0000-0000-0000000d00d3','Mark All',
+        now() - interval '7 days', now() - interval '7 days' + interval '50 min', 10, 0, 'scheduled');
+
+-- The instructor confirms ONE future occurrence themselves (confirmed_by stays null).
+select set_config('t.one', (select id::text from class_occurrences
+  where series_id='ac38ac38-0000-0000-0000-00000000f0a9' and status='scheduled' and starts_at > now()
+  order by starts_at limit 1), false);
+set role authenticated; select set_config('request.jwt.claim.sub','ac38ac38-0000-0000-0000-000000000d33',false);  -- D3
+select confirm_assignment(current_setting('t.one')::uuid);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+
+set role authenticated; select set_config('request.jwt.claim.sub','ac38ac38-0000-0000-0000-0000000000a1',false);  -- owner
+select set_config('t.markn', (select (mark_series_confirmed('ac38ac38-0000-0000-0000-00000000f0a9') ->> 'confirmed')), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('Mark all confirmed stamps only the FUTURE UNCONFIRMED occurrences',
+  current_setting('t.markn')::bigint, ac38_future('ac38ac38-0000-0000-0000-00000000f0a9') - 1);
+select expect_true('every FUTURE occurrence is now confirmed',
+  (select count(*) = ac38_future('ac38ac38-0000-0000-0000-00000000f0a9') from class_occurrences
+     where series_id='ac38ac38-0000-0000-0000-00000000f0a9' and status='scheduled' and starts_at > now()
+       and assignment_confirmed_at is not null));
+select expect_true('...and the PAST occurrence is left unconfirmed',
+  (select assignment_confirmed_at is null from class_occurrences where id='ac38ac38-0000-0000-0000-00000000cc09'));
+select expect_num('summary total = the future requested count',
+  (series_confirmation_summary('ac38ac38-0000-0000-0000-00000000f0a9') ->> 'total')::int::bigint,
+  ac38_future('ac38ac38-0000-0000-0000-00000000f0a9'));
+select expect_num('summary by_instructor = 1 (the instructor-confirmed one)',
+  (series_confirmation_summary('ac38ac38-0000-0000-0000-00000000f0a9') ->> 'by_instructor')::int::bigint, 1);
+select expect_num('summary by_studio = the rest (marked by the studio)',
+  (series_confirmation_summary('ac38ac38-0000-0000-0000-00000000f0a9') ->> 'by_studio')::int::bigint,
+  ac38_future('ac38ac38-0000-0000-0000-00000000f0a9') - 1);
+
+-- =============================================================================
+-- 13. Teeth on the bypass guards: a non-manager is refused, and removing the
+--     is_manager_up guard lets a non-manager stamp.
+-- =============================================================================
+set role authenticated; select set_config('request.jwt.claim.sub','ac38ac38-0000-0000-0000-000000000d22',false);  -- D2 instructor
+select expect_raises('a non-manager cannot Mark all confirmed',
+  'select mark_series_confirmed(''ac38ac38-0000-0000-0000-00000000f0a9''::uuid)', 'PT403');
+select expect_raises('a non-manager cannot bypass a single class',
+  'select mark_assignment_confirmed(''ac38ac38-0000-0000-0000-00000000c702''::uuid)', 'PT403');
+reset role; select set_config('request.jwt.claim.sub', null, false);
+
+create or replace function mark_assignment_confirmed(p_occurrence_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare o class_occurrences%rowtype; v_on boolean;
+begin
+  select * into o from class_occurrences where id = p_occurrence_id;
+  if not found then raise exception 'no such class' using errcode = 'PT404'; end if;
+  -- TEETH: manager guard removed.
+  select assignment_confirmations into v_on from studio_settings where studio_id = o.studio_id;
+  if not coalesce(v_on, false) then return jsonb_build_object('ok', false, 'reason', 'off'); end if;
+  update class_occurrences
+     set assignment_requested_at = coalesce(assignment_requested_at, now()),
+         assignment_confirmed_at = now(), assignment_confirmed_by = auth.uid()
+   where id = p_occurrence_id and assignment_confirmed_at is null;
+  return jsonb_build_object('ok', true, 'confirmed', 1);
+end $$;
+set role authenticated; select set_config('request.jwt.claim.sub','ac38ac38-0000-0000-0000-000000000d22',false);  -- D2 (not a manager)
+select expect_true('TEETH: with the manager guard gone, a non-manager CAN bypass',
+  (select (mark_assignment_confirmed('ac38ac38-0000-0000-0000-00000000c702') ->> 'ok')::boolean));
+reset role; select set_config('request.jwt.claim.sub', null, false);
+
+-- =============================================================================
+-- 14. Teeth on the confirm guard.
 -- =============================================================================
 create or replace function confirm_assignment(p_occurrence_id uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$

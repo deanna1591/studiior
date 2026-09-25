@@ -93,6 +93,13 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
     return { ok: false, message: busy, blockedBy: r?.blocked_by };
   }
 
+  // Decision 38 amendment: paper-first studios tick "already confirmed with the
+  // instructor" (default), so the class is stamped confirmed-by-studio and the
+  // instructor is not asked. mark_assignment_confirmed no-ops off/no-login.
+  if (String(fd.get("already_confirmed") ?? "") === "on" && r.occurrence_id) {
+    await supabase.rpc("mark_assignment_confirmed", { p_occurrence_id: r.occurrence_id });
+  }
+
   revalidatePath("/schedule"); revalidatePath("/");
   const warnings = r.warnings ?? [];
   return {
@@ -170,6 +177,14 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
   const avail = await seriesAvailabilityWarning(res.id);
   if (avail) warnings.push("outside_agreed_dates");
 
+  // Decision 38 amendment: "already confirmed" bypass (default for paper-first
+  // studios). Stamps confirmed-by-studio so the instructor is not asked.
+  let confirmed = false;
+  if (String(fd.get("already_confirmed") ?? "") === "on") {
+    const { data: m } = await supabase.rpc("mark_series_confirmed", { p_series_id: res.id });
+    confirmed = ((m as unknown as { confirmed?: number } | null)?.confirmed ?? 0) > 0;
+  }
+
   revalidatePath("/series"); revalidatePath("/schedule"); revalidatePath("/");
   return {
     ok: true,
@@ -179,6 +194,7 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
         ? `Repeating class created. ${skipWarningText(skip)}`
         : "Repeating class created. Its year of classes is on the calendar now.")
       + (avail ? ` ${availabilityWarningText(avail)}` : "")
+      + (confirmed ? " Marked confirmed with the instructor — they won't be asked." : "")
       + (warnings.includes("standalone_flex")
           ? " Some are standalone flex classes — no other class of that instructor beside them — so they carry a standby fee."
           : ""),

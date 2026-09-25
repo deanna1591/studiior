@@ -50,8 +50,8 @@ export type SlotDraft = {
  * the repeat itself.
  */
 export default function CreateOnSlot({
-  draft, classTypes, rooms, instructors, coreEnabled, flexEnabled, timeZone,
-  onDone, onCancel,
+  draft, classTypes, rooms, instructors, coreEnabled, flexEnabled,
+  assignmentConfirmations, timeZone, onDone, onCancel,
 }: {
   draft: SlotDraft;
   classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
@@ -59,6 +59,7 @@ export default function CreateOnSlot({
   instructors: { id: string; name: string }[];
   coreEnabled: boolean;
   flexEnabled: boolean;
+  assignmentConfirmations: boolean;
   timeZone: string;
   onDone: () => void;
   onCancel: () => void;
@@ -277,6 +278,22 @@ export default function CreateOnSlot({
         <div className="mt-4">
           <TierField coreEnabled={coreEnabled} flexEnabled={flexEnabled} />
         </div>
+
+        {/* Decision 38 amendment: paper-first studios agree the month off-app, so
+            "already confirmed" is the default when confirmations are on and a real
+            instructor is chosen. Ticked → stamped confirmed-by-studio, no ask. */}
+        {assignmentConfirmations && instructorId !== "" && (
+          <label className="mt-4 flex items-start gap-2.5">
+            <input type="checkbox" name="already_confirmed" defaultChecked className="mt-1" />
+            <span className="text-[13px] leading-[19px] text-ink">
+              <span className="font-medium">Already confirmed with {instructorName} — don&rsquo;t ask them</span>
+              <span className="block text-[12px] leading-[18px] text-ink-3">
+                Marks {repeats ? "these classes" : "this class"} confirmed by the studio, so {instructorName} is not
+                asked again. Untick to have them confirm in the app.
+              </span>
+            </span>
+          </label>
+        )}
 
         {/* Repeats weekly — OFF by default. A calendar that silently made a year
             of classes would be a bad surprise (089); this makes the repeat, its

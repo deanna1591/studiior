@@ -75,6 +75,7 @@ function DayPicker({ days, onChange }: {
 
 export default function SeriesForm({
   draft, mode, classTypes, rooms, instructors, timeZone, tomorrow,
+  assignmentConfirmations = false,
 }: {
   draft: SeriesDraft;
   mode: "create" | "edit";
@@ -84,6 +85,8 @@ export default function SeriesForm({
   timeZone: string;
   /** Formatted on the server: a Date crossing the boundary is a runtime error. */
   tomorrow: string;
+  /** Decision 38 amendment: show the "already confirmed" bypass tick on create. */
+  assignmentConfirmations?: boolean;
 }) {
   const [name, setName] = useState(draft.name);
   const [classTypeId, setClassTypeId] = useState(draft.class_type_id ?? "");
@@ -280,6 +283,23 @@ export default function SeriesForm({
             <input type="date" value={effectiveFrom}
                    onChange={(e) => setEffectiveFrom(e.target.value)} className={inputClass} />
           </Field>
+        )}
+
+        {/* Decision 38 amendment: paper-first studios agree the month off-app.
+            Ticked (default) stamps confirmed-by-studio, so the instructor is not
+            asked. Only on create, with confirmations on and a real instructor. */}
+        {mode === "create" && assignmentConfirmations && instructorId !== "" && (
+          <label className="flex items-start gap-2.5 rounded border border-line bg-surface px-3.5 py-3">
+            <input type="checkbox" name="already_confirmed" defaultChecked className="mt-1" />
+            <span className="text-[13px] leading-[19px] text-ink">
+              <span className="font-medium">
+                Already confirmed with {instructors.find((i) => i.id === instructorId)?.name ?? "the instructor"} — don&rsquo;t ask them
+              </span>
+              <span className="block text-[12px] leading-[18px] text-ink-3">
+                Marks these classes confirmed by the studio. Untick to have the instructor confirm in the app.
+              </span>
+            </span>
+          </label>
         )}
 
         <div className="flex items-center gap-4">
