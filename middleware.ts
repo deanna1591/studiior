@@ -26,6 +26,15 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   url.pathname = `/${app}${url.pathname === "/" ? "" : url.pathname}`;
 
+  // Decision 41: the auth callback establishes the session itself (it sets the
+  // cookies from the code/OTP exchange), and there is NO session yet when a
+  // member arrives on a confirmation link. Rewrite it into the member subtree
+  // so the route is reached, but do not run the session refresh below — let the
+  // route handler own the cookie write.
+  if (app === "member" && request.nextUrl.pathname === "/auth/callback") {
+    return NextResponse.rewrite(url, { request: { headers: forwarded } });
+  }
+
   // Refresh the session. Server Components cannot write cookies, so this is
   // where an expiring token gets renewed; the refreshed cookies are copied
   // onto the response actually returned.

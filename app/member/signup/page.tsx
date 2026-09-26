@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function Signup({
   searchParams,
 }: {
-  searchParams: { sent?: string };
+  searchParams: { sent?: string; next?: string };
 }) {
   const slug = currentSlug();
   const anon = createServerClient<Database>(
@@ -68,7 +68,7 @@ export default async function Signup({
           Check your email for a confirmation link.
         </p>
       )}
-      <SignupForm />
+      <SignupForm next={searchParams.next} />
       <a href="/login" className="m-body mt-6 inline-block text-lime-text underline underline-offset-4">
         Already have an account? Sign in
       </a>

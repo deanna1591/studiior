@@ -3,11 +3,14 @@
 import { signUp } from "../actions";
 import { Note, PrimaryButton, useAuthAction } from "@/components/member/ui";
 
-export default function SignupForm() {
+export default function SignupForm({ next }: { next?: string }) {
   const { error, pending, onSubmit } = useAuthAction(signUp, "/signup?sent=1");
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
       {error && <Note ok={false}>{error}</Note>}
+      {/* Decision 41: carried into signUp's emailRedirectTo so the confirmation
+          link returns to this studio's own /auth/callback and then here. */}
+      <input type="hidden" name="next" value={next ?? "/"} />
       <label className="block">
         <span className="m-sub mb-1.5 block font-medium text-ink">Your name</span>
         <input name="full_name" autoComplete="name"

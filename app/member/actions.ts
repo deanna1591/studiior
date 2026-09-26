@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberContext } from "@/lib/auth";
 import { stripeFor } from "@/lib/stripe";
-import { memberOrigin } from "@/lib/tenant";
+import { memberOrigin, currentMemberOrigin } from "@/lib/tenant";
+import { buildAuthCallback } from "@/lib/auth-redirect";
 
 export type SignInResult = { error: string } | { ok: true } | null;
 
@@ -432,24 +433,57 @@ export async function finishSignup(_prev: ClaimState, fd: FormData): Promise<Cla
   return { ok: true };
 }
 
-/** Self-signup: create the account, Supabase sends the confirmation. */
+/**
+ * Self-signup: create the account, Supabase sends the confirmation.
+ *
+ * Decision 41: the confirmation link must come back to THIS studio's own member
+ * host, not the project-wide Site URL (which is one value for every studio, and
+ * sent members confirming at reformcollective.studiior.app to the staff login).
+ * emailRedirectTo is built per request from the member host, carrying the
+ * signup page's own ?next (the embed passes /class/{id}); default "/".
+ */
 export async function signUp(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   const password = String(fd.get("password") ?? "");
   const fullName = String(fd.get("full_name") ?? "").trim();
+  const next = String(fd.get("next") ?? "/");
 
   if (!email) return { error: "We need an email address." };
   if (password.length < 8) return { error: "Pick a password of at least 8 characters." };
 
+  const origin = currentMemberOrigin();
   const supabase = createClient();
   const { error } = await supabase.auth.signUp({
-    email, password, options: { data: { full_name: fullName } },
+    email, password,
+    options: {
+      data: { full_name: fullName },
+      emailRedirectTo: origin ? buildAuthCallback(origin, next) : undefined,
+    },
   });
   if (error) {
     return /already registered/i.test(error.message)
       ? { error: "There is already an account for that email. Try signing in instead." }
       : { error: error.message };
   }
+  return { ok: true };
+}
+
+/**
+ * Send a password-reset link (Decision 41: same per-studio redirect as signUp).
+ * The link returns to the studio's own /auth/callback, which establishes the
+ * recovery session and lands on the member settings screen. Always reports ok —
+ * never reveal whether an address has an account. No forgot-password screen
+ * calls this yet; it exists so the reset link is per-studio the day one does.
+ */
+export async function requestPasswordReset(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
+  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  if (!email) return { error: "We need an email address." };
+
+  const origin = currentMemberOrigin();
+  const supabase = createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: origin ? buildAuthCallback(origin, "/settings") : undefined,
+  });
   return { ok: true };
 }
 

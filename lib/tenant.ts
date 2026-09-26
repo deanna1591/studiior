@@ -54,3 +54,25 @@ export function memberOrigin(slug: string): string {
   return `${scheme}://${slug}.${base}`;
 }
 
+/**
+ * The member origin for the CURRENT request, from the ACTUAL request host —
+ * `https://{slug}.studiior.app` on hosted, `http://{slug}.lvh.me:3000` (or
+ * `.localhost`) locally. Decision 41: the sign-up confirmation / password-reset
+ * redirect is chosen per request from the member host, never from the
+ * project-wide Site URL and never from a hardcoded slug. Returns null when the
+ * request is not on a member host (nothing to confirm to).
+ */
+export function currentMemberOrigin(): string | null {
+  const host = headers().get("host");
+  if (!host) return null;
+  if (resolveHost(host).app !== "member") return null;
+  const hostname = host.split(":")[0].toLowerCase();
+  const local =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "lvh.me" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".lvh.me");
+  return `${local ? "http" : "https"}://${host}`;
+}
+

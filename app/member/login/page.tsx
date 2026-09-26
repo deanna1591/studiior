@@ -5,6 +5,7 @@ import { currentSlug } from "@/lib/tenant";
 import { themeVars, accentRamp, neutralAccent, accentGradient, type PresetKey } from "@/lib/theme";
 import type { Database } from "@/lib/database.types";
 import LoginForm from "./form";
+import { safeNext } from "@/lib/auth-redirect";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,11 @@ export const dynamic = "force-dynamic";
  *
  * The word Studiior does not appear.
  */
-export default async function MemberLogin() {
+export default async function MemberLogin({
+  searchParams,
+}: {
+  searchParams: { next?: string; error?: string };
+}) {
   const slug = currentSlug();
 
   const anon = createServerClient<Database>(
@@ -117,7 +122,7 @@ export default async function MemberLogin() {
             to refract. Over the accent gradient this is a solid sheet: blur over
             a flat field is fog with a compositor layer attached. */}
         <div className={`${image ? "m-glass" : "m-panel"} px-5 pb-8 pt-6`}>
-          <LoginForm onImage={!!image} />
+          <LoginForm onImage={!!image} next={safeNext(searchParams?.next)} />
 
           <Link
             href="/signup"

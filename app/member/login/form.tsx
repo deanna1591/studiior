@@ -25,8 +25,11 @@ function Submit({ pending }: { pending: boolean }) {
  * — a single translucent treatment would have text sitting on whatever the
  * photograph happened to be doing.
  */
-export default function LoginForm({ onImage }: { onImage: boolean }) {
-  const { error, pending, onSubmit } = useAuthAction(signIn, "/");
+export default function LoginForm({ onImage, next = "/" }: { onImage: boolean; next?: string }) {
+  // Decision 41: after signing in, land on the ?next carried through the login
+  // page (the embed / a confirmation error round-trip); already safeNext'd on
+  // the server, default "/".
+  const { error, pending, onSubmit } = useAuthAction(signIn, next);
 
   const field = onImage
     ? "m-glass-field m-tap w-full rounded-xl px-3.5 text-[16px] outline-none"
