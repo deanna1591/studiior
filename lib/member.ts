@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signAvatar } from "@/lib/avatars";
-import { getMemberContext } from "@/lib/auth";
+import { getMemberContext, currentUserId } from "@/lib/auth";
 import type { PresetKey } from "@/lib/theme";
 
 /**
@@ -14,7 +14,15 @@ import type { PresetKey } from "@/lib/theme";
  */
 export async function memberScreen() {
   const ctx = await getMemberContext();
-  if (!ctx) redirect("/login");
+  if (!ctx) {
+    // Decision 41 amendment — distinguish "no session" from "signed in but no
+    // member row for this studio". The latter is a confirmed-but-unattached
+    // self-signup; sending them to /login loops (login succeeds, still no row).
+    // Send them to /signup (the finish button attaches them); /login only when
+    // there is genuinely no session.
+    const uid = await currentUserId();
+    redirect(uid ? "/signup" : "/login");
+  }
 
   const supabase = createClient();
   const b = ctx.bootstrap;

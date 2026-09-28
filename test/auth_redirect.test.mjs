@@ -4,7 +4,7 @@
 // this is a standalone Node built-in test of the pure helpers.)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { safeNext, buildAuthCallback } from "../lib/auth-redirect.mjs";
+import { safeNext, buildAuthCallback, confirmDestination } from "../lib/auth-redirect.mjs";
 
 test("safeNext keeps a relative path", () => {
   assert.equal(safeNext("/class/abc"), "/class/abc");
@@ -45,4 +45,30 @@ test("buildAuthCallback rejects an absolute next (open-redirect guard) -> /", ()
     buildAuthCallback("https://reform.studiior.app", "//evil.com"),
     "https://reform.studiior.app/auth/callback?next=%2F",
   );
+});
+
+// Decision 41 amendment — where the confirmation callback sends the member
+// after trying to attach them (the sign-up loop fix).
+test("confirmDestination: attached (null reason) -> the safe next", () => {
+  assert.equal(confirmDestination(true, null, "/class/abc"), "/class/abc");
+  assert.equal(confirmDestination(true, null, "/"), "/");
+});
+
+test("confirmDestination: already_claimed -> next (they can proceed)", () => {
+  assert.equal(confirmDestination(true, "already_claimed", "/book"), "/book");
+});
+
+test("confirmDestination: any other reason -> /signup", () => {
+  assert.equal(confirmDestination(true, "email_not_verified", "/"), "/signup");
+  assert.equal(confirmDestination(true, "no_such_studio", "/class/x"), "/signup");
+});
+
+test("confirmDestination: no session -> /login?error=confirm", () => {
+  assert.equal(confirmDestination(false, null, "/"), "/login?error=confirm");
+  assert.equal(confirmDestination(false, "email_not_verified", "/x"), "/login?error=confirm");
+});
+
+test("confirmDestination: next is still open-redirect guarded", () => {
+  assert.equal(confirmDestination(true, null, "https://evil.com"), "/");
+  assert.equal(confirmDestination(true, "already_claimed", "//evil.com"), "/");
 });

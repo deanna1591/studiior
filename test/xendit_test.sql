@@ -294,6 +294,31 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_true('member_bootstrap.xendit_enabled is true', current_setting('t.xen')::boolean);
 select expect_true('has_payment_provider stays Stripe-specific (false here)', current_setting('t.hpp')::boolean is false);
 
+-- =============================================================================
+-- 13. Decision 40 amendment: expired is not final. A succeeded callback still
+--     activates a purchase the local sweep marked expired, and the override is
+--     recorded in audit_logs. A replay after that is still a duplicate.
+-- =============================================================================
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.pid5', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+-- the local reconcile sweep marked it expired before the (late) callback arrives
+update xendit_purchases set status='expired', completed_at=now() where id=current_setting('t.pid5')::uuid;
+
+select set_config('t.ev_exp', jsonb_build_object(
+  'event','payment.succeeded',
+  'data', jsonb_build_object('reference_id', current_setting('t.pid5'),
+     'payment_id','py-e40d-5','status','SUCCEEDED','amount',1400,'currency','PHP'))::text, false);
+select set_config('t.r_exp', (xendit_webhook(current_setting('t.ev_exp')::jsonb, 'goodtoken'))->>'outcome', false);
+
+select expect_text('a succeeded callback activates an EXPIRED purchase', current_setting('t.r_exp'), 'succeeded');
+select expect_text('the expired purchase is now succeeded', (select status from xendit_purchases where id=current_setting('t.pid5')::uuid), 'succeeded');
+select expect_num('the expiry override is recorded in audit_logs',
+  (select count(*) from audit_logs where action='xendit.expiry_overridden' and entity_id=current_setting('t.pid5')::uuid), 1);
+select set_config('t.r_exp2', (xendit_webhook(current_setting('t.ev_exp')::jsonb, 'goodtoken'))->>'status', false);
+select expect_text('a replay after the override is still a duplicate', current_setting('t.r_exp2'), 'duplicate');
+
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
 -- raises PT401"; removing the amount guard fails the mismatch assertions;

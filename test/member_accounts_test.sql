@@ -619,3 +619,28 @@ select expect_text('...and who has no address to be asked at',
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'invite tests done' as done;
+
+-- --- Decision 41 amendment: claim_member_by_email attaches a verified self- ---
+-- signup, and is idempotent. This is what the confirmation callback now calls
+-- so a fresh signup has a member row before Home loads (no Home->/login loop).
+insert into auth.users (id, email, email_confirmed_at)
+  values ('abababab-0000-0000-0000-0000000000e1','selfsignup@example.com', now());
+insert into profiles (id, email, full_name)
+  values ('abababab-0000-0000-0000-0000000000e1','selfsignup@example.com','Sam Signup');
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000e1',false);
+select set_config('a.claim1', coalesce((claim_member_by_email('abababab-0000-0000-0000-000000000001')).failure_reason, 'ATTACHED'), false);
+select set_config('a.mrows1', (select count(*) from members where studio_id='abababab-0000-0000-0000-000000000001' and user_id='abababab-0000-0000-0000-0000000000e1')::text, false);
+-- second call: idempotent, finds the row, returns null reason, creates no second row
+select set_config('a.claim2', coalesce((claim_member_by_email('abababab-0000-0000-0000-000000000001')).failure_reason, 'ATTACHED'), false);
+select set_config('a.mrows2', (select count(*) from members where studio_id='abababab-0000-0000-0000-000000000001' and user_id='abababab-0000-0000-0000-0000000000e1')::text, false);
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+
+select expect_text('claim_member_by_email attaches a verified self-signup (null reason)', current_setting('a.claim1'), 'ATTACHED');
+select expect_num('...creating exactly one member row', current_setting('a.mrows1')::bigint, 1);
+select expect_text('...and a second call is idempotent (still null reason)', current_setting('a.claim2'), 'ATTACHED');
+select expect_num('...with no second row', current_setting('a.mrows2')::bigint, 1);
+
+select 'member account tests done' as done;

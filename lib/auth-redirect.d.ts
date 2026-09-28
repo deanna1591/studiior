@@ -2,3 +2,8 @@
 // import it without a TypeScript loader; see the .mjs header).
 export function safeNext(next: string | null | undefined): string;
 export function buildAuthCallback(memberOrigin: string, next: string | null | undefined): string;
+export function confirmDestination(
+  sessionOk: boolean,
+  claimReason: string | null | undefined,
+  next: string | null | undefined,
+): string;

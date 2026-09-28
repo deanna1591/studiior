@@ -196,7 +196,7 @@ export type MemberBootstrap = {
  * same), and every policy keys on auth.uid() from that verified claim rather
  * than on anything read here.
  */
-async function currentUserId(): Promise<string | null> {
+export async function currentUserId(): Promise<string | null> {
   void assertAsymmetricSigning();
   const supabase = createClient();
   const { data } = await supabase.auth.getClaims();

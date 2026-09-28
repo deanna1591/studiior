@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
-import { safeNext } from "@/lib/auth-redirect";
+import { safeNext, confirmDestination } from "@/lib/auth-redirect";
+import { resolveHost } from "@/lib/tenant";
 
 // Decision 41: the per-studio auth callback. Supabase sends the member back
 // here on THIS studio's own host (emailRedirectTo, built per request). It
@@ -63,6 +64,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     hostname === "lvh.me" || hostname.endsWith(".localhost") || hostname.endsWith(".lvh.me");
   const base = `${local ? "http" : "https"}://${host}`;
 
-  if (failed) return NextResponse.redirect(new URL("/login?error=confirm", base));
-  return NextResponse.redirect(new URL(next, base));
+  if (failed) {
+    return NextResponse.redirect(new URL(confirmDestination(false, null, next), base));
+  }
+
+  // Decision 41 amendment — attach the member to THIS studio here, or a fresh
+  // self-signup (which has no member row until claimed) loops Home -> /login ->
+  // Home. claim_member_by_email is the SAME function the /signup finish button
+  // calls, and it is idempotent (a second call finds the row and returns null).
+  // A null reason (attached / already linked) or already_claimed -> next; any
+  // other reason -> /signup (still shows the finish button and the reason).
+  let claimReason: string | null | undefined = "no_studio";
+  const slug = resolveHost(host).slug;
+  if (slug) {
+    const { data: studio } = await supabase.rpc("studio_by_slug", { p_slug: slug });
+    const s = Array.isArray(studio) ? studio[0] : studio;
+    if (s?.id) {
+      const { data: claim } = await supabase.rpc("claim_member_by_email", { p_studio_id: s.id });
+      const c = Array.isArray(claim) ? claim[0] : claim;
+      claimReason = (c as { failure_reason?: string | null } | null)?.failure_reason ?? null;
+    }
+  }
+  return NextResponse.redirect(new URL(confirmDestination(true, claimReason, next), base));
 }
