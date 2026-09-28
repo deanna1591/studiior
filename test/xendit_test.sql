@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (51 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (59 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -221,9 +221,9 @@ select expect_true('the member was notified of the failure',
   (select count(*) > 0 from notifications where member_id='e40de40d-0000-0000-0000-00000000dd01' and template_key='xendit_purchase_failed'));
 
 -- =============================================================================
--- 9. An unknown reference (valid UUID, no purchase) is ignored — and STORED
---    (Decision 40 amendment 2: after the token is verified, every event is
---    recorded, even an ignored one), activating nothing.
+-- 9. A reference that resolves to no purchase (valid UUID, none of the three
+--    resolution paths match) is ignored as bad_reference — and STORED (after the
+--    token is verified every event is recorded, even an ignored one).
 -- =============================================================================
 select set_config('t.ev_unk', jsonb_build_object(
   'event','payment.succeeded',
@@ -231,10 +231,10 @@ select set_config('t.ev_unk', jsonb_build_object(
      'payment_id','py-unknown','status','SUCCEEDED'))::text, false);
 select set_config('t.events_before', (select count(*) from xendit_events)::text, false);
 select set_config('t.r_unk', (xendit_webhook(current_setting('t.ev_unk')::jsonb, 'goodtoken'))->>'reason', false);
-select expect_text('an unknown reference is ignored', current_setting('t.r_unk'), 'unknown_reference');
+select expect_text('a reference that resolves to no purchase is ignored (bad_reference)', current_setting('t.r_unk'), 'bad_reference');
 select expect_num('...and the event IS stored (token was valid), marked ignored',
   (select count(*) from xendit_events), current_setting('t.events_before')::bigint + 1);
-select expect_text('...the stored event carries the reason', (select error from xendit_events where payload->'data'->>'payment_id'='py-unknown'), 'unknown_reference');
+select expect_text('...the stored event carries the reason', (select error from xendit_events where payload->'data'->>'payment_id'='py-unknown'), 'bad_reference');
 
 -- =============================================================================
 -- 10. Owner-triggered apply: COMPLETED activates; a non-manager is refused.
@@ -346,7 +346,7 @@ select set_config('t.memb_before', (select count(*) from memberships)::text, fal
 select set_config('t.r_sample', (xendit_webhook(current_setting('t.sample')::jsonb, 'goodtoken'))->>'result', false);
 select expect_text('the Xendit sample payload (non-UUID reference) is ignored, not a 500', current_setting('t.r_sample'), 'ignored');
 select expect_num('...the sample event is stored (bad_reference)',
-  (select count(*) from xendit_events where event_type='payment.succeeded' and error='bad_reference'), 1);
+  (select count(*) from xendit_events where error='bad_reference' and payload->>'business_id'='sample_business_id'), 1);
 select expect_num('...and nothing was activated', (select count(*) from memberships), current_setting('t.memb_before')::bigint);
 
 -- (b) Cross-tenant teeth: studio A's token + a VALID reference to studio B's
@@ -385,6 +385,62 @@ select expect_text('the failure event is processed', current_setting('t.r_f'), '
 select expect_text('a succeeded with the SAME payment id is NOT a duplicate (type is in the key)', current_setting('t.r_s'), 'processed');
 select expect_num('...both are stored as distinct events',
   (select count(*) from xendit_events where payload->'data'->>'payment_id'='py-dedupe'), 2);
+
+-- =============================================================================
+-- 16. Decision 40 amendment 4: resolve the purchase from metadata.purchase_id /
+--     the session id / a suffixed reference_id, and reprocess stored ignored
+--     events. (Xendit appends a suffix to the payment's reference_id.)
+-- =============================================================================
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.pid7', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc001')), false);
+select set_config('t.pid8', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+-- (a) a suffixed reference_id "<uuid>_SUFFIX" resolves and activates.
+select set_config('t.ev_suf', jsonb_build_object('event','payment.succeeded',
+  'data', jsonb_build_object('reference_id', current_setting('t.pid7')||'_INzvmwJabc',
+     'payment_id','py-suffix','status','SUCCEEDED','amount',1400,'currency','PHP'))::text, false);
+select set_config('t.r_suf', (xendit_webhook(current_setting('t.ev_suf')::jsonb, 'goodtoken'))->>'outcome', false);
+select expect_text('a suffixed reference_id (<uuid>_SUFFIX) resolves and activates', current_setting('t.r_suf'), 'succeeded');
+select expect_text('...the suffixed purchase is succeeded', (select status from xendit_purchases where id=current_setting('t.pid7')::uuid), 'succeeded');
+
+-- (b) metadata.purchase_id resolves even when reference_id is unusable.
+select set_config('t.ev_meta', jsonb_build_object('event','payment.succeeded',
+  'data', jsonb_build_object('reference_id','totally-not-a-uuid',
+     'metadata', jsonb_build_object('purchase_id', current_setting('t.pid8')),
+     'payment_id','py-meta','status','SUCCEEDED','amount',1400,'currency','PHP'))::text, false);
+select set_config('t.r_meta', (xendit_webhook(current_setting('t.ev_meta')::jsonb, 'goodtoken'))->>'outcome', false);
+select expect_text('metadata.purchase_id resolves even with a bad reference_id', current_setting('t.r_meta'), 'succeeded');
+select expect_text('...the metadata purchase is succeeded', (select status from xendit_purchases where id=current_setting('t.pid8')::uuid), 'succeeded');
+
+-- (c) reprocess a STORED ignored event -> activates a pending purchase, idempotent.
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.pid9', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+insert into xendit_events (studio_id, event_id, event_type, payload, error) values
+  ('e40de40d-0000-0000-0000-000000000001','payment.succeeded:py-stored','payment.succeeded',
+   jsonb_build_object('event','payment.succeeded','data', jsonb_build_object(
+     'reference_id', current_setting('t.pid9')||'_LATE','payment_id','py-stored',
+     'status','SUCCEEDED','amount',1400,'currency','PHP')), 'bad_reference');
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-0000000000a1',false);
+select set_config('t.rep1', (xendit_reprocess_ignored('e40de40d-0000-0000-0000-000000000001'))->>'reprocessed', false);
+select set_config('t.rep2', (xendit_reprocess_ignored('e40de40d-0000-0000-0000-000000000001'))->>'reprocessed', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('reprocessing a stored ignored event recovers at least one', current_setting('t.rep1')::int >= 1);
+select expect_text('...the recovered purchase is succeeded', (select status from xendit_purchases where id=current_setting('t.pid9')::uuid), 'succeeded');
+select expect_num('...a second reprocess is idempotent (nothing left)', current_setting('t.rep2')::bigint, 0);
+-- a non-manager cannot reprocess
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+do $$ begin
+  begin perform xendit_reprocess_ignored('e40de40d-0000-0000-0000-000000000001');
+    perform set_config('t.rep_m','no_raise',false);
+  exception when others then perform set_config('t.rep_m', sqlstate, false); end;
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('a non-manager cannot reprocess ignored events (PT403)', current_setting('t.rep_m'), 'PT403');
 
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token

@@ -72,7 +72,9 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
     customerGivenNames: member?.first_name ?? ctx.firstName ?? "Member",
     customerSurname: member?.last_name ?? undefined,
     customerEmail: member?.email ?? undefined,
-    metadata: { studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
+    // purchase_id is the primary way the callback resolves back to this
+    // purchase (Xendit appends a suffix to the payment's reference_id).
+    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
     successUrl: `${origin}/purchase/${purchase.purchase_id}`,
     cancelUrl: `${origin}/account/plan`,
   });

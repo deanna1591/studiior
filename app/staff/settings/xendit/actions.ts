@@ -135,6 +135,14 @@ export async function syncPendingXendit(_prev: XenditState, _fd: FormData): Prom
       if (!error) updated += 1;
     }
   }
+
+  // Also re-run resolution on any events we stored as ignored before the
+  // reference-resolution fix — activates a pending purchase from its stored
+  // event without a fresh callback (Decision 40 amendment 4).
+  const { data: rep } = await supabase.rpc("xendit_reprocess_ignored", { p_studio_id: ctx.studioId });
+  const reprocessed = (rep as { reprocessed?: number } | null)?.reprocessed ?? 0;
+
   revalidatePath("/settings/xendit");
-  return { ok: true, message: `Checked ${pending.length} pending — ${updated} resolved.` };
+  const extra = reprocessed ? `, ${reprocessed} recovered from stored events` : "";
+  return { ok: true, message: `Checked ${pending.length} pending — ${updated} resolved${extra}.` };
 }

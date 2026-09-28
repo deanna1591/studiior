@@ -7313,6 +7313,18 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -8729,6 +8741,8 @@ export type Database = {
         Returns: undefined
       }
       xendit_reconcile_sweep: { Args: { p_now?: string }; Returns: Json }
+      xendit_reprocess_ignored: { Args: { p_studio_id: string }; Returns: Json }
+      xendit_resolve_purchase: { Args: { p_data: Json }; Returns: string }
       xendit_webhook: {
         Args: { p_event: Json; p_token: string }
         Returns: Json
