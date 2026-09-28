@@ -48,9 +48,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (error.code === "PT401" || /PT401/.test(error.message)) {
       return NextResponse.json({ error: "invalid token" }, { status: 401 });
     }
-    // Genuine server error: 500 so Xendit retries.
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Genuine server error: 500 so Xendit retries. NEVER echo the database
+    // message to the caller — the real error goes only to the server logs.
+    console.error("xendit callback failed", error);
+    return NextResponse.json({ error: "callback failed" }, { status: 500 });
   }
 
-  return NextResponse.json(data ?? { status: "ok" }, { status: 200 });
+  // ignored / duplicate / processed / refused all come back with no error -> 200
+  // (a mismatch or a sample won't fix itself on a retry; Xendit stops retrying).
+  return NextResponse.json(data ?? { result: "ok" }, { status: 200 });
 }

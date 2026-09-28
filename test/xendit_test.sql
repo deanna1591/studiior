@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (41 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (48 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -151,7 +151,7 @@ select expect_num('a wrong token stores NO event', (select count(*) from xendit_
 -- =============================================================================
 -- 5. A SUCCEEDED callback activates the plan, exactly as a manual payment would.
 -- =============================================================================
-select set_config('t.r_ok', (xendit_webhook(current_setting('t.ev_ok')::jsonb, 'goodtoken'))->>'status', false);
+select set_config('t.r_ok', (xendit_webhook(current_setting('t.ev_ok')::jsonb, 'goodtoken'))->>'result', false);
 
 select expect_text('a good-token success is processed', current_setting('t.r_ok'), 'processed');
 select expect_text('the purchase is marked succeeded', (select status from xendit_purchases where id=current_setting('t.pid1')::uuid), 'succeeded');
@@ -172,7 +172,7 @@ select expect_num('the payments amount matches the plan (140000)',
 -- =============================================================================
 -- 6. A REPLAY of the same event is a duplicate — no second activation.
 -- =============================================================================
-select set_config('t.r_dup', (xendit_webhook(current_setting('t.ev_ok')::jsonb, 'goodtoken'))->>'status', false);
+select set_config('t.r_dup', (xendit_webhook(current_setting('t.ev_ok')::jsonb, 'goodtoken'))->>'result', false);
 select expect_text('a replayed event is a duplicate', current_setting('t.r_dup'), 'duplicate');
 select expect_num('no second membership from the replay',
   (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd01'), 1);
@@ -221,7 +221,9 @@ select expect_true('the member was notified of the failure',
   (select count(*) > 0 from notifications where member_id='e40de40d-0000-0000-0000-00000000dd01' and template_key='xendit_purchase_failed'));
 
 -- =============================================================================
--- 9. An unknown reference is ignored and stores nothing.
+-- 9. An unknown reference (valid UUID, no purchase) is ignored — and STORED
+--    (Decision 40 amendment 2: after the token is verified, every event is
+--    recorded, even an ignored one), activating nothing.
 -- =============================================================================
 select set_config('t.ev_unk', jsonb_build_object(
   'event','payment.succeeded',
@@ -230,8 +232,9 @@ select set_config('t.ev_unk', jsonb_build_object(
 select set_config('t.events_before', (select count(*) from xendit_events)::text, false);
 select set_config('t.r_unk', (xendit_webhook(current_setting('t.ev_unk')::jsonb, 'goodtoken'))->>'reason', false);
 select expect_text('an unknown reference is ignored', current_setting('t.r_unk'), 'unknown_reference');
-select expect_num('an unknown reference stores no event',
-  (select count(*) from xendit_events), current_setting('t.events_before')::bigint);
+select expect_num('...and the event IS stored (token was valid), marked ignored',
+  (select count(*) from xendit_events), current_setting('t.events_before')::bigint + 1);
+select expect_text('...the stored event carries the reason', (select error from xendit_events where event_id='py-unknown'), 'unknown_reference');
 
 -- =============================================================================
 -- 10. Owner-triggered apply: COMPLETED activates; a non-manager is refused.
@@ -316,8 +319,48 @@ select expect_text('a succeeded callback activates an EXPIRED purchase', current
 select expect_text('the expired purchase is now succeeded', (select status from xendit_purchases where id=current_setting('t.pid5')::uuid), 'succeeded');
 select expect_num('the expiry override is recorded in audit_logs',
   (select count(*) from audit_logs where action='xendit.expiry_overridden' and entity_id=current_setting('t.pid5')::uuid), 1);
-select set_config('t.r_exp2', (xendit_webhook(current_setting('t.ev_exp')::jsonb, 'goodtoken'))->>'status', false);
+select set_config('t.r_exp2', (xendit_webhook(current_setting('t.ev_exp')::jsonb, 'goodtoken'))->>'result', false);
 select expect_text('a replay after the override is still a duplicate', current_setting('t.r_exp2'), 'duplicate');
+
+-- =============================================================================
+-- 14. Decision 40 amendment 2: the callback never 500s on Xendit's "Test and
+--     save" sample (non-UUID reference), and a cross-tenant reference is ignored.
+-- =============================================================================
+-- Studio B with a pending purchase (inserted directly — we only need a purchase
+-- owned by a DIFFERENT studio than studio A's token).
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('e40de40d-0000-0000-0000-000000000002','Xen B','e40d-sb','Asia/Manila','PHP','active');
+insert into studio_settings (studio_id) values ('e40de40d-0000-0000-0000-000000000002');
+insert into members (id, studio_id, first_name, last_name, email, status) values
+  ('e40de40d-0000-0000-0000-00000000dd02','e40de40d-0000-0000-0000-000000000002','Bee','Two','mem2@example.com','active');
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits, validity_days, visibility, status) values
+  ('e40de40d-0000-0000-0000-0000000cc0b2','e40de40d-0000-0000-0000-000000000002','B Pack','class_pack',140000,'PHP',10,30,'public','active');
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency) values
+  ('e40de40d-0000-0000-0000-0000000b2001','e40de40d-0000-0000-0000-000000000002','e40de40d-0000-0000-0000-00000000dd02','e40de40d-0000-0000-0000-0000000cc0b2',140000,'PHP');
+
+-- (a) The EXACT hosted sample: non-UUID reference, IDR, sample_business_id, with
+--     a VALID token. Must NOT raise (a 500 makes Xendit refuse the URL); ignored,
+--     the event is stored, nothing activated.
+select set_config('t.sample', '{"event":"payment.succeeded","business_id":"sample_business_id","data":{"reference_id":"a5151a05-e84d-4cef-bb17-1ref3e7fb3a","status":"SUCCEEDED","currency":"IDR"}}', false);
+select set_config('t.memb_before', (select count(*) from memberships)::text, false);
+select set_config('t.r_sample', (xendit_webhook(current_setting('t.sample')::jsonb, 'goodtoken'))->>'result', false);
+select expect_text('the Xendit sample payload (non-UUID reference) is ignored, not a 500', current_setting('t.r_sample'), 'ignored');
+select expect_num('...the sample event is stored (bad_reference)',
+  (select count(*) from xendit_events where event_type='payment.succeeded' and error='bad_reference'), 1);
+select expect_num('...and nothing was activated', (select count(*) from memberships), current_setting('t.memb_before')::bigint);
+
+-- (b) Cross-tenant teeth: studio A's token + a VALID reference to studio B's
+--     purchase -> ignored, B's purchase NOT activated.
+select set_config('t.ev_xt', jsonb_build_object(
+  'event','payment.succeeded',
+  'data', jsonb_build_object('reference_id','e40de40d-0000-0000-0000-0000000b2001',
+     'payment_id','py-crosstenant','status','SUCCEEDED','amount',1400,'currency','PHP'))::text, false);
+select set_config('t.r_xt', (xendit_webhook(current_setting('t.ev_xt')::jsonb, 'goodtoken'))->>'reason', false);
+select expect_text('a reference to ANOTHER studio''s purchase (this studio''s token) is cross_tenant', current_setting('t.r_xt'), 'cross_tenant');
+select expect_text('...and studio B''s purchase is NOT activated (still pending)',
+  (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000b2001'), 'pending');
+select expect_num('...no membership for studio B''s member',
+  (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd02'), 0);
 
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
