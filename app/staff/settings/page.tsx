@@ -29,6 +29,7 @@ export default async function Settings() {
     { href: "/settings/location", label: "Location & self check-in", sub: "Where the studio is, so members can check in from their phone" },
     { href: "/settings/closures", label: "Closures", sub: "Days you are shut — nothing is generated, and members are told" },
     { href: "/settings/stripe", label: "Card payments", sub: "Take card payments online (optional — a studio can take cash)" },
+    { href: "/settings/xendit", label: "Xendit payments", sub: "Take online payments in the Philippines (packs and drop-ins)" },
   ];
   if (ctx.role === "owner") {
     groups.push({ href: "/branding", label: "Member app", sub: "Colours, logo and the photograph members see" });

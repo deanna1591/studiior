@@ -164,6 +164,7 @@ export type MemberBootstrap = {
   booking_window_days: number;
   how_to_buy: string | null;
   studio_contact_email: string | null;
+  xendit_enabled: boolean;
 };
 
 /** Who is making this request, on the member PWA. */

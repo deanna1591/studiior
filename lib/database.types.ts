@@ -5804,6 +5804,70 @@ export type Database = {
           },
         ]
       }
+      studio_payment_providers: {
+        Row: {
+          callback_token_ciphertext: string
+          callback_token_sha256: string
+          connected_at: string
+          connected_by: string | null
+          key_last4: string | null
+          last_verified_at: string | null
+          provider: Database["public"]["Enums"]["payment_provider"]
+          secret_key_ciphertext: string
+          studio_id: string
+          test_mode: boolean
+          updated_at: string
+        }
+        Insert: {
+          callback_token_ciphertext: string
+          callback_token_sha256: string
+          connected_at?: string
+          connected_by?: string | null
+          key_last4?: string | null
+          last_verified_at?: string | null
+          provider: Database["public"]["Enums"]["payment_provider"]
+          secret_key_ciphertext: string
+          studio_id: string
+          test_mode?: boolean
+          updated_at?: string
+        }
+        Update: {
+          callback_token_ciphertext?: string
+          callback_token_sha256?: string
+          connected_at?: string
+          connected_by?: string | null
+          key_last4?: string | null
+          last_verified_at?: string | null
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          secret_key_ciphertext?: string
+          studio_id?: string
+          test_mode?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_payment_providers_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_payment_providers_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_payment_providers_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       studio_settings: {
         Row: {
           adjacency_minutes: number
@@ -6523,6 +6587,151 @@ export type Database = {
           },
         ]
       }
+      xendit_events: {
+        Row: {
+          error: string | null
+          event_id: string
+          event_type: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          purchase_id: string | null
+          received_at: string
+          studio_id: string | null
+        }
+        Insert: {
+          error?: string | null
+          event_id: string
+          event_type?: string | null
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          purchase_id?: string | null
+          received_at?: string
+          studio_id?: string | null
+        }
+        Update: {
+          error?: string | null
+          event_id?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          purchase_id?: string | null
+          received_at?: string
+          studio_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xendit_events_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "xendit_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      xendit_purchases: {
+        Row: {
+          amount_cents: number
+          completed_at: string | null
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          member_id: string
+          payment_link_url: string | null
+          payment_session_id: string | null
+          plan_id: string
+          status: string
+          studio_id: string
+          updated_at: string
+          xendit_payment_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          completed_at?: string | null
+          created_at?: string
+          currency: string
+          failure_reason?: string | null
+          id?: string
+          member_id: string
+          payment_link_url?: string | null
+          payment_session_id?: string | null
+          plan_id: string
+          status?: string
+          studio_id: string
+          updated_at?: string
+          xendit_payment_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          completed_at?: string | null
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          member_id?: string
+          payment_link_url?: string | null
+          payment_session_id?: string | null
+          plan_id?: string
+          status?: string
+          studio_id?: string
+          updated_at?: string
+          xendit_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xendit_purchases_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       member_quick_view: {
@@ -7166,14 +7375,21 @@ export type Database = {
       ics_escape: { Args: { p: string }; Returns: string }
       ics_fold: { Args: { p: string }; Returns: string }
       ics_instructor_vevent: {
-        Args: { p_cancelled: boolean; p_occurrence_id: string }
+        Args: {
+          p_attendee_email?: string
+          p_cancelled: boolean
+          p_occurrence_id: string
+          p_organizer_email?: string
+        }
         Returns: string
       }
       ics_member_vevent: {
         Args: {
+          p_attendee_email?: string
           p_cancelled: boolean
           p_member_id: string
           p_occurrence_id: string
+          p_organizer_email?: string
         }
         Returns: string
       }
@@ -7181,10 +7397,12 @@ export type Database = {
       ics_studio_location: { Args: { p_studio_id: string }; Returns: string }
       ics_vevent: {
         Args: {
+          p_attendee?: string
           p_cancelled: boolean
           p_description: string
           p_end: string
           p_location: string
+          p_organizer?: string
           p_seq: number
           p_start: string
           p_summary: string
@@ -7418,6 +7636,7 @@ export type Database = {
           studio_timezone: string
           theme_preset: Database["public"]["Enums"]["theme_preset"]
           waitlist_enabled: boolean
+          xendit_enabled: boolean
         }[]
       }
       member_challenge_detail: {
@@ -8390,7 +8609,10 @@ export type Database = {
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_guest_waivers: { Args: never; Returns: Json }
-      sweep_instructor_class_reminders: { Args: never; Returns: Json }
+      sweep_instructor_class_reminders: {
+        Args: { p_now?: string }
+        Returns: Json
+      }
       sweep_instructor_confirmations: { Args: never; Returns: Json }
       sweep_membership_periods: { Args: never; Returns: Json }
       sweep_no_shows: { Args: never; Returns: Json }
@@ -8467,6 +8689,50 @@ export type Database = {
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
+      xendit_activate_success_internal: {
+        Args: { p_payment_id: string; p_purchase_id: string }
+        Returns: string
+      }
+      xendit_apply_session: {
+        Args: {
+          p_payment_id?: string
+          p_purchase_id: string
+          p_session_status: string
+        }
+        Returns: Json
+      }
+      xendit_attach_session: {
+        Args: {
+          p_link_url: string
+          p_purchase_id: string
+          p_session_id: string
+        }
+        Returns: undefined
+      }
+      xendit_begin_purchase: {
+        Args: { p_plan_id: string; p_studio_id: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          purchase_id: string
+        }[]
+      }
+      xendit_checkout_context: {
+        Args: { p_studio_id: string }
+        Returns: {
+          secret_key_ciphertext: string
+          test_mode: boolean
+        }[]
+      }
+      xendit_fail_purchase_internal: {
+        Args: { p_purchase_id: string; p_reason: string; p_status: string }
+        Returns: undefined
+      }
+      xendit_reconcile_sweep: { Args: { p_now?: string }; Returns: Json }
+      xendit_webhook: {
+        Args: { p_event: Json; p_token: string }
+        Returns: Json
+      }
     }
     Enums: {
       billing_interval: "week" | "month" | "quarter" | "year"
@@ -8537,7 +8803,7 @@ export type Database = {
       pay_model: "per_class"
       pay_period_status: "open" | "closed"
       pay_record_type: "class" | "conversion" | "adjustment"
-      payment_provider: "manual" | "stripe"
+      payment_provider: "manual" | "stripe" | "xendit"
       payment_source:
         | "membership"
         | "class_pack"
@@ -8799,7 +9065,7 @@ export const Constants = {
       pay_model: ["per_class"],
       pay_period_status: ["open", "closed"],
       pay_record_type: ["class", "conversion", "adjustment"],
-      payment_provider: ["manual", "stripe"],
+      payment_provider: ["manual", "stripe", "xendit"],
       payment_source: [
         "membership",
         "class_pack",

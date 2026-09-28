@@ -233,14 +233,17 @@ reset role;
 -- anon-executable function is a real surface and must be one of the eleven. (The
 -- hosted advisor is the true gate — local and hosted ACLs differ — but this
 -- catches a stray grant before it ships.)
-select expect_num('exactly eleven real functions are executable by anon',
+select expect_num('exactly twelve real functions are executable by anon',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%')::bigint, 11);
+      and p.proname not like 'expect\_%')::bigint, 12);
 select expect_true('public_schedule is one of them',
   has_function_privilege('anon', 'public_schedule(text,int)'::regprocedure, 'execute'));
 select expect_true('calendar_feed is one of them',
   has_function_privilege('anon', 'calendar_feed(text)'::regprocedure, 'execute'));
+-- Decision 40: xendit_webhook is the twelfth.
+select expect_true('xendit_webhook is one of them',
+  has_function_privilege('anon', 'xendit_webhook(jsonb, text)'::regprocedure, 'execute'));
 -- The cache table is closed to clients.
 select expect_false('anon cannot read the cache table directly',
   has_table_privilege('anon', 'public_schedule_cache', 'select'));

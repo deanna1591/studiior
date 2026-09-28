@@ -57,6 +57,7 @@ export async function memberScreen() {
       waitlistEnabled: b?.waitlist_enabled ?? true,
       guestPassesEnabled: b?.guest_passes_enabled ?? false,
       hasPaymentProvider: b?.has_payment_provider ?? false,
+      xenditEnabled: b?.xendit_enabled ?? false,
       howToBuy: b?.how_to_buy ?? null,
       studioContactEmail: b?.studio_contact_email ?? null,
     },

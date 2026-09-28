@@ -11,7 +11,11 @@ supabase/.temp
 /out
 next-env.d.ts
 .env*.local
+.env*.local*
 tsconfig.tsbuildinfo
 
 # Claude Code — per-machine local settings (launch.json IS tracked; this is not)
 .claude/settings.local.json
+
+# Generated per-studio schedule embed output (built artifact, not source)
+embed/out/

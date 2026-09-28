@@ -842,7 +842,14 @@ values ('5e215e21-0000-0000-0000-0000000fd101','5e215e21-0000-0000-0000-00000000
         '5e215e21-0000-0000-0000-00000000000c','5e215e21-0000-0000-0000-00000000fd01',
         '5e215e21-0000-0000-0000-00000000cc01','DEMO SERIES',
         '5e215e21-0000-0000-0000-00000000ee02',10,
-        now() - interval '7 days', now() - interval '7 days' + interval '50 min',
+        -- A fixed 13:30 (studio-local) slot 7 days ago, not now()'s time-of-day:
+        -- room ee02 has classes at 06:00/09:00/10:30/18:00, and a moving now()-7d
+        -- collided with the 09:00 slot whenever the suite ran mid-morning UTC
+        -- (occ_room_no_overlap). 13:30 is clear on every weekday. Its exact time
+        -- is irrelevant to the purge assertions — it only needs to be a past,
+        -- completed, is_demo class with a booking. (See CLAUDE.md date-fragility.)
+        ((current_date - 7)::timestamp + time '13:30') at time zone 'Europe/Prague',
+        ((current_date - 7)::timestamp + time '13:30') at time zone 'Europe/Prague' + interval '50 min',
         'completed', true);
 insert into bookings (id, studio_id, occurrence_id, member_id, status, is_demo)
 values ('5e215e21-0000-0000-0000-0000000fd201','5e215e21-0000-0000-0000-000000000001',

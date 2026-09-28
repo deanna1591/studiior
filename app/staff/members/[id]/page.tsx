@@ -309,6 +309,7 @@ export default async function MemberDetail({
                               {p.method_note ? ` (${p.method_note})` : ""}</>
                           )}
                           {p.card_brand && <> · {p.card_brand} ····{p.card_last4}</>}
+                          {p.provider === "xendit" && <> · Xendit</>}
                           {p.reference && <> · ref {p.reference}</>}
                           {p.status !== "succeeded" && <> · {p.status.replace("_", " ")}</>}
                           {p.refunded_cents > 0 && p.status === "partially_refunded" && (

@@ -4,6 +4,7 @@ import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney } from "@/lib/plans";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
+import BuyPlan from "./buy";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,11 @@ export default async function Plan() {
                   </div>
                   {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
                   <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
+                  {/* Decision 40: buy a one-time plan online when the studio has
+                      Xendit connected. Recurring plans stay at the desk (Part B). */}
+                  {settings.xenditEnabled && (p.type === "class_pack" || p.type === "drop_in") && (
+                    <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} /></div>
+                  )}
                 </li>
               );
             })}
