@@ -620,27 +620,47 @@ reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'invite tests done' as done;
 
--- --- Decision 41 amendment: claim_member_by_email attaches a verified self- ---
--- signup, and is idempotent. This is what the confirmation callback now calls
--- so a fresh signup has a member row before Home loads (no Home->/login loop).
-insert into auth.users (id, email, email_confirmed_at)
-  values ('abababab-0000-0000-0000-0000000000e1','selfsignup@example.com', now());
-insert into profiles (id, email, full_name)
-  values ('abababab-0000-0000-0000-0000000000e1','selfsignup@example.com','Sam Signup');
+-- --- Decision 41 amendment 2: claim_member_by_email CREATES the profile a self- --
+-- signup never had (members.user_id -> profiles), attaches the member with the
+-- right names from raw_user_meta_data, and is idempotent. An unverified user is
+-- still refused and gets NO profile. This is what the confirmation callback now
+-- calls so a fresh signup has a member row before Home loads (no Home->/login loop).
+-- NOTE: no profiles row is inserted here — the function must create it (the bug
+-- was members_user_id_fkey because it never did).
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('abababab-0000-0000-0000-0000000000e1','selfsignup@example.com', now(), '{"full_name":"Sam Signup"}'::jsonb),
+  ('abababab-0000-0000-0000-0000000000e2','unconfirmed@example.com', null, '{"full_name":"Uma Unconfirmed"}'::jsonb);
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000e1',false);
 select set_config('a.claim1', coalesce((claim_member_by_email('abababab-0000-0000-0000-000000000001')).failure_reason, 'ATTACHED'), false);
+select set_config('a.prof1',  (select count(*) from profiles where id='abababab-0000-0000-0000-0000000000e1')::text, false);
+select set_config('a.pname1', (select full_name from profiles where id='abababab-0000-0000-0000-0000000000e1'), false);
+select set_config('a.mfirst', (select first_name from members where studio_id='abababab-0000-0000-0000-000000000001' and user_id='abababab-0000-0000-0000-0000000000e1'), false);
+select set_config('a.mlast',  (select last_name  from members where studio_id='abababab-0000-0000-0000-000000000001' and user_id='abababab-0000-0000-0000-0000000000e1'), false);
 select set_config('a.mrows1', (select count(*) from members where studio_id='abababab-0000-0000-0000-000000000001' and user_id='abababab-0000-0000-0000-0000000000e1')::text, false);
--- second call: idempotent, finds the row, returns null reason, creates no second row
+-- second call: idempotent — finds the row, null reason, no second member, still one profile
 select set_config('a.claim2', coalesce((claim_member_by_email('abababab-0000-0000-0000-000000000001')).failure_reason, 'ATTACHED'), false);
 select set_config('a.mrows2', (select count(*) from members where studio_id='abababab-0000-0000-0000-000000000001' and user_id='abababab-0000-0000-0000-0000000000e1')::text, false);
+select set_config('a.prof2',  (select count(*) from profiles where id='abababab-0000-0000-0000-0000000000e1')::text, false);
+select set_config('request.jwt.claim.sub','',false);
+-- an unverified user: refused, and NO profile created
+select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000e2',false);
+select set_config('a.claimU', coalesce((claim_member_by_email('abababab-0000-0000-0000-000000000001')).failure_reason, 'ATTACHED'), false);
+select set_config('a.profU',  (select count(*) from profiles where id='abababab-0000-0000-0000-0000000000e2')::text, false);
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
 
 select expect_text('claim_member_by_email attaches a verified self-signup (null reason)', current_setting('a.claim1'), 'ATTACHED');
+select expect_num('...creating the profiles row it never had', current_setting('a.prof1')::bigint, 1);
+select expect_text('...with full_name from raw_user_meta_data', current_setting('a.pname1'), 'Sam Signup');
+select expect_text('...and the member first name from it', current_setting('a.mfirst'), 'Sam');
+select expect_text('...and the member last name from it', current_setting('a.mlast'), 'Signup');
 select expect_num('...creating exactly one member row', current_setting('a.mrows1')::bigint, 1);
-select expect_text('...and a second call is idempotent (still null reason)', current_setting('a.claim2'), 'ATTACHED');
-select expect_num('...with no second row', current_setting('a.mrows2')::bigint, 1);
+select expect_text('...a second call is idempotent (still null reason)', current_setting('a.claim2'), 'ATTACHED');
+select expect_num('...with no second member row', current_setting('a.mrows2')::bigint, 1);
+select expect_num('...and still exactly one profile', current_setting('a.prof2')::bigint, 1);
+select expect_text('an unverified user is refused', current_setting('a.claimU'), 'email_not_verified');
+select expect_num('...and no profile is created for them', current_setting('a.profU')::bigint, 0);
 
 select 'member account tests done' as done;
