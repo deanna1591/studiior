@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free. Run after `supabase db reset`.
+-- UUID space e40d, checked free (41 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
