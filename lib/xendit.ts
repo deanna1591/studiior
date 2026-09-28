@@ -34,6 +34,10 @@ export type CreateSessionInput = {
   currency: string; // e.g. "PHP"
   country?: string; // e.g. "PH" — required by Xendit
   description?: string;
+  // Either send an existing Xendit customer_id (returned by a prior session), OR
+  // the customer object below. A reference_id can be used to CREATE a customer
+  // only once, so a member's second checkout must send customer_id instead.
+  customerId?: string; // Xendit "cust-…" — takes precedence over the object
   // Xendit requires the customer object to carry type + reference_id +
   // individual_detail (with given_names) when a customer is sent. reference_id
   // must be alphanumeric with NO special characters, so a member UUID has its
@@ -67,6 +71,12 @@ export function buildSessionBody(input: CreateSessionInput): Record<string, unkn
   if (input.description) body.description = input.description;
   if (input.metadata) body.metadata = input.metadata;
 
+  // An existing customer_id wins — a reference_id may create a customer only
+  // once, so a returning member sends customer_id, not the customer object.
+  if (input.customerId) {
+    body.customer_id = input.customerId;
+    return body;
+  }
   const ref = (input.customerReferenceId ?? "").replace(/[^a-zA-Z0-9]/g, "");
   if (ref && input.customerGivenNames) {
     body.customer = {
@@ -86,6 +96,7 @@ export type CreateSessionResult = {
   payment_session_id: string;
   payment_link_url: string;
   status: string;
+  customer_id?: string | null; // present when a customer object created one
 };
 
 export type XenditError = { status: number; code?: string; message: string };
@@ -141,4 +152,20 @@ export function getSession(secretKey: string, sessionId: string) {
 
 export function getBalance(secretKey: string) {
   return call<{ balance: number }>(secretKey, "/balance", { method: "GET" });
+}
+
+/**
+ * Find an existing Xendit customer id by our reference_id — used to recover when
+ * a customer was created on a prior checkout but we did not store its id (so a
+ * fresh customer-object send would 409 "reference_id used before"). Returns the
+ * id or null.
+ */
+export async function getCustomerByReferenceId(secretKey: string, referenceId: string): Promise<string | null> {
+  const res = await call<{ data?: { id?: string }[] }>(
+    secretKey,
+    `/customers?reference_id=${encodeURIComponent(referenceId)}`,
+    { method: "GET" },
+  );
+  if (!res.ok) return null;
+  return res.data?.data?.[0]?.id ?? null;
 }

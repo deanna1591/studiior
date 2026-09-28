@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (65 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (71 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -479,6 +479,44 @@ select set_config('t.ev_late2', jsonb_build_object('event','payment.succeeded',
 select set_config('t.r_late2', (xendit_webhook(current_setting('t.ev_late2')::jsonb, 'goodtoken'))->>'result', false);
 select expect_text('a later payment.succeeded is processed (distinct event)', current_setting('t.r_late2'), 'processed');
 select expect_num('...but does NOT add a second payment row (no double-activation)', (select count(*) from payments where provider='xendit' and reference='py-psc'), 1);
+
+-- =============================================================================
+-- 18. Decision 40 amendment 6: the Xendit customer id is stored per member (a
+--     reference_id creates a customer only once) and is RLS-scoped.
+-- =============================================================================
+-- another studio's stored customer, to prove isolation (studio B from §14, dd02)
+insert into member_payment_customers (studio_id, member_id, provider, customer_ref) values
+  ('e40de40d-0000-0000-0000-000000000002','e40de40d-0000-0000-0000-00000000dd02','xendit','cust-studioB');
+
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select xendit_set_customer('e40de40d-0000-0000-0000-000000000001','cust-e40d-first');
+select set_config('t.cust1', (select customer_ref from member_payment_customers where member_id='e40de40d-0000-0000-0000-00000000dd01' and provider='xendit'), false);
+-- a second set upserts (still one row, ref updated)
+select xendit_set_customer('e40de40d-0000-0000-0000-000000000001','cust-e40d-second');
+select set_config('t.cust2', (select customer_ref from member_payment_customers where member_id='e40de40d-0000-0000-0000-00000000dd01' and provider='xendit'), false);
+select set_config('t.own_rows', (select count(*)::text from member_payment_customers where member_id='e40de40d-0000-0000-0000-00000000dd01'), false);
+-- the member sees ONLY their own row (not studio B's dd02)
+select set_config('t.member_visible', (select count(*)::text from member_payment_customers), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+-- desk-up staff of studio A see studio A's row, not studio B's
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-0000000000a1',false);
+select set_config('t.staff_visible', (select count(*)::text from member_payment_customers), false);
+-- a non-member cannot store a customer id
+do $$ begin
+  begin perform xendit_set_customer('e40de40d-0000-0000-0000-000000000001','cust-hax');
+    perform set_config('t.set_nonmember','no_raise',false);
+  exception when others then perform set_config('t.set_nonmember', sqlstate, false); end;
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+select expect_text('xendit_set_customer stores the customer id', current_setting('t.cust1'), 'cust-e40d-first');
+select expect_text('...a second set upserts the ref', current_setting('t.cust2'), 'cust-e40d-second');
+select expect_num('...leaving exactly one row', current_setting('t.own_rows')::bigint, 1);
+select expect_num('a member sees ONLY their own customer row (not another studio''s)', current_setting('t.member_visible')::bigint, 1);
+select expect_num('desk-up staff see their studio''s row only', current_setting('t.staff_visible')::bigint, 1);
+-- the owner a1 is manager-up of studio A only, so is_desk_up(A) true, is_desk_up(B) false — but xendit_set_customer as a NON-member of A is refused
+select expect_text('a non-member cannot store a customer id (PT403)', current_setting('t.set_nonmember'), 'PT403');
 
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token

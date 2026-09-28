@@ -4,7 +4,7 @@ import { getMemberContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { currentMemberOrigin } from "@/lib/tenant";
 import { decryptSecret } from "@/lib/integrations-crypto";
-import { createSession } from "@/lib/xendit";
+import { createSession, getCustomerByReferenceId } from "@/lib/xendit";
 
 export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 
@@ -55,31 +55,64 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
     return { ok: false, message: "The studio’s payment key couldn’t be read — ask the studio to reconnect Xendit." };
   }
 
-  const [{ data: plan }, { data: member }] = await Promise.all([
+  const [{ data: plan }, { data: member }, { data: cust }] = await Promise.all([
     supabase.from("membership_plans").select("name").eq("id", planId).maybeSingle(),
     // Xendit requires a customer.reference_id + given_names; the member reads
     // their own row (members_self RLS).
     supabase.from("members").select("first_name, last_name, email").eq("id", ctx.memberId).maybeSingle(),
+    // A Xendit customer created on a prior checkout — reused as customer_id so
+    // we do not re-send the reference_id (which Xendit refuses the second time).
+    supabase.from("member_payment_customers").select("customer_ref")
+      .eq("member_id", ctx.memberId).eq("provider", "xendit").maybeSingle(),
   ]);
 
-  const res = await createSession(secret, {
+  // Must match buildSessionBody's stripping, so the /customers lookup uses the
+  // same reference_id we would have created the customer with.
+  const strippedRef = ctx.memberId.replace(/[^a-zA-Z0-9]/g, "");
+  const common = {
     referenceId: purchase.purchase_id,
     amountCents: purchase.amount_cents,
     currency: purchase.currency,
     country: "PH",
     description: `${ctx.studioName} — ${plan?.name ?? "plan"}`,
+    // purchase_id is the primary way the callback resolves back to this purchase.
+    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
+    successUrl: `${origin}/purchase/${purchase.purchase_id}`,
+    cancelUrl: `${origin}/account/plan`,
+  };
+  const withCustomerId = (customerId: string) => createSession(secret, { ...common, customerId });
+  const withCustomerObject = () => createSession(secret, {
+    ...common,
     customerReferenceId: ctx.memberId, // hyphens stripped in buildSessionBody
     customerGivenNames: member?.first_name ?? ctx.firstName ?? "Member",
     customerSurname: member?.last_name ?? undefined,
     customerEmail: member?.email ?? undefined,
-    // purchase_id is the primary way the callback resolves back to this
-    // purchase (Xendit appends a suffix to the payment's reference_id).
-    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
-    successUrl: `${origin}/purchase/${purchase.purchase_id}`,
-    cancelUrl: `${origin}/account/plan`,
   });
+
+  let res: Awaited<ReturnType<typeof createSession>>;
+  let newCustomerId: string | null = null;
+  if (cust?.customer_ref) {
+    res = await withCustomerId(cust.customer_ref);
+  } else {
+    res = await withCustomerObject();
+    if (res.ok) {
+      newCustomerId = res.data.customer_id ?? null;
+    } else if (/reference_id.*used before|has been used before/i.test(res.error.message)) {
+      // We created the customer on a prior checkout but did not store its id;
+      // look it up by reference_id and retry once with customer_id.
+      const found = await getCustomerByReferenceId(secret, strippedRef);
+      if (found) {
+        await supabase.rpc("xendit_set_customer", { p_studio_id: ctx.studioId, p_customer_id: found });
+        res = await withCustomerId(found);
+      }
+    }
+  }
+
   if (!res.ok) {
     return { ok: false, message: `Couldn’t open checkout: ${res.error.message}` };
+  }
+  if (newCustomerId) {
+    await supabase.rpc("xendit_set_customer", { p_studio_id: ctx.studioId, p_customer_id: newCustomerId });
   }
 
   await supabase.rpc("xendit_attach_session", {

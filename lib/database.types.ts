@@ -3485,6 +3485,62 @@ export type Database = {
           },
         ]
       }
+      member_payment_customers: {
+        Row: {
+          created_at: string
+          customer_ref: string
+          member_id: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_ref: string
+          member_id: string
+          provider: Database["public"]["Enums"]["payment_provider"]
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_ref?: string
+          member_id?: string
+          provider?: Database["public"]["Enums"]["payment_provider"]
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_payment_customers_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_payment_customers_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_payment_customers_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_payment_customers_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_tag_assignments: {
         Row: {
           created_at: string
@@ -7313,18 +7369,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -8743,6 +8787,10 @@ export type Database = {
       xendit_reconcile_sweep: { Args: { p_now?: string }; Returns: Json }
       xendit_reprocess_ignored: { Args: { p_studio_id: string }; Returns: Json }
       xendit_resolve_purchase: { Args: { p_data: Json }; Returns: string }
+      xendit_set_customer: {
+        Args: { p_customer_id: string; p_studio_id: string }
+        Returns: undefined
+      }
       xendit_webhook: {
         Args: { p_event: Json; p_token: string }
         Returns: Json
