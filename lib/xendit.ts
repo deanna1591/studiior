@@ -34,12 +34,53 @@ export type CreateSessionInput = {
   currency: string; // e.g. "PHP"
   country?: string; // e.g. "PH" — required by Xendit
   description?: string;
+  // Xendit requires the customer object to carry type + reference_id +
+  // individual_detail (with given_names) when a customer is sent. reference_id
+  // must be alphanumeric with NO special characters, so a member UUID has its
+  // hyphens stripped in buildSessionBody.
+  customerReferenceId?: string; // the member id (hyphens stripped)
+  customerGivenNames?: string;
+  customerSurname?: string;
   customerEmail?: string;
-  customerName?: string;
   metadata?: Record<string, string>;
   successUrl: string;
   cancelUrl: string;
 };
+
+/**
+ * Build the POST /sessions request body. Pure (no network), so it is unit-
+ * testable. A customer object is included only when we have both the
+ * reference_id and given_names Xendit requires; reference_id is stripped to
+ * alphanumeric (a member UUID's hyphens are "special characters" Xendit rejects).
+ */
+export function buildSessionBody(input: CreateSessionInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    reference_id: input.referenceId,
+    session_type: "PAY",
+    mode: "PAYMENT_LINK",
+    amount: pesosFromCents(input.amountCents),
+    currency: input.currency,
+    country: input.country ?? "PH",
+    success_return_url: input.successUrl,
+    cancel_return_url: input.cancelUrl,
+  };
+  if (input.description) body.description = input.description;
+  if (input.metadata) body.metadata = input.metadata;
+
+  const ref = (input.customerReferenceId ?? "").replace(/[^a-zA-Z0-9]/g, "");
+  if (ref && input.customerGivenNames) {
+    body.customer = {
+      reference_id: ref,
+      type: "INDIVIDUAL",
+      ...(input.customerEmail ? { email: input.customerEmail } : {}),
+      individual_detail: {
+        given_names: input.customerGivenNames,
+        ...(input.customerSurname ? { surname: input.customerSurname } : {}),
+      },
+    };
+  }
+  return body;
+}
 
 export type CreateSessionResult = {
   payment_session_id: string;
@@ -79,26 +120,10 @@ async function call<T>(
 }
 
 export function createSession(secretKey: string, input: CreateSessionInput) {
-  const body: Record<string, unknown> = {
-    reference_id: input.referenceId,
-    session_type: "PAY",
-    mode: "PAYMENT_LINK",
-    amount: pesosFromCents(input.amountCents),
-    currency: input.currency,
-    country: input.country ?? "PH",
-    success_return_url: input.successUrl,
-    cancel_return_url: input.cancelUrl,
-  };
-  if (input.description) body.description = input.description;
-  if (input.metadata) body.metadata = input.metadata;
-  if (input.customerEmail || input.customerName) {
-    body.customer = {
-      type: "INDIVIDUAL",
-      ...(input.customerEmail ? { email: input.customerEmail } : {}),
-      ...(input.customerName ? { individual_detail: { given_names: input.customerName } } : {}),
-    };
-  }
-  return call<CreateSessionResult>(secretKey, "/sessions", { method: "POST", body: JSON.stringify(body) });
+  return call<CreateSessionResult>(secretKey, "/sessions", {
+    method: "POST",
+    body: JSON.stringify(buildSessionBody(input)),
+  });
 }
 
 export type SessionStatus = {

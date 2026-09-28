@@ -55,8 +55,12 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
     return { ok: false, message: "The studio’s payment key couldn’t be read — ask the studio to reconnect Xendit." };
   }
 
-  const { data: plan } = await supabase
-    .from("membership_plans").select("name").eq("id", planId).maybeSingle();
+  const [{ data: plan }, { data: member }] = await Promise.all([
+    supabase.from("membership_plans").select("name").eq("id", planId).maybeSingle(),
+    // Xendit requires a customer.reference_id + given_names; the member reads
+    // their own row (members_self RLS).
+    supabase.from("members").select("first_name, last_name, email").eq("id", ctx.memberId).maybeSingle(),
+  ]);
 
   const res = await createSession(secret, {
     referenceId: purchase.purchase_id,
@@ -64,7 +68,10 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
     currency: purchase.currency,
     country: "PH",
     description: `${ctx.studioName} — ${plan?.name ?? "plan"}`,
-    customerName: ctx.firstName,
+    customerReferenceId: ctx.memberId, // hyphens stripped in buildSessionBody
+    customerGivenNames: member?.first_name ?? ctx.firstName ?? "Member",
+    customerSurname: member?.last_name ?? undefined,
+    customerEmail: member?.email ?? undefined,
     metadata: { studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
     successUrl: `${origin}/purchase/${purchase.purchase_id}`,
     cancelUrl: `${origin}/account/plan`,

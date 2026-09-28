@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (48 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (51 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -195,7 +195,7 @@ select set_config('t.r_bad', (xendit_webhook(current_setting('t.ev_bad')::jsonb,
 
 select expect_text('an amount mismatch is refused', current_setting('t.r_bad'), 'amount_mismatch');
 select expect_text('the mismatch is logged on the event',
-  (select error from xendit_events where event_id='py-e40d-2'), 'amount_mismatch');
+  (select error from xendit_events where payload->'data'->>'payment_id'='py-e40d-2'), 'amount_mismatch');
 select expect_text('the mismatched purchase is still pending (not activated)',
   (select status from xendit_purchases where id=current_setting('t.pid2')::uuid), 'pending');
 select expect_num('still only one membership (mismatch did not activate)',
@@ -234,7 +234,7 @@ select set_config('t.r_unk', (xendit_webhook(current_setting('t.ev_unk')::jsonb,
 select expect_text('an unknown reference is ignored', current_setting('t.r_unk'), 'unknown_reference');
 select expect_num('...and the event IS stored (token was valid), marked ignored',
   (select count(*) from xendit_events), current_setting('t.events_before')::bigint + 1);
-select expect_text('...the stored event carries the reason', (select error from xendit_events where event_id='py-unknown'), 'unknown_reference');
+select expect_text('...the stored event carries the reason', (select error from xendit_events where payload->'data'->>'payment_id'='py-unknown'), 'unknown_reference');
 
 -- =============================================================================
 -- 10. Owner-triggered apply: COMPLETED activates; a non-manager is refused.
@@ -361,6 +361,30 @@ select expect_text('...and studio B''s purchase is NOT activated (still pending)
   (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000b2001'), 'pending');
 select expect_num('...no membership for studio B''s member',
   (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd02'), 0);
+
+-- =============================================================================
+-- 15. Decision 40 amendment 3: the event dedupe key includes the event TYPE, so
+--     a payment.failure then a payment.succeeded for the SAME payment id are two
+--     events, not a duplicate.
+-- =============================================================================
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.pid6', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+
+select set_config('t.ev_f', jsonb_build_object('event','payment.failure',
+  'data', jsonb_build_object('reference_id', current_setting('t.pid6'),
+     'payment_id','py-dedupe','status','FAILED'))::text, false);
+select set_config('t.ev_s', jsonb_build_object('event','payment.succeeded',
+  'data', jsonb_build_object('reference_id', current_setting('t.pid6'),
+     'payment_id','py-dedupe','status','SUCCEEDED','amount',1400,'currency','PHP'))::text, false);
+select set_config('t.r_f', (xendit_webhook(current_setting('t.ev_f')::jsonb, 'goodtoken'))->>'outcome', false);
+select set_config('t.r_s', (xendit_webhook(current_setting('t.ev_s')::jsonb, 'goodtoken'))->>'result', false);
+
+select expect_text('the failure event is processed', current_setting('t.r_f'), 'failed');
+select expect_text('a succeeded with the SAME payment id is NOT a duplicate (type is in the key)', current_setting('t.r_s'), 'processed');
+select expect_num('...both are stored as distinct events',
+  (select count(*) from xendit_events where payload->'data'->>'payment_id'='py-dedupe'), 2);
 
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
