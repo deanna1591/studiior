@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (59 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (65 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -441,6 +441,44 @@ do $$ begin
 end $$;
 select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_text('a non-manager cannot reprocess ignored events (PT403)', current_setting('t.rep_m'), 'PT403');
+
+-- =============================================================================
+-- 17. Decision 40 amendment 5: the real checkout callback is
+--     payment_session.completed with status COMPLETED (amount 8500 PHP, no
+--     data.id, metadata without purchase_id) — it activates; a later
+--     payment.succeeded for the same purchase cannot double-activate.
+-- =============================================================================
+insert into members (id, studio_id, first_name, last_name, email, status) values
+  ('e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-000000000001','Cee','Three','mem3@example.com','active');
+-- a pending PHP 8,500 purchase (850000 centavos) with a stored session id, as
+-- the buy action would have left it. amount_cents set directly for the 8500 case.
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency, payment_session_id) values
+  ('e40de40d-0000-0000-0000-0000000c5c01','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-0000000cc001',850000,'PHP','ps-testsession');
+
+-- the exact payment_session.completed shape (no data.id, metadata without purchase_id)
+select set_config('t.ev_psc', jsonb_build_object(
+  'event','payment_session.completed',
+  'data', jsonb_build_object(
+    'session_type','PAY','status','COMPLETED','amount',8500,'currency','PHP',
+    'reference_id','e40de40d-0000-0000-0000-0000000c5c01',
+    'payment_id','py-psc','payment_session_id','ps-testsession',
+    'metadata', jsonb_build_object('kind','plan','plan_id','e40de40d-0000-0000-0000-0000000cc001',
+      'member_id','e40de40d-0000-0000-0000-00000000dd03','studio_id','e40de40d-0000-0000-0000-000000000001')))::text, false);
+select set_config('t.r_psc', (xendit_webhook(current_setting('t.ev_psc')::jsonb, 'goodtoken'))->>'outcome', false);
+
+select expect_text('payment_session.completed (COMPLETED) activates the purchase', current_setting('t.r_psc'), 'succeeded');
+select expect_text('...the purchase is succeeded', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000c5c01'), 'succeeded');
+select expect_num('...one xendit payment row referencing the payment_id', (select count(*) from payments where provider='xendit' and reference='py-psc'), 1);
+select expect_num('...the PHP 8,500 amount is recorded (850000 centavos)', (select amount_cents from payments where provider='xendit' and reference='py-psc'), 850000);
+
+-- a later payment.succeeded (Payment Requests row, suffixed reference, same
+-- payment id) is a distinct event but cannot double-activate.
+select set_config('t.ev_late2', jsonb_build_object('event','payment.succeeded',
+  'data', jsonb_build_object('reference_id','e40de40d-0000-0000-0000-0000000c5c01_LATE',
+     'payment_id','py-psc','status','SUCCEEDED','amount',8500,'currency','PHP'))::text, false);
+select set_config('t.r_late2', (xendit_webhook(current_setting('t.ev_late2')::jsonb, 'goodtoken'))->>'result', false);
+select expect_text('a later payment.succeeded is processed (distinct event)', current_setting('t.r_late2'), 'processed');
+select expect_num('...but does NOT add a second payment row (no double-activation)', (select count(*) from payments where provider='xendit' and reference='py-psc'), 1);
 
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
