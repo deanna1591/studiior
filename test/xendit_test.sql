@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (71 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (82 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -518,9 +518,84 @@ select expect_num('desk-up staff see their studio''s row only', current_setting(
 -- the owner a1 is manager-up of studio A only, so is_desk_up(A) true, is_desk_up(B) false — but xendit_set_customer as a NON-member of A is refused
 select expect_text('a non-member cannot store a customer id (PT403)', current_setting('t.set_nonmember'), 'PT403');
 
+-- =============================================================================
+-- 19. Decision 40 amendment 7: the v3 "Payment Status" shape. event
+--     payment.capture, status SUCCEEDED, amount in data.request_amount (and
+--     data.captures[].capture_amount, NO data.amount), reference in
+--     data.payment_id (NO data.id). And "Payment Request Status" —
+--     payment_request.expiry with status EXPIRED — for an already-succeeded
+--     purchase changes nothing.
+-- =============================================================================
+-- four pending PHP 8,500 purchases (850000 centavos), as the buy action leaves them
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency) values
+  ('e40de40d-0000-0000-0000-0000000ca301','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-0000000cc001',850000,'PHP'),
+  ('e40de40d-0000-0000-0000-0000000ca302','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-0000000cc001',850000,'PHP'),
+  ('e40de40d-0000-0000-0000-0000000ca303','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-0000000cc001',850000,'PHP'),
+  ('e40de40d-0000-0000-0000-0000000ca304','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-0000000cc001',850000,'PHP');
+
+-- (a) the EXACT v3 payment.capture SUCCEEDED shape (request_amount, captures,
+--     payment_id, no data.amount, no data.id) → activates and validates the amount.
+select set_config('t.ev_v3a', jsonb_build_object(
+  'api_version','v3','event','payment.capture',
+  'data', jsonb_build_object(
+    'payment_id','py-v3a','status','SUCCEEDED',
+    'request_amount', 8500,
+    'captures', jsonb_build_array(jsonb_build_object('capture_amount', 8500)),
+    'reference_id','e40de40d-0000-0000-0000-0000000ca301',
+    'payment_request_id','pr-v3a','customer_id','cust-v3a','currency','PHP'))::text, false);
+select set_config('t.r_v3a', (xendit_webhook(current_setting('t.ev_v3a')::jsonb, 'goodtoken'))->>'outcome', false);
+select expect_text('v3 payment.capture SUCCEEDED (request_amount 8500) activates a pending purchase', current_setting('t.r_v3a'), 'succeeded');
+select expect_text('...the purchase is succeeded', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000ca301'), 'succeeded');
+select expect_num('...the payments row references data.payment_id (py-v3a) at 850000', (select amount_cents from payments where provider='xendit' and reference='py-v3a'), 850000);
+
+-- (b) the amount IS read from request_amount — a wrong request_amount is caught
+--     (before the fix v_amount was null and the check was skipped → wrongly activated).
+select set_config('t.ev_v3b', jsonb_build_object(
+  'api_version','v3','event','payment.capture',
+  'data', jsonb_build_object(
+    'payment_id','py-v3b','status','SUCCEEDED','request_amount', 9999,
+    'reference_id','e40de40d-0000-0000-0000-0000000ca302','currency','PHP'))::text, false);
+select set_config('t.r_v3b', (xendit_webhook(current_setting('t.ev_v3b')::jsonb, 'goodtoken'))->>'reason', false);
+select expect_text('a v3 request_amount mismatch is refused (amount is read, not skipped)', current_setting('t.r_v3b'), 'amount_mismatch');
+select expect_text('...the mismatched purchase is still pending', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000ca302'), 'pending');
+
+-- (c) captures[0].capture_amount is the third amount source (no amount, no request_amount).
+select set_config('t.ev_v3c', jsonb_build_object(
+  'api_version','v3','event','payment.capture',
+  'data', jsonb_build_object(
+    'payment_id','py-v3c','status','SUCCEEDED',
+    'captures', jsonb_build_array(jsonb_build_object('capture_amount', 8500)),
+    'reference_id','e40de40d-0000-0000-0000-0000000ca303','currency','PHP'))::text, false);
+select set_config('t.r_v3c', (xendit_webhook(current_setting('t.ev_v3c')::jsonb, 'goodtoken'))->>'outcome', false);
+select expect_text('captures[0].capture_amount is the third amount source → activates', current_setting('t.r_v3c'), 'succeeded');
+
+-- (d) the payment reference falls back to data.id when there is no data.payment_id.
+select set_config('t.ev_v3d', jsonb_build_object('event','payment.succeeded',
+  'data', jsonb_build_object('id','py-legacy','status','SUCCEEDED','amount', 8500,
+    'reference_id','e40de40d-0000-0000-0000-0000000ca304','currency','PHP'))::text, false);
+select set_config('t.r_v3d', (xendit_webhook(current_setting('t.ev_v3d')::jsonb, 'goodtoken'))->>'outcome', false);
+select expect_text('the payment reference falls back to data.id (no payment_id) → activates', current_setting('t.r_v3d'), 'succeeded');
+select expect_num('...the payments row references data.id (py-legacy)', (select count(*) from payments where provider='xendit' and reference='py-legacy'), 1);
+
+-- (e) a payment_request.expiry (EXPIRED) for an ALREADY-SUCCEEDED purchase (ca301)
+--     changes nothing — fail_internal returns early on a succeeded purchase.
+select set_config('t.memb_dd03', (select count(*)::text from memberships where member_id='e40de40d-0000-0000-0000-00000000dd03'), false);
+select set_config('t.ev_exp3', jsonb_build_object(
+  'api_version','v3','event','payment_request.expiry',
+  'data', jsonb_build_object(
+    'payment_request_id','pr-v3a','status','EXPIRED','request_amount', 8500,
+    'reference_id','e40de40d-0000-0000-0000-0000000ca301','currency','PHP'))::text, false);
+select set_config('t.r_exp3', (xendit_webhook(current_setting('t.ev_exp3')::jsonb, 'goodtoken'))->>'outcome', false);
+select expect_text('payment_request.expiry on a succeeded purchase is processed', current_setting('t.r_exp3'), 'failed');
+select expect_text('...but the purchase stays succeeded (no-op)', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000ca301'), 'succeeded');
+select expect_num('...no membership was removed or added', (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd03'), current_setting('t.memb_dd03')::bigint);
+select expect_num('...the payments row for py-v3a still stands', (select count(*) from payments where provider='xendit' and reference='py-v3a'), 1);
+
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
 -- raises PT401"; removing the amount guard fails the mismatch assertions;
+-- reverting v_amount to read only data.amount fails "a v3 request_amount mismatch
+-- is refused" (the check would be skipped and the purchase wrongly activated);
 -- removing the manager-up guard on xendit_apply_session fails "a non-manager
 -- cannot apply"; the sweep's service_role-only grant (belt: is_service_context)
 -- is what refuses a signed-in user (42501).
