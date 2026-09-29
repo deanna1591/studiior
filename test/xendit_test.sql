@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (82 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (101 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -591,6 +591,81 @@ select expect_text('...but the purchase stays succeeded (no-op)', (select status
 select expect_num('...no membership was removed or added', (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd03'), current_setting('t.memb_dd03')::bigint);
 select expect_num('...the payments row for py-v3a still stands', (select count(*) from payments where provider='xendit' and reference='py-v3a'), 1);
 
+-- =============================================================================
+-- 20. Decision 40 amendment 8: confirm on return (the belt). The member's poll
+--     page asks Xendit directly and applies COMPLETED through a member-guarded
+--     path (xendit_return_check_claim + xendit_return_check_apply). The Xendit
+--     GET is mocked here — the tests pass the session status the action would
+--     have read straight to _apply.
+-- =============================================================================
+-- four pending PHP 1,400 purchases for dd01 (own) and one for dd03 (another member)
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency, payment_session_id) values
+  ('e40de40d-0000-0000-0000-0000000cb301','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-ret1'),
+  ('e40de40d-0000-0000-0000-0000000cb302','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-ret3'),
+  ('e40de40d-0000-0000-0000-0000000cb303','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-ret4'),
+  ('e40de40d-0000-0000-0000-0000000cb304','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd03','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-ret2');
+
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.memb_pre', (select count(*)::text from memberships where member_id='e40de40d-0000-0000-0000-00000000dd01'), false);
+
+-- (a) own pending purchase, COMPLETED session → activated, pack granted, audit 'return_check'.
+select set_config('t.rc_claim', (xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb301'))->>'check', false);
+select set_config('t.rc_apply', (xendit_return_check_apply('e40de40d-0000-0000-0000-0000000cb301','COMPLETED','py-ret1'))->>'outcome', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('the member claims a return-check on their own pending purchase', current_setting('t.rc_claim'), 'true');
+select expect_text('a COMPLETED session activates via the return-check path', current_setting('t.rc_apply'), 'succeeded');
+select expect_text('...the purchase is succeeded', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb301'), 'succeeded');
+select expect_num('...a membership was granted (dd01 +1)', (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd01'), current_setting('t.memb_pre')::bigint + 1);
+select expect_num('...the payments row references the payment id (py-ret1)', (select count(*) from payments where provider='xendit' and reference='py-ret1'), 1);
+select expect_num('...an audit_logs xendit.return_check row was written', (select count(*) from audit_logs where action='xendit.return_check' and entity_id='e40de40d-0000-0000-0000-0000000cb301'), 1);
+
+-- (b) another member's purchase → PT403 from both claim and apply.
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+do $$ begin
+  begin perform xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb304');
+    perform set_config('t.rc_other_claim','no_raise',false);
+  exception when others then perform set_config('t.rc_other_claim', sqlstate, false); end;
+end $$;
+do $$ begin
+  begin perform xendit_return_check_apply('e40de40d-0000-0000-0000-0000000cb304','COMPLETED','py-hax');
+    perform set_config('t.rc_other_apply','no_raise',false);
+  exception when others then perform set_config('t.rc_other_apply', sqlstate, false); end;
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('a member cannot claim another member''s purchase (PT403)', current_setting('t.rc_other_claim'), 'PT403');
+select expect_text('a member cannot apply another member''s purchase (PT403)', current_setting('t.rc_other_apply'), 'PT403');
+select expect_text('...the other member''s purchase is untouched (still pending)', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb304'), 'pending');
+
+-- (c) already succeeded → no-op (no second membership, no second payment, no second audit row).
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.memb_mid', (select count(*)::text from memberships where member_id='e40de40d-0000-0000-0000-00000000dd01'), false);
+select set_config('t.rc_again', (xendit_return_check_apply('e40de40d-0000-0000-0000-0000000cb301','COMPLETED','py-again'))->>'outcome', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('applying a COMPLETED session to an already-succeeded purchase is a no-op success', current_setting('t.rc_again'), 'succeeded');
+select expect_num('...no second membership', (select count(*) from memberships where member_id='e40de40d-0000-0000-0000-00000000dd01'), current_setting('t.memb_mid')::bigint);
+select expect_num('...no second payments row (py-again absent)', (select count(*) from payments where provider='xendit' and reference='py-again'), 0);
+select expect_num('...no second audit row', (select count(*) from audit_logs where action='xendit.return_check' and entity_id='e40de40d-0000-0000-0000-0000000cb301'), 1);
+
+-- (d) EXPIRED session → the purchase is marked expired.
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.rc_exp', (xendit_return_check_apply('e40de40d-0000-0000-0000-0000000cb302','EXPIRED',null))->>'outcome', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('an EXPIRED session is applied as expired', current_setting('t.rc_exp'), 'expired');
+select expect_text('...the purchase is marked expired', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb302'), 'expired');
+
+-- (e) rate limit: a second claim within 5s is throttled; a claim 6s later is allowed.
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.rc_l1', (xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb303'))->>'check', false);
+select set_config('t.rc_l2', (xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb303'))->>'throttled', false);
+select set_config('t.rc_l3', (xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb303', now() + interval '6 seconds'))->>'check', false);
+-- a terminal purchase comes back check=false with its status
+select set_config('t.rc_done', (xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb301'))->>'status', false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('the first claim is allowed', current_setting('t.rc_l1'), 'true');
+select expect_text('a second claim within 5s is throttled', current_setting('t.rc_l2'), 'true');
+select expect_text('a claim 6s later is allowed again', current_setting('t.rc_l3'), 'true');
+select expect_text('a claim on a terminal purchase reports its status, not a check', current_setting('t.rc_done'), 'succeeded');
+
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
 -- raises PT401"; removing the amount guard fails the mismatch assertions;
@@ -598,6 +673,8 @@ select expect_num('...the payments row for py-v3a still stands', (select count(*
 -- is refused" (the check would be skipped and the purchase wrongly activated);
 -- removing the manager-up guard on xendit_apply_session fails "a non-manager
 -- cannot apply"; the sweep's service_role-only grant (belt: is_service_context)
--- is what refuses a signed-in user (42501).
+-- is what refuses a signed-in user (42501). Removing the member-ownership guard
+-- on xendit_return_check_claim/_apply fails the PT403 assertions in §20; dropping
+-- the early return on 'succeeded' in _apply fails "no second membership".
 
 select 'xendit_test: all assertions passed' as result;

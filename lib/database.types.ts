@@ -6709,6 +6709,7 @@ export type Database = {
           currency: string
           failure_reason: string | null
           id: string
+          last_return_check_at: string | null
           member_id: string
           payment_link_url: string | null
           payment_session_id: string | null
@@ -6725,6 +6726,7 @@ export type Database = {
           currency: string
           failure_reason?: string | null
           id?: string
+          last_return_check_at?: string | null
           member_id: string
           payment_link_url?: string | null
           payment_session_id?: string | null
@@ -6741,6 +6743,7 @@ export type Database = {
           currency?: string
           failure_reason?: string | null
           id?: string
+          last_return_check_at?: string | null
           member_id?: string
           payment_link_url?: string | null
           payment_session_id?: string | null
@@ -7368,6 +7371,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -8787,6 +8802,18 @@ export type Database = {
       xendit_reconcile_sweep: { Args: { p_now?: string }; Returns: Json }
       xendit_reprocess_ignored: { Args: { p_studio_id: string }; Returns: Json }
       xendit_resolve_purchase: { Args: { p_data: Json }; Returns: string }
+      xendit_return_check_apply: {
+        Args: {
+          p_payment_id?: string
+          p_purchase_id: string
+          p_session_status: string
+        }
+        Returns: Json
+      }
+      xendit_return_check_claim: {
+        Args: { p_now?: string; p_purchase_id: string }
+        Returns: Json
+      }
       xendit_set_customer: {
         Args: { p_customer_id: string; p_studio_id: string }
         Returns: undefined

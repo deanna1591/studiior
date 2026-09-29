@@ -3,19 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/member/icons";
-import { purchaseStatus } from "./actions";
+import { purchaseStatus, confirmWithXendit } from "./actions";
 
 const TERMINAL = ["succeeded", "failed", "expired", "cancelled"];
 
 /**
  * The member lands here from Xendit's hosted checkout (success_return_url). The
- * callback is what actually grants the plan, so we poll our own purchase row
- * until it flips (every 3s, up to 2 minutes) rather than trusting the return.
+ * callback is the primary path that grants the plan, so we poll our own purchase
+ * row every 3s (up to 2 minutes). As a BELT (Decision 40 amendment 8) we ask
+ * Xendit directly on every OTHER tick — confirmWithXendit is server-rate-limited
+ * to once per 5s per purchase, so a ~6s cadence never over-asks — which recovers
+ * a payment whose webhook was late or never delivered.
  */
 export default function PurchasePoll({ id, initialStatus }: { id: string; initialStatus: string | null }) {
   const [status, setStatus] = useState<string | null>(initialStatus);
   const [timedOut, setTimedOut] = useState(false);
   const started = useRef(Date.now());
+  const ticks = useRef(0);
 
   useEffect(() => {
     if (status && TERMINAL.includes(status)) return;
@@ -23,7 +27,10 @@ export default function PurchasePoll({ id, initialStatus }: { id: string; initia
     const tick = async () => {
       if (!alive) return;
       if (Date.now() - started.current > 120_000) { setTimedOut(true); return; }
-      const s = await purchaseStatus(id);
+      // Even ticks ask Xendit directly (the belt); odd ticks read our own row
+      // (catches a webhook that landed in between).
+      const n = ticks.current++;
+      const s = n % 2 === 0 ? await confirmWithXendit(id) : await purchaseStatus(id);
       if (!alive) return;
       if (s) setStatus(s);
       if (!s || !TERMINAL.includes(s)) setTimeout(tick, 3000);
