@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (101 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (110 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -666,6 +666,69 @@ select expect_text('a second claim within 5s is throttled', current_setting('t.r
 select expect_text('a claim 6s later is allowed again', current_setting('t.rc_l3'), 'true');
 select expect_text('a claim on a terminal purchase reports its status, not a check', current_setting('t.rc_done'), 'succeeded');
 
+-- =============================================================================
+-- 21. Decision 40 amendment 9: the return-check records its outcome so a stuck
+--     purchase says why (last_return_check_result), and the note is member-guarded.
+-- =============================================================================
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency, payment_session_id) values
+  ('e40de40d-0000-0000-0000-0000000cb601','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-res1'),
+  ('e40de40d-0000-0000-0000-0000000cb602','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-res2');
+
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select xendit_return_check_claim('e40de40d-0000-0000-0000-0000000cb601');
+select set_config('t.res_claim', (select last_return_check_result from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb601'), false);
+select xendit_return_check_apply('e40de40d-0000-0000-0000-0000000cb601','COMPLETED','py-res1');
+select set_config('t.res_apply', (select last_return_check_result from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb601'), false);
+-- the action records a failure reason for its own purchase
+select xendit_return_check_note('e40de40d-0000-0000-0000-0000000cb602','get_failed:0');
+select set_config('t.res_note', (select last_return_check_result from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb602'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('claim stamps last_return_check_result = checking', current_setting('t.res_claim'), 'checking');
+select expect_text('apply records the completed outcome', current_setting('t.res_apply'), 'completed');
+select expect_text('note records a failure reason', current_setting('t.res_note'), 'get_failed:0');
+
+-- another member cannot note (dd01's purchase, caller e02 who is not that member)
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e02',false);
+do $$ begin
+  begin perform xendit_return_check_note('e40de40d-0000-0000-0000-0000000cb602','hax');
+    perform set_config('t.note_other','no_raise',false);
+  exception when others then perform set_config('t.note_other', sqlstate, false); end;
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('a member cannot note another member''s purchase (PT403)', current_setting('t.note_other'), 'PT403');
+select expect_text('...and the note is unchanged', (select last_return_check_result from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb602'), 'get_failed:0');
+
+-- =============================================================================
+-- 22. Decision 40 amendment 9 ROOT CAUSE: activation must NOT raise PT403 when
+--     the conversion bonus is on and the caller is NOT service-context (the anon
+--     webhook, the member belt). award_conversion_bonus_run must call the
+--     UNGUARDED member_first_class_run — reverting it to member_first_class makes
+--     this section fail with cv_state = 'PT403' (the exact production 500).
+-- =============================================================================
+update studio_settings set conversion_bonus_enabled = true, conversion_bonus_cents = 50000,
+       conversion_window_days = 30 where studio_id = 'e40de40d-0000-0000-0000-000000000001';
+update membership_plans set counts_for_conversion = true where id = 'e40de40d-0000-0000-0000-0000000cc001';
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency, payment_session_id) values
+  ('e40de40d-0000-0000-0000-0000000cb701','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP','ps-cv1');
+
+set role anon;
+do $$ declare r jsonb; begin
+  begin
+    r := xendit_webhook(jsonb_build_object('event','payment.succeeded',
+      'data', jsonb_build_object('reference_id','e40de40d-0000-0000-0000-0000000cb701',
+        'status','SUCCEEDED','amount',1400,'currency','PHP','payment_id','py-cv1')), 'goodtoken');
+    perform set_config('t.cv_result', r->>'result', false);
+    perform set_config('t.cv_state', 'ok', false);
+  exception when others then
+    perform set_config('t.cv_state', sqlstate, false);
+  end;
+end $$;
+reset role;
+select expect_text('an anon webhook with the conversion bonus ON does NOT raise PT403', current_setting('t.cv_state'), 'ok');
+select expect_text('...the callback is processed', current_setting('t.cv_result'), 'processed');
+select expect_text('...the purchase is succeeded', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb701'), 'succeeded');
+select expect_num('...the pack was granted (payments row py-cv1)', (select count(*) from payments where provider='xendit' and reference='py-cv1'), 1);
+
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token
 -- raises PT401"; removing the amount guard fails the mismatch assertions;
@@ -676,5 +739,7 @@ select expect_text('a claim on a terminal purchase reports its status, not a che
 -- is what refuses a signed-in user (42501). Removing the member-ownership guard
 -- on xendit_return_check_claim/_apply fails the PT403 assertions in §20; dropping
 -- the early return on 'succeeded' in _apply fails "no second membership".
+-- Reverting award_conversion_bonus_run to call the GUARDED member_first_class
+-- makes §22 fail with cv_state = 'PT403' — the exact production 500.
 
 select 'xendit_test: all assertions passed' as result;

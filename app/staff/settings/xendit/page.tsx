@@ -30,6 +30,14 @@ export default async function XenditSettings() {
     .select("key_last4, test_mode, last_verified_at")
     .eq("studio_id", ctx.studioId).eq("provider", "xendit").maybeSingle();
 
+  // Pending purchases + why the last return-check did nothing, so staff can see
+  // WHY a payment is stuck (Decision 40 amendment 9).
+  const { data: pending } = await supabase
+    .from("xendit_purchases")
+    .select("id, amount_cents, currency, last_return_check_result, last_return_check_at, created_at")
+    .eq("studio_id", ctx.studioId).eq("status", "pending")
+    .order("created_at", { ascending: false }).limit(20);
+
   const staffOrigin = process.env.NEXT_PUBLIC_STAFF_ORIGIN ?? "https://app.studiior.com";
   const callbackUrl = `${staffOrigin}/api/xendit/callback`;
 
@@ -42,6 +50,13 @@ export default async function XenditSettings() {
             testMode={prov.test_mode}
             lastVerifiedAt={prov.last_verified_at}
             callbackUrl={callbackUrl}
+            pending={(pending ?? []).map((p) => ({
+              id: p.id,
+              amountCents: p.amount_cents,
+              currency: p.currency,
+              lastResult: p.last_return_check_result,
+              lastCheckAt: p.last_return_check_at,
+            }))}
           />
         ) : (
           <>

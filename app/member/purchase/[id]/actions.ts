@@ -31,36 +31,44 @@ async function plainStatus(supabase: Supa, id: string): Promise<string | null> {
  */
 export async function confirmWithXendit(id: string): Promise<string | null> {
   const supabase = createClient();
+  // Best-effort: record WHY a return-check did nothing, so a stuck purchase names
+  // its own failure instead of hiding behind a silent 200 (Decision 40 amdt 9).
+  const note = async (r: string) => {
+    try { await supabase.rpc("xendit_return_check_note", { p_purchase_id: id, p_result: r }); }
+    catch { /* never let the note itself mask the outcome */ }
+  };
   try {
     const { data: claimData, error: cErr } = await supabase.rpc("xendit_return_check_claim", {
       p_purchase_id: id,
     });
-    if (cErr) return plainStatus(supabase, id);
+    if (cErr) { await note("claim_failed:" + (cErr.code || "err")); return plainStatus(supabase, id); }
     const claim = (Array.isArray(claimData) ? claimData[0] : claimData) as
       | { status: string; check: boolean; session_id?: string; studio_id?: string }
       | null;
     if (!claim) return plainStatus(supabase, id);
     // Terminal, throttled, or no session attached — nothing to ask Xendit.
     if (!claim.check) return claim.status;
-    if (!claim.session_id || !claim.studio_id) return "pending";
+    if (!claim.session_id || !claim.studio_id) { await note("no_session"); return "pending"; }
 
-    const { data: cctx } = await supabase.rpc("xendit_checkout_context", {
+    const { data: cctx, error: ctxErr } = await supabase.rpc("xendit_checkout_context", {
       p_studio_id: claim.studio_id,
     });
+    if (ctxErr) { await note("context_failed:" + (ctxErr.code || "err")); return "pending"; }
     const ctx = (Array.isArray(cctx) ? cctx[0] : cctx) as { secret_key_ciphertext: string } | null;
-    if (!ctx?.secret_key_ciphertext) return "pending";
+    if (!ctx?.secret_key_ciphertext) { await note("no_ciphertext"); return "pending"; }
     let secret: string;
     try {
       secret = decryptSecret(ctx.secret_key_ciphertext);
     } catch {
-      return "pending";
+      await note("decrypt_failed"); return "pending";
     }
 
     const res = await getSession(secret, claim.session_id);
-    if (!res.ok) return "pending"; // Xendit unreachable — keep polling, don't error
+    if (!res.ok) { await note("get_failed:" + res.error.status); return "pending"; } // 0 = network
     const st = (res.data.status ?? "").toUpperCase();
     if (st !== "COMPLETED" && st !== "EXPIRED" && st !== "CANCELED" && st !== "CANCELLED") {
-      return "pending"; // still ACTIVE (or unknown) — nothing to apply yet
+      await note("session_" + (st ? st.toLowerCase() : "unknown")); // still ACTIVE — nothing to apply
+      return "pending";
     }
 
     const { error: aErr } = await supabase.rpc("xendit_return_check_apply", {
@@ -68,9 +76,10 @@ export async function confirmWithXendit(id: string): Promise<string | null> {
       p_session_status: res.data.status,
       p_payment_id: res.data.payment_id ?? undefined,
     });
-    if (aErr) return plainStatus(supabase, id);
-    return plainStatus(supabase, id);
-  } catch {
+    if (aErr) { await note("apply_failed:" + (aErr.code || "err")); return plainStatus(supabase, id); }
+    return plainStatus(supabase, id); // apply set last_return_check_result
+  } catch (e) {
+    await note("action_threw:" + (e instanceof Error ? e.name : "unknown"));
     return plainStatus(supabase, id);
   }
 }

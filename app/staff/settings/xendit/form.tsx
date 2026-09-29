@@ -33,9 +33,14 @@ export function ConnectForm() {
   );
 }
 
+type PendingPurchase = {
+  id: string; amountCents: number; currency: string;
+  lastResult: string | null; lastCheckAt: string | null;
+};
+
 export function ConnectedPanel({
-  keyLast4, testMode, lastVerifiedAt, callbackUrl,
-}: { keyLast4: string | null; testMode: boolean; lastVerifiedAt: string | null; callbackUrl: string }) {
+  keyLast4, testMode, lastVerifiedAt, callbackUrl, pending = [],
+}: { keyLast4: string | null; testMode: boolean; lastVerifiedAt: string | null; callbackUrl: string; pending?: PendingPurchase[] }) {
   const [testState, testAction] = useFormState<XenditState, FormData>(testXenditConnection, null);
   const [syncState, syncAction] = useFormState<XenditState, FormData>(syncPendingXendit, null);
   const [offState, offAction] = useFormState<XenditState, FormData>(disconnectXendit, null);
@@ -60,6 +65,30 @@ export function ConnectedPanel({
       </div>
       {testState && <Notice kind={testState.ok ? "ok" : "error"}>{testState.message}</Notice>}
       {syncState && <Notice kind={syncState.ok ? "ok" : "error"}>{syncState.message}</Notice>}
+
+      {pending.length > 0 && (
+        <div className="border-t border-line pt-4">
+          <p className="text-[13px] font-semibold text-ink">Pending payments</p>
+          <p className="mb-2 text-[12px] text-ink-3">
+            Waiting to confirm. The last column is what the member app’s own check saw —
+            it tells you why a payment is still pending.
+          </p>
+          <ul className="space-y-1">
+            {pending.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[12px]">
+                <span className="font-mono text-ink-2">{p.id.slice(0, 8)}</span>
+                <span className="tabular-nums text-ink">
+                  {(p.amountCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0 })} {p.currency}
+                </span>
+                <span className="text-ink-2">
+                  {p.lastResult ?? "not checked yet"}
+                  {p.lastCheckAt && <span className="text-ink-3"> · {new Date(p.lastCheckAt).toLocaleTimeString()}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <form action={offAction} className="border-t border-line pt-4">
         {offState && !offState.ok && <Notice kind="error">{offState.message}</Notice>}

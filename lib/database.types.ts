@@ -6710,6 +6710,7 @@ export type Database = {
           failure_reason: string | null
           id: string
           last_return_check_at: string | null
+          last_return_check_result: string | null
           member_id: string
           payment_link_url: string | null
           payment_session_id: string | null
@@ -6727,6 +6728,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           last_return_check_at?: string | null
+          last_return_check_result?: string | null
           member_id: string
           payment_link_url?: string | null
           payment_session_id?: string | null
@@ -6744,6 +6746,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           last_return_check_at?: string | null
+          last_return_check_result?: string | null
           member_id?: string
           payment_link_url?: string | null
           payment_session_id?: string | null
@@ -8813,6 +8816,10 @@ export type Database = {
       xendit_return_check_claim: {
         Args: { p_now?: string; p_purchase_id: string }
         Returns: Json
+      }
+      xendit_return_check_note: {
+        Args: { p_purchase_id: string; p_result: string }
+        Returns: undefined
       }
       xendit_set_customer: {
         Args: { p_customer_id: string; p_studio_id: string }
