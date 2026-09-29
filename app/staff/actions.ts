@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { zonedToUtc } from "@/lib/time";
 import { memberOrigin } from "@/lib/tenant";
+import { standaloneFlexSentence } from "@/lib/flex-copy";
+import { standbyText } from "@/app/staff/series/shared";
 
 export async function signIn(_prev: string | null, formData: FormData) {
   const supabase = createClient();
@@ -96,12 +98,12 @@ export async function createClassOccurrence(_prev: CreateClassState, formData: F
   // A clean create goes straight back to the dashboard, as before. One that
   // carries a warning stays so the studio reads it.
   if (warnings.length === 0) redirect("/");
+  const st = warnings.includes("standalone_flex")
+    ? await standbyText(ctx.studioId, ctx.currency) : null;
   return {
     ok: true,
     message: `Added, ${r.local_when}.`
-      + (warnings.includes("standalone_flex")
-          ? " It is a standalone flex class — no other class of that instructor beside it — so it carries a standby fee."
-          : "")
+      + standaloneFlexSentence(st, 1)
       + (warnings.includes("outside_availability")
           ? " It is outside the hours they have said they work — they have not been told."
           : ""),

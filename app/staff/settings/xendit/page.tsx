@@ -38,6 +38,11 @@ export default async function XenditSettings() {
     .eq("studio_id", ctx.studioId).eq("status", "pending")
     .order("created_at", { ascending: false }).limit(20);
 
+  // Recent webhook events, with the outcome and — for a failure — WHY. Read
+  // through a manager-up SECURITY DEFINER reader: xendit_events is closed to
+  // clients (the token is a credential, the payload opaque). Read-only.
+  const { data: events } = await supabase.rpc("xendit_recent_events", { p_studio_id: ctx.studioId });
+
   const staffOrigin = process.env.NEXT_PUBLIC_STAFF_ORIGIN ?? "https://app.studiior.com";
   const callbackUrl = `${staffOrigin}/api/xendit/callback`;
 
@@ -56,6 +61,12 @@ export default async function XenditSettings() {
               currency: p.currency,
               lastResult: p.last_return_check_result,
               lastCheckAt: p.last_return_check_at,
+            }))}
+            events={(events ?? []).map((e) => ({
+              eventType: e.event_type,
+              result: e.result,
+              error: e.error,
+              receivedAt: e.received_at,
             }))}
           />
         ) : (

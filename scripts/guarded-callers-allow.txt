@@ -1,0 +1,3 @@
+# guarded-caller allowlist: "caller -> guarded  # reason"
+# A function that calls a guarded wrapper on purpose (a member-facing path where
+# the guard IS the point) goes here, one per line, with a reason. Empty for now.

@@ -133,6 +133,13 @@ export default async function MemberLogin({
             Create an account
           </Link>
 
+          {/* Instructors and members sign in on the same host at different URLs;
+              a link across so nobody lands on the wrong one (Deanna, 30 Sep). */}
+          <Link href="/instructor/login" className="m-micro mt-3 block text-center underline underline-offset-4"
+                style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>
+            Instructor? Sign in here
+          </Link>
+
           {process.env.NODE_ENV === "development" && (
             <p className="m-micro mt-4 text-center"
                style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>

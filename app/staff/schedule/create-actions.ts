@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { fields, invalid, insertSeriesRow, seriesSkipWarning, skipWarningText, seriesAvailabilityWarning, availabilityWarningText } from "@/app/staff/series/shared";
+import { fields, invalid, insertSeriesRow, seriesSkipWarning, skipWarningText, seriesAvailabilityWarning, availabilityWarningText, standbyText } from "@/app/staff/series/shared";
+import { standaloneFlexSentence } from "@/lib/flex-copy";
 
 /**
  * Creating a class from an empty slot on the calendar.
@@ -102,14 +103,14 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
 
   revalidatePath("/schedule"); revalidatePath("/");
   const warnings = r.warnings ?? [];
+  const st = warnings.includes("standalone_flex")
+    ? await standbyText(ctx.studioId, ctx.currency) : null;
   return {
     ok: true,
     occurrenceId: r.occurrence_id!,
     warnings,
     message: `Added, ${r.local_when}.`
-      + (warnings.includes("standalone_flex")
-          ? " It is a standalone flex class — no other class of that instructor beside it — so it carries a standby fee."
-          : "")
+      + standaloneFlexSentence(st, 1)
       + (warnings.includes("outside_availability")
           ? " It is outside the hours they have said they work — they have not been told."
           : ""),
@@ -159,6 +160,7 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
   const tier = String(fd.get("tier") ?? "").trim();
   const minBookings = String(fd.get("min_bookings") ?? "").trim();
   const warnings: string[] = [];
+  let standaloneCount = 0;
   if (tier === "flex" || tier === "always" || (tier === "core" && minBookings !== "")) {
     const { data: g } = await supabase.rpc("set_series_guarantee", {
       p_series_id: res.id,
@@ -166,7 +168,10 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
       p_min_bookings: minBookings === "" ? undefined : Number(minBookings),
     });
     const gr = g as unknown as { standalone_count?: number } | null;
-    if (tier === "flex" && (gr?.standalone_count ?? 0) > 0) warnings.push("standalone_flex");
+    if (tier === "flex" && (gr?.standalone_count ?? 0) > 0) {
+      warnings.push("standalone_flex");
+      standaloneCount = gr?.standalone_count ?? 0;
+    }
   }
 
   // Weeks the generator silently skipped because the instructor or room was busy.
@@ -195,9 +200,9 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
         : "Repeating class created. Its year of classes is on the calendar now.")
       + (avail ? ` ${availabilityWarningText(avail)}` : "")
       + (confirmed ? " Marked confirmed with the instructor — they won't be asked." : "")
-      + (warnings.includes("standalone_flex")
-          ? " Some are standalone flex classes — no other class of that instructor beside them — so they carry a standby fee."
-          : ""),
+      + standaloneFlexSentence(
+          warnings.includes("standalone_flex") ? await standbyText(ctx.studioId, ctx.currency) : null,
+          standaloneCount),
   };
 }
 

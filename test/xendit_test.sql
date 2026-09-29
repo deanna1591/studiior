@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (110 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (119 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
@@ -728,6 +728,43 @@ select expect_text('an anon webhook with the conversion bonus ON does NOT raise 
 select expect_text('...the callback is processed', current_setting('t.cv_result'), 'processed');
 select expect_text('...the purchase is succeeded', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb701'), 'succeeded');
 select expect_num('...the pack was granted (payments row py-cv1)', (select count(*) from payments where provider='xendit' and reference='py-cv1'), 1);
+
+-- =============================================================================
+-- 23. Store the event BEFORE processing (migration 187): a processing FAILURE
+--     leaves a stored row with result='failed' + the error, and re-sending the
+--     same event reprocesses it (not a duplicate) and flips it to processed. A
+--     test-only BEFORE INSERT trigger on payments forces the activation to raise.
+-- =============================================================================
+create function e40d_boom() returns trigger language plpgsql as $$
+begin
+  if new.reference = 'py-boom' then raise exception 'boom (forced test failure)' using errcode = 'P0001'; end if;
+  return new;
+end $$;
+create trigger e40d_boom_trg before insert on payments for each row execute function e40d_boom();
+
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency) values
+  ('e40de40d-0000-0000-0000-0000000cb801','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cc001',140000,'PHP');
+select set_config('t.ev_boom', jsonb_build_object('event','payment.succeeded',
+  'data', jsonb_build_object('reference_id','e40de40d-0000-0000-0000-0000000cb801',
+    'status','SUCCEEDED','amount',1400,'currency','PHP','payment_id','py-boom'))::text, false);
+select set_config('t.boom1', (xendit_webhook(current_setting('t.ev_boom')::jsonb, 'goodtoken'))->>'result', false);
+select expect_text('a processing failure returns result=failed (not a raise)', current_setting('t.boom1'), 'failed');
+select expect_text('...the event row is STORED with result=failed', (select result from xendit_events where event_id='payment.succeeded:py-boom'), 'failed');
+select expect_true('...with the error text captured', (select error is not null and length(error) > 0 from xendit_events where event_id='payment.succeeded:py-boom'));
+select expect_text('...the purchase is still pending (activation rolled back)', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb801'), 'pending');
+select expect_num('...and no payments row was left behind', (select count(*) from payments where reference='py-boom'), 0);
+
+-- clear the forced failure and re-send the SAME event: reprocessed, not duplicate.
+drop trigger e40d_boom_trg on payments;
+select set_config('t.boom2', (xendit_webhook(current_setting('t.ev_boom')::jsonb, 'goodtoken'))->>'result', false);
+select expect_text('re-sending a failed event reprocesses it (not a duplicate)', current_setting('t.boom2'), 'processed');
+select expect_text('...the stored row flips to result=processed', (select result from xendit_events where event_id='payment.succeeded:py-boom'), 'processed');
+select expect_text('...the purchase is now succeeded', (select status from xendit_purchases where id='e40de40d-0000-0000-0000-0000000cb801'), 'succeeded');
+select expect_num('...and the payments row now exists', (select count(*) from payments where reference='py-boom'), 1);
+-- a PROCESSED event re-sent again is a duplicate (only 'failed' rows reprocess).
+select set_config('t.boom3', (xendit_webhook(current_setting('t.ev_boom')::jsonb, 'goodtoken'))->>'result', false);
+select expect_text('a processed event re-sent is a duplicate', current_setting('t.boom3'), 'duplicate');
+drop function e40d_boom();
 
 -- --- Teeth-of-teeth note ------------------------------------------------------
 -- Reverting the token check in xendit_webhook fails "a wrong callback token

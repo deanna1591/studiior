@@ -1,5 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { studioToday, shiftDateKey } from "@/lib/tz";
+import { formatMoney } from "@/lib/plans";
+
+/**
+ * The studio's standby-fee text for the standalone-flex warning, or null when
+ * the studio pays no standby (flex_standby_pay_cents = 0) — then the warning is
+ * silent (Reform pays none, so "so it carries a standby fee" was a false claim).
+ * Read once from studio_settings; the caller passes the result to
+ * standaloneFlexSentence, which is empty on a null amount.
+ */
+export async function standbyText(studioId: string, currency: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.from("studio_settings")
+    .select("flex_standby_pay_cents").eq("studio_id", studioId).maybeSingle();
+  const cents = data?.flex_standby_pay_cents ?? 0;
+  return cents > 0 ? formatMoney(cents, currency) : null;
+}
 
 // Shared between the /series form actions and the Schedule calendar's
 // click-to-create (Decision 37). Kept OUT of the "use server" actions file

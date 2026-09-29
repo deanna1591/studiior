@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { standbyText } from "./shared";
+import { standaloneFlexSentence } from "@/lib/flex-copy";
 import type { EditResult } from "./actions";
 
 /**
@@ -211,6 +213,7 @@ export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promis
   // told rather than left to find it at payroll. A warning, not a refusal:
   // adjacency changes when other classes move.
   const standalone = tier === "flex" ? (r?.standalone_count ?? 0) : 0;
+  const st = standalone > 0 ? await standbyText(ctx.studioId, ctx.currency) : null;
   return {
     ok: true,
     message:
@@ -220,8 +223,6 @@ export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promis
         ? "Set to flex. It runs only if it reaches its minimum by the cutoff."
         : "Set to core. It runs if it reaches its minimum, and pays a holding rate if it does not.")
       + (n ? ` ${n} class${n === 1 ? "" : "es"} already on the calendar updated.` : "")
-      + (standalone
-          ? ` Heads up: ${standalone} of them ${standalone === 1 ? "is" : "are"} standalone — no other class of this instructor beside ${standalone === 1 ? "it" : "them"} — so ${standalone === 1 ? "it carries" : "each carries"} a standby fee.`
-          : ""),
+      + standaloneFlexSentence(st, standalone),
   };
 }

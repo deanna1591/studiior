@@ -38,9 +38,13 @@ type PendingPurchase = {
   lastResult: string | null; lastCheckAt: string | null;
 };
 
+type WebhookEvent = {
+  eventType: string | null; result: string | null; error: string | null; receivedAt: string;
+};
+
 export function ConnectedPanel({
-  keyLast4, testMode, lastVerifiedAt, callbackUrl, pending = [],
-}: { keyLast4: string | null; testMode: boolean; lastVerifiedAt: string | null; callbackUrl: string; pending?: PendingPurchase[] }) {
+  keyLast4, testMode, lastVerifiedAt, callbackUrl, pending = [], events = [],
+}: { keyLast4: string | null; testMode: boolean; lastVerifiedAt: string | null; callbackUrl: string; pending?: PendingPurchase[]; events?: WebhookEvent[] }) {
   const [testState, testAction] = useFormState<XenditState, FormData>(testXenditConnection, null);
   const [syncState, syncAction] = useFormState<XenditState, FormData>(syncPendingXendit, null);
   const [offState, offAction] = useFormState<XenditState, FormData>(disconnectXendit, null);
@@ -84,6 +88,30 @@ export function ConnectedPanel({
                   {p.lastResult ?? "not checked yet"}
                   {p.lastCheckAt && <span className="text-ink-3"> · {new Date(p.lastCheckAt).toLocaleTimeString()}</span>}
                 </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {events.length > 0 && (
+        <div className="border-t border-line pt-4">
+          <p className="text-[13px] font-semibold text-ink">Recent webhook events</p>
+          <p className="mb-2 text-[12px] text-ink-3">
+            What Xendit has sent us. A failed one shows why — the payment is not lost,
+            it retries and reprocesses on its own.
+          </p>
+          <ul className="space-y-1">
+            {events.map((e, i) => (
+              <li key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
+                <span className="font-mono text-ink-2">{e.eventType ?? "—"}</span>
+                <span className={e.result === "failed" ? "font-medium text-coral" : "text-ink-2"}>
+                  {e.result ?? "—"}
+                </span>
+                {e.result === "failed" && e.error && (
+                  <span className="text-ink-3">{e.error}</span>
+                )}
+                <span className="ml-auto text-ink-3">{new Date(e.receivedAt).toLocaleString()}</span>
               </li>
             ))}
           </ul>

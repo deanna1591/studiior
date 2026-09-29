@@ -6653,6 +6653,7 @@ export type Database = {
           processed_at: string | null
           purchase_id: string | null
           received_at: string
+          result: string | null
           studio_id: string | null
         }
         Insert: {
@@ -6664,6 +6665,7 @@ export type Database = {
           processed_at?: string | null
           purchase_id?: string | null
           received_at?: string
+          result?: string | null
           studio_id?: string | null
         }
         Update: {
@@ -6675,6 +6677,7 @@ export type Database = {
           processed_at?: string | null
           purchase_id?: string | null
           received_at?: string
+          result?: string | null
           studio_id?: string | null
         }
         Relationships: [
@@ -7374,18 +7377,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -8801,6 +8792,16 @@ export type Database = {
       xendit_fail_purchase_internal: {
         Args: { p_purchase_id: string; p_reason: string; p_status: string }
         Returns: undefined
+      }
+      xendit_recent_events: {
+        Args: { p_studio_id: string }
+        Returns: {
+          error: string
+          event_type: string
+          processed_at: string
+          received_at: string
+          result: string
+        }[]
       }
       xendit_reconcile_sweep: { Args: { p_now?: string }; Returns: Json }
       xendit_reprocess_ignored: { Args: { p_studio_id: string }; Returns: Json }

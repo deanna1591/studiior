@@ -54,6 +54,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "callback failed" }, { status: 500 });
   }
 
+  // A PROCESSING failure now comes back as data.result === 'failed' (the event
+  // is stored regardless — store-first, migration 187). Log the SQLSTATE and
+  // return 500 so Xendit retries; the retry reprocesses the stored 'failed' row.
+  // Never echo the database message to the caller.
+  const result = (data as { result?: string; error_code?: string } | null)?.result;
+  if (result === "failed") {
+    console.error("xendit callback processing failed", (data as { error_code?: string }).error_code);
+    return NextResponse.json({ error: "callback failed" }, { status: 500 });
+  }
+
   // ignored / duplicate / processed / refused all come back with no error -> 200
   // (a mismatch or a sample won't fix itself on a retry; Xendit stops retrying).
   return NextResponse.json(data ?? { result: "ok" }, { status: 200 });

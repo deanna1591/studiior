@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import Link from "next/link";
 import type { Database } from "@/lib/database.types";
 import { currentSlug } from "@/lib/tenant";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
@@ -38,6 +39,10 @@ export default async function InstructorLogin() {
           Your week, your rosters, cover, availability and what you are owed.
         </p>
         <LoginForm />
+        {/* The mirror of the member login's cross-link (Deanna, 30 Sep). */}
+        <Link href="/login" className="m-micro mt-4 block text-center text-ink-3 underline underline-offset-4">
+          Member? Sign in here
+        </Link>
       </main>
     </div>
   );
