@@ -81,25 +81,10 @@ export function fromStudioWall(wall: Date, tz: string): Date {
   return guess;
 }
 
-/**
- * A wall-clock Date for 'YYYY-MM-DD' at a given hour, for the grid's bounds.
- *
- * HOUR 24 IS THE END OF THE SAME DAY, NOT MIDNIGHT OF THE NEXT ONE. A studio
- * open until 22:50 makes the schedule page compute maxHour = 24 (ceil(1370/60)+1),
- * and `new Date(y, m-1, d, 24, ...)` rolls JavaScript over to the FOLLOWING day
- * at 00:00 — so react-big-calendar was handed a `max` on a different calendar
- * day than its `min`/`date`, which it cannot lay out: every event collapsed to
- * top:100% height:0%, a single strip at the very bottom of the grid. Clamping to
- * 23:59:59.999 keeps `max` on the anchor day (rbc's own end-of-day convention),
- * so the last hour is shown and events position at their real times. Only `max`
- * ever reaches 24 here — minHour is floor(earliest/60)-1 ≤ 22, `date` is noon,
- * `scrollToTime` is minHour — so nothing else changes.
- */
-export function wallAt(dateKey: string, hour: number): Date {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  if (hour >= 24) return new Date(y, m - 1, d, 23, 59, 59, 999);
-  return new Date(y, m - 1, d, hour, 0, 0, 0);
-}
+// wallAt lives in lib/schedule-bounds.mjs (plain ESM) so it can be tested with
+// `node --test` alongside hourBounds; re-exported here so callers keep importing
+// it from @/lib/tz and there is ONE implementation. hour >= 24 is end-of-same-day.
+export { wallAt } from "./schedule-bounds";
 
 /** Move a 'YYYY-MM-DD' by whole days without going near a Date's timezone. */
 export function shiftDateKey(dateKey: string, days: number): string {

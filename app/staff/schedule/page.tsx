@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
 import { shiftDateKey, studioDateKey, studioToday } from "@/lib/tz";
+import { hourBounds } from "@/lib/schedule-bounds";
 import ScheduleCalendar, { UNASSIGNED, type CalEvent, type Resource } from "./calendar";
 import JumpToDate from "./jump";
 import InstructorFilter from "./instructor-filter";
@@ -221,12 +222,10 @@ export default async function Schedule({
   // else's studio anyway. Computed from the studio-local minutes the reader
   // already resolved, so no timezone arithmetic happens in a browser.
   const inRange = occurrences.filter((o) => o.local_date >= weekStart);
-  const earliest = inRange.length
-    ? Math.min(...inRange.map((o) => o.start_minutes)) : 7 * 60;
-  const latest = inRange.length
-    ? Math.max(...inRange.map((o) => o.end_minutes)) : 20 * 60;
-  const minHour = Math.max(0, Math.floor(earliest / 60) - 1);
-  const maxHour = Math.min(24, Math.ceil(latest / 60) + 1);
+  const { minHour, maxHour } = hourBounds(
+    inRange.map((o) => o.start_minutes),
+    inRange.map((o) => o.end_minutes),
+  );
 
   // Fetched in the batch above rather than behind an `if`: it used to be a
   // FOURTH serial hop that fired only when the day was empty, which is exactly
