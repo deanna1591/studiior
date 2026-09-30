@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
-import { text, nullable, fields, invalid, insertSeriesRow, say, seriesSkipWarning, seriesAvailabilityWarning } from "./shared";
+import { text, nullable, fields, invalid, insertSeriesRow, say, seriesSkipWarning, seriesAvailabilityWarning, seriesOutsideHours } from "./shared";
 
 export type SeriesState = { error: string } | null;
 
@@ -58,6 +58,8 @@ export async function createSeries(_prev: SeriesState, fd: FormData): Promise<Se
   const skip = await seriesSkipWarning(ctx.studioId, ctx.timeZone, res.id, f);
   // Decision 37 amendment (c): weeks outside the instructor's agreed dates.
   const avail = await seriesAvailabilityWarning(res.id);
+  // Decision 44: the series' start time is outside the studio's opening hours.
+  const hours = await seriesOutsideHours(ctx.studioId, f.p_time_of_day);
 
   // Decision 38 amendment: "already confirmed" bypass (default for paper-first
   // studios) — stamp confirmed-by-studio so the instructor is not asked.
@@ -72,6 +74,7 @@ export async function createSeries(_prev: SeriesState, fd: FormData): Promise<Se
   const params = new URLSearchParams();
   if (skip) { params.set("expected", String(skip.expected)); params.set("made", String(skip.created)); }
   if (avail) { params.set("avail", String(avail.count)); params.set("who", avail.instructor_name); }
+  if (hours) params.set("hours", hours);
   if (confirmed) params.set("confirmed", "1");
   const q = params.toString();
   redirect(q ? `/series/${res.id}?${q}` : `/series/${res.id}`);

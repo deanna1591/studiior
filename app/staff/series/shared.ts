@@ -17,6 +17,37 @@ export async function standbyText(studioId: string, currency: string): Promise<s
   return cents > 0 ? formatMoney(cents, currency) : null;
 }
 
+/**
+ * Decision 44 — the studio's opening window as "HH:MM–HH:MM", or null when it is
+ * unset. Read on the warning path only (like standbyText); passed to
+ * outsideHoursSentence, which is empty on a null window.
+ */
+const hhmm = (t: string) => String(t).slice(0, 5);
+export async function openingHoursText(studioId: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.from("studio_settings")
+    .select("open_time, close_time").eq("studio_id", studioId).maybeSingle();
+  if (!data?.open_time || !data?.close_time) return null;
+  return `${hhmm(data.open_time)}–${hhmm(data.close_time)}`;
+}
+
+/**
+ * Decision 44 — the window text when a series' start time (HH:MM[:SS]) falls
+ * OUTSIDE the opening window, else null. Inside is [open, close] inclusive
+ * (a 22:00 start at a 22:00 close is inside), so a class closes when it ends,
+ * not when it starts. Zero-padded HH:MM compares lexicographically. Null when
+ * hours are unset (nothing is outside) — the SQL create path uses
+ * occurrence_outside_hours for the same test on a one-off.
+ */
+export async function seriesOutsideHours(studioId: string, timeOfDay: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.from("studio_settings")
+    .select("open_time, close_time").eq("studio_id", studioId).maybeSingle();
+  if (!data?.open_time || !data?.close_time || !timeOfDay) return null;
+  const t = hhmm(timeOfDay), o = hhmm(data.open_time), c = hhmm(data.close_time);
+  return t < o || t > c ? `${o}–${c}` : null;
+}
+
 // Shared between the /series form actions and the Schedule calendar's
 // click-to-create (Decision 37). Kept OUT of the "use server" actions file
 // because a "use server" module may only export async server actions — these

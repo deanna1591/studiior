@@ -117,7 +117,7 @@ export default async function Schedule({
       supabase.from("shift_applications")
         .select("occurrence_id").eq("status", "pending"),
       supabase.from("studio_settings")
-        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled, assignment_confirmations")
+        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled, assignment_confirmations, open_time, close_time")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
@@ -222,9 +222,20 @@ export default async function Schedule({
   // else's studio anyway. Computed from the studio-local minutes the reader
   // already resolved, so no timezone arithmetic happens in a browser.
   const inRange = occurrences.filter((o) => o.local_date >= weekStart);
+  // Decision 44: when the studio has set opening hours, the grid spans the
+  // window (widened to include any class outside it) rather than deriving from
+  // the classes present — so a day with two midday classes still shows the whole
+  // working day. Times are "HH:MM:SS" studio-local; null when unset.
+  const toMin = (t: string | null | undefined) => {
+    if (!t) return null;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
   const { minHour, maxHour } = hourBounds(
     inRange.map((o) => o.start_minutes),
     inRange.map((o) => o.end_minutes),
+    toMin(settings?.open_time),
+    toMin(settings?.close_time),
   );
 
   // Fetched in the batch above rather than behind an `if`: it used to be a

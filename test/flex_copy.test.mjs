@@ -2,7 +2,7 @@
 // name the amount. Runs with zero deps:  node --test test/flex_copy.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { standaloneFlexSentence } from "../lib/flex-copy.mjs";
+import { standaloneFlexSentence, outsideHoursSentence } from "../lib/flex-copy.mjs";
 
 test("no standby pay (0 -> null) says nothing about a standby fee", () => {
   assert.equal(standaloneFlexSentence(null, 1), "");
@@ -28,4 +28,21 @@ test("never contains the bare unconditional 'carries a standby fee'", () => {
   // The old false claim. With standby > 0 it is always 'the <amount> standby fee'.
   assert.doesNotMatch(standaloneFlexSentence("₱400.00", 1), /carries a standby fee/);
   assert.doesNotMatch(standaloneFlexSentence("₱400.00", 2), /carry a standby fee/);
+});
+
+// Decision 44 — the opening-hours warning sentence.
+test("no window (unset) says nothing about opening hours", () => {
+  assert.equal(outsideHoursSentence(null), "");
+  assert.equal(outsideHoursSentence(""), "");
+  assert.equal(outsideHoursSentence(undefined, true), "");
+});
+
+test("a one-off names the window (It starts…)", () => {
+  const s = outsideHoursSentence("06:00–22:00", false);
+  assert.equal(s, " It starts outside the studio's opening hours (06:00–22:00).");
+});
+
+test("a series is plural (These start…)", () => {
+  const s = outsideHoursSentence("06:00–22:00", true);
+  assert.equal(s, " These start outside the studio's opening hours (06:00–22:00).");
 });

@@ -279,6 +279,10 @@ export default function ScheduleCalendar({
           // Decision 9: permitted, and said out loud.
           bits.push("that is outside the availability they gave us");
         }
+        if (res.warnings.includes("outside_hours")) {
+          // Decision 44: a warning on a drag, like the create paths.
+          bits.push("that is outside the studio's opening hours");
+        }
         if (res.significant) {
           bits.push("everyone booked can now cancel without penalty, because the time they agreed to has changed");
         }

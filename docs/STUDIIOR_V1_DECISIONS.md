@@ -489,6 +489,22 @@ Instructors enter and submit their monthly availability from their phone, inside
 
 ---
 
+## 44 — Studio opening hours
+
+A studio may set one opening window (`open_time`, `close_time`, studio-local) in Settings → Studio. Optional and unset by default product-wide: with no hours set, nothing anywhere changes (the `all_off` canary holds). A class is INSIDE opening hours when its START time falls within `[open_time, close_time]` — the end may run past close (Reform's last class is 22:00–22:50 with a 22:00 close; a studio closes when the last class ends). A class outside hours is a WARNING at creation (one-off and series) and on a drag, never a block — the same posture as Decision 37 amendment (c) for availability. When hours are set, the staff Schedule's Day and Week views span the opening window (plus any class outside it) instead of deriving the visible hours from the classes present. Per-weekday hours and closures-by-date are deferred; the existing closures mechanism is unchanged. Deanna, 30 Sep 2026.
+
+**Schema + the predicate.** `studio_settings.open_time`/`close_time` (`time`, null) with a CHECK — both null (not set) or both set with `open_time < close_time`. `occurrence_outside_hours(studio, starts_at)` (SECURITY DEFINER, service-role only, no caller guard — it reads only the studio's own settings) is the one test: false when hours are unset, else the studio-local start time is outside `[open, close]`. `create_occurrence` and `move_occurrence` (re-issued from their newest definitions, create-or-replace) append `'outside_hours'` to their `warnings` array when it returns true — alongside `outside_availability` and `standalone_flex`, never a refusal.
+
+**The copy is a pure builder** (`outsideHoursSentence` in `lib/flex-copy.mjs`, node-tested), like `standaloneFlexSentence`: `" It starts outside the studio's opening hours (06:00–22:00)."` for a one-off, `" These start outside the studio's opening hours (06:00–22:00)."` for a series, empty when the window is unset. The window is formatted HH:MM (24-hour, as the staff app shows time). The series paths compute the warning in TS (`seriesOutsideHours`, comparing the series' `time_of_day` against the window) since a series is a `class_series` row materialised by a trigger, not a `create_occurrence` call; `/series/new` carries it to the series detail banner via a query param, the calendar modal renders it inline, and a drag's notice adds "that is outside the studio's opening hours".
+
+**The visible hours.** `hourBounds` (`lib/schedule-bounds.mjs`) gains optional open/close minutes: when set, `minHour = floor(open)` and `maxHour = ceil(close)+1`, then WIDENED (never narrowed) to include any class outside the window — a 05:30 class pulls minHour to 5, a 22:00–22:50 class at a 22:00 close pushes maxHour to 24 (the `hour>=24` clamp in `wallAt` keeps `max` on the anchor day, the strip-at-the-bottom regression). Unset → exactly today's class-derived behaviour. The Schedule page passes the studio's hours in.
+
+**Migration 190** (`20260831950000`). Tests: `test/opening_hours_test.sql` (space `0d44`, 14 assertions — the CHECK both ways, the predicate inside/outside/unset, a Manila 07:00 judged in the studio zone, and `create_occurrence` warning-not-blocking at 22:15/05:45 and silent at 22:00 and unset) + node tests for `hourBounds` (window-only, widened to 5, the 22:50 regression) and `outsideHoursSentence`. Browser-verified: Settings → Studio saves 06:00–22:00 and clears; a 22:15 one-off renders the warning and is created; the Day view shows the 06:00–23:00 gutter on a day whose classes end at 12:50.
+
+**Where:** Business Rules §5; Data Model §5; migration 190. **Status:** settled. **Extends:** Decision 37 amendment (c) (warn, never block). **Reuses:** `create_occurrence`/`move_occurrence`'s warnings array, the flex-copy pure-builder pattern, `hourBounds`.
+
+---
+
 ## 41 — The sign-up confirmation redirect is chosen per studio, not from the project-wide Site URL
 
 A member signing up at `reformcollective.studiior.app` clicked the confirmation link and landed on the **staff login** at `app.studiior.com`. Cause: `signUp` called `supabase.auth.signUp` with no `emailRedirectTo`, so GoTrue used the project-wide **Site URL** — one value for every studio, and it points at the staff app. A multi-tenant platform cannot use Site URL for this: **the redirect must be chosen per request from the member host.**

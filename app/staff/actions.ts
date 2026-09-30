@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { zonedToUtc } from "@/lib/time";
 import { memberOrigin } from "@/lib/tenant";
-import { standaloneFlexSentence } from "@/lib/flex-copy";
-import { standbyText } from "@/app/staff/series/shared";
+import { standaloneFlexSentence, outsideHoursSentence } from "@/lib/flex-copy";
+import { standbyText, openingHoursText } from "@/app/staff/series/shared";
 
 export async function signIn(_prev: string | null, formData: FormData) {
   const supabase = createClient();
@@ -100,13 +100,16 @@ export async function createClassOccurrence(_prev: CreateClassState, formData: F
   if (warnings.length === 0) redirect("/");
   const st = warnings.includes("standalone_flex")
     ? await standbyText(ctx.studioId, ctx.currency) : null;
+  const oh = warnings.includes("outside_hours")
+    ? await openingHoursText(ctx.studioId) : null;
   return {
     ok: true,
     message: `Added, ${r.local_when}.`
       + standaloneFlexSentence(st, 1)
       + (warnings.includes("outside_availability")
           ? " It is outside the hours they have said they work — they have not been told."
-          : ""),
+          : "")
+      + outsideHoursSentence(oh, false),
   };
 }
 

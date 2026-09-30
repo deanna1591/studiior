@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { fields, invalid, insertSeriesRow, seriesSkipWarning, skipWarningText, seriesAvailabilityWarning, availabilityWarningText, standbyText } from "@/app/staff/series/shared";
-import { standaloneFlexSentence } from "@/lib/flex-copy";
+import { fields, invalid, insertSeriesRow, seriesSkipWarning, skipWarningText, seriesAvailabilityWarning, availabilityWarningText, standbyText, openingHoursText, seriesOutsideHours } from "@/app/staff/series/shared";
+import { standaloneFlexSentence, outsideHoursSentence } from "@/lib/flex-copy";
 
 /**
  * Creating a class from an empty slot on the calendar.
@@ -105,6 +105,8 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
   const warnings = r.warnings ?? [];
   const st = warnings.includes("standalone_flex")
     ? await standbyText(ctx.studioId, ctx.currency) : null;
+  const oh = warnings.includes("outside_hours")
+    ? await openingHoursText(ctx.studioId) : null;
   return {
     ok: true,
     occurrenceId: r.occurrence_id!,
@@ -113,7 +115,8 @@ export async function createOnSlot(_prev: CreateState, fd: FormData): Promise<Cr
       + standaloneFlexSentence(st, 1)
       + (warnings.includes("outside_availability")
           ? " It is outside the hours they have said they work — they have not been told."
-          : ""),
+          : "")
+      + outsideHoursSentence(oh, false),
   };
 }
 
@@ -181,6 +184,9 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
   // dates — kept assigned, surfaced, never blocked.
   const avail = await seriesAvailabilityWarning(res.id);
   if (avail) warnings.push("outside_agreed_dates");
+  // Decision 44: the series' start time is outside the studio's opening hours.
+  const oh = await seriesOutsideHours(ctx.studioId, f.p_time_of_day);
+  if (oh) warnings.push("outside_hours");
 
   // Decision 38 amendment: "already confirmed" bypass (default for paper-first
   // studios). Stamps confirmed-by-studio so the instructor is not asked.
@@ -202,7 +208,8 @@ async function createSeriesFromSlot(fd: FormData): Promise<CreateState> {
       + (confirmed ? " Marked confirmed with the instructor — they won't be asked." : "")
       + standaloneFlexSentence(
           warnings.includes("standalone_flex") ? await standbyText(ctx.studioId, ctx.currency) : null,
-          standaloneCount),
+          standaloneCount)
+      + outsideHoursSentence(oh, true),
   };
 }
 

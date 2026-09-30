@@ -67,6 +67,28 @@ test("an empty day falls back to 07:00–20:00, non-degenerate and same-day", ()
   assert.ok(max.getTime() > min.getTime());
 });
 
+test("Decision 44: hours set with no classes → the window only (06:00–22:00 → 6..23)", () => {
+  const { minHour, maxHour } = hourBounds([], [], 360, 1320); // open 06:00, close 22:00
+  assert.equal(minHour, 6, "floor(open)");
+  assert.equal(maxHour, 23, "ceil(close)+1 — the 06:00–23:00 gutter");
+});
+
+test("Decision 44: hours set + a 05:30 class widens minHour down to 5 (never narrowed)", () => {
+  const { minHour, maxHour } = hourBounds([330], [380], 360, 1320); // 05:30–06:20 class
+  assert.equal(minHour, 5, "min(floor(open)=6, floor(330/60)=5)");
+  assert.equal(maxHour, 23, "the late close is not narrowed by an early class");
+});
+
+test("Decision 44: hours 06:00–22:00 with a 22:00–22:50 class → maxHour 24, same day (regression holds)", () => {
+  const { minHour, maxHour } = hourBounds([1320], [1370], 360, 1320);
+  assert.equal(minHour, 6);
+  assert.equal(maxHour, 24, "widened up by the 22:50 end");
+  const min = wallAt(ANCHOR, minHour);
+  const max = wallAt(ANCHOR, maxHour);
+  assert.equal(max.getDate(), min.getDate(), "max stays on the anchor day");
+  assert.equal(max.getHours(), 23, "end-of-day, not next-day midnight");
+});
+
 test("wallAt: hour >= 24 is end-of-same-day, under 24 is an exact hour", () => {
   assert.equal(wallAt(ANCHOR, 24).getDate(), 11);
   assert.equal(wallAt(ANCHOR, 24).getHours(), 23);

@@ -56,6 +56,45 @@ export async function applyHorizon(_prev: SettingsState, fd: FormData) {
 export type PlainState = { ok: boolean; message: string } | null;
 
 /**
+ * Decision 44 — the studio's one opening window. Optional: Clear sets both null
+ * and nothing is flagged anywhere. When set, a class that STARTS outside
+ * [open, close] is warned about at creation and on a drag — never blocked. The
+ * CHECK constraint enforces both-or-neither and open < close; this validates the
+ * same so the studio gets a sentence rather than a raw constraint error.
+ */
+export async function saveOpeningHours(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const supabase = createClient();
+
+  if (String(fd.get("intent") ?? "") === "clear") {
+    const { data, error } = await supabase.from("studio_settings")
+      .update({ open_time: null, close_time: null })
+      .eq("studio_id", ctx.studioId).select("studio_id");
+    if (error) return { ok: false, message: error.message };
+    if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+    revalidatePath("/settings"); revalidatePath("/schedule");
+    return { ok: true, message: "Opening hours cleared — nothing is flagged now." };
+  }
+
+  const open = String(fd.get("open_time") ?? "").trim();
+  const close = String(fd.get("close_time") ?? "").trim();
+  if (!open || !close) return { ok: false, message: "Set both an opening and a closing time, or press Clear." };
+  if (open >= close) return { ok: false, message: "The opening time has to be before the closing time." };
+
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ open_time: open, close_time: close })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) {
+    return { ok: false, message: /opening_hours_ck/.test(error.message)
+      ? "The opening time has to be before the closing time." : error.message };
+  }
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings"); revalidatePath("/schedule");
+  return { ok: true, message: "Saved. Classes that start outside these hours are flagged when you create them." };
+}
+
+/**
  * The two timing settings migrations 066 and 067 added, which had the same
  * problem this screen exists to fix: a column with a default and nowhere to
  * change it.

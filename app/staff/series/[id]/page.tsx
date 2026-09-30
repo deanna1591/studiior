@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EditSeries({
   params, searchParams,
-}: { params: { id: string }; searchParams: { expected?: string; made?: string; avail?: string; who?: string } }) {
+}: { params: { id: string }; searchParams: { expected?: string; made?: string; avail?: string; who?: string; hours?: string } }) {
   const screen = await staffScreen(`/series/${params.id}`);
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -95,6 +95,17 @@ export default async function EditSeries({
             {availCount === 1 ? "week is" : "weeks are"} outside{" "}
             {searchParams.who || "that instructor"}&apos;s agreed dates. The classes were
             still created and assigned — nothing is blocked; this is just to let you know.
+          </p>
+        </div>
+      )}
+      {/* Decision 44: the series starts outside the studio's opening hours. */}
+      {searchParams.hours && (
+        <div className="mb-6 max-w-xl rounded border-l-[3px] px-3.5 py-3"
+             style={{ borderLeftColor: "var(--amber-deep)", background: "var(--amber-tint)" }}
+             role="alert">
+          <p className="text-[13px] leading-[19px] text-ink">
+            These start outside the studio&apos;s opening hours (<span className="num">{searchParams.hours}</span>).
+            The classes were still created — nothing is blocked; this is just to let you know.
           </p>
         </div>
       )}

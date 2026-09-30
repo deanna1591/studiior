@@ -5940,6 +5940,7 @@ export type Database = {
           checkin_secret: string
           checkin_window_enforced: boolean
           claiming_enabled: boolean
+          close_time: string | null
           commitment_shortfall_weeks: number
           conversion_attribution: string
           conversion_bonus_cents: number
@@ -5977,6 +5978,7 @@ export type Database = {
           no_show_fee_cents: number
           occurrence_horizon_days: number
           onboarding_completed_at: string | null
+          open_time: string | null
           pay_period_anchor: string | null
           pay_period_days: number
           pay_period_mode: string
@@ -6030,6 +6032,7 @@ export type Database = {
           checkin_secret?: string
           checkin_window_enforced?: boolean
           claiming_enabled?: boolean
+          close_time?: string | null
           commitment_shortfall_weeks?: number
           conversion_attribution?: string
           conversion_bonus_cents?: number
@@ -6067,6 +6070,7 @@ export type Database = {
           no_show_fee_cents?: number
           occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
+          open_time?: string | null
           pay_period_anchor?: string | null
           pay_period_days?: number
           pay_period_mode?: string
@@ -6120,6 +6124,7 @@ export type Database = {
           checkin_secret?: string
           checkin_window_enforced?: boolean
           claiming_enabled?: boolean
+          close_time?: string | null
           commitment_shortfall_weeks?: number
           conversion_attribution?: string
           conversion_bonus_cents?: number
@@ -6157,6 +6162,7 @@ export type Database = {
           no_show_fee_cents?: number
           occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
+          open_time?: string | null
           pay_period_anchor?: string | null
           pay_period_days?: number
           pay_period_mode?: string
@@ -7144,6 +7150,16 @@ export type Database = {
         }
         Returns: Json
       }
+      co44: {
+        Args: {
+          ct: string
+          room: string
+          startt: string
+          studio: string
+          uid: string
+        }
+        Returns: Json
+      }
       commitment_pending: {
         Args: { p_studio_id: string }
         Returns: {
@@ -7378,6 +7394,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7517,6 +7541,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_available_at_run: {
+        Args: {
+          p_ends_at: string
+          p_instructor_id: string
+          p_starts_at: string
+        }
+        Returns: boolean
+      }
       instructor_can_claim_month: {
         Args: { p_instructor_id: string; p_month: string }
         Returns: boolean
@@ -7562,6 +7594,10 @@ export type Database = {
       instructor_pending_claims: {
         Args: { p_instructor_id: string }
         Returns: Json
+      }
+      instructor_portal_url: {
+        Args: { p_path: string; p_studio_id: string }
+        Returns: string
       }
       instructor_qualified: {
         Args: { p_class_type_id: string; p_instructor_id: string }
@@ -7897,6 +7933,10 @@ export type Database = {
       }
       occurrence_is_peak: {
         Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
+      occurrence_outside_hours: {
+        Args: { p_starts_at: string; p_studio_id: string }
         Returns: boolean
       }
       occurrence_published: {
@@ -8751,6 +8791,7 @@ export type Database = {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
+      warns44: { Args: { res: Json; w: string }; Returns: boolean }
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
