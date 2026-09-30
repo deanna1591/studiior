@@ -6,8 +6,8 @@ import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/compon
 import Link from "next/link";
 import { bookClass, bookFirstFree, cancelBooking } from "@/app/member/actions";
 import GuestInvite from "@/components/member/guest-invite";
-import type { FreeFirst } from "@/app/member/class/[id]/load";
-import { fmtTime, fmtDayLong } from "@/lib/time";
+import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
+import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
 
 /**
  * One class, in full — the body shared by the full page (`/class/[id]`) and the
@@ -45,7 +45,7 @@ export type DetailType = {
 export type DetailBooking = { id: string; status: string; waitlist_position: number | null } | null;
 
 export default function ClassDetailBody({
-  occ, type, booking, timeZone, waitlistEnabled, guest, freeFirst,
+  occ, type, booking, timeZone, waitlistEnabled, guest, freeFirst, pending,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -54,12 +54,29 @@ export default function ClassDetailBody({
   waitlistEnabled: boolean;
   guest?: { enabled: boolean; canInvite: boolean };
   freeFirst?: FreeFirst;
+  /** Decision 21 amendment: a flex class not yet decided — its confirmation
+   *  deadline and how it is expressed. Null for core/always/decided classes. */
+  pending?: Pending;
 }) {
   const booked = booking?.status === "booked";
   const waiting = booking?.status === "waitlisted";
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
   const past = new Date(occ.starts_at).getTime() < Date.now();
+
+  // Decision 21 amendment: the member-facing confirmation copy — always about
+  // THEIR booking, never a minimum or a headcount. The "confirmed by" line
+  // (hours-before vs the evening before) and the "waiting" status once booked.
+  const confirmLine = pending && !past
+    ? (pending.mode === "hours_before"
+        ? `Bookings for this class are confirmed ${Math.round(
+            (new Date(occ.starts_at).getTime() - new Date(pending.until).getTime()) / 3_600_000,
+          )} hours before it starts.`
+        : `Bookings for this class are confirmed by ${fmtTime(pending.until, timeZone)} the evening before.`)
+    : null;
+  const waitingLabel = pending && !past
+    ? `Waiting for confirmation · by ${fmtDeadlineShort(pending.until, timeZone)}`
+    : null;
   const mins = occ.ends_at
     ? Math.round((new Date(occ.ends_at).getTime() - new Date(occ.starts_at).getTime()) / 60000)
     : null;
@@ -101,11 +118,17 @@ export default function ClassDetailBody({
       <div className="m-card mt-4 p-4">
         <p className="m-sub mb-3 text-ink-2">
           {past ? "This class has already started."
-            : booked ? "You're booked in."
+            : booked ? (waitingLabel ?? "You're booked in.")
             : waiting ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the waitlist.</>
             : full ? <>Fully booked{(occ.waitlist_count ?? 0) > 0 && <> · <span className="num">{occ.waitlist_count}</span> waiting</>}</>
             : <><span className="num font-medium text-ink">{spaces}</span> {spaces === 1 ? "place" : "places"} left</>}
         </p>
+
+        {/* Decision 21 amendment: the confirmation deadline, shown before booking
+            on a flex class not yet decided. m-sub, no icon, no badge. */}
+        {confirmLine && !booked && !waiting && (
+          <p className="m-sub mb-3 text-ink-3">{confirmLine}</p>
+        )}
 
         {past ? null : booked || waiting ? (
           <>

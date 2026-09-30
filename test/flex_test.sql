@@ -230,10 +230,19 @@ select expect_num('...through the studio path, so the credit went back',
     where studio_id = 'f1e0f1e0-0000-0000-0000-000000000001'
       and reason = 'cancellation_refund')::bigint,
   current_setting('t.credits_before')::bigint + 0);
-select expect_num('...and the member booked on it was told',
+-- Decision 21 amendment: an unmet-minimum cancellation tells the booked member
+-- through flex_booking_not_confirmed ("booking not confirmed"), NOT
+-- class_cancelled — the member is never told the class was cut for want of
+-- numbers. (A studio-decision cancellation still uses class_cancelled; see the
+-- dedicated flex_member_confirmation suite.)
+select expect_num('...and the member booked on it was told (flex_booking_not_confirmed)',
+  (select count(*) from notifications
+    where template_key = 'flex_booking_not_confirmed'
+      and payload ->> 'class_name' = 'SCULPT 07:00')::bigint, 1);
+select expect_num('...and NOT class_cancelled (the amendment)',
   (select count(*) from notifications
     where template_key = 'class_cancelled'
-      and payload ->> 'class_name' = 'SCULPT 07:00')::bigint, 1);
+      and payload ->> 'class_name' = 'SCULPT 07:00')::bigint, 0);
 select expect_num('...and nobody was marked a late cancellation for the studio''s decision',
   (select count(*) from bookings
     where occurrence_id = current_setting('t.day2')::uuid and is_late_cancel)::bigint, 0);

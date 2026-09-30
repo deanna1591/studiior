@@ -41,6 +41,17 @@ export function fmtTime(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
+/**
+ * Decision 21 amendment — the flex confirmation deadline, short: "20:00 Mon".
+ * 24-hour to match every other time in the member app (fmtTime, and CLAUDE.md's
+ * rule), even though a 12-hour example was sketched in the ask.
+ */
+export function fmtDeadlineShort(iso: string, timeZone: string): string {
+  const time = fmtTime(iso, timeZone);
+  const day = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short" }).format(new Date(iso));
+  return `${time} ${day}`;
+}
+
 export function fmtDayLabel(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone, weekday: "short", day: "numeric", month: "short",

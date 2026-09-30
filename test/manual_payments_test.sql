@@ -522,11 +522,17 @@ select expect_true('a cash recurring membership has a period at all',
 
 -- The interval is the plan's, not a constant. A month, a fortnight and a
 -- quarter, all decided in this one run.
+-- One calendar month from the period's OWN start (studio-local), not from the
+-- server's current_date — the two differ during the UTC evening, when the
+-- server day is a day behind Manila, and Oct's 31 days made "+1 month from the
+-- server date" (30) disagree with the product's real Oct 1 -> Nov 1 period (31).
 select expect_num('a monthly plan ends one month out',
   (select ((current_period_end at time zone 'Asia/Manila')::date
            - (current_period_start at time zone 'Asia/Manila')::date)::bigint
      from memberships where id = current_setting('t.m1')::uuid),
-  (select ((current_date + interval '1 month')::date - current_date)::bigint));
+  (select ((((current_period_start at time zone 'Asia/Manila')::date + interval '1 month')::date
+            - (current_period_start at time zone 'Asia/Manila')::date))::bigint
+     from memberships where id = current_setting('t.m1')::uuid));
 select expect_num('a two-week plan ends a fortnight out, not a month',
   (select ((current_period_end at time zone 'Asia/Manila')::date
            - (current_period_start at time zone 'Asia/Manila')::date)::bigint
@@ -535,7 +541,11 @@ select expect_num('and the other studio''s quarterly plan runs three months',
   (select ((current_period_end at time zone 'Asia/Manila')::date
            - (current_period_start at time zone 'Asia/Manila')::date)::bigint
      from memberships where id = current_setting('t.mq')::uuid),
-  (select ((current_date + interval '3 months')::date - current_date)::bigint));
+  -- Three calendar months from the period's own start (see the monthly note
+  -- above) — Oct 1 -> Jan 1 is 92 days, not the 91 a fixed number assumed.
+  (select ((((current_period_start at time zone 'Asia/Manila')::date + interval '3 months')::date
+            - (current_period_start at time zone 'Asia/Manila')::date))::bigint
+     from memberships where id = current_setting('t.mq')::uuid));
 
 select expect_true('renews_on is the period end as one of the studio''s own dates',
   (select renews_on = (current_period_end at time zone 'Asia/Manila')::date
@@ -586,12 +596,16 @@ select expect_text('and the payment renewed that one',
 select expect_true('the new period starts where the old one ended',
   (current_setting('t.ren')::jsonb -> 'renewed' ->> 'period_start')::timestamptz
     = current_setting('t.end1')::timestamptz);
+-- One interval long, anchored to the period's own (advanced) start — the new
+-- period runs a single calendar month from where the old one ended, whatever
+-- that month's length (see the monthly note above).
 select expect_num('and it is one more interval, not two',
   (select ((current_period_end at time zone 'Asia/Manila')::date
            - (current_period_start at time zone 'Asia/Manila')::date)::bigint
      from memberships where id = current_setting('t.m1')::uuid),
-  (select ((current_date + interval '2 months')::date
-           - (current_date + interval '1 month')::date)::bigint));
+  (select ((((current_period_start at time zone 'Asia/Manila')::date + interval '1 month')::date
+            - (current_period_start at time zone 'Asia/Manila')::date))::bigint
+     from memberships where id = current_setting('t.m1')::uuid));
 select expect_text('the desk is told it is paid up',
   (current_setting('t.ren')::jsonb -> 'renewed' ->> 'still_owing'), 'false');
 select expect_num('and the renewal is on the record',

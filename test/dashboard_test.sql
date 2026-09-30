@@ -773,7 +773,14 @@ select expect_true('a month with classes on it carries no pointer',
   jsonb_typeof(dashboard_month('da58da58-0000-0000-0000-00000000000b') -> 'next') = 'null');
 
 -- The studio that genuinely has nothing anywhere still gets the create path.
+-- Day One was seeded with five PAST heatmap classes earlier in this suite, so
+-- it is not "no classes at all" until those are cleared — next_class_day finds a
+-- previous class and dashboard_month points back at it rather than offering the
+-- create path. Whether that back-pointer fires is date-sensitive (it depends on
+-- where the past run lands relative to today), which is why this assertion was
+-- fragile. Clear them so the studio is genuinely empty, as the assertion means.
 reset role;
+delete from class_occurrences where studio_id = 'da58da58-0000-0000-0000-00000000000a';
 set role authenticated;
 select set_config('request.jwt.claim.sub','da58da58-0000-0000-0000-0000000000a1',false);
 select expect_true('a studio with no classes at all is told to set one up, not sent nowhere',

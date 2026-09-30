@@ -7150,16 +7150,6 @@ export type Database = {
         }
         Returns: Json
       }
-      co44: {
-        Args: {
-          ct: string
-          room: string
-          startt: string
-          studio: string
-          uid: string
-        }
-        Returns: Json
-      }
       commitment_pending: {
         Args: { p_studio_id: string }
         Returns: {
@@ -7394,17 +7384,23 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
+      }
+      flex_deadline_for: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          deadline_at: string
+          mode: string
+        }[]
+      }
+      flex_deadline_for_run: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          deadline_at: string
+          mode: string
+        }[]
       }
       flex_pending: {
         Args: { p_studio_id: string }
@@ -7809,6 +7805,13 @@ export type Database = {
           remaining: number
         }[]
       }
+      member_pending_bookings: {
+        Args: { p_studio_id: string }
+        Returns: {
+          occurrence_id: string
+          pending_until: string
+        }[]
+      }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
       member_waiver_current: {
         Args: { p_member_id: string; p_studio_id: string }
@@ -8105,7 +8108,10 @@ export type Database = {
         Returns: string
       }
       queue_occurrence_cancelled: {
-        Args: { p_occurrence_id: string }
+        Args: {
+          p_cause?: Database["public"]["Enums"]["cancellation_cause"]
+          p_occurrence_id: string
+        }
         Returns: number
       }
       queue_payment_failed: {
@@ -8791,7 +8797,6 @@ export type Database = {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
-      warns44: { Args: { res: Json; w: string }; Returns: boolean }
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }

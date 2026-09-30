@@ -24,7 +24,7 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
   return (
     <Sheet preset={preset} accent={accent}>
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} />
+                       timeZone={ctx.timeZone} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending} />
     </Sheet>
   );
 }

@@ -7,7 +7,7 @@ import IconChip from "@/components/member/icon-chip";
 import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
 import { bookClass, cancelBooking, respondToOffer } from "./actions";
-import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts } from "@/lib/time";
+import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts, fmtDeadlineShort } from "@/lib/time";
 import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 import WaiverBanner from "@/components/member/waiver-banner";
 import Announcements, { type Announcement } from "@/components/member/announcements";
@@ -38,7 +38,7 @@ export default async function MemberHome() {
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
-         { data: waiver }] =
+         { data: waiver }, { data: pendingRows }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -77,7 +77,15 @@ export default async function MemberHome() {
     // Decision 34: the waiver state — whether the studio requires one, has
     // published one, and whether this member has signed the current version.
     supabase.rpc("current_waiver", { p_studio_id: ctx.studioId }),
+    // Decision 21 amendment: the member's own bookings still waiting for a flex
+    // confirmation, with the deadline. Presence here IS "pending"; no minimum,
+    // count or reason is ever returned.
+    supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId }),
   ]);
+
+  const pendingUntil = new Map<string, string>(
+    ((pendingRows ?? []) as { occurrence_id: string; pending_until: string }[])
+      .map((p) => [p.occurrence_id, p.pending_until]));
 
   const ms = milestones as unknown as { total: number; next_target: number | null; to_go: number | null } | null;
 
@@ -268,6 +276,15 @@ export default async function MemberHome() {
           </div>
         </section>
       ) : null}
+
+      {/* Decision 21 amendment: a booked flex class not yet decided — the same
+          "waiting for confirmation" line the class page shows. */}
+      {occ && next && pendingUntil.has(next.occurrence_id) && (
+        <p className="mt-2 px-1 text-[12.5px] leading-[18px] text-ink-2">
+          Waiting for confirmation · by{" "}
+          <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone)}</span>
+        </p>
+      )}
 
       {occ && !inWindow && (
         <div className="mt-2.5 px-1">
@@ -487,6 +504,12 @@ export default async function MemberHome() {
                     {day(b.class_occurrences!.starts_at)} ·{" "}
                     <span className="num">{fmtTime(b.class_occurrences!.starts_at, ctx.timeZone)}</span>
                   </span>
+                  {pendingUntil.has(b.occurrence_id) && (
+                    <span className="m-micro mt-0.5 block text-ink-2">
+                      Waiting for confirmation · by{" "}
+                      <span className="num">{fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone)}</span>
+                    </span>
+                  )}
                 </span>
                 <Link href="/book" className="m-micro shrink-0 text-lime-text underline underline-offset-4">
                   Manage
