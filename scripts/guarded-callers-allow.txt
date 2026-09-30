@@ -1,3 +1,29 @@
 # guarded-caller allowlist: "caller -> guarded  # reason"
-# A function that calls a guarded wrapper on purpose (a member-facing path where
-# the guard IS the point) goes here, one per line, with a reason. Empty for now.
+# A SECURITY DEFINER function that calls a subject-guarded function where the
+# guard is genuinely satisfied for the caller's principal goes here, one per line
+# with a reason. The sweep flags every definer -> subject-guarded call; these are
+# the ones triaged as benign (the caller reaches the callee as a manager, in a
+# service context, or for the caller's OWN subject). request_cover ->
+# instructor_available_at is NOT here — it was the real bug and was fixed to call
+# the _run twin (migration 20260831940000).
+
+# --- instructor_available_at: benign callers (guard is satisfied) ---
+accept_cover -> instructor_available_at             # checks the caller's OWN availability (v_taker = auth_instructor_id); is_self passes
+apply_for_shift -> instructor_available_at          # checks the caller's OWN availability (v_instructor = auth_instructor_id); is_self passes
+assign_instructors_run -> instructor_available_at   # the engine; only ever run by a manager RPC or in a service context; is_manager_up/is_service passes
+availability_conflicts -> instructor_available_at   # manager-only reader; is_manager_up passes
+claim_ranking -> instructor_available_at            # manager-only (reviews claims); is_manager_up passes
+cover_available_to -> instructor_available_at       # checks p_instructor_id, which the guard on cover_available_to already proved is the caller (self/manager/service)
+create_occurrence -> instructor_available_at        # manager-only create; is_manager_up passes
+instructor_claimable -> instructor_available_at     # checks p_instructor_id, which the guard on instructor_claimable already proved is the caller (self/manager/service)
+move_occurrence -> instructor_available_at          # manager-only move; is_manager_up passes
+notify_open_shifts -> instructor_available_at       # service sweep; is_service_context passes
+roster_carry_plan -> instructor_available_at        # carry sweep / manager preview; is_service_context/is_manager_up passes
+set_instructor_availability_rows -> instructor_available_at  # writes for that instructor as self/manager; guard passes
+
+# --- other instructor subject-guarded callees: benign callers ---
+commitment_report -> instructor_weekly_load         # manager-only report; instructor_weekly_load's is_manager_up passes
+generate_morning_brief -> instructor_weekly_load    # service sweep; is_service_context passes
+set_instructor_availability -> set_instructor_availability_rows  # self-or-manager writer for that instructor; guard passes
+sweep_week_confirmations -> instructor_week          # service sweep; is_service_context passes
+withdraw_from_shift -> request_cover                 # instructor withdraws their OWN shift -> request_cover(own occurrence), auth_instructor_id matches; the foreign-instructor call inside request_cover is the one that was fixed

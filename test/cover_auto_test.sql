@@ -103,26 +103,50 @@ select expect_text('...the cover request is covered by T',
 select expect_num('...R was told it is covered',
   (select count(*) from notifications where template_key='cover_approved' and user_id='c0e5c0e5-0000-0000-0000-0000000000d1')::bigint, 1);
 
--- Decision 45: request_cover's auto-accept OFFER to a qualified instructor now
--- carries an absolute portal link (it was a bare domain). A fresh urgent class
--- assigned to R, at +3h so T (busy at +2h with c00002) is free to be offered.
--- Requested by the OWNER: request_cover's offer loop calls the guarded
--- instructor_available_at, which refuses a non-manager instructor caller — a
--- pre-existing guard issue (out of Decision 45's scope), so the manager path is
--- the one exercised here for the link.
+-- THE INSTRUCTOR asks for cover on their own urgent class (Decision 18's only
+-- exit) at an auto-accept studio. request_cover's offer loop checks OTHER
+-- instructors' availability — before the fix it called the GUARDED
+-- instructor_available_at, which raised PT403 on the first foreign candidate for
+-- a non-manager instructor caller and failed the whole request. Now it calls the
+-- unguarded instructor_available_at_run. Fresh class assigned to R at +3h, so T
+-- (busy at +2h with c00002) is free to be offered.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
 values ('c0e5c0e5-0000-0000-0000-000000c00009','c0e5c0e5-0000-0000-0000-000000000001','c0e5c0e5-0000-0000-0000-00000000000a','c0e5c0e5-0000-0000-0000-0000000cc0a1','c0e5c0e5-0000-0000-0000-0000000ee0a1','c0e5c0e5-0000-0000-0000-0000000d00d1','Reformer',10,0, now()+interval '3 hours', now()+interval '3 hours'+interval '50 min','scheduled');
 set role authenticated;
-select set_config('request.jwt.claim.sub','c0e5c0e5-0000-0000-0000-0000000000a1',false);  -- owner (manager-up)
-select request_cover('c0e5c0e5-0000-0000-0000-000000c00009','urgent, sorry');
+select set_config('request.jwt.claim.sub','c0e5c0e5-0000-0000-0000-0000000000d1',false);  -- R, the INSTRUCTOR (not a manager)
+select expect_true('an instructor asks for cover on their own urgent class — no PT403 on a foreign candidate',
+  (request_cover('c0e5c0e5-0000-0000-0000-000000c00009','urgent, sorry')::jsonb ->> 'ok')::boolean);
 reset role;
-select expect_true('the auto-accept cover offer links to the instructor portal',
+select expect_true('...and the auto-accept offer reached the qualified instructor, portal-linked',
   coalesce((select payload ->> 'href' from notifications
     where template_key='cover_available'
       and user_id='c0e5c0e5-0000-0000-0000-0000000000d2' limit 1), '')
   like 'https://cover-a.studiior.app/instructor/shifts%');
 -- Take it back out of scope so it does not sit on the take-now list below.
 update class_occurrences set status='cancelled' where id='c0e5c0e5-0000-0000-0000-000000c00009';
+
+-- The MANAGER path still works: an owner requesting cover on an urgent class.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
+values ('c0e5c0e5-0000-0000-0000-000000c0000a','c0e5c0e5-0000-0000-0000-000000000001','c0e5c0e5-0000-0000-0000-00000000000a','c0e5c0e5-0000-0000-0000-0000000cc0a1','c0e5c0e5-0000-0000-0000-0000000ee0a1','c0e5c0e5-0000-0000-0000-0000000d00d1','Reformer',10,0, now()+interval '3 hours', now()+interval '3 hours'+interval '50 min','scheduled');
+set role authenticated;
+select set_config('request.jwt.claim.sub','c0e5c0e5-0000-0000-0000-0000000000a1',false);  -- owner (manager-up)
+select expect_true('the manager path still requests cover',
+  (request_cover('c0e5c0e5-0000-0000-0000-000000c0000a','cover please')::jsonb ->> 'ok')::boolean);
+reset role;
+update class_occurrences set status='cancelled' where id='c0e5c0e5-0000-0000-0000-000000c0000a';
+
+-- The guard still stands: a caller who is neither a manager, the instructor, nor
+-- a service context is refused a direct read of somebody's availability.
+set role authenticated;
+select set_config('request.jwt.claim.sub','c0e5c0e5-0000-0000-0000-00000000dead',false);  -- a stranger, no staff row
+do $$ begin
+  begin
+    perform instructor_available_at('c0e5c0e5-0000-0000-0000-0000000d00d1', now(), now()+interval '1 hour');
+    raise exception 'FAIL  instructor_available_at let a non-staff caller read another instructor';
+  exception when sqlstate 'PT403' then raise notice 'PASS  instructor_available_at refuses a non-staff caller (PT403)';
+  end;
+end $$;
+reset role;
 
 -- A FAR class (10 days out) with a cover request cannot be auto-taken.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
