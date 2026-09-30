@@ -1,16 +1,9 @@
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, Notice, SectionLabel } from "@/components/ui";
 import WeekEditor, { type Day } from "@/app/staff/instructors/[id]/availability/week-editor";
+import { STATUS_LINE } from "@/lib/availability";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_LINE: Record<string, string> = {
-  none: "Not sent yet.",
-  draft: "Saved as a draft. The studio has not seen it.",
-  submitted: "Sent. Waiting for the studio.",
-  approved: "Approved. Classes are being scheduled around it.",
-  changes_requested: "The studio has asked for a change.",
-};
 
 /** Which month is being collected, and when it is due — both from the studio's setting. */
 export default async function MyAvailability({

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { validateWeek, type Day } from "@/lib/availability";
 
 export type MyState = { ok: boolean; message: string } | null;
 
@@ -29,9 +30,12 @@ export async function submitAvailability(_prev: MyState, fd: FormData): Promise<
   const submit = String(fd.get("submit") ?? "1") === "1";
   if (!instructorId || !period) return { ok: false, message: "Nothing to submit." };
 
-  let days: unknown;
-  try { days = JSON.parse(String(fd.get("days") ?? "[]")); }
+  let days: Day[];
+  try { days = JSON.parse(String(fd.get("days") ?? "[]")) as Day[]; }
   catch { return { ok: false, message: "That month did not come through. Try again." }; }
+
+  const bad = validateWeek(days);
+  if (bad) return { ok: false, message: bad };
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("submit_availability", {

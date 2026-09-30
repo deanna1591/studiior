@@ -397,6 +397,14 @@ select expect_true(
        then current_setting('t.q_b')::int > 0
        else current_setting('t.q_b')::int = 0 end);
 
+-- Decision 45: the emailed link is the instructor PORTAL, absolute, never the
+-- staff-host path the availability-due mail used to render as `http:///...`.
+select expect_true('the availability-due link points at the instructor portal',
+  coalesce((select payload ->> 'href' from notifications
+    where studio_id = '1f5e1f5e-0000-0000-0000-000000000002'
+      and template_key = 'availability_due' limit 1), '')
+  like 'https://iss-b.studiior.app/instructor/availability%');
+
 -- Studio A's instructors have all submitted or been entered, so nobody is
 -- chased whatever the date says.
 update studio_settings set availability_due_day = 1 where studio_id = '1f5e1f5e-0000-0000-0000-000000000001';
@@ -426,6 +434,12 @@ select expect_num('studio B is not, because its ask day is tomorrow',
   (select count(*) from notifications
     where studio_id = '1f5e1f5e-0000-0000-0000-000000000002'
       and template_key = 'week_confirm_ask')::bigint, 0);
+-- Decision 45: week-confirm mail links to the instructor portal, not staff /my/week.
+select expect_true('the week-confirm-ask link points at the instructor portal',
+  coalesce((select payload ->> 'href' from notifications
+    where studio_id = '1f5e1f5e-0000-0000-0000-000000000001'
+      and template_key = 'week_confirm_ask' limit 1), '')
+  like 'https://iss-a.studiior.app/instructor/schedule%');
 select expect_num('the instructor with no login is not asked, having no address',
   (select count(*) from notifications n
     where n.studio_id = '1f5e1f5e-0000-0000-0000-000000000001'

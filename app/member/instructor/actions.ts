@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { validateWeek, type Day } from "@/lib/availability";
 
 export type InstructorState = { error: string } | { ok: string } | null;
 
@@ -80,6 +81,56 @@ export async function askForCover(
   revalidatePath("/instructor/month");
   revalidatePath("/instructor/schedule");
   return { ok: "Asked. The studio decides — you are still down to teach it until they do." };
+}
+
+/**
+ * Decision 45 — the month ahead, submitted from the phone.
+ *
+ * Same `submit_availability` the desktop calls, same draft/submit distinction,
+ * same validator (lib/availability). The whole week is one payload — a
+ * half-applied week silently changes who the scheduler thinks can teach — so it
+ * posts as one JSON blob, never day by day. The database guards to the
+ * instructor themselves; this is not a second opinion about that.
+ */
+export async function submitMyAvailability(
+  _prev: InstructorState, form: FormData,
+): Promise<InstructorState> {
+  const instructorId = String(form.get("instructor_id") ?? "");
+  const period = String(form.get("period_start") ?? "");
+  const submit = String(form.get("submit") ?? "1") === "1";
+  if (!instructorId || !period) return { error: "Nothing to send." };
+
+  let days: Day[];
+  try { days = JSON.parse(String(form.get("days") ?? "[]")) as Day[]; }
+  catch { return { error: "That did not come through — try again." }; }
+
+  const bad = validateWeek(days);
+  if (bad) return { error: bad };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("submit_availability", {
+    p_instructor_id: instructorId,
+    p_period_start: period,
+    p_days: days as never,
+    p_submit: submit,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      error: /PT403/.test(m) ? "That is not yours to change."
+        : /PT409/.test(m) ? "That month is already approved — ask the studio to reopen it."
+        : /PT422/.test(m) ? m.replace(/^.*?:\s*/, "")
+        : m,
+    };
+  }
+  const r = (data ?? {}) as { ranges?: number };
+  revalidatePath("/instructor/availability");
+  revalidatePath("/instructor");
+  return {
+    ok: submit
+      ? "Sent to the studio. You can still change it until they look at it."
+      : `Saved as a draft — ${r.ranges ?? 0} time ${r.ranges === 1 ? "range" : "ranges"}. Nothing goes to the studio until you send it.`,
+  };
 }
 
 export async function applyForShift(

@@ -319,6 +319,13 @@ select expect_num('...the approved one is told',
 select expect_num('...and so is the one who was not chosen',
   (select count(*) from notifications where studio_id='f00df00d-0000-0000-0000-000000000001'
     and template_key='shift_declined'), 1);
+-- Decision 45: the declined instructor's link is the instructor portal, not the
+-- staff /shifts it used to point at.
+select expect_true('...the shift-declined link points at the instructor portal',
+  coalesce((select payload ->> 'shifts_url' from notifications
+    where studio_id='f00df00d-0000-0000-0000-000000000001'
+      and template_key='shift_declined' limit 1), '')
+  like 'https://shift-test.studiior.app/instructor/shifts%');
 select expect_num('no application is left pending',
   (select count(*) from shift_applications
     where occurrence_id='f00df00d-0000-0000-0000-00000000f002' and status='pending'), 0);

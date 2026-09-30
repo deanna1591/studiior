@@ -29,7 +29,11 @@ export default async function InstructorHome() {
   const { ctx, supabase } = await instructorScreen();
   const today = studioToday(ctx.timezone);
 
-  const [week, rosters, changes, coverNeeded, notifData, anns] = await Promise.all([
+  // The month being collected for availability, and this month's due day.
+  const [ty, tm] = today.split("-").map(Number);
+  const nextMonthISO = new Date(Date.UTC(ty, tm, 1)).toISOString().slice(0, 10);
+
+  const [week, rosters, changes, coverNeeded, notifData, anns, settings, availSub] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: today, p_to: shiftDate(today, 13),
     }),
@@ -46,6 +50,10 @@ export default async function InstructorHome() {
     supabase.rpc("cover_available_to", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("instructor_notifications", { p_instructor_id: ctx.instructor_id, p_limit: 6 }),
     supabase.rpc("instructor_announcements", { p_studio_id: ctx.studio_id }),
+    supabase.from("studio_settings").select("availability_due_day")
+      .eq("studio_id", ctx.studio_id).maybeSingle(),
+    supabase.from("availability_submissions").select("status")
+      .eq("instructor_id", ctx.instructor_id).eq("period_start", nextMonthISO).maybeSingle(),
   ]);
 
   const w = week.data as { classes?: Klass[] } | null;
@@ -62,6 +70,17 @@ export default async function InstructorHome() {
         .format(new Date(`${roster.month}T00:00:00Z`))
     : null;
   const availChanges = (changes.data ?? []).length > 0;
+
+  // Decision 45: the collected month is due on the studio's availability_due_day
+  // and is not yet in. Shown until it is submitted; changes_requested is handled
+  // by its own item above, so this covers only "not sent yet" and "draft".
+  const dueDay = (settings.data?.availability_due_day as number | null) ?? 20;
+  const availStatus = (availSub.data?.status as string | null) ?? "none";
+  const availDue = availStatus === "none" || availStatus === "draft";
+  const nextMonthLabel = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" })
+    .format(new Date(`${nextMonthISO}T00:00:00Z`));
+  const dueLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
+    .format(new Date(Date.UTC(ty, tm - 1, dueDay)));
 
   const coverClasses = ((coverNeeded.data as unknown as { classes?: {
     id: string; time: string; date: string; class_name: string; room: string | null; booked: number; capacity: number;
@@ -95,6 +114,9 @@ export default async function InstructorHome() {
   if (availChanges)
     waiting.push({ key: "avail", href: "/instructor/availability",
       label: "The studio asked for changes to your availability" });
+  if (availDue)
+    waiting.push({ key: "avail_due", href: "/instructor/availability",
+      label: `Your ${nextMonthLabel} availability is due ${dueLabel}` });
 
   const quiet = !next && waiting.length === 0 && coverClasses.length === 0;
 

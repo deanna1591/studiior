@@ -271,6 +271,12 @@ select expect_num('everything else moved to the new time',
   (select count(*) from class_occurrences
     where series_id = '5e215e21-0000-0000-0000-00000000f002'
       and starts_at > now() and not is_exception
+      -- The retime is effective from TOMORROW — update_series never touches
+      -- today's class (an edit at 18:00 must not retime this morning's) — so a
+      -- today-slot legitimately keeps its old time. Exclude it, or this fails on
+      -- the one day in seven today is this WE series' own weekday.
+      and (starts_at at time zone 'Europe/Prague')::date
+            > (now() at time zone 'Europe/Prague')::date
       and (starts_at at time zone 'Europe/Prague')::time <> '10:30')::bigint, 0);
 
 -- =============================================================================
