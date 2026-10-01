@@ -14,6 +14,7 @@ type Facts = {
   is_current: boolean; is_past: boolean;
   published: boolean; published_at: string | null; auto: boolean;
   classes: number; open_shifts: number; bookings: number;
+  booking_members: number; booking_classes: number;
   instructors: {
     instructor_id: string; name: string; classes: number; reachable: boolean;
     notified_at: string | null; confirmed_at: string | null; cover_pending: number;
@@ -249,18 +250,27 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
             )}
 
             {/* Decision 42a — clear every instructor assignment in the month.
-                Refused on the screen when the month is published AND members
-                have booked into it; offered otherwise, when there is something
-                to clear. */}
+                On a published month members have booked into, an OWNER may still
+                clear it with an explicit acknowledgement (bookings untouched,
+                every class becomes an open shift); a MANAGER sees the refusal.
+                Any other month is offered the ordinary clear. */}
             {selected.instructors.length > 0 && (
               <div className="mt-6 rounded border border-line bg-surface p-4">
                 <SectionLabel>Clear assignments</SectionLabel>
                 {selected.published && selected.bookings > 0 ? (
-                  <p className="mt-2 max-w-[60ch] text-[13px] leading-[19px] text-ink-2">
-                    This month is published and members have booked into it — change assignments
-                    class by class from the{" "}
-                    <Link href="/schedule" className="underline underline-offset-4">Schedule</Link> instead.
-                  </p>
+                  ctx.role === "owner" ? (
+                    <div className="mt-2">
+                      <ClearMonthButton month={selected.month} label={selected.label}
+                                        members={selected.booking_members}
+                                        classes={selected.booking_classes} />
+                    </div>
+                  ) : (
+                    <p className="mt-2 max-w-[60ch] text-[13px] leading-[19px] text-ink-2">
+                      This month is published and members have booked into it — change assignments
+                      class by class from the{" "}
+                      <Link href="/schedule" className="underline underline-offset-4">Schedule</Link> instead.
+                    </p>
+                  )
                 ) : (
                   <div className="mt-2">
                     <ClearMonthButton month={selected.month} label={selected.label} />

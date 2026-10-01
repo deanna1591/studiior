@@ -53,7 +53,8 @@ insert into auth.users (id) values
   ('a543a543-0000-0000-0000-0000000ada01'),  -- Ada login (availability)
   ('a543a543-0000-0000-0000-0000000000b1'),  -- owner SB
   ('a543a543-0000-0000-0000-0000000e1b01'),  -- E1 login (SB)
-  ('a543a543-0000-0000-0000-0000000000c1');  -- owner SC
+  ('a543a543-0000-0000-0000-0000000000c1'),  -- owner SC
+  ('a543a543-0000-0000-0000-0000000c2a01');  -- manager SC
 insert into profiles (id, email) values
   ('a543a543-0000-0000-0000-0000000000a1','a543-owner-a@example.com'),
   ('a543a543-0000-0000-0000-00000000d101','a543-d1@example.com'),
@@ -62,7 +63,8 @@ insert into profiles (id, email) values
   ('a543a543-0000-0000-0000-0000000ada01','a543-ada@example.com'),
   ('a543a543-0000-0000-0000-0000000000b1','a543-owner-b@example.com'),
   ('a543a543-0000-0000-0000-0000000e1b01','a543-e1@example.com'),
-  ('a543a543-0000-0000-0000-0000000000c1','a543-owner-c@example.com');
+  ('a543a543-0000-0000-0000-0000000000c1','a543-owner-c@example.com'),
+  ('a543a543-0000-0000-0000-0000000c2a01','a543-mgr-c@example.com');
 
 insert into studios (id, name, slug, timezone, currency, status) values
   ('a543a543-0000-0000-0000-000000000001','Hand Assign','a543-a','Europe/Prague','CZK','active'),
@@ -95,7 +97,8 @@ insert into studio_staff (id, studio_id, user_id, email, role) values
   ('a543a543-0000-0000-0000-000000055da1','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000ada01','a543-ada@example.com','instructor'),
   ('a543a543-0000-0000-0000-0000000550b1','a543a543-0000-0000-0000-000000000002','a543a543-0000-0000-0000-0000000000b1','a543-owner-b@example.com','owner'),
   ('a543a543-0000-0000-0000-000000055e01','a543a543-0000-0000-0000-000000000002','a543a543-0000-0000-0000-0000000e1b01','a543-e1@example.com','instructor'),
-  ('a543a543-0000-0000-0000-0000000550c1','a543a543-0000-0000-0000-000000000003','a543a543-0000-0000-0000-0000000000c1','a543-owner-c@example.com','owner');
+  ('a543a543-0000-0000-0000-0000000550c1','a543a543-0000-0000-0000-000000000003','a543a543-0000-0000-0000-0000000000c1','a543-owner-c@example.com','owner'),
+  ('a543a543-0000-0000-0000-00000055c2a1','a543a543-0000-0000-0000-000000000003','a543a543-0000-0000-0000-0000000c2a01','a543-mgr-c@example.com','manager');
 insert into instructors (id, studio_id, display_name, staff_id) values
   ('a543a543-0000-0000-0000-00000000d1aa','a543a543-0000-0000-0000-000000000001','Dana One','a543a543-0000-0000-0000-000000055d01'),
   ('a543a543-0000-0000-0000-00000000d2aa','a543a543-0000-0000-0000-000000000001','Deb Two','a543a543-0000-0000-0000-000000055d02'),
@@ -425,12 +428,12 @@ insert into bookings (studio_id, occurrence_id, member_id, status) values
   ('a543a543-0000-0000-0000-000000000003','a543a543-0000-0000-0000-000000010001','a543a543-0000-0000-0000-00000003e0c1','booked');
 
 -- =============================================================================
--- 11. clear_month: published + bookings → PT409.
+-- 11. clear_month: published + bookings, OWNER WITHOUT acknowledge → PT409.
 -- =============================================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000c1',false);  -- owner SC
-select expect_raises('clear: a published month with bookings is refused',
-  'select clear_month_assignments(''a543a543-0000-0000-0000-000000000003''::uuid, '''|| current_setting('t.p') ||'''::date, true)',
+select expect_raises('clear: published+bookings, owner but no acknowledge, is refused',
+  'select clear_month_assignments(''a543a543-0000-0000-0000-000000000003''::uuid, '''|| current_setting('t.p') ||'''::date, true, false)',
   'PT409');
 reset role; select set_config('request.jwt.claim.sub', null, false);
 select expect_true('clear: the refused month''s class keeps its instructor',
@@ -482,5 +485,54 @@ select expect_raises('clear: a non-manager of the studio is refused',
   'select clear_month_assignments(''a543a543-0000-0000-0000-000000000003''::uuid, '''|| current_setting('t.rr') ||'''::date, false)',
   'PT403');
 reset role; select set_config('request.jwt.claim.sub', null, false);
+
+-- =============================================================================
+-- 15–16. Decision 42a AMENDMENT — the OWNER may clear a published month with
+--        bookings, with an explicit acknowledge; a MANAGER still cannot.
+--        Run last, so P stays intact for test 12's cross-month isolation check.
+-- =============================================================================
+-- The N/M the owner acknowledgement names come from SQL (month_publication_facts),
+-- not from TS: P has one member booked into one class.
+select expect_num('facts: P names 1 booking member',
+  (month_publication_facts('a543a543-0000-0000-0000-000000000003', current_setting('t.p')::date) ->> 'booking_members')::bigint, 1);
+select expect_num('facts: P names 1 booking class',
+  (month_publication_facts('a543a543-0000-0000-0000-000000000003', current_setting('t.p')::date) ->> 'booking_classes')::bigint, 1);
+
+-- A MANAGER with acknowledge is still refused (amendment is owner-only).
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000c2a01',false);  -- manager SC
+select expect_raises('clear: published+bookings, MANAGER with acknowledge, still refused',
+  'select clear_month_assignments(''a543a543-0000-0000-0000-000000000003''::uuid, '''|| current_setting('t.p') ||'''::date, true, true)',
+  'PT409');
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_true('clear: after the manager refusal P''s class keeps its instructor',
+  (select instructor_id is not null from class_occurrences where id='a543a543-0000-0000-0000-000000020001'));
+
+-- Snapshot the member's notification footprint and the booking before the clear.
+select set_config('t.notif_before',
+  (select count(*)::text from notifications where member_id='a543a543-0000-0000-0000-00000003e0c1'), false);
+
+-- The OWNER with acknowledge clears it: instructor off, class open, bookings intact.
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000c1',false);  -- owner SC
+select set_config('t.cp', (select clear_month_assignments(
+  'a543a543-0000-0000-0000-000000000003', current_setting('t.p')::date, true, true)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('clear P (owner + acknowledge): one cleared',
+  (current_setting('t.cp')::jsonb ->> 'cleared')::bigint, 1);
+select expect_true('clear P: the class is now open, instructor null',
+  (select instructor_id is null and staffing='open' from class_occurrences where id='a543a543-0000-0000-0000-000000020001'));
+-- Bookings untouched: same count, same status, same member on P's class.
+select expect_num('clear P: the member booking still stands (not cancelled)',
+  (select count(*)::bigint from bookings
+    where occurrence_id='a543a543-0000-0000-0000-000000020001' and status='booked'
+      and member_id='a543a543-0000-0000-0000-00000003e0c1'), 1);
+select expect_num('clear P: no booking became cancelled',
+  (select count(*)::bigint from bookings
+    where occurrence_id='a543a543-0000-0000-0000-000000020001' and status='cancelled'), 0);
+-- No member notification was queued by the clear (members are not told).
+select expect_num('clear P: no member notification queued',
+  (select count(*)::bigint from notifications where member_id='a543a543-0000-0000-0000-00000003e0c1'),
+  current_setting('t.notif_before')::bigint);
 
 select 'assign from schedule suite finished' as done;

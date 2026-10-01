@@ -79,9 +79,14 @@ export async function clearMonthAssignments(fd: FormData): Promise<void> {
   if (!ctx) redirect("/login");
   const month = String(fd.get("month") ?? "");
   const clearTemplates = String(fd.get("clear_templates") ?? "") === "on";
+  // Decision 42a amendment: on a published month with bookings the owner must
+  // tick an acknowledgement. The tick arrives as "on"; the database still
+  // enforces owner + acknowledge, so a forged field changes nothing.
+  const acknowledge = String(fd.get("acknowledge") ?? "") === "on";
   const supabase = createClient();
   const { data, error } = await supabase.rpc("clear_month_assignments", {
     p_studio_id: ctx.studioId, p_month: month, p_clear_templates: clearTemplates,
+    p_acknowledge: acknowledge,
   });
   if (error) {
     const msg = /PT409/.test(error.message)

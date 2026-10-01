@@ -527,6 +527,18 @@ Assignments are made per class or per period from the Schedule, not on the serie
 
 **Where:** Business Rules §5; Data Model §5; migration 193. **Status:** settled (42a only; 42b — bulk edits on `/series` — is a separate later build). **Extends:** Decision 38 (confirmation request), Decision 37 amendment (c) (availability warns), Decision 25 (no unpublish), Decision 17 (open shift). **Reuses:** `reassign_occurrence`/`move_occurrence` (the single-occurrence path), `mark_assignment_confirmed`, `queue_assignment_request`, the block panel.
 
+### Amendment — the owner may clear a published month with bookings (Deanna, 1 Oct 2026)
+
+clear_month_assignments may run on a published month that members have booked into, but only by an OWNER (not a manager), with an explicit acknowledgement. Member bookings are never touched by it — only the instructor comes off each class and the class becomes an open shift until assigned. Managers still get the refusal. Deanna, 1 Oct 2026.
+
+**Why:** Reform's November is published (auto-published when publication was turned on, because eight real members had already booked) and the owner needs to strip the auto-assigned instructors from all 346 classes and assign by hand (Decisions 43/42a). Cancelling members' bookings to qualify is not acceptable, so the published+bookings refusal needed an owner-only exit.
+
+**Mechanism (migration 194).** `clear_month_assignments` gains `p_acknowledge boolean default false` (a signature change, so the 3-arg function is DROPPED and recreated 4-arg, ACLs re-asserted — the 028 trap). Today's rule is kept; the published-AND-bookings branch now allows the clear when the caller is the studio OWNER (`coalesce(is_owner(p_studio_id), false)`, null-safe) AND `p_acknowledge` is true, otherwise the same PT409 sentence. A manager with acknowledge still gets PT409. The per-occurrence unassign path is byte-for-byte unchanged — `move_occurrence(p_clear_instructor => true)`: member bookings are untouched (`move_occurrence`'s member notification is gated on `v_moved and booked_count > 0`, and clearing the instructor is not a time move so `v_moved` is false; `queue_instructor_assigned` is skipped because the cleared instructor is null), pending Decision 38 requests are withdrawn, and `staffing → open`. **No member notification is queued** by the clear, confirmed by reading `move_occurrence`.
+
+**UI.** On the Publish page, a published month with bookings shows the OWNER (not a manager) the sentence *"This month is published and N members have booked into M classes. Their bookings stay exactly as they are; every class becomes an open shift until you assign it. Members are not told."*, then a tick *"I understand — members' bookings are not affected"* and the Clear button (disabled until ticked), with the same "also remove from the recurring classes" tick as a draft-month clear. A manager still sees the refusal sentence.
+
+**Status:** settled. **Extends:** this Decision (42a) and Decision 25 (no unpublish — so the only exit is an owner acknowledgement, never a withdrawal of the publication). **Reuses:** `is_owner`, the unchanged per-occurrence unassign path.
+
 ---
 
 ## 41 — The sign-up confirmation redirect is chosen per studio, not from the project-wide Site URL
