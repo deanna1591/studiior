@@ -124,3 +124,70 @@ export async function moveClass(input: {
       : null,
   };
 }
+
+export type PeriodAssignResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Decision 42a — assign (or unassign) an instructor from the Schedule, for a
+ * scope: just this class, every week this month, or until a date. Each
+ * occurrence goes through the existing single-occurrence path, so Decision 38's
+ * confirmation request, the double-booking constraints and the audit all apply;
+ * a clash is skipped and named, never silently reassigned. The series template
+ * is never touched. Instructor id empty = unassign (back to an open shift).
+ */
+export async function assignOccurrencesForPeriod(_prev: PeriodAssignResult, fd: FormData): Promise<PeriodAssignResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const instructorId = String(fd.get("instructor_id") ?? "");   // "" => unassign
+  const scope = String(fd.get("scope") ?? "one");
+  const untilRaw = String(fd.get("until") ?? "").trim();
+  const confirmed = String(fd.get("confirmed") ?? "") === "on";
+  if (scope === "until" && !untilRaw) return { ok: false, message: "Pick a date to assign until." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("assign_occurrences_for_period", {
+    p_occurrence_id: occurrenceId,
+    // Omitted (undefined) means the function's default null — i.e. unassign.
+    p_instructor_id: instructorId || undefined,
+    p_scope: scope,
+    p_until: scope === "until" ? untilRaw : undefined,
+    p_confirmed: confirmed,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers change the timetable."
+        : /PT422/.test(m) ? "Check the scope and date."
+        : m,
+    };
+  }
+
+  const r = data as unknown as {
+    ok: boolean; assigned: number; instructor: string | null;
+    skipped: { occurrence_id: string; when: string; reason: string }[];
+    warnings: string[];
+  };
+  const unassign = !instructorId;
+  const n = r.assigned ?? 0;
+  const who = r.instructor ?? "the instructor";
+  const parts: string[] = [];
+  parts.push(unassign
+    ? `Unassigned ${n} ${n === 1 ? "class" : "classes"}.`
+    : `Assigned ${who} to ${n} ${n === 1 ? "class" : "classes"}.`);
+  const skipped = r.skipped ?? [];
+  if (skipped.length > 0) {
+    parts.push(`Skipped ${skipped.length}: ` + skipped.map((s) => `${s.when} — ${s.reason}`).join("; ") + ".");
+  }
+  if ((r.warnings ?? []).includes("outside_availability")) {
+    parts.push(`${who} is outside the hours they gave us for at least one of these — assigned anyway.`);
+  }
+
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  return { ok: true, message: parts.join(" ") };
+}

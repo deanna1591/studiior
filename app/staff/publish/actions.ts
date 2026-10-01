@@ -71,3 +71,24 @@ export async function carryForwardNow(fd: FormData): Promise<void> {
   revalidatePath("/");
   redirect(`/publish?m=${month.slice(0, 7)}${error ? `&err=${encodeURIComponent(error.message)}` : "&carried=1"}`);
 }
+
+// Decision 42a — clear every instructor assignment in a month. Refused (PT409)
+// only when the month is published AND members have booked into it.
+export async function clearMonthAssignments(fd: FormData): Promise<void> {
+  const ctx = await getStaffContext();
+  if (!ctx) redirect("/login");
+  const month = String(fd.get("month") ?? "");
+  const clearTemplates = String(fd.get("clear_templates") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("clear_month_assignments", {
+    p_studio_id: ctx.studioId, p_month: month, p_clear_templates: clearTemplates,
+  });
+  if (error) {
+    const msg = /PT409/.test(error.message)
+      ? "This month is published and members have booked into it — change assignments class by class from the Schedule instead."
+      : error.message;
+    redirect(`/publish?m=${month.slice(0, 7)}&err=${encodeURIComponent(msg)}`);
+  }
+  const r = data as unknown as { cleared: number; templates_cleared: number };
+  redirect(`/publish?m=${month.slice(0, 7)}&cleared_n=${r?.cleared ?? 0}&tpl=${r?.templates_cleared ?? 0}`);
+}

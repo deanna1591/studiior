@@ -3,6 +3,7 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Notice, SectionLabel } from "@/components/ui";
 import PublishForm from "./publish-form";
+import ClearMonthButton from "./clear-month";
 import { confirmRosterFor, carryForwardNow } from "./actions";
 import { buttonQuietClass } from "@/components/ui";
 
@@ -44,7 +45,7 @@ function rosterState(i: Facts["instructors"][number]) {
  * Publishing with holes is allowed and warned, never blocked. An open shift is
  * a real state and Decision 17 handles it.
  */
-export default async function PublishPage({ searchParams }: { searchParams: { m?: string; just?: string; err?: string; carried?: string } }) {
+export default async function PublishPage({ searchParams }: { searchParams: { m?: string; just?: string; err?: string; carried?: string; cleared_n?: string; tpl?: string } }) {
   const screen = await staffScreen("/publish");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -135,6 +136,12 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
 
       {searchParams.err && <Notice kind="error">{searchParams.err}</Notice>}
       {searchParams.carried === "1" && <Notice kind="ok">Rosters carried forward. Anything not carried is listed below with why.</Notice>}
+      {searchParams.cleared_n && (
+        <Notice kind="ok">
+          Cleared {searchParams.cleared_n} {searchParams.cleared_n === "1" ? "class" : "classes"} — every one is now an open shift.
+          {searchParams.tpl && Number(searchParams.tpl) > 0 && ` ${searchParams.tpl} recurring ${Number(searchParams.tpl) === 1 ? "class" : "classes"} cleared too, so future months start unassigned.`}
+        </Notice>
+      )}
 
       {/* Rendered from the facts, not from a message the action carried back:
           the row says who was sent a roster and who could not be. */}
@@ -239,6 +246,27 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
                   </li>
                 ))}
               </ul>
+            )}
+
+            {/* Decision 42a — clear every instructor assignment in the month.
+                Refused on the screen when the month is published AND members
+                have booked into it; offered otherwise, when there is something
+                to clear. */}
+            {selected.instructors.length > 0 && (
+              <div className="mt-6 rounded border border-line bg-surface p-4">
+                <SectionLabel>Clear assignments</SectionLabel>
+                {selected.published && selected.bookings > 0 ? (
+                  <p className="mt-2 max-w-[60ch] text-[13px] leading-[19px] text-ink-2">
+                    This month is published and members have booked into it — change assignments
+                    class by class from the{" "}
+                    <Link href="/schedule" className="underline underline-offset-4">Schedule</Link> instead.
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <ClearMonthButton month={selected.month} label={selected.label} />
+                  </div>
+                )}
+              </div>
             )}
 
             {/* G: what a silent roster will carry into this month, and what it

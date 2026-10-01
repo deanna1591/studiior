@@ -386,14 +386,18 @@ select expect_true('...naming the one with no login, who cannot be emailed',
 -- column — and it holds on any day the suite is run.
 reset role;
 update studio_settings set availability_due_day = 1 where studio_id = '1f5e1f5e-0000-0000-0000-000000000002';
-select set_config('t.overdue_b',
-  (select (availability_cycle('1f5e1f5e-0000-0000-0000-000000000002') ->> 'overdue')), false);
+-- queue_availability_reminders fires ON the due day and after (today >= due,
+-- i.e. days_left <= 0), while availability_cycle.overdue is strictly AFTER
+-- (today > due). Keying this on days_left matches the reminder's own gate, so
+-- the assertion holds on the due day itself (e.g. the 1st with due_day = 1).
+select set_config('t.dleft_b',
+  (select (availability_cycle('1f5e1f5e-0000-0000-0000-000000000002') ->> 'days_left')), false);
 select set_config('t.q_b', (select queue_availability_reminders('1f5e1f5e-0000-0000-0000-000000000002')::text), false);
 select expect_true(
-  case when current_setting('t.overdue_b')::boolean
-       then 'past the due day, the instructor who has not submitted is reminded'
+  case when current_setting('t.dleft_b')::int <= 0
+       then 'on or past the due day, the instructor who has not submitted is reminded'
        else 'before the due day, nobody is reminded early' end,
-  case when current_setting('t.overdue_b')::boolean
+  case when current_setting('t.dleft_b')::int <= 0
        then current_setting('t.q_b')::int > 0
        else current_setting('t.q_b')::int = 0 end);
 

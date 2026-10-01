@@ -863,3 +863,25 @@ export async function saveAssignmentConfirmations(_prev: PlainState, fd: FormDat
       : "Off. Instructors are not asked to confirm assignments.",
   };
 }
+
+// Decision 43 — automatic instructor assignment is a per-tenant switch, off by
+// default. When off, materialising a series never auto-assigns; the owner
+// assigns by hand from the Schedule.
+export async function saveAutoAssign(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("auto_assign_open_classes") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ auto_assign_open_classes: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. New recurring classes are given an instructor automatically from their availability."
+      : "Off. You assign each class from the Schedule.",
+  };
+}

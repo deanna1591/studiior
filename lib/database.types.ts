@@ -5928,6 +5928,7 @@ export type Database = {
         Row: {
           adjacency_minutes: number
           assignment_confirmations: boolean
+          auto_assign_open_classes: boolean
           availability_due_day: number
           availability_reminders_enabled: boolean
           booking_cutoff_minutes: number
@@ -6020,6 +6021,7 @@ export type Database = {
         Insert: {
           adjacency_minutes?: number
           assignment_confirmations?: boolean
+          auto_assign_open_classes?: boolean
           availability_due_day?: number
           availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
@@ -6112,6 +6114,7 @@ export type Database = {
         Update: {
           adjacency_minutes?: number
           assignment_confirmations?: boolean
+          auto_assign_open_classes?: boolean
           availability_due_day?: number
           availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
@@ -6982,6 +6985,26 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_occurrences_for_period: {
+        Args: {
+          p_confirmed?: boolean
+          p_instructor_id?: string
+          p_occurrence_id: string
+          p_scope?: string
+          p_until?: string
+        }
+        Returns: Json
+      }
+      assign_occurrences_for_period_run: {
+        Args: {
+          p_confirmed?: boolean
+          p_instructor_id?: string
+          p_occurrence_id: string
+          p_scope?: string
+          p_until?: string
+        }
+        Returns: Json
+      }
       auth_instructor_id: { Args: { target: string }; Returns: string }
       auth_member_studios: { Args: never; Returns: string[] }
       auth_participates_in: {
@@ -6993,6 +7016,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["staff_role"]
       }
       auth_staff_studios: { Args: never; Returns: string[] }
+      auto_assign_enabled: { Args: { p_studio_id: string }; Returns: boolean }
       availability_conflicts: { Args: { p_studio_id: string }; Returns: Json }
       availability_cycle: {
         Args: { p_period_start?: string; p_studio_id: string }
@@ -7125,6 +7149,14 @@ export type Database = {
       clear_availability_exception: {
         Args: { p_date: string; p_instructor_id: string }
         Returns: number
+      }
+      clear_month_assignments: {
+        Args: {
+          p_clear_templates?: boolean
+          p_month: string
+          p_studio_id: string
+        }
+        Returns: Json
       }
       close_pay_period: { Args: { p_period_id: string }; Returns: Json }
       close_studio: {

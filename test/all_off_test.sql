@@ -255,4 +255,29 @@ select expect_num('teeth: with reminders ON, the evening-before sweep queues one
      and user_id = '0ff00ff0-0000-0000-0000-0000000000a1'), 1);
 update studio_settings set instructor_class_reminders = false where studio_id = :'S';
 
+-- =============================================================================
+-- Decision 43: automatic assignment is off by default. A fresh studio with
+-- defaults creates a series and every occurrence materialises open/unassigned
+-- (Decision 17). A positive control flips it on and re-fires the trigger: the
+-- engine fills the open occurrences — so the open-ness was the switch being off.
+-- =============================================================================
+insert into instructor_class_types (studio_id, instructor_id, class_type_id) values
+  (:'S','0ff00ff0-0000-0000-0000-0000000d0001','0ff00ff0-0000-0000-0000-0000000cc001');
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('0ff00ff0-0000-0000-0000-000000005043',:'S','0ff00ff0-0000-0000-0000-00000000000a',
+        '0ff00ff0-0000-0000-0000-0000000cc001','Auto Off Series','0ff00ff0-0000-0000-0000-0000000ee001', null,
+        8,50,'FREQ=WEEKLY;BYDAY=MO,TH', current_date + 1, '06:00');
+select expect_true('defaults: a materialised series is ALL open, nobody assigned',
+  (select count(*) > 0 and count(*) = count(*) filter (where instructor_id is null and staffing = 'open')
+     from class_occurrences where series_id = '0ff00ff0-0000-0000-0000-000000005043'));
+-- teeth: auto ON, re-fire the series trigger (status is in its column list) → the
+-- engine assigns the qualified instructor to the open occurrences.
+update studio_settings set auto_assign_open_classes = true where studio_id = :'S';
+update class_series set status = 'active' where id = '0ff00ff0-0000-0000-0000-000000005043';
+select expect_true('teeth: with auto-assign ON, the engine fills the open occurrences',
+  (select count(*) filter (where instructor_id is not null) > 0
+     from class_occurrences where series_id = '0ff00ff0-0000-0000-0000-000000005043'));
+update studio_settings set auto_assign_open_classes = false where studio_id = :'S';
+
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;
