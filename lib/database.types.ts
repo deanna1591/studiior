@@ -5967,6 +5967,7 @@ export type Database = {
           free_first_peak_allowed: boolean
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
+          hide_unstaffed_from_members: boolean
           how_to_buy: string | null
           instructor_booking_alerts: boolean
           instructor_class_reminders: boolean
@@ -6060,6 +6061,7 @@ export type Database = {
           free_first_peak_allowed?: boolean
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
+          hide_unstaffed_from_members?: boolean
           how_to_buy?: string | null
           instructor_booking_alerts?: boolean
           instructor_class_reminders?: boolean
@@ -6153,6 +6155,7 @@ export type Database = {
           free_first_peak_allowed?: boolean
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
+          hide_unstaffed_from_members?: boolean
           how_to_buy?: string | null
           instructor_booking_alerts?: boolean
           instructor_class_reminders?: boolean
@@ -7997,6 +8000,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
+      occurrence_member_visible_run: {
+        Args: { p_member_id?: string; p_occurrence_id: string }
+        Returns: boolean
+      }
       occurrence_outside_hours: {
         Args: { p_starts_at: string; p_studio_id: string }
         Returns: boolean
@@ -8702,6 +8709,10 @@ export type Database = {
           day_end: string
           day_start: string
         }[]
+      }
+      studio_hides_unstaffed: {
+        Args: { p_studio_id: string }
+        Returns: boolean
       }
       studio_invite_preview: {
         Args: { p_token: string }

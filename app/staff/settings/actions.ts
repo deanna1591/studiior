@@ -885,3 +885,22 @@ export async function saveAutoAssign(_prev: PlainState, fd: FormData): Promise<P
       : "Off. You assign each class from the Schedule.",
   };
 }
+
+export async function saveHideUnstaffed(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("hide_unstaffed_from_members") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ hide_unstaffed_from_members: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. A class with no instructor is hidden from members and the website until you assign someone."
+      : "Off. Unstaffed classes are shown to members.",
+  };
+}

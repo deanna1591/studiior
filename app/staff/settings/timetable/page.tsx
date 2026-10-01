@@ -4,6 +4,7 @@ import { AppShell, Denied, SectionLabel } from "@/components/ui";
 import HorizonPanel from "../horizon";
 import PublicationPanel from "../publication";
 import BookingWindowPanel from "../booking-window";
+import HideUnstaffedPanel from "../hide-unstaffed";
 import SettingsBack from "../back";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export default async function TimetableSettings() {
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Timetable"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
 
   const [{ data: settings }, { count: scheduled }, { data: last }, { data: horizon }] = await Promise.all([
-    supabase.from("studio_settings").select("occurrence_horizon_days, publication_enabled, booking_window_days").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("occurrence_horizon_days, publication_enabled, booking_window_days, hide_unstaffed_from_members").eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_occurrences").select("id", { count: "exact", head: true }).eq("status", "scheduled").gte("starts_at", new Date().toISOString()),
     supabase.from("class_occurrences").select("starts_at").eq("status", "scheduled").order("starts_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.rpc("timetable_horizon", { p_studio_id: ctx.studioId }),
@@ -37,10 +38,14 @@ export default async function TimetableSettings() {
         <SectionLabel>How far ahead members can book</SectionLabel>
         <div className="mt-3"><BookingWindowPanel value={settings?.booking_window_days ?? 30} /></div>
       </section>
-      <section>
+      <section className="mb-10">
         <SectionLabel>Publishing the month</SectionLabel>
         <div className="mt-3"><PublicationPanel enabled={settings?.publication_enabled ?? false}
           publishedMonths={(hz?.months ?? []).map(monthLabel)} nextDraft={hz?.next_unpublished ? monthLabel(hz.next_unpublished) : null} /></div>
+      </section>
+      <section>
+        <SectionLabel>Unstaffed classes</SectionLabel>
+        <div className="mt-3"><HideUnstaffedPanel enabled={settings?.hide_unstaffed_from_members ?? false} /></div>
       </section>
     </AppShell>
   );

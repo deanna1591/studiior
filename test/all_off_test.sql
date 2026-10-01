@@ -149,6 +149,13 @@ select expect_num('no assignment was requested (a login instructor assigned, swi
 select expect_num('no assignment-confirmation email was queued',
   (select count(*) from notifications where studio_id = :'S' and template_key = 'assignment_confirmation_request'), 0);
 
+-- Decision 48: hide_unstaffed_from_members defaults OFF, so an unstaffed class
+-- stays visible and bookable — nothing hidden for a studio that opted into nothing.
+select expect_true('hide_unstaffed_from_members defaults off',
+  (select not hide_unstaffed_from_members from studio_settings where studio_id = :'S'));
+select expect_true('an unstaffed class is NOT hidden at the canary studio',
+  not studio_hides_unstaffed(:'S'));
+
 -- The three gates 142 added, at their defaults for a studio that inserted only
 -- its studio_id.
 select expect_true('weekly confirmation is OFF by default (142 flipped it)',
