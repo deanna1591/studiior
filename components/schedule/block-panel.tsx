@@ -3,13 +3,15 @@
 import { useEffect, useState, useTransition } from "react";
 import { republishShift, openShift } from "@/app/staff/roster/actions";
 import { assignCandidates } from "@/app/staff/schedule/actions";
-import { assignOccurrencesForPeriod } from "@/app/staff/schedule/actions";
+import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
 
 export type BlockFacts = {
   id: string;
   title: string;
   when: string;
+  /** The clicked class's studio-local weekday ("Thursday"), for scope labels. */
+  weekday: string;
   instructorId: string | null;
   instructorName: string | null;
   bookedCount: number;
@@ -17,6 +19,10 @@ export type BlockFacts = {
   waitlistCount: number;
   staffing: "assigned" | "open" | "pending_approval";
   pendingApplications: number;
+  /** Decision 47: a cancelled class keeps showing; its panel is read-only. */
+  cancelled?: boolean;
+  cancellationCause?: string | null;
+  cancellationReason?: string | null;
 };
 
 /**
@@ -70,14 +76,29 @@ export default function BlockPanel({
     return () => { alive = false; };
   }, [facts.id, canManage]);
 
-  // The current instructor is not a target to change TO; dropped from the
-  // choices and named above instead.
-  const choices = (candidates ?? []).filter((c) => c.id !== facts.instructorId);
-  const primary = choices.filter((c) => c.qualified && c.free);
-  const rest = choices.filter((c) => !(c.qualified && c.free));
+  // 42a amendment (b): the current instructor is INCLUDED and defaulted to, so a
+  // scope can be applied to the same person without re-choosing them. They lead
+  // "Qualified and available", labelled "(current)".
+  const choices = candidates ?? [];
+  const current = choices.find((c) => c.id === facts.instructorId) ?? null;
+  const others = choices.filter((c) => c.id !== facts.instructorId);
+  const primary = others.filter((c) => c.qualified && c.free);
+  const rest = others.filter((c) => !(c.qualified && c.free));
+  // Default the dropdown to the current instructor once the candidates arrive.
   useEffect(() => {
-    if (candidates && primary.length === 0 && rest.length > 0) setShowAll(true);
-  }, [candidates, primary.length, rest.length]);
+    if (candidates && assigned && facts.instructorId && who === "") setWho(facts.instructorId);
+  }, [candidates, assigned, facts.instructorId, who]);
+  useEffect(() => {
+    if (candidates && !assigned && primary.length === 0 && rest.length > 0) setShowAll(true);
+  }, [candidates, assigned, primary.length, rest.length]);
+  const sameAsCurrent = assigned && who === facts.instructorId;
+  const wd = facts.weekday ? `${facts.weekday}s` : "classes";
+  const buttonText = who === "__open"
+    ? "Unassign"
+    : sameAsCurrent
+      ? (scope === "month" ? `Apply to ${wd} this month` : scope === "until" ? "Apply until…" : "Assign")
+      : "Assign";
+  const buttonDisabled = pending || (sameAsCurrent && scope === "one");
 
   const label = (c: AssignCandidate) => {
     const bits: string[] = [];
@@ -147,17 +168,26 @@ export default function BlockPanel({
           </button>
         </div>
 
-        <p className="mt-2 text-[13px] leading-[19px] text-ink-2">
-          {assigned
-            ? <>{facts.instructorName ?? "An instructor"} is teaching it.</>
-            : <span className="font-medium text-ink">Nobody is teaching it.</span>}
-          {" · "}
-          <span className="num text-ink">{facts.bookedCount}/{facts.capacity}</span> booked
-          {facts.waitlistCount > 0 && <> · <span className="num">+{facts.waitlistCount}</span> waiting</>}
-          {facts.pendingApplications > 0 && <> · <span className="num">{facts.pendingApplications}</span> applied</>}
-        </p>
+        {facts.cancelled ? (
+          <div className="mt-2 border-l-[3px] bg-coral-tint px-3 py-2 text-[13px] leading-[19px] text-ink"
+               style={{ borderLeftColor: "var(--coral)" }} role="status">
+            <p className="font-medium">This class is cancelled — {causeLabel(facts.cancellationCause)}.</p>
+            {facts.cancellationReason && <p className="mt-0.5 text-ink-2">“{facts.cancellationReason}”</p>}
+            <p className="mt-0.5 text-ink-2">It stays on the schedule so the gap is visible.</p>
+          </div>
+        ) : (
+          <p className="mt-2 text-[13px] leading-[19px] text-ink-2">
+            {assigned
+              ? <>{facts.instructorName ?? "An instructor"} is teaching it.</>
+              : <span className="font-medium text-ink">Nobody is teaching it.</span>}
+            {" · "}
+            <span className="num text-ink">{facts.bookedCount}/{facts.capacity}</span> booked
+            {facts.waitlistCount > 0 && <> · <span className="num">+{facts.waitlistCount}</span> waiting</>}
+            {facts.pendingApplications > 0 && <> · <span className="num">{facts.pendingApplications}</span> applied</>}
+          </p>
+        )}
 
-        {canManage && (
+        {canManage && !facts.cancelled && (
           <div className="mt-3 border-t border-line pt-3">
             {msg && (
               <p className={`mb-2 text-[12.5px] leading-[18px] ${msg.ok ? "text-ink-2" : "text-coral-deep"}`}>
@@ -172,10 +202,18 @@ export default function BlockPanel({
               <>
                 <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Assign to"
                         className="w-full rounded-lg border border-line-2 bg-paper px-2.5 py-1.5 text-[13px] text-ink">
-                  <option value="">{assigned ? "Change to…" : "Assign someone…"}</option>
+                  {!assigned && <option value="">Assign someone…</option>}
                   <option value="__open">Unassigned — open it as a shift</option>
-                  {primary.length > 0 && (
+                  {/* The current instructor always appears and is defaulted to,
+                      even when the candidate list is empty — so a scope can be
+                      applied to them without re-choosing (42a amendment b). */}
+                  {(current || primary.length > 0 || (assigned && facts.instructorId)) && (
                     <optgroup label="Qualified and available">
+                      {current
+                        ? <option key={current.id} value={current.id}>{current.display_name} (current)</option>
+                        : assigned && facts.instructorId
+                          ? <option key={facts.instructorId} value={facts.instructorId}>{facts.instructorName ?? "The instructor"} (current)</option>
+                          : null}
                       {primary.map((c) => <option key={c.id} value={c.id}>{c.display_name}</option>)}
                     </optgroup>
                   )}
@@ -195,7 +233,7 @@ export default function BlockPanel({
                 {/* Scope — just this class, the month, or until a date. */}
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
                   <ScopeRadio value="one">Just this class</ScopeRadio>
-                  <ScopeRadio value="month">Every week this month</ScopeRadio>
+                  <ScopeRadio value="month">Every {facts.weekday || "week"} this month</ScopeRadio>
                   <ScopeRadio value="until">Until…</ScopeRadio>
                   {scope === "until" && (
                     <input type="date" value={until} onChange={(e) => setUntil(e.target.value)}
@@ -213,9 +251,9 @@ export default function BlockPanel({
                 )}
 
                 <div className="mt-3 flex items-center gap-2">
-                  <button onClick={submit} disabled={pending}
+                  <button onClick={submit} disabled={buttonDisabled}
                           className="rounded-lg bg-lime px-3 py-1.5 text-[13px] font-medium text-ink disabled:opacity-60">
-                    {pending ? "…" : unassigning ? "Unassign" : "Assign"}
+                    {pending ? "…" : buttonText}
                   </button>
                   {!assigned && (
                     <button onClick={doRepublish} disabled={pending}
@@ -239,7 +277,115 @@ export default function BlockPanel({
             Open the full roster →
           </a>
         </div>
+
+        {/* Decision 47: cancel this class (or the rest of its weekday this month). */}
+        {canManage && !facts.cancelled && (
+          <CancelClass facts={facts} onCancelled={onUnassigned} onClose={onClose} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function causeLabel(cause?: string | null): string {
+  switch (cause) {
+    case "no_instructor": return "no instructor was available";
+    case "studio_fault": return "the studio's own reason";
+    case "force_majeure": return "beyond anyone's control";
+    case "unmet_minimum": return "it did not reach its minimum";
+    case "closure": return "the studio was closed";
+    default: return "cancelled";
+  }
+}
+
+/**
+ * Decision 47 — cancel this class, or the rest of its studio-local weekday this
+ * month. Goes through cancel_occurrences_for_period → cancel_occurrence, so
+ * booked members get the §3.2 treatment and the instructor, if any, is told.
+ */
+function CancelClass({ facts, onCancelled, onClose }: {
+  facts: BlockFacts; onCancelled: () => void; onClose: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [cause, setCause] = useState<"no_instructor" | "studio_fault" | "force_majeure">(
+    facts.instructorId ? "studio_fault" : "no_instructor");
+  const [reason, setReason] = useState("");
+  const [scope, setScope] = useState<"one" | "month">("one");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const wd = facts.weekday ? `${facts.weekday}s` : "this weekday";
+
+  const go = () => {
+    const fd = new FormData();
+    fd.set("occurrence_id", facts.id);
+    fd.set("scope", scope);
+    fd.set("cause", cause);
+    if (reason.trim()) fd.set("reason", reason.trim());
+    setMsg(null);
+    start(async () => {
+      const r = await cancelOccurrencesForPeriod(null, fd);
+      if (r?.ok) { setMsg(r.message); onCancelled(); setTimeout(onClose, 900); }
+      else setMsg(r?.message ?? "That could not be done.");
+    });
+  };
+
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      {!open ? (
+        <button type="button" onClick={() => setOpen(true)}
+                className="text-[12.5px] text-coral-deep underline underline-offset-4 hover:opacity-80">
+          Cancel this class
+        </button>
+      ) : (
+        <div>
+          <p className="text-[12.5px] font-medium text-ink">Why is it cancelled?</p>
+          <div className="mt-1.5 flex flex-col gap-1">
+            <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+              <input type="radio" name="cancause" checked={cause === "no_instructor"}
+                     onChange={() => setCause("no_instructor")} disabled={!!facts.instructorId} />
+              No instructor available{facts.instructorId ? " (this class has one)" : ""}
+            </label>
+            <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+              <input type="radio" name="cancause" checked={cause === "studio_fault"}
+                     onChange={() => setCause("studio_fault")} />
+              Studio&rsquo;s own reason
+            </label>
+            <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+              <input type="radio" name="cancause" checked={cause === "force_majeure"}
+                     onChange={() => setCause("force_majeure")} />
+              Beyond anyone&rsquo;s control
+            </label>
+          </div>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a note (optional)"
+                 className="mt-2 w-full rounded-lg border border-line-2 bg-paper px-2.5 py-1.5 text-[13px] text-ink" />
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+              <input type="radio" name="canscope" checked={scope === "one"} onChange={() => setScope("one")} />
+              Just this class
+            </label>
+            <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+              <input type="radio" name="canscope" checked={scope === "month"} onChange={() => setScope("month")} />
+              Every {facts.weekday || "week"} this month
+            </label>
+          </div>
+          {facts.bookedCount > 0 && (
+            <p className="mt-2 text-[12px] leading-[17px] text-ink-2">
+              {facts.bookedCount} {facts.bookedCount === 1 ? "member is" : "members are"} booked
+              {scope === "month" ? ` across these ${wd}` : ""} — they&rsquo;ll get their credit back and an email.
+            </p>
+          )}
+          {msg && <p className="mt-2 text-[12.5px] leading-[18px] text-ink-2">{msg}</p>}
+          <div className="mt-2 flex items-center gap-2">
+            <button onClick={go} disabled={pending}
+                    className="rounded-lg border bg-coral-tint px-3 py-1.5 text-[12.5px] font-medium text-ink disabled:opacity-60"
+                    style={{ borderColor: "var(--coral)" }}>
+              {pending ? "…" : scope === "month" ? `Cancel these ${wd}` : "Cancel this class"}
+            </button>
+            <button type="button" onClick={() => { setOpen(false); setReason(""); }}
+                    className="text-[12px] text-ink-3 hover:text-ink">Keep it</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

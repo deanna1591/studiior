@@ -7101,6 +7101,24 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_occurrences_for_period: {
+        Args: {
+          p_cause?: Database["public"]["Enums"]["cancellation_cause"]
+          p_occurrence_id: string
+          p_reason?: string
+          p_scope?: string
+        }
+        Returns: Json
+      }
+      cancel_occurrences_for_period_run: {
+        Args: {
+          p_cause?: Database["public"]["Enums"]["cancellation_cause"]
+          p_occurrence_id: string
+          p_reason?: string
+          p_scope?: string
+        }
+        Returns: Json
+      }
       carry_forward_roster: {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json
@@ -7424,22 +7442,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; sql: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
@@ -8954,6 +8956,7 @@ export type Database = {
         | "studio_fault"
         | "force_majeure"
         | "closure"
+        | "no_instructor"
       challenge_audience: "member" | "instructor"
       challenge_status: "draft" | "scheduled" | "active" | "ended" | "archived"
       challenge_type: "class_count" | "streak" | "class_type_count"
@@ -9217,6 +9220,7 @@ export const Constants = {
         "studio_fault",
         "force_majeure",
         "closure",
+        "no_instructor",
       ],
       challenge_audience: ["member", "instructor"],
       challenge_status: ["draft", "scheduled", "active", "ended", "archived"],

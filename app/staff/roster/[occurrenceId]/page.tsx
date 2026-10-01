@@ -4,6 +4,7 @@ import { staffScreen } from "@/lib/screen";
 import { isManagerUp } from "@/lib/auth";
 import OpenShift from "../open-shift";
 import AssignShift from "../assign-shift";
+import CancelClass from "../cancel-class";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { HealthChip, bandOf } from "@/components/health-band";
 import { fmtDayLong, fmtTime, relativeDayName } from "@/lib/time";
@@ -155,6 +156,14 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
           view, which was the only way and undiscoverable. */}
       {unstaffed && (
         <AssignShift occurrenceId={occ.id} candidates={candidates} pendingApplications={pendingApplications} />
+      )}
+
+      {/* Decision 47: cancel this class (or the rest of its weekday this month),
+          manager-up and only while it is still scheduled. */}
+      {isManagerUp(ctx.role) && occ.status === "scheduled" && (
+        <CancelClass occurrenceId={occ.id}
+          weekday={new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: ctx.timeZone }).format(new Date(occ.starts_at))}
+          hasInstructor={!!occ.instructor_id} bookedCount={occ.booked_count} />
       )}
 
       {heldPay && <ReleasePay occurrenceId={occ.id} />}

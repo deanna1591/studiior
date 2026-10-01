@@ -475,6 +475,20 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 47 — Staff can cancel a specific class (or the rest of its weekday this month) from the Schedule
+
+Staff (manager-up) can cancel one scheduled class, or that series' remaining classes on the same studio-local weekday in the same month, from the Schedule panel and the roster page. It goes through the existing `cancel_occurrence` path, so booked members get the Business Rules §3.2 treatment (credit back regardless of timing, fee waived, `class_cancelled` email, calendar cancellation) and the instructor, if any, is told. New `cancellation_cause` `'no_instructor'` for the case this exists for — nobody available to teach — which pays nobody (there is no instructor). The other staff-chosen causes are offered too: `studio_fault` (pays the assigned instructor base, as Decision 22 says), `force_majeure` (pays nothing). The recurring class (series) is never touched — cancelling November's Mondays leaves December's Mondays on the calendar. A cancelled class stays visible on the staff Schedule as cancelled, not deleted. Deanna, 1 Oct 2026.
+
+**Mechanism.** `cancel_occurrences_for_period(p_occurrence_id, p_scope in ('one','month'), p_cause cancellation_cause, p_reason text)` — a manager-up guarded wrapper over a service-role `_run` twin. It resolves the target set exactly as `assign_occurrences_for_period_run` does after the 42a amendment (a): 'one' = this occurrence; 'month' = this series' scheduled occurrences in the same studio-local calendar month, same studio-local weekday as the clicked class (never the series' other weekdays), with `starts_at >= this one`. It skips already-cancelled/completed occurrences and calls `cancel_occurrence` per target inside a savepoint, so one failure never aborts the batch. `p_cause` is restricted to `no_instructor | studio_fault | force_majeure` — never `unmet_minimum` (that is the flex sweep's own cause, Decision 21) or a closure cause (Decision 44 owns those). `no_instructor` on a class that HAS an assigned instructor is refused PT422 ("This class has an instructor — choose a different reason."). `no_instructor` writes no pay record (there is no instructor to pay); `studio_fault` pays the assigned instructor base and `force_majeure` pays nothing, both through the existing `cancel_occurrence` → pay path (Decision 22). Returns `{cancelled, skipped:[{occurrence_id, when, reason}], members_affected}`, one audit row per call.
+
+**The enum value is added in its own migration step** (CLAUDE.md's rule: a new enum value cannot be USED in the transaction that adds it), then the function migration follows.
+
+**UI.** The Schedule block panel and the roster header gain a "Cancel this class" control opening a confirm: a cause radio (No instructor available / Studio's own reason / Beyond anyone's control), an optional reason line, a scope (Just this class / Every {weekday} this month), and the count — "N members are booked across these classes — they'll get their credit back and an email." The result sentence reads "Cancelled 4 classes. 1 member told." A cancelled class keeps rendering on the Schedule (not deleted); its panel shows the cause and reason and no Assign control.
+
+**Where:** Business Rules §3.2; Data Model §5; Decision 22 (pay by cause); migrations (the enum step + the function). **Status:** settled. **Extends:** Decision 42a (same-weekday scope from the Schedule), Decision 22 (cancellation pay by cause), Decision 21 (flex cancellation path unchanged). **Reuses:** `cancel_occurrence` (the §3.2 path, the only credit-returner), `assign_occurrences_for_period_run`'s target-set resolution.
+
+---
+
 ## 45 — Instructors enter their monthly availability on their phone, and every instructor notification link points at the tenant portal
 
 Instructors enter and submit their monthly availability from their phone, inside the tenant instructor portal (`{slug}.studiior.app/instructor/availability`), using the same month-submission mechanism the desktop editor uses (`availability_submission_week` / `submit_availability`; draft → submitted → approved / changes_requested; the whole week saves as ONE payload). The portal editor is the Calendly-style pattern already in the desktop week editor — per weekday time ranges plus copy-a-day — laid out phone-first. All instructor-facing notification links are absolute and point at the tenant portal, built by one helper so they cannot drift. The desktop editor stays for managers.
@@ -538,6 +552,14 @@ clear_month_assignments may run on a published month that members have booked in
 **UI.** On the Publish page, a published month with bookings shows the OWNER (not a manager) the sentence *"This month is published and N members have booked into M classes. Their bookings stay exactly as they are; every class becomes an open shift until you assign it. Members are not told."*, then a tick *"I understand — members' bookings are not affected"* and the Clear button (disabled until ticked), with the same "also remove from the recurring classes" tick as a draft-month clear. A manager still sees the refusal sentence.
 
 **Status:** settled. **Extends:** this Decision (42a) and Decision 25 (no unpublish — so the only exit is an owner acknowledgement, never a withdrawal of the publication). **Reuses:** `is_owner`, the unchanged per-occurrence unassign path.
+
+### Amendment — scope is the same weekday, and the dropdown defaults to the current instructor (Deanna, 1 Oct 2026)
+
+**(a) Scope = same weekday.** A series may run on several weekdays with different instructors per day ("every Monday and Thursday at 11:00", Nikko on Mondays, Joseph on Thursdays). The 'month' and 'until' scopes resolve to the same series AND the same studio-local weekday as the clicked class, never the series' other weekdays. `assign_occurrences_for_period_run` adds `and extract(dow from starts_at at time zone <studio tz>) = <dow of the clicked occurrence>` to both scopes. Labels read "Every Thursday this month" / "Every Thursday until…", the weekday taken from the clicked class. The same weekday rule governs the Decision 47 cancel scopes.
+
+**(b) The dropdown defaults to the current instructor.** The Assign dropdown includes and defaults to the class's current instructor (the block panel previously filtered them out, so a scope could not be applied to the same person without re-choosing them). When the class has an instructor the dropdown defaults to them at the top of "Qualified and available", labelled "{name} (current)"; "Unassigned" stays available. The button reads "Assign" when the chosen instructor differs from the current one, "Apply to {weekday}s this month" / "Apply until…" when it is the same person with a wider scope, and is disabled for "Just this class" with the same instructor. Server-side, the same instructor on an already-assigned occurrence is a no-op for that one and the rest of the scope is assigned.
+
+**Status:** settled. **Extends:** this Decision (42a). **Reuses:** `assign_occurrences_for_period_run` (the weekday filter added to its existing scope resolution), the block panel.
 
 ---
 

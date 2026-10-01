@@ -201,6 +201,11 @@ export default async function Schedule({
     // keeps it (migration 116) so the slot that cancels week after week is
     // visible; the calendar draws it not-running with the count that decided it.
     notRunning: o.occ_status === "cancelled" && o.occ_cancellation_cause === "unmet_minimum",
+    // Decision 47: a staff cancellation. schedule_range keeps these visible; the
+    // calendar draws them cancelled and the panel is read-only.
+    cancelled: o.occ_status === "cancelled"
+      && ["no_instructor", "studio_fault", "force_majeure"].includes(o.occ_cancellation_cause ?? ""),
+    cancellationCause: o.occ_cancellation_cause,
     // Decision 38: the assigned-class confirmation state (only when asked).
     assignmentConfirmed: o.occ_assignment_confirmed,
     assignmentAwaiting: o.occ_assignment_requested && !o.occ_assignment_confirmed,

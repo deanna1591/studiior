@@ -535,4 +535,166 @@ select expect_num('clear P: no member notification queued',
   (select count(*)::bigint from notifications where member_id='a543a543-0000-0000-0000-00000003e0c1'),
   current_setting('t.notif_before')::bigint);
 
+-- =============================================================================
+-- Decision 47 + 42a amendment (a): same-weekday scope, and staff cancel a class
+-- (or the rest of its weekday this month). Fixtures in SA, dedicated room 1a02.
+-- =============================================================================
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('a543a543-0000-0000-0000-000000001a02','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','R47',10);
+insert into members (id, studio_id, first_name, last_name, email) values
+  ('a543a543-0000-0000-0000-00000003e0a1','a543a543-0000-0000-0000-000000000001','Mem','A','a543-mem-a@example.com');
+-- A base rate for D1 + guarantees ON so the studio_fault cancel writes pay
+-- (tg_record_class_pay gates the cancel path on guarantees/flex, migration 139).
+insert into instructor_rate_versions (studio_id, instructor_id, effective_from, currency, base_rate_cents)
+  values ('a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-00000000d1aa', current_date - 30, 'CZK', 90000);
+update studio_settings set guarantees_enabled = true where studio_id='a543a543-0000-0000-0000-000000000001';
+
+-- A Mon+Thu series (5005) with two Mondays + two Thursdays in month m, so the
+-- same-weekday scope can be proven: a different weekday is never touched.
+select set_config('t.mon', (current_setting('t.m')::date + ((1 - extract(dow from current_setting('t.m')::date)::int + 7) % 7))::text, false);
+select set_config('t.thu', (current_setting('t.m')::date + ((4 - extract(dow from current_setting('t.m')::date)::int + 7) % 7))::text, false);
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('a543a543-0000-0000-0000-000000005005','a543a543-0000-0000-0000-000000000001',
+        'a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','Weekday Series',
+        'a543a543-0000-0000-0000-000000001a02', null, 10,50,
+        'FREQ=WEEKLY;BYDAY=MO,TH', current_date + interval '6 months', '06:30');
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, series_id, name, capacity,
+   starts_at, ends_at, status, staffing)
+values
+  -- Mondays M1, M2.
+  ('a543a543-0000-0000-0000-000000032001','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a02','a543a543-0000-0000-0000-000000005005','Weekday Series',10,
+   (current_setting('t.mon')::date + time '06:30') at time zone 'Europe/Prague',(current_setting('t.mon')::date + time '07:20') at time zone 'Europe/Prague','scheduled','open'),
+  ('a543a543-0000-0000-0000-000000032002','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a02','a543a543-0000-0000-0000-000000005005','Weekday Series',10,
+   ((current_setting('t.mon')::date + 7) + time '06:30') at time zone 'Europe/Prague',((current_setting('t.mon')::date + 7) + time '07:20') at time zone 'Europe/Prague','scheduled','open'),
+  -- Thursdays T1, T2.
+  ('a543a543-0000-0000-0000-000000032003','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a02','a543a543-0000-0000-0000-000000005005','Weekday Series',10,
+   (current_setting('t.thu')::date + time '06:30') at time zone 'Europe/Prague',(current_setting('t.thu')::date + time '07:20') at time zone 'Europe/Prague','scheduled','open'),
+  ('a543a543-0000-0000-0000-000000032004','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a02','a543a543-0000-0000-0000-000000005005','Weekday Series',10,
+   ((current_setting('t.thu')::date + 7) + time '06:30') at time zone 'Europe/Prague',((current_setting('t.thu')::date + 7) + time '07:20') at time zone 'Europe/Prague','scheduled','open'),
+  -- A staffed standalone one-off (D1), month m, for the studio_fault pay test.
+  ('a543a543-0000-0000-0000-000000032005','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a02',null,'Staffed One-off',10,
+   (current_setting('t.m')::date + 20 + time '14:00') at time zone 'Europe/Prague',(current_setting('t.m')::date + 20 + time '14:50') at time zone 'Europe/Prague','scheduled','assigned'),
+  -- An open one-off with a member booked, for the member-release test.
+  ('a543a543-0000-0000-0000-000000032006','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a02',null,'Booked One-off',10,
+   (current_setting('t.m')::date + 21 + time '16:00') at time zone 'Europe/Prague',(current_setting('t.m')::date + 21 + time '16:50') at time zone 'Europe/Prague','scheduled','open');
+update class_occurrences set instructor_id='a543a543-0000-0000-0000-00000000d1aa', staffing='assigned'
+ where id='a543a543-0000-0000-0000-000000032005';
+insert into bookings (studio_id, occurrence_id, member_id, status) values
+  ('a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-000000032006','a543a543-0000-0000-0000-00000003e0a1','booked');
+
+-- =============================================================================
+-- 17. 42a amendment: same-weekday assign scope + same-instructor no-op. Click a
+--     THURSDAY, assign D1 — the Mondays are never touched.
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);  -- owner SA
+select set_config('t.w1', (select assign_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000032003','a543a543-0000-0000-0000-00000000d1aa','one',null,false)::text), false);
+-- Now 'month' from T1 with the SAME instructor: T1 is a no-op, T2 is assigned.
+select set_config('t.w2', (select assign_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000032003','a543a543-0000-0000-0000-00000000d1aa','month',null,false)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('weekday assign: T1 assigned on its own', (current_setting('t.w1')::jsonb ->> 'assigned')::bigint, 1);
+select expect_num('weekday assign month: two Thursdays (T1 no-op + T2)', (current_setting('t.w2')::jsonb ->> 'assigned')::bigint, 2);
+select expect_num('weekday assign: no skips', jsonb_array_length(current_setting('t.w2')::jsonb -> 'skipped')::bigint, 0);
+select expect_true('weekday assign: both Thursdays carry D1',
+  (select count(*)=2 from class_occurrences where instructor_id='a543a543-0000-0000-0000-00000000d1aa'
+     and id in ('a543a543-0000-0000-0000-000000032003','a543a543-0000-0000-0000-000000032004')));
+select expect_true('weekday assign: the Mondays are untouched (different weekday, same month)',
+  (select count(*)=2 from class_occurrences where instructor_id is null and staffing='open'
+     and id in ('a543a543-0000-0000-0000-000000032001','a543a543-0000-0000-0000-000000032002')));
+
+-- =============================================================================
+-- 18. Decision 47 cancel: same-weekday scope + no_instructor on unstaffed. Click
+--     a MONDAY, cancel no_instructor 'month' → both Mondays, Thursdays untouched,
+--     no pay record (no instructor), nobody booked.
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+select set_config('t.c18', (select cancel_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000032001','month','no_instructor','nobody to teach')::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('cancel weekday: two Mondays cancelled', (current_setting('t.c18')::jsonb ->> 'cancelled')::bigint, 2);
+select expect_num('cancel weekday: nobody booked, 0 members told', (current_setting('t.c18')::jsonb ->> 'members_affected')::bigint, 0);
+select expect_true('cancel weekday: both Mondays cancelled, cause no_instructor',
+  (select count(*)=2 from class_occurrences where status='cancelled' and cancellation_cause='no_instructor'
+     and id in ('a543a543-0000-0000-0000-000000032001','a543a543-0000-0000-0000-000000032002')));
+select expect_true('cancel weekday: the Thursdays are untouched (still scheduled, D1)',
+  (select count(*)=2 from class_occurrences where status='scheduled' and instructor_id='a543a543-0000-0000-0000-00000000d1aa'
+     and id in ('a543a543-0000-0000-0000-000000032003','a543a543-0000-0000-0000-000000032004')));
+select expect_num('cancel no_instructor: no pay record written (there is no instructor)',
+  (select count(*) from instructor_pay_records
+     where occurrence_id in ('a543a543-0000-0000-0000-000000032001','a543a543-0000-0000-0000-000000032002'))::bigint, 0);
+
+-- =============================================================================
+-- 19. no_instructor on a STAFFED class → PT422.
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+select expect_raises('cancel no_instructor on a staffed class is refused PT422',
+  'select cancel_occurrences_for_period(''a543a543-0000-0000-0000-000000032003''::uuid, ''one'', ''no_instructor''::cancellation_cause, null)',
+  'PT422');
+reset role; select set_config('request.jwt.claim.sub', null, false);
+
+-- =============================================================================
+-- 20. studio_fault on a staffed class → cancelled, instructor told, pay per
+--     Decision 22 (base, since guarantees are on and D1 has a rate).
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+select set_config('t.c20', (select cancel_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000032005','one','studio_fault','brownout')::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('studio_fault: one cancelled', (current_setting('t.c20')::jsonb ->> 'cancelled')::bigint, 1);
+select expect_true('studio_fault: the class is cancelled, cause studio_fault',
+  (select status='cancelled' and cancellation_cause='studio_fault' from class_occurrences where id='a543a543-0000-0000-0000-000000032005'));
+select expect_num('studio_fault: the instructor is paid base (Decision 22)',
+  (select amount_cents from instructor_pay_records where occurrence_id='a543a543-0000-0000-0000-000000032005' and type='class')::bigint, 90000);
+select expect_true('studio_fault: the assigned instructor is told',
+  (select exists(select 1 from notifications where template_key='instructor_class_cancelled'
+     and user_id='a543a543-0000-0000-0000-00000000d101'
+     and payload->>'occurrence_id'='a543a543-0000-0000-0000-000000032005')));
+
+-- =============================================================================
+-- 21. A booked member → released studio_released (the §3.2 path), credit/email
+--     handled by cancel_occurrence; class_cancelled queued; members_affected 1.
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+select set_config('t.c21', (select cancel_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000032006','one','no_instructor',null)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('member release: one cancelled', (current_setting('t.c21')::jsonb ->> 'cancelled')::bigint, 1);
+select expect_num('member release: one member told', (current_setting('t.c21')::jsonb ->> 'members_affected')::bigint, 1);
+select expect_true('member release: the booking is released with reason studio_released',
+  (select status <> 'booked' and release_reason='studio_released' from bookings
+     where occurrence_id='a543a543-0000-0000-0000-000000032006' and member_id='a543a543-0000-0000-0000-00000003e0a1'));
+select expect_true('member release: a class_cancelled notification was queued for the member',
+  (select exists(select 1 from notifications where template_key='class_cancelled'
+     and member_id='a543a543-0000-0000-0000-00000003e0a1'
+     and payload->>'occurrence_id'='a543a543-0000-0000-0000-000000032006')));
+
+-- =============================================================================
+-- 22. series row untouched; already-cancelled skipped; non-manager PT403.
+-- =============================================================================
+select expect_true('cancel: the series template is never touched (instructor still null)',
+  (select instructor_id is null from class_series where id='a543a543-0000-0000-0000-000000005005'));
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+-- M1 is already cancelled: the scheduled-only filter leaves nothing to cancel.
+select set_config('t.c22', (select cancel_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000032001','one','no_instructor',null)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('cancel: a re-run on an already-cancelled class does nothing',
+  (current_setting('t.c22')::jsonb ->> 'cancelled')::bigint, 0);
+-- A non-manager (instructor D1's login) cannot cancel.
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-00000000d101',false);
+select expect_raises('cancel: a non-manager is refused PT403',
+  'select cancel_occurrences_for_period(''a543a543-0000-0000-0000-000000032004''::uuid, ''one'', ''studio_fault''::cancellation_cause, null)',
+  'PT403');
+reset role; select set_config('request.jwt.claim.sub', null, false);
+
 select 'assign from schedule suite finished' as done;

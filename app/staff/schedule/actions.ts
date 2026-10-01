@@ -191,3 +191,62 @@ export async function assignOccurrencesForPeriod(_prev: PeriodAssignResult, fd: 
   revalidatePath("/");
   return { ok: true, message: parts.join(" ") };
 }
+
+export type PeriodCancelResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Decision 47 — staff cancel one class, or the rest of its studio-local weekday
+ * this month, from the Schedule. Goes through cancel_occurrence per target, so
+ * booked members get the Business Rules §3.2 treatment and the instructor, if
+ * any, is told. Cause is one of no_instructor / studio_fault / force_majeure;
+ * no_instructor on a class that has an instructor is refused (PT422).
+ */
+export async function cancelOccurrencesForPeriod(_prev: PeriodCancelResult, fd: FormData): Promise<PeriodCancelResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const scope = String(fd.get("scope") ?? "one");
+  const cause = String(fd.get("cause") ?? "");
+  const reason = String(fd.get("reason") ?? "").trim();
+  if (!["no_instructor", "studio_fault", "force_majeure"].includes(cause)) {
+    return { ok: false, message: "Choose a reason for the cancellation." };
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("cancel_occurrences_for_period", {
+    p_occurrence_id: occurrenceId,
+    p_scope: scope,
+    p_cause: cause as "no_instructor" | "studio_fault" | "force_majeure",
+    p_reason: reason || undefined,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers cancel a class."
+        : /no instructor/i.test(m) ? "This class has an instructor — choose a different reason."
+        : /PT422/.test(m) ? "Check the reason and scope."
+        : m,
+    };
+  }
+
+  const r = data as unknown as {
+    ok: boolean; cancelled: number; members_affected: number;
+    skipped: { occurrence_id: string; when: string; reason: string }[];
+  };
+  const n = r.cancelled ?? 0;
+  const mcount = r.members_affected ?? 0;
+  const parts: string[] = [`Cancelled ${n} ${n === 1 ? "class" : "classes"}.`];
+  if (mcount > 0) parts.push(`${mcount} ${mcount === 1 ? "member" : "members"} told.`);
+  const skipped = r.skipped ?? [];
+  if (skipped.length > 0) {
+    parts.push(`Skipped ${skipped.length}: ` + skipped.map((s) => `${s.when} — ${s.reason}`).join("; ") + ".");
+  }
+
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  return { ok: true, message: parts.join(" ") };
+}

@@ -95,6 +95,10 @@ export type CalEvent = {
   /** A flex class the cutoff turned off — a DECIDED state, not the dashed
    *  "still waiting on its deadline". Kept apart on purpose. */
   notRunning?: boolean;
+  /** Decision 47: a staff cancellation (no_instructor/studio_fault/force_majeure).
+   *  Kept visible, drawn cancelled, read-only in the panel. */
+  cancelled?: boolean;
+  cancellationCause?: string | null;
   /** Decision 38: the assigned instructor confirmed / was asked and has not. */
   assignmentConfirmed?: boolean;
   assignmentAwaiting?: boolean;
@@ -352,7 +356,7 @@ export default function ScheduleCalendar({
     // line-through in the content, and NOT dashed (dashed means "flex, still
     // deciding"). The ink stays full strength — muting the tint, not the text,
     // is the lesson from the ended-series block.
-    if (e.notRunning) {
+    if (e.notRunning || e.cancelled) {
       return {
         style: {
           background: "color-mix(in srgb, var(--ink-3) 8%, var(--surface))",
@@ -427,6 +431,24 @@ export default function ScheduleCalendar({
     event: ({ event }: { event: WallEvent }) => {
       const f = fullness(event);
       const unstaffed = event.staffing !== "assigned";
+      if (event.cancelled) {
+        const why = event.cancellationCause === "no_instructor" ? "no instructor"
+          : event.cancellationCause === "force_majeure" ? "beyond anyone's control"
+          : "studio's reason";
+        return (
+          <div className="text-[12px] leading-4">
+            <div className="flex items-baseline justify-between gap-1.5">
+              <span className="min-w-0 truncate font-medium text-ink line-through">{event.title}</span>
+              {event.bookedCount > 0 && (
+                <span className="num shrink-0 text-[13px] font-semibold tabular-nums">
+                  {event.bookedCount}/{event.capacity}
+                </span>
+              )}
+            </div>
+            <div className="text-ink-2">Cancelled — {why}</div>
+          </div>
+        );
+      }
       if (event.notRunning) {
         return (
           <div className="text-[12px] leading-4">
@@ -712,6 +734,10 @@ export default function ScheduleCalendar({
               weekday: "long", day: "numeric", month: "long",
               hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
             }).format(new Date(selected.startsAt)),
+            weekday: new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone })
+              .format(new Date(selected.startsAt)),
+            cancelled: selected.cancelled ?? false,
+            cancellationCause: selected.cancellationCause ?? null,
             instructorId: selected.resourceId === UNASSIGNED ? null : selected.resourceId,
             instructorName: selected.resourceId === UNASSIGNED
               ? null : instructorNames[selected.resourceId] ?? null,
