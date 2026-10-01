@@ -7070,6 +7070,14 @@ export type Database = {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
       }
+      bulk_update_series: {
+        Args: { p_change: Json; p_preview?: boolean; p_series_ids: string[] }
+        Returns: Json
+      }
+      bulk_update_series_run: {
+        Args: { p_change: Json; p_preview: boolean; p_series_ids: string[] }
+        Returns: Json
+      }
       calendar_feed: { Args: { p_token: string }; Returns: string }
       calendar_feed_state: {
         Args: { p_kind: string; p_studio_id: string }
@@ -7416,10 +7424,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       expect_num: {
         Args: { actual: number; label: string; want: number }

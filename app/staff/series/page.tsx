@@ -3,13 +3,14 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
-import { SetupShell, SetupRow, ArchivedSection } from "@/components/setup-list";
+import { SetupRow, ArchivedSection } from "@/components/setup-list";
 import { TierMark, tierOf, tierWords, tierPhrase } from "@/components/tier-mark";
 import { parseRrule, describeRule } from "@/lib/rrule";
 import { studioToday } from "@/lib/tz";
 import ViewTabs from "./tabs";
 import SeriesFilters from "./filters";
 import SeriesGrid, { type GridSeries } from "./grid";
+import BulkManage, { type BulkSeries } from "./bulk";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function SeriesList({
     : searchParams.view === "list" ? "list"
     : cookies().get("series_view")?.value === "grid" ? "grid" : "list";
 
-  const [{ data: series }, { data: settings }, { data: classTypes }] = await Promise.all([
+  const [{ data: series }, { data: settings }, { data: classTypes }, { data: roomRows }, { data: instrRows }] = await Promise.all([
     supabase.from("class_series")
       .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, flex, minimum_bookings, class_types(name, color), rooms(name)")
       .order("status").order("time_of_day"),
@@ -43,6 +44,8 @@ export default async function SeriesList({
       .select("week_starts_on, guarantees_enabled, flex_enabled, flex_min_bookings, core_min_bookings")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
+    supabase.from("rooms").select("id, name").eq("status", "active").order("name"),
+    supabase.from("instructors").select("id, display_name").eq("status", "active").order("display_name"),
   ]);
 
   const today = studioToday(ctx.timeZone);
@@ -198,20 +201,63 @@ export default async function SeriesList({
     );
   }
 
+  // The live series as the bulk manager needs them: display built on the server
+  // (no client timezone/rule work), tier resolved the same way as the marks.
+  const bulkSeries: BulkSeries[] = live.map((s) => ({
+    id: s.id, name: s.name, meta: meta(s), open: !s.instructor_id,
+    tier: showTier ? tierOf(s.guarantee_tier, s.flex) : undefined,
+    minimum: showTier ? s.minimum_bookings : null,
+  }));
+
   return (
-    <SetupShell
-      shell={shell}
-      title="Recurring classes"
-      blurb="Your standing timetable. A series materialises twelve months of classes and keeps
-             itself topped up every night, so a member can always book a month ahead.
-             One-off classes are added from the schedule instead."
-      tabs={<>{endedToggle}<ViewTabs view={view} /></>}
-      belowBlurb={<>{summary}{filters}</>}
-      newHref="/series/new" newLabel="Add a series" count={live.length}
-      empty={filterLabel
-        ? "No series match this filter."
-        : "No recurring classes yet — this is where a studio's week comes from."}
-      archived={
+    <AppShell {...shell} title="Recurring classes"
+              actions={
+                <>
+                  {endedToggle}
+                  <ViewTabs view={view} />
+                  <Link href="/series/new"
+                        className="inline-flex items-center rounded bg-ink px-3.5 py-2
+                                   text-[13px] font-medium leading-[18px] text-paper hover:bg-ink-2">
+                    Add a series
+                  </Link>
+                </>
+              }>
+      <p className="mb-5 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
+        Your standing timetable. A series materialises twelve months of classes and keeps itself
+        topped up every night, so a member can always book a month ahead. One-off classes are added
+        from the schedule instead.
+      </p>
+      {summary}
+      {filters}
+
+      {live.length === 0 ? (
+        <p className="mt-4 text-[13px] leading-[20px] text-ink-2">
+          {filterLabel
+            ? "No series match this filter."
+            : <>No recurring classes yet — this is where a studio's week comes from.{" "}
+               <Link href="/series/new" className="text-lime-text underline underline-offset-4">add a series</Link>.</>}
+        </p>
+      ) : (
+        <BulkManage series={bulkSeries}
+                    rooms={(roomRows ?? []).map((r) => ({ id: r.id, name: r.name }))}
+                    instructors={(instrRows ?? []).map((i) => ({ id: i.id, name: i.display_name }))}
+                    showTier={showTier} flexMin={flexMin} />
+      )}
+
+      {!hideEnded && ended.length > 0 && (
+        <ul className="mt-4 divide-y divide-line rounded border border-line bg-surface">
+          {ended.map((s) => (
+            <li key={s.id} className="px-3.5 py-2.5">
+              <Link href={`/series/${s.id}`} className="text-[14px] leading-5 text-ink-3 line-through hover:underline">
+                {tierBits(s).mark && <span className="mr-1.5">{tierBits(s).mark}</span>}{s.name}
+              </Link>
+              <span className="block text-[12px] leading-4 text-ink-3">{meta(s)} · ended</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {archived.length > 0 && (
         <ArchivedSection noun="series" count={archived.length}>
           {archived.map((s) => (
             <SetupRow key={s.id} href={`/series/${s.id}`} name={s.name}
@@ -219,19 +265,7 @@ export default async function SeriesList({
                       mark={tierBits(s).mark} markLabel={tierBits(s).markLabel} />
           ))}
         </ArchivedSection>
-      }
-    >
-      {live.map((s) => (
-        <SetupRow key={s.id} href={`/series/${s.id}`} name={s.name}
-                  meta={meta(s)}
-                  mark={tierBits(s).mark} markLabel={tierBits(s).markLabel}
-                  right={s.instructor_id ? undefined : "open"} />
-      ))}
-      {!hideEnded && ended.map((s) => (
-        <SetupRow key={s.id} href={`/series/${s.id}`} name={s.name}
-                  meta={meta(s)} state="ended"
-                  mark={tierBits(s).mark} markLabel={tierBits(s).markLabel} />
-      ))}
-    </SetupShell>
+      )}
+    </AppShell>
   );
 }
