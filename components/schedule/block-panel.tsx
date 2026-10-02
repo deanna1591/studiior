@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { republishShift, openShift } from "@/app/staff/roster/actions";
-import { assignCandidates } from "@/app/staff/schedule/actions";
+import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
 import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
 
@@ -48,8 +48,20 @@ export default function BlockPanel({
   onUnassigned: () => void;
   onClose: () => void;
 }) {
-  const assigned = facts.staffing === "assigned";
   const [candidates, setCandidates] = useState<AssignCandidate[] | null>(null);
+  // The occurrence's current staffing, fetched with the candidates so the header
+  // and the dropdown read the SAME row. Until it lands, fall back to the click
+  // snapshot so nothing is blank.
+  const [live, setLive] = useState<CurrentStaffing | null>(null);
+  const eff = {
+    instructorId: live ? live.instructorId : facts.instructorId,
+    instructorName: live ? live.instructorName : facts.instructorName,
+    staffing: live ? live.staffing : facts.staffing,
+    bookedCount: live ? live.bookedCount : facts.bookedCount,
+    capacity: live ? live.capacity : facts.capacity,
+    waitlistCount: live ? live.waitlistCount : facts.waitlistCount,
+  };
+  const assigned = eff.staffing === "assigned";
   const [loadError, setLoadError] = useState<string | null>(null);
   const [who, setWho] = useState("");                    // "" nothing, "__open" unassign, else instructor id
   const [scope, setScope] = useState<"one" | "month" | "until">("one");
@@ -71,7 +83,7 @@ export default function BlockPanel({
     assignCandidates(facts.id).then((r) => {
       if (!alive) return;
       if ("error" in r) setLoadError(r.error);
-      else setCandidates(r.candidates);
+      else { setCandidates(r.candidates); setLive(r.current); }
     });
     return () => { alive = false; };
   }, [facts.id, canManage]);
@@ -80,18 +92,18 @@ export default function BlockPanel({
   // scope can be applied to the same person without re-choosing them. They lead
   // "Qualified and available", labelled "(current)".
   const choices = candidates ?? [];
-  const current = choices.find((c) => c.id === facts.instructorId) ?? null;
-  const others = choices.filter((c) => c.id !== facts.instructorId);
+  const current = choices.find((c) => c.id === eff.instructorId) ?? null;
+  const others = choices.filter((c) => c.id !== eff.instructorId);
   const primary = others.filter((c) => c.qualified && c.free);
   const rest = others.filter((c) => !(c.qualified && c.free));
   // Default the dropdown to the current instructor once the candidates arrive.
   useEffect(() => {
-    if (candidates && assigned && facts.instructorId && who === "") setWho(facts.instructorId);
-  }, [candidates, assigned, facts.instructorId, who]);
+    if (candidates && assigned && eff.instructorId && who === "") setWho(eff.instructorId);
+  }, [candidates, assigned, eff.instructorId, who]);
   useEffect(() => {
     if (candidates && !assigned && primary.length === 0 && rest.length > 0) setShowAll(true);
   }, [candidates, assigned, primary.length, rest.length]);
-  const sameAsCurrent = assigned && who === facts.instructorId;
+  const sameAsCurrent = assigned && who === eff.instructorId;
   const wd = facts.weekday ? `${facts.weekday}s` : "classes";
   const buttonText = who === "__open"
     ? "Unassign"
@@ -178,11 +190,11 @@ export default function BlockPanel({
         ) : (
           <p className="mt-2 text-[13px] leading-[19px] text-ink-2">
             {assigned
-              ? <>{facts.instructorName ?? "An instructor"} is teaching it.</>
+              ? <>{eff.instructorName ?? "An instructor"} is teaching it.</>
               : <span className="font-medium text-ink">Nobody is teaching it.</span>}
             {" · "}
-            <span className="num text-ink">{facts.bookedCount}/{facts.capacity}</span> booked
-            {facts.waitlistCount > 0 && <> · <span className="num">+{facts.waitlistCount}</span> waiting</>}
+            <span className="num text-ink">{eff.bookedCount}/{eff.capacity}</span> booked
+            {eff.waitlistCount > 0 && <> · <span className="num">+{eff.waitlistCount}</span> waiting</>}
             {facts.pendingApplications > 0 && <> · <span className="num">{facts.pendingApplications}</span> applied</>}
           </p>
         )}
@@ -207,12 +219,12 @@ export default function BlockPanel({
                   {/* The current instructor always appears and is defaulted to,
                       even when the candidate list is empty — so a scope can be
                       applied to them without re-choosing (42a amendment b). */}
-                  {(current || primary.length > 0 || (assigned && facts.instructorId)) && (
+                  {(current || primary.length > 0 || (assigned && eff.instructorId)) && (
                     <optgroup label="Qualified and available">
                       {current
                         ? <option key={current.id} value={current.id}>{current.display_name} (current)</option>
-                        : assigned && facts.instructorId
-                          ? <option key={facts.instructorId} value={facts.instructorId}>{facts.instructorName ?? "The instructor"} (current)</option>
+                        : assigned && eff.instructorId
+                          ? <option key={eff.instructorId} value={eff.instructorId}>{eff.instructorName ?? "The instructor"} (current)</option>
                           : null}
                       {primary.map((c) => <option key={c.id} value={c.id}>{c.display_name}</option>)}
                     </optgroup>
@@ -265,7 +277,7 @@ export default function BlockPanel({
 
                 {/* The deliberate "take off + tell them why" path (Decision 17),
                     for a single class — kept beside the scope control. */}
-                {assigned && <OpenAsShift occurrenceId={facts.id} instructorName={facts.instructorName}
+                {assigned && <OpenAsShift occurrenceId={facts.id} instructorName={eff.instructorName}
                                           onDone={onUnassigned} onMsg={setMsg} pending={pending} start={start} />}
               </>
             )}
@@ -280,7 +292,8 @@ export default function BlockPanel({
 
         {/* Decision 47: cancel this class (or the rest of its weekday this month). */}
         {canManage && !facts.cancelled && (
-          <CancelClass facts={facts} onCancelled={onUnassigned} onClose={onClose} />
+          <CancelClass facts={{ ...facts, instructorId: eff.instructorId, bookedCount: eff.bookedCount }}
+                       onCancelled={onUnassigned} onClose={onClose} />
         )}
       </div>
     </div>
@@ -314,6 +327,12 @@ function CancelClass({ facts, onCancelled, onClose }: {
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const wd = facts.weekday ? `${facts.weekday}s` : "this weekday";
+  // If the live staffing (which may arrive after mount) shows an instructor,
+  // no_instructor is not a valid cause — move off it so a stale default cannot
+  // be submitted against a now-staffed class (PT422).
+  useEffect(() => {
+    if (facts.instructorId && cause === "no_instructor") setCause("studio_fault");
+  }, [facts.instructorId, cause]);
 
   const go = () => {
     const fd = new FormData();

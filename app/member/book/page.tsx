@@ -26,7 +26,21 @@ export default async function Book({
 }) {
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers, memberName, avatarUrl} = await memberScreen();
 
-  const offset = Number(searchParams.d ?? 0) || 0;
+  // ?d= is a day. Internally it is an OFFSET from today, which is what every
+  // in-app link builds (qs() below). But a link from outside the app — a shared
+  // link, or one pointing at a specific day — naturally carries a calendar DATE,
+  // and Number("2026-11-14") is NaN, so `|| 0` silently landed every dated link
+  // on today. Accept a YYYY-MM-DD date too, converting it to the offset whose
+  // studio-local day key is that date (the same integer-day arithmetic
+  // nextDayOffset uses), so a member following a link to a specific day lands on
+  // it. A bare number stays an offset, so nothing in-app changes.
+  const dParam = (searchParams.d ?? "").trim();
+  const offset = /^\d{4}-\d{2}-\d{2}$/.test(dParam)
+    ? Math.round(
+        (Date.parse(`${dParam}T00:00:00Z`) -
+          Date.parse(`${zonedDateKey(new Date().toISOString(), ctx.timeZone)}T00:00:00Z`)) /
+          86_400_000)
+    : Number(dParam) || 0;
   const from = dayStart(new Date(), ctx.timeZone, offset);
   const to = addDays(from, 1);
   const now = Date.now();

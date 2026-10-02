@@ -6,34 +6,68 @@ import { createClient } from "@/lib/supabase/server";
 import { computeAssignCandidates, type AssignCandidate } from "@/lib/assign";
 
 /**
+ * The occurrence's authoritative current staffing, read fresh when the panel
+ * opens — so the panel's header ("who is teaching it") and its dropdown
+ * ("(current)") are driven by the SAME fetched row, not by the click-time
+ * CalEvent snapshot which can lag the database (e.g. a class assigned since the
+ * week was last rendered). They disagreed before: "Nobody is teaching it" over a
+ * dropdown reading "Coach Illiana (current)".
+ */
+export type CurrentStaffing = {
+  instructorId: string | null;
+  instructorName: string | null;
+  staffing: "assigned" | "open" | "pending_approval";
+  bookedCount: number;
+  capacity: number;
+  waitlistCount: number;
+};
+
+/**
  * Who could take an unstaffed class — loaded on demand when the calendar's
  * Assign popover opens, so an assigned class (the common case) pays for none of
  * it and the whole week's candidates are not computed up front. Same helper as
- * the roster's Assign panel.
+ * the roster's Assign panel. Also returns the occurrence's current staffing, so
+ * the panel header and the dropdown agree (and refresh together).
  */
 export async function assignCandidates(
   occurrenceId: string,
-): Promise<{ candidates: AssignCandidate[]; pendingApplications: number } | { error: string }> {
+): Promise<{ candidates: AssignCandidate[]; pendingApplications: number; current: CurrentStaffing } | { error: string }> {
   const ctx = await getStaffContext();
   if (!ctx) return { error: "You are not signed in." };
 
   const supabase = createClient();
   const [{ data: occ }, { count }] = await Promise.all([
     supabase.from("class_occurrences")
-      .select("id, class_type_id, starts_at, ends_at, status, instructor_id")
+      .select("id, class_type_id, starts_at, ends_at, status, instructor_id, staffing, booked_count, capacity, waitlist_count")
       .eq("id", occurrenceId).maybeSingle(),
     supabase.from("shift_applications")
       .select("id", { count: "exact", head: true })
       .eq("occurrence_id", occurrenceId).eq("status", "pending"),
   ]);
   if (!occ) return { error: "That class no longer exists." };
+  // Resolve the current instructor's name from the same read, so the header can
+  // name whoever is on it without trusting the (possibly stale) click snapshot.
+  let instructorName: string | null = null;
+  if (occ.instructor_id) {
+    const { data: ins } = await supabase.from("instructors")
+      .select("display_name").eq("id", occ.instructor_id).maybeSingle();
+    instructorName = ins?.display_name ?? null;
+  }
+  const current: CurrentStaffing = {
+    instructorId: occ.instructor_id ?? null,
+    instructorName,
+    staffing: (occ.staffing ?? "open") as CurrentStaffing["staffing"],
+    bookedCount: occ.booked_count ?? 0,
+    capacity: occ.capacity ?? 0,
+    waitlistCount: occ.waitlist_count ?? 0,
+  };
   // A still-scheduled class has candidates — to fill it when unstaffed, or to
   // swap the instructor when it is assigned. A cancelled class has none.
   if (occ.status !== "scheduled") {
-    return { candidates: [], pendingApplications: count ?? 0 };
+    return { candidates: [], pendingApplications: count ?? 0, current };
   }
   const candidates = await computeAssignCandidates(supabase, occ, ctx.timeZone);
-  return { candidates, pendingApplications: count ?? 0 };
+  return { candidates, pendingApplications: count ?? 0, current };
 }
 
 export type BlockedBy = {

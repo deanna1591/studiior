@@ -697,4 +697,107 @@ select expect_raises('cancel: a non-manager is refused PT403',
   'PT403');
 reset role; select set_config('request.jwt.claim.sub', null, false);
 
+-- =============================================================================
+-- 23. 42a amendment (a) — the scope is same series + same weekday + SAME
+--     TIME-OF-DAY. A single series can carry two occurrences on the same weekday
+--     at different clock times (hosted: one REFORMER BURN series at Sat 09:00 AND
+--     17:00; one at Wed 07:00 AND 18:00). Clicking the 06:30 one with "this month"
+--     must reach only the 06:30 Mondays, never the 18:30 ones of the same series,
+--     and never another series even when it shares the exact slot. Proven for
+--     assign, unassign AND cancel.
+-- =============================================================================
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','R23',10);
+-- Two Mondays in month m (first Monday + 14 and + 21, both in-month).
+select set_config('t.m2', (current_setting('t.mon')::date + 14)::text, false);
+select set_config('t.m3', (current_setting('t.mon')::date + 21)::text, false);
+-- Series 5006: one series, Mondays, with occurrences at TWO times (06:30 AND
+-- 18:30) — the hosted shape.
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('a543a543-0000-0000-0000-000000005006','a543a543-0000-0000-0000-000000000001',
+        'a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','Two Time Series',
+        'a543a543-0000-0000-0000-000000001a03', null, 10,50,
+        'FREQ=WEEKLY;BYDAY=MO', current_date + interval '6 months', '06:30');
+-- Series 5007: a DIFFERENT series sharing the exact slot (Monday 06:30) of 5006's
+-- first occurrence — proves series_id still isolates even when weekday AND time
+-- coincide.
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('a543a543-0000-0000-0000-000000005007','a543a543-0000-0000-0000-000000000001',
+        'a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','Same Slot Other',
+        'a543a543-0000-0000-0000-000000001a01', null, 10,50,
+        'FREQ=WEEKLY;BYDAY=MO', current_date + interval '6 months', '06:30');
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, series_id, name, capacity,
+   starts_at, ends_at, status, staffing)
+values
+  -- 5006 A/B: the 06:30 Mondays (A is the clicked one).
+  ('a543a543-0000-0000-0000-000000033001','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000005006','Two Time Series',10,
+   (current_setting('t.m2')::date + time '06:30') at time zone 'Europe/Prague',(current_setting('t.m2')::date + time '07:20') at time zone 'Europe/Prague','scheduled','open'),
+  ('a543a543-0000-0000-0000-000000033002','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000005006','Two Time Series',10,
+   (current_setting('t.m3')::date + time '06:30') at time zone 'Europe/Prague',(current_setting('t.m3')::date + time '07:20') at time zone 'Europe/Prague','scheduled','open'),
+  -- 5006 C/D: the 18:30 Mondays, SAME series, SAME weekday, DIFFERENT time.
+  ('a543a543-0000-0000-0000-000000033003','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000005006','Two Time Series',10,
+   (current_setting('t.m2')::date + time '18:30') at time zone 'Europe/Prague',(current_setting('t.m2')::date + time '19:20') at time zone 'Europe/Prague','scheduled','open'),
+  ('a543a543-0000-0000-0000-000000033004','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000005006','Two Time Series',10,
+   (current_setting('t.m3')::date + time '18:30') at time zone 'Europe/Prague',(current_setting('t.m3')::date + time '19:20') at time zone 'Europe/Prague','scheduled','open'),
+  -- 5007 E: a DIFFERENT series, exact same slot as A (Monday m2 06:30), own room.
+  ('a543a543-0000-0000-0000-000000033005','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a01','a543a543-0000-0000-0000-000000005007','Same Slot Other',10,
+   (current_setting('t.m2')::date + time '06:30') at time zone 'Europe/Prague',(current_setting('t.m2')::date + time '07:20') at time zone 'Europe/Prague','scheduled','open');
+
+-- 23a. ASSIGN 'month' from A (06:30) → only the two 06:30 Mondays; the 18:30
+--      siblings of the SAME series are untouched; the other series is untouched.
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);  -- owner SA
+select set_config('t.t1', (select assign_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000033001','a543a543-0000-0000-0000-00000000d2aa','month',null,false)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('time-of-day assign: only the two 06:30 Mondays assigned',
+  (current_setting('t.t1')::jsonb ->> 'assigned')::bigint, 2);
+select expect_true('time-of-day assign: A and B (06:30) carry D2',
+  (select count(*)=2 from class_occurrences where instructor_id='a543a543-0000-0000-0000-00000000d2aa'
+     and id in ('a543a543-0000-0000-0000-000000033001','a543a543-0000-0000-0000-000000033002')));
+select expect_true('time-of-day assign: C and D (18:30, same series) are UNTOUCHED',
+  (select count(*)=2 from class_occurrences where instructor_id is null and staffing='open'
+     and id in ('a543a543-0000-0000-0000-000000033003','a543a543-0000-0000-0000-000000033004')));
+select expect_true('time-of-day assign: the other series at the exact same slot is UNTOUCHED',
+  (select instructor_id is null and staffing='open' from class_occurrences where id='a543a543-0000-0000-0000-000000033005'));
+
+-- 23b. UNASSIGN respects time-of-day. First staff the 18:30 pair too, then
+--      unassign 'month' from A (06:30) → only A/B cleared; C/D keep D2.
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+select assign_occurrences_for_period('a543a543-0000-0000-0000-000000033003','a543a543-0000-0000-0000-00000000d2aa','month',null,false);
+select set_config('t.t2', (select assign_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000033001', null, 'month', null, false)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('time-of-day unassign: only the two 06:30 Mondays cleared',
+  (current_setting('t.t2')::jsonb ->> 'assigned')::bigint, 2);
+select expect_true('time-of-day unassign: A and B (06:30) are open again',
+  (select count(*)=2 from class_occurrences where instructor_id is null and staffing='open'
+     and id in ('a543a543-0000-0000-0000-000000033001','a543a543-0000-0000-0000-000000033002')));
+select expect_true('time-of-day unassign: C and D (18:30) KEEP D2',
+  (select count(*)=2 from class_occurrences where instructor_id='a543a543-0000-0000-0000-00000000d2aa'
+     and id in ('a543a543-0000-0000-0000-000000033003','a543a543-0000-0000-0000-000000033004')));
+
+-- 23c. CANCEL respects time-of-day. A/B are now open again; cancel no_instructor
+--      'month' from A → only A/B cancelled; the 18:30 pair (staffed, different
+--      time) is untouched and still scheduled; the other series is untouched.
+set role authenticated;
+select set_config('request.jwt.claim.sub','a543a543-0000-0000-0000-0000000000a1',false);
+select set_config('t.t3', (select cancel_occurrences_for_period(
+  'a543a543-0000-0000-0000-000000033001','month','no_instructor',null)::text), false);
+reset role; select set_config('request.jwt.claim.sub', null, false);
+select expect_num('time-of-day cancel: only the two 06:30 Mondays cancelled',
+  (current_setting('t.t3')::jsonb ->> 'cancelled')::bigint, 2);
+select expect_true('time-of-day cancel: A and B (06:30) cancelled no_instructor',
+  (select count(*)=2 from class_occurrences where status='cancelled' and cancellation_cause='no_instructor'
+     and id in ('a543a543-0000-0000-0000-000000033001','a543a543-0000-0000-0000-000000033002')));
+select expect_true('time-of-day cancel: C and D (18:30, same series) still scheduled, keep D2',
+  (select count(*)=2 from class_occurrences where status='scheduled' and instructor_id='a543a543-0000-0000-0000-00000000d2aa'
+     and id in ('a543a543-0000-0000-0000-000000033003','a543a543-0000-0000-0000-000000033004')));
+select expect_true('time-of-day cancel: the other series at the same slot still scheduled',
+  (select status='scheduled' from class_occurrences where id='a543a543-0000-0000-0000-000000033005'));
+
 select 'assign from schedule suite finished' as done;
