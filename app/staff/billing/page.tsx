@@ -37,6 +37,22 @@ export default async function Billing({
   const locked = billing?.locked ?? false;
   const days = billing?.days_left ?? 0;
   const tz = ctx.timeZone ?? "UTC";
+  // Decision 53: a complimentary studio is never billed, warned or locked, and
+  // sees no payment controls — just the one sentence.
+  const comp = status === "complimentary";
+
+  if (comp) {
+    return (
+      <AppShell {...shell} title="Billing" actions={<NavLink href="/">Back to the dashboard</NavLink>}>
+        <div className="max-w-xl space-y-4">
+          <h2 className="text-[17px] font-semibold leading-6 text-ink">Complimentary</h2>
+          <p className="text-[14px] leading-[22px] text-ink-2">
+            Complimentary — Studiior does not bill this studio.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
 
   const headline =
     locked   ? `${ctx.studioName} is locked`

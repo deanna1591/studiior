@@ -4970,6 +4970,9 @@ export type Database = {
       platform_subscriptions: {
         Row: {
           cancelled_at: string | null
+          comp_note: string | null
+          comp_set_at: string | null
+          comp_set_by: string | null
           created_at: string
           currency: string
           current_period_end: string | null
@@ -4986,6 +4989,9 @@ export type Database = {
         }
         Insert: {
           cancelled_at?: string | null
+          comp_note?: string | null
+          comp_set_at?: string | null
+          comp_set_by?: string | null
           created_at?: string
           currency?: string
           current_period_end?: string | null
@@ -5002,6 +5008,9 @@ export type Database = {
         }
         Update: {
           cancelled_at?: string | null
+          comp_note?: string | null
+          comp_set_at?: string | null
+          comp_set_by?: string | null
           created_at?: string
           currency?: string
           current_period_end?: string | null
@@ -7197,6 +7206,10 @@ export type Database = {
         }
         Returns: Json
       }
+      clear_studio_complimentary: {
+        Args: { p_studio_id: string }
+        Returns: string
+      }
       close_pay_period: { Args: { p_period_id: string }; Returns: Json }
       close_studio: {
         Args: {
@@ -8588,6 +8601,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_studio_complimentary: {
+        Args: { p_note: string; p_studio_id: string }
+        Returns: undefined
+      }
       set_waiver_version: {
         Args: {
           p_body?: string
@@ -9048,6 +9065,7 @@ export type Database = {
         | "past_due"
         | "locked"
         | "cancelled"
+        | "complimentary"
       series_status: "active" | "ended" | "cancelled" | "archived"
       session_kind: "group" | "private" | "duo" | "trio"
       staff_role: "owner" | "manager" | "instructor" | "front_desk"
@@ -9313,6 +9331,7 @@ export const Constants = {
         "past_due",
         "locked",
         "cancelled",
+        "complimentary",
       ],
       series_status: ["active", "ended", "cancelled", "archived"],
       session_kind: ["group", "private", "duo", "trio"],

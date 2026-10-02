@@ -366,4 +366,134 @@ reset role;
 select expect_text('extending a locked studio unlocks it',
   (select studio_is_locked('b111b111-0000-0000-0000-000000000001')::text), 'false');
 
+-- =============================================================================
+-- 8. Decision 53 — complimentary (house) studios: never billed, warned or locked
+-- =============================================================================
+-- b1 is a member, never a platform admin. a1 WAS added to platform_admins in
+-- section 7, so it is the operator here. The warning count stands at 3 from
+-- section 3 and must not grow: a comp studio is never warned.
+
+-- A non-admin cannot comp a studio.
+set role authenticated;
+select set_config('request.jwt.claim.sub','b111b111-0000-0000-0000-0000000000b1',false);
+do $$
+begin
+  perform set_studio_complimentary('b111b111-0000-0000-0000-000000000001','freebie');
+  raise exception 'FAIL  a member marked a studio complimentary';
+exception when sqlstate 'PT403' then
+  raise notice 'PASS  a member cannot mark a studio complimentary';
+end $$;
+reset role;
+
+-- An empty note is refused (the note is what makes it accountable).
+set role authenticated;
+select set_config('request.jwt.claim.sub','b111b111-0000-0000-0000-0000000000a1',false);
+do $$
+begin
+  perform set_studio_complimentary('b111b111-0000-0000-0000-000000000001','   ');
+  raise exception 'FAIL  a complimentary studio was marked with no note';
+exception when sqlstate 'PT400' then
+  raise notice 'PASS  a complimentary studio needs a note';
+end $$;
+-- The admin marks it complimentary.
+select set_studio_complimentary('b111b111-0000-0000-0000-000000000001','Founder''s own studio');
+reset role;
+
+select expect_text('set → status is complimentary',
+  (select status::text from platform_subscriptions
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'), 'complimentary');
+select expect_text('...and not locked',
+  (select studio_is_locked('b111b111-0000-0000-0000-000000000001')::text), 'false');
+select expect_text('...with the note recorded',
+  (select comp_note from platform_subscriptions
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'), 'Founder''s own studio');
+select expect_text('...and an audit row written',
+  (select (count(*) > 0)::text from audit_logs
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'
+      and action = 'platform.complimentary_set'), 'true');
+
+-- The sweep must skip it at ANY date. Put a long-lapsed trial and an expired
+-- grace on the row — a trialing/past_due row would lock on this — and sweep.
+update platform_subscriptions
+   set trial_ends_at = now() - interval '60 days', grace_ends_at = now() - interval '30 days'
+ where studio_id = 'b111b111-0000-0000-0000-000000000001';
+select sweep_platform_billing();
+select expect_text('the sweep never lapses or locks a complimentary studio',
+  (select status::text from platform_subscriptions
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'), 'complimentary');
+select expect_text('...it is still not locked, even past every date',
+  (select studio_is_locked('b111b111-0000-0000-0000-000000000001')::text), 'false');
+select expect_num('...and the sweep queued no warning for it',
+  (select count(*) from notifications
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'
+      and template_key = 'platform_billing_warning'), 3);
+
+-- The staff gate reads it as complimentary — the /billing screen's branch.
+select expect_text('studio_billing_state reports complimentary to the screen',
+  (select status::text from studio_billing_state('b111b111-0000-0000-0000-000000000001')), 'complimentary');
+select expect_text('...reporting not-locked, so the staff gate stays open',
+  (select locked::text from studio_billing_state('b111b111-0000-0000-0000-000000000001')), 'false');
+
+-- A stray Stripe event for the comp studio is ignored, not acted on. A
+-- payment_failed would otherwise flip a normal studio to past_due and warn it.
+select set_config('t.comp_fail',
+  '{"id":"evt_comp_fail","type":"invoice.payment_failed","livemode":false,"data":{"object":'
+  '{"id":"in_comp","customer":"cus_plat",'
+  '"metadata":{"studio_id":"b111b111-0000-0000-0000-000000000001"}}}}', false);
+select expect_text('a Stripe event for a complimentary studio is ignored',
+  (select stripe_platform_webhook(current_setting('t.comp_fail'),
+     psig(current_setting('t.comp_fail'))) ->> 'result'), 'ignored_complimentary');
+select expect_text('...the status is untouched',
+  (select status::text from platform_subscriptions
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'), 'complimentary');
+select expect_num('...and no warning was queued by the event',
+  (select count(*) from notifications
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'
+      and template_key = 'platform_billing_warning'), 3);
+
+-- A non-admin cannot stop it.
+set role authenticated;
+select set_config('request.jwt.claim.sub','b111b111-0000-0000-0000-0000000000b1',false);
+do $$
+begin
+  perform clear_studio_complimentary('b111b111-0000-0000-0000-000000000001');
+  raise exception 'FAIL  a member stopped a complimentary studio';
+exception when sqlstate 'PT403' then
+  raise notice 'PASS  a member cannot stop a complimentary studio';
+end $$;
+reset role;
+
+-- The admin stops it: a fresh 14-day trial.
+set role authenticated;
+select set_config('request.jwt.claim.sub','b111b111-0000-0000-0000-0000000000a1',false);
+select clear_studio_complimentary('b111b111-0000-0000-0000-000000000001');
+reset role;
+select expect_text('clear → back to trialing',
+  (select status::text from platform_subscriptions
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'), 'trialing');
+select expect_num('...with a fresh fourteen days',
+  (select extract(day from trial_ends_at - now())::int from platform_subscriptions
+    where studio_id = 'b111b111-0000-0000-0000-000000000001'), 13);
+select expect_text('...and the comp fields cleared',
+  (select (comp_note is null and comp_set_by is null and comp_set_at is null)::text
+     from platform_subscriptions where studio_id = 'b111b111-0000-0000-0000-000000000001'), 'true');
+
+-- Clearing a studio that is not complimentary is refused.
+set role authenticated;
+select set_config('request.jwt.claim.sub','b111b111-0000-0000-0000-0000000000a1',false);
+do $$
+begin
+  perform clear_studio_complimentary('b111b111-0000-0000-0000-000000000001');
+  raise exception 'FAIL  cleared a studio that was not complimentary';
+exception when sqlstate 'PT409' then
+  raise notice 'PASS  cannot stop a studio that is not complimentary';
+end $$;
+reset role;
+
+-- The canary: complimentary is admin-set, never a default. A studio gets its
+-- billing row from a trigger, and that row is trialing, not complimentary.
+select expect_text('a studio''s billing row defaults to trialing, never complimentary',
+  (select column_default from information_schema.columns
+    where table_name = 'platform_subscriptions' and column_name = 'status'), '''trialing''::platform_status');
+
 select 'ALL PLATFORM BILLING TESTS PASSED' as result;
