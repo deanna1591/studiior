@@ -24,11 +24,18 @@ export default async function Branding() {
     );
   }
 
-  const { data: studio } = await supabase
-    .from("studios")
-    .select("name, theme_preset, accent_color, logo_url, login_image_url, login_image_focus_x, login_image_focus_y, contact_email, contact_phone, login_tagline, install_welcome")
-    .eq("id", ctx.studioId)
-    .maybeSingle();
+  const [{ data: studio }, { data: settings }] = await Promise.all([
+    supabase
+      .from("studios")
+      .select("name, theme_preset, accent_color, logo_url, login_image_url, login_image_focus_x, login_image_focus_y, contact_email, contact_phone, login_tagline, install_welcome")
+      .eq("id", ctx.studioId)
+      .maybeSingle(),
+    supabase
+      .from("studio_settings")
+      .select("public_instructor_name")
+      .eq("studio_id", ctx.studioId)
+      .maybeSingle(),
+  ]);
 
   return (
     <AppShell {...shell} title="Member app">
@@ -49,6 +56,7 @@ export default async function Branding() {
         contactPhone={studio?.contact_phone ?? ""}
         loginTagline={studio?.login_tagline ?? ""}
         installWelcome={studio?.install_welcome ?? ""}
+        publicInstructorName={(settings?.public_instructor_name ?? "first") as "first" | "full"}
       />
     </AppShell>
   );

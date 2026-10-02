@@ -230,8 +230,10 @@
       box.appendChild(img);
     } else {
       // An UNASSIGNED class shows the studio's initials, not "instructor TBC"
-      // (Decision 17 — we never advertise uncertainty).
-      box.textContent = c.instructor_first_name ? initials(c.instructor_first_name, 1)
+      // (Decision 17 — we never advertise uncertainty). Up to two initials, so a
+      // full name (public_instructor_name = 'full') renders two and a first name
+      // renders one (Decision 51).
+      box.textContent = c.instructor_first_name ? initials(c.instructor_first_name, 2)
         : initials(studioName, 2) || "•";
     }
     return box;

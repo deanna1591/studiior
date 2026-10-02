@@ -52,6 +52,7 @@ export default function BrandingForm({
   studioName, preset: initialPreset, accent: initialAccent, logoUrl, loginImageUrl,
   loginFocusX, loginFocusY,
   contactEmail, contactPhone, loginTagline: initialTagline, installWelcome: initialWelcome,
+  publicInstructorName: initialNameMode,
 }: {
   studioName: string;
   preset: PresetKey; accent: string | null; logoUrl: string | null;
@@ -62,12 +63,14 @@ export default function BrandingForm({
   contactPhone: string;
   loginTagline: string;
   installWelcome: string;
+  publicInstructorName: "first" | "full";
 }) {
   // Local state so the preview moves as they choose, before anything is saved.
   const [preset, setPreset] = useState<PresetKey>(initialPreset);
   const [accent, setAccent] = useState(initialAccent ?? "#BEF738");
   const [tagline, setTagline] = useState(initialTagline);
   const [welcome, setWelcome] = useState(initialWelcome);
+  const [nameMode, setNameMode] = useState<"first" | "full">(initialNameMode);
 
   const [state, action] = useFormState<BrandingState, FormData>(saveBranding, null);
   const [logoState, logoAction] = useFormState<BrandingState, FormData>(uploadLogo, null);
@@ -94,8 +97,8 @@ export default function BrandingForm({
                     <span className="flex items-center gap-2">
                       <span className="text-[13px] font-medium text-ink">{PRESETS[k].label}</span>
                       <span className="flex gap-0.5">
-                        {[PRESETS[k].paper, PRESETS[k].surface, PRESETS[k].ink].map((c) => (
-                          <span key={c} className="inline-block h-3 w-3 rounded-sm border border-line-2"
+                        {[PRESETS[k].paper, PRESETS[k].surface, PRESETS[k].ink].map((c, i) => (
+                          <span key={i} className="inline-block h-3 w-3 rounded-sm border border-line-2"
                                 style={{ background: c }} />
                         ))}
                       </span>
@@ -155,6 +158,24 @@ export default function BrandingForm({
             </label>
             <LoginSheetPreview preset={preset} accent={accent} studioName={studioName}
                                logoUrl={logoUrl} tagline={taglineText(tagline)} />
+          </fieldset>
+
+          {/* Decision 51: how instructors are named on the public website schedule
+              (the embed). The member app and staff screens are unaffected. */}
+          <fieldset className="space-y-2 border-t border-line pt-5">
+            <legend className="mb-1 text-[13px] font-medium leading-[18px] text-ink">
+              Instructor names on the website
+            </legend>
+            <p className="text-[12px] leading-4 text-ink-3">
+              How teachers are shown on the schedule you embed on your own site.
+            </p>
+            {([["first", "First name only"], ["full", "Full name"]] as const).map(([v, label]) => (
+              <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded border border-line bg-surface p-2.5 hover:bg-paper">
+                <input type="radio" name="public_instructor_name" value={v}
+                       checked={nameMode === v} onChange={() => setNameMode(v)} className="shrink-0" />
+                <span className="text-[13px] text-ink">{label}</span>
+              </label>
+            ))}
           </fieldset>
 
           <fieldset className="space-y-3 border-t border-line pt-5">

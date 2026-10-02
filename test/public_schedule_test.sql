@@ -172,6 +172,43 @@ select expect_false('the surname never appears', current_setting('t.a') like '%S
 select expect_false('the bio never appears', current_setting('t.a') like '%BIOLEAK%');
 
 -- =============================================================================
+-- 3b. Decision 51: public_instructor_name = 'full' names the whole display_name
+--     on the website schedule; 'first' (the default) keeps the first word.
+-- =============================================================================
+-- Writes and direct studio_settings reads need a privileged role; this section
+-- sits inside the suite's `set role anon` block, so step out and back.
+reset role;
+select expect_text('default public_instructor_name is first',
+  (select public_instructor_name from studio_settings where studio_id='ec40ec40-0000-0000-0000-0000000000a1'), 'first');
+-- Switch Alpha to full names and bust the 5-minute cache so the next read recomputes.
+update studio_settings set public_instructor_name = 'full' where studio_id='ec40ec40-0000-0000-0000-0000000000a1';
+delete from public_schedule_cache where slug = 'ec40-alpha';
+select set_config('t.af', public_schedule('ec40-alpha', 7)::text, false);
+select set_config('t.af1', (
+  select c::text from jsonb_array_elements(current_setting('t.af')::jsonb -> 'classes') c
+   where c ->> 'id' = 'ec40ec40-0000-0000-0000-00000cccc0a1'), false);
+select expect_text('full: the instructor name is the whole display_name',
+  current_setting('t.af1')::jsonb ->> 'instructor_first_name', 'Xavier SURNAMELEAK');
+select expect_true('full: the surname now appears (the studio chose to show it)',
+  current_setting('t.af') like '%SURNAMELEAK%');
+select expect_false('full: the bio STILL never appears', current_setting('t.af') like '%BIOLEAK%');
+-- Back to first-name-only and bust the cache again.
+update studio_settings set public_instructor_name = 'first' where studio_id='ec40ec40-0000-0000-0000-0000000000a1';
+delete from public_schedule_cache where slug = 'ec40-alpha';
+select set_config('t.ag', public_schedule('ec40-alpha', 7)::text, false);
+select set_config('t.ag1', (
+  select c::text from jsonb_array_elements(current_setting('t.ag')::jsonb -> 'classes') c
+   where c ->> 'id' = 'ec40ec40-0000-0000-0000-00000cccc0a1'), false);
+select expect_text('first again: back to the first word only',
+  current_setting('t.ag1')::jsonb ->> 'instructor_first_name', 'Xavier');
+select expect_false('first again: the surname is gone from the payload',
+  current_setting('t.ag') like '%SURNAMELEAK%');
+-- This section recomputed the alpha cache; re-seed t.a from the current cached
+-- payload so section 6's "served from cache" comparison stays valid.
+select set_config('t.a', public_schedule('ec40-alpha', 7)::text, false);
+set role anon;   -- restore the block the rest of this section expects
+
+-- =============================================================================
 -- 4. PUBLISHED MONTHS ONLY — Bravo's unpublished month is absent, then present
 -- =============================================================================
 select set_config('t.b', public_schedule('ec40-bravo', 7)::text, false);

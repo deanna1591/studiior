@@ -5990,6 +5990,7 @@ export type Database = {
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
+          public_instructor_name: string
           publication_enabled: boolean
           reminder_hours_before: number
           require_waiver: boolean
@@ -6084,6 +6085,7 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
@@ -6178,6 +6180,7 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean

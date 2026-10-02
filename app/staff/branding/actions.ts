@@ -51,6 +51,11 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
   const loginTagline = trimField("login_tagline", 140);
   const installWelcome = trimField("install_welcome", 160);
 
+  // Decision 51: how the website schedule names an instructor. Anything but the
+  // two known values falls back to the safe default rather than being refused.
+  const rawName = String(fd.get("public_instructor_name") ?? "first");
+  const publicInstructorName = rawName === "full" ? "full" : "first";
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from("studios")
@@ -66,6 +71,14 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
   if (!data || data.length === 0) {
     return { ok: false, message: "Only the studio owner can change how the member app looks." };
   }
+
+  // The instructor-name rule lives on studio_settings. Same owner boundary (the
+  // studios update above already proved it); a refused update changes nothing.
+  const { error: sErr } = await supabase
+    .from("studio_settings")
+    .update({ public_instructor_name: publicInstructorName })
+    .eq("studio_id", ctx.studioId);
+  if (sErr) return { ok: false, message: sErr.message };
 
   revalidatePath("/branding");
   return { ok: true, message: "Saved. Members will see it next time they open the app." };
