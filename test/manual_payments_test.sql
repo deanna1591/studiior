@@ -799,4 +799,84 @@ reset role;
 select expect_true('the sweep still reaches it',
   (select sweep_membership_periods() is not null));
 
+-- =============================================================================
+-- Decision 12 amendment (migration 202): drop_in / trial activate as PACKS,
+-- never unlimited. A ONE-class drop-in gives exactly one credit; a trial gives
+-- its credits (default 1); both through the ledger with a default-30 expiry.
+-- =============================================================================
+insert into auth.users (id) values
+  ('cafecafe-0000-0000-0000-0000000000b7'),
+  ('cafecafe-0000-0000-0000-0000000000b8'),
+  ('cafecafe-0000-0000-0000-0000000000b9'),
+  ('cafecafe-0000-0000-0000-0000000000ba');
+insert into profiles (id, email) values
+  ('cafecafe-0000-0000-0000-0000000000b7','cafe-d3@example.com'),
+  ('cafecafe-0000-0000-0000-0000000000b8','cafe-d4@example.com'),
+  ('cafecafe-0000-0000-0000-0000000000b9','cafe-d5@example.com'),
+  ('cafecafe-0000-0000-0000-0000000000ba','cafe-d6@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, joined_on, status, waiver_signed_at) values
+  ('cafecafe-0000-0000-0000-00000000dd91','cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-0000000000b7','Dee','Three','d3@example.com', current_date-5, 'active', now()),
+  ('cafecafe-0000-0000-0000-00000000dd92','cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-0000000000b8','Dee','Four','d4@example.com', current_date-5, 'active', now()),
+  ('cafecafe-0000-0000-0000-00000000dd93','cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-0000000000b9','Dee','Five','d5@example.com', current_date-5, 'active', now()),
+  ('cafecafe-0000-0000-0000-00000000dd94','cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-0000000000ba','Dee','Six','d6@example.com', current_date-5, 'active', now());
+-- A trial plan (3 classes, 14 days).
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits, validity_days, status) values
+  ('cafecafe-0000-0000-0000-0000000000d1','cafecafe-0000-0000-0000-000000000001','Intro 3','trial', 30000, 'PHP', 3, 14, 'active');
+-- Two more bookable occurrences for the consume / exhausted tests.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name, capacity, starts_at, ends_at, status) values
+  ('cafecafe-0000-0000-0000-00000000f091','cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000000c','cafecafe-0000-0000-0000-00000000cc01',null,'Reformer',10, now()+interval '6 days', now()+interval '6 days 50 minutes','scheduled'),
+  ('cafecafe-0000-0000-0000-00000000f092','cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000000c','cafecafe-0000-0000-0000-00000000cc01',null,'Reformer',10, now()+interval '7 days', now()+interval '7 days 50 minutes','scheduled');
+
+reset role; select set_config('request.jwt.claim.sub', null, false);
+-- A drop-in activates as a one-credit pack.
+select set_config('t.dmem', activate_purchase('cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000dd91','cafecafe-0000-0000-0000-0000000000c4', 50000, 'PHP')::text, false);
+select expect_num('drop_in: credits_remaining is ONE, not unlimited',
+  (select credits_remaining from memberships where id=current_setting('t.dmem')::uuid)::bigint, 1);
+select expect_true('drop_in: expires_on set to today + 30',
+  (select expires_on = (studio_today('cafecafe-0000-0000-0000-000000000001') + 30) from memberships where id=current_setting('t.dmem')::uuid));
+select expect_true('drop_in: auto_renew is false',
+  (select not auto_renew from memberships where id=current_setting('t.dmem')::uuid));
+select expect_num('drop_in: exactly one purchase ledger row of +1',
+  (select count(*) from credit_ledger where membership_id=current_setting('t.dmem')::uuid and reason='purchase' and delta=1)::bigint, 1);
+
+-- book_class consumes the one credit (covered by the pack), leaving zero.
+set role authenticated; select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000b7',false);
+select set_config('t.bk1', (select (book_class('cafecafe-0000-0000-0000-00000000f091','cafecafe-0000-0000-0000-00000000dd91','member',null,null)).booking_id::text), false);
+reset role;
+select expect_text('drop_in: the booking is covered by the pack (payment_source class_pack)',
+  (select payment_source::text from bookings where id=current_setting('t.bk1')::uuid), 'class_pack');
+select expect_num('drop_in: the one credit is spent (credits_remaining 0)',
+  (select credits_remaining from memberships where id=current_setting('t.dmem')::uuid)::bigint, 0);
+
+-- A SECOND booking is NOT covered by the exhausted pack: it resolves as a fresh
+-- drop-in (book_class has no 'no_credits' wall — an exhausted pack becomes a
+-- drop-in the member pays for). The credit was finite: one class, not unlimited.
+set role authenticated; select set_config('request.jwt.claim.sub','cafecafe-0000-0000-0000-0000000000b7',false);
+select set_config('t.bk2', (select (book_class('cafecafe-0000-0000-0000-00000000f092','cafecafe-0000-0000-0000-00000000dd91','member',null,null)).booking_id::text), false);
+reset role;
+select expect_text('drop_in: the next booking is a NEW drop-in, not another free pack class',
+  (select payment_source::text from bookings where id=current_setting('t.bk2')::uuid), 'drop_in');
+
+-- A trial activates with its credits (3), through the ledger, never unlimited.
+select set_config('t.tmem', activate_purchase('cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000dd92','cafecafe-0000-0000-0000-0000000000d1', 30000, 'PHP')::text, false);
+select expect_num('trial: credits_remaining is 3 (plan.credits), not unlimited',
+  (select credits_remaining from memberships where id=current_setting('t.tmem')::uuid)::bigint, 3);
+select expect_text('trial: status is trialing',
+  (select status::text from memberships where id=current_setting('t.tmem')::uuid), 'trialing');
+select expect_num('trial: one purchase ledger row of +3',
+  (select count(*) from credit_ledger where membership_id=current_setting('t.tmem')::uuid and reason='purchase' and delta=3)::bigint, 1);
+
+-- Recurring unlimited is UNCHANGED: credits_remaining null = unlimited.
+select set_config('t.rmem', activate_purchase('cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000dd93','cafecafe-0000-0000-0000-0000000000c1', 250000, 'PHP')::text, false);
+select expect_null('recurring unlimited: credits_remaining stays null (unlimited)',
+  (select credits_remaining::text from memberships where id=current_setting('t.rmem')::uuid));
+select expect_num('recurring unlimited: no pack purchase ledger row',
+  (select count(*) from credit_ledger where membership_id=current_setting('t.rmem')::uuid and reason='purchase')::bigint, 0);
+
+-- Class pack is UNCHANGED: credits_remaining = plan.credits (10).
+select set_config('t.pmem', activate_purchase('cafecafe-0000-0000-0000-000000000001','cafecafe-0000-0000-0000-00000000dd94','cafecafe-0000-0000-0000-0000000000c3', 900000, 'PHP')::text, false);
+select expect_num('class_pack: credits_remaining is 10 (unchanged)',
+  (select credits_remaining from memberships where id=current_setting('t.pmem')::uuid)::bigint, 10);
+
+
 select 'ALL MANUAL PAYMENT TESTS PASSED' as result;

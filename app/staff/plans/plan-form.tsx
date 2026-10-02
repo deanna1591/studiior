@@ -190,12 +190,22 @@ export default function PlanForm({
             </p>
           </Field>
         )}
-        {f.credits && (
+        {f.credits && type === "drop_in" ? (
+          // Decision 12 amendment: a drop-in is exactly one class. Locked.
           <Field label="Classes included">
-            <input name="credits" type="number" min={1} defaultValue={num(draft.credits)}
-                   className={inputClass} placeholder="10" />
+            <input name="credits" type="number" value={1} readOnly
+                   className={`${inputClass} bg-paper text-ink-2`} aria-readonly />
+            <p className="mt-1 text-xs text-ink-3">A drop-in is one class.</p>
           </Field>
-        )}
+        ) : f.credits ? (
+          <Field label="Classes included">
+            {/* A trial is usually a few classes; default to 1 when unset so it
+                can never activate as unlimited (Decision 12 amendment). */}
+            <input name="credits" type="number" min={1}
+                   defaultValue={num(draft.credits) || (type === "trial" ? "1" : "")}
+                   className={inputClass} placeholder={type === "trial" ? "1" : "10"} />
+          </Field>
+        ) : null}
         {f.validity && (
           <Field label="Valid for (days)">
             <input name="validity_days" type="number" min={1} defaultValue={num(draft.validity_days)}

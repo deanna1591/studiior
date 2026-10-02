@@ -154,6 +154,14 @@ The ambiguity mattered because two columns describing one concept is exactly how
 
 **Where:** Data Model §7, Business Rules §2.2, migration 010. **Status:** settled.
 
+### Amendment — drop_in and trial activate as packs, never unlimited (Deanna, 2 Oct 2026)
+
+A drop_in plan activates as a pack of exactly ONE credit; a trial plan activates as a pack of `plan.credits` (default 1) — both through the `credit_ledger` like a class pack, with `validity_days` (default 30 when null) setting `expires_on`. Neither is ever unlimited. The member app shows "1 class · use by {date}", never "Unlimited classes", for these types. `max_bookings_per_day` on any plan is enforced by `book_class` as today.
+
+**Why.** `activate_purchase` set `credits_remaining = (case type when 'class_pack' then plan.credits else plan.credits_per_period end)`. For a drop_in or trial, `credits_per_period` is NULL (the `plan_credits_per_period_recurring_only` CHECK forces it), and Decision 12 above makes a NULL `credits_per_period` mean **unlimited** — so a ₱100 one-class drop-in activated as unlimited, with no ledger rows and no expiry. Reproduced on hosted (Reform): a member on a `Test Payment` drop_in showed `credits_remaining = NULL`. The unlimited semantics belong only to a **recurring** plan with a null allowance; a pack-shaped plan (class_pack, drop_in, trial) is always a finite bundle reaching booking through `credits_remaining` and the ledger.
+
+**Where:** migration 201+ (re-issue `activate_purchase`), the member-app plan/Home cards and `member_bootstrap` (an "unlimited" reading must be recurring-only), the plan form (drop_in locks credits to 1, trial defaults credits to 1). **Status:** settled. **Amends:** this Decision (12). **Reuses:** the class-pack `credit_ledger` path, `book_class`'s existing `credits_remaining` consumption and `max_bookings_per_day`.
+
 ---
 
 ## 14 — Member Health Score is a band with a reason, not a number

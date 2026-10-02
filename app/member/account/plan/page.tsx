@@ -88,9 +88,9 @@ export default async function Plan() {
 
           <div className="mt-4 border-t border-line pt-3">
             <p className="m-micro text-ink-3">Classes left</p>
-            {live.credits_remaining === null
+            {live.membership_plans?.type === "recurring" && live.credits_remaining === null
               ? <p className="m-body text-ink">Unlimited</p>
-              : <p className="num text-[30px] leading-9 text-ink">{live.credits_remaining}</p>}
+              : <p className="num text-[30px] leading-9 text-ink">{live.credits_remaining ?? 0}</p>}
             {nextExpiry?.expires_at && <p className="m-micro mt-1 text-ink-2">Use them by {d(nextExpiry.expires_at)}.</p>}
           </div>
 
@@ -147,6 +147,9 @@ export default async function Plan() {
                    p.validity_days ? `use within ${p.validity_days} days` : null]
                 : p.type === "drop_in"
                 ? ["Single class"]
+                : p.type === "trial"
+                ? [`${p.credits ?? 1} class${(p.credits ?? 1) === 1 ? "" : "es"}`,
+                   p.validity_days ? `use within ${p.validity_days} days` : null]
                 : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
                    p.billing_interval
                      ? `billed ${(p.billing_interval_count ?? 1) > 1

@@ -354,9 +354,9 @@ export default async function MemberDetail({
                   {!live.auto_renew && <> · will not renew</>}
                 </div>
                 <div className="mt-2 text-[13px] leading-[18px] text-ink">
-                  {live.credits_remaining === null
+                  {live.membership_plans?.type === "recurring" && live.credits_remaining === null
                     ? "Unlimited classes"
-                    : <><span className="num">{live.credits_remaining}</span> credit
+                    : <><span className="num">{live.credits_remaining ?? 0}</span> credit
                         {live.credits_remaining === 1 ? "" : "s"} left</>}
                 </div>
                 {/* MONEY OWED IS NOT A WORD IN A METADATA LINE. `past_due` was

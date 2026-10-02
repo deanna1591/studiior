@@ -149,6 +149,9 @@ export default async function MemberHome() {
 
   const pastDue = membership.live?.status === "past_due";
   const credits = membership.live?.credits_remaining ?? null;
+  // Decision 12 amendment: "unlimited" is recurring-only. A drop_in/trial is a
+  // finite pack even if a stray null slipped through — never show it as ∞.
+  const unlimited = membership.live?.membership_plans?.type === "recurring" && credits === null;
 
   const day = (iso: string) => relativeDayName(iso, ctx.timeZone) ?? fmtDayLong(iso, ctx.timeZone);
 
@@ -410,8 +413,8 @@ export default async function MemberHome() {
           and it was the only one the app knew and never showed. */}
       <div className="mt-4 grid grid-cols-3 gap-2.5">
         {([
-          ["ticket",   membership.live ? (credits === null ? "\u221e" : String(credits)) : "\u2014",
-                       membership.live && credits === null ? "Unlimited" : "Classes left"],
+          ["ticket",   membership.live ? (unlimited ? "\u221e" : String(credits ?? 0)) : "\u2014",
+                       membership.live && unlimited ? "Unlimited" : "Classes left"],
           ["flame",    String(ctx.streak), "Week streak"],
           ["calendar", String(thisMonth ?? 0), "This month"],
         ] as const).map(([icon, value, label]) => (

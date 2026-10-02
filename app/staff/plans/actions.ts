@@ -73,7 +73,12 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
         : null,
       billing_interval_count: f.billing ? (num("billing_interval_count") ?? 1) : 1,
 
-      credits: f.credits ? num("credits") : null,
+      // Decision 12 amendment: a drop-in is exactly one class (locked); a trial
+      // defaults to one so it can never activate as unlimited. A readonly input
+      // is not a constraint, so it is enforced here too.
+      credits: f.credits
+        ? (type === "drop_in" ? 1 : type === "trial" ? (num("credits") ?? 1) : num("credits"))
+        : null,
       credits_per_period: f.creditsPerPeriod ? num("credits_per_period") : null,
       validity_days: f.validity ? num("validity_days") : null,
 

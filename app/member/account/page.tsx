@@ -43,9 +43,9 @@ export default async function Account() {
           <span className="min-w-0 flex-1">
             <span className="m-name block text-ink">{live.membership_plans?.name}</span>
             <span className="m-sub block text-ink-2">
-              {live.credits_remaining === null
+              {live.membership_plans?.type === "recurring" && live.credits_remaining === null
                 ? "Unlimited classes"
-                : <><span className="num font-semibold text-ink">{live.credits_remaining}</span> classes left</>}
+                : <><span className="num font-semibold text-ink">{live.credits_remaining ?? 0}</span> classes left</>}
               {live.status !== "active" && <> · {live.status.replace("_", " ")}</>}
             </span>
           </span>
