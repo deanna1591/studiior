@@ -573,6 +573,18 @@ clear_month_assignments may run on a published month that members have booked in
 
 **Status:** settled. **Extends:** this Decision (42a). **Reuses:** `assign_occurrences_for_period_run` (the weekday filter added to its existing scope resolution), the block panel.
 
+### Amendment (c) — drag safety, and the top-up never re-creates a moved slot (Deanna, 2 Oct 2026)
+
+On hosted, two Reform series ended up with occurrences at a second clock time on the same weekday (a Wed 07:00 series with 18:00 copies; a Sat 17:00 series with 09:00 copies). The most likely cause: a Day-view drag that changed the **time** as well as the instructor column (a slip between columns that also moved vertically), after which the nightly top-up (`generate_occurrences`) re-created the vacated slot — so the class read as *moved and also still there*. The scope bug this exposed (a period scope that swept both times) is fixed in migration 199; this amendment removes the CAUSE and makes any strays visible and fixable.
+
+**(1) A drag that changes the TIME confirms; a drag that only changes the instructor column does not.** On the staff Schedule, a drag whose start instant differs from the class's current one opens a confirm — *"Move {class} from 07:00 to 18:00 on Wed 11 Nov? {n} members are booked and will be emailed."* — with Move / Cancel; a drag that keeps the time and only changes the resource column keeps today's behaviour (the instructor swap, which does not email members). This is distinct from the existing booked-members confirm (which only fires when members are booked): a time change always asks, because an unintended retime is the failure here. **Day view additionally snaps the drop to the original time unless the vertical movement exceeds one full slot**, so a drag that lands a class in a different instructor's column without a deliberate vertical move never retimes it — the slip that produced the strays can no longer change the time by accident.
+
+**(2) The top-up treats a moved class as moved, not missing.** `generate_occurrences` must not re-create a slot for a series on a studio-local day where an occurrence of that series **already exists at any time** — so a class dragged from 07:00 to 18:00 on a Wednesday leaves one Wednesday occurrence, and the next nightly run does not add a 07:00 back. (Until now the materialise guard keyed on `(series_id, series_slot_at)` and the exact start instant; a moved occurrence keeps its `series_slot_at`, but a top-up that computed a fresh slot for that date and found nothing at that precise instant re-created it.) The per-day-per-series rule is the backstop: one class per series per day, wherever on that day it sits.
+
+**(3) Strays are visible and fixable on the series page, never auto-corrected.** The series page gains a "Classes not at the usual time" list — its future scheduled occurrences whose studio-local time or weekday differs from the template's `time_of_day` / `BYDAY` — each with a "Move back" link that calls `move_occurrence` to the template time on that occurrence's own date. No automatic correction: a stray may be deliberate, and moving a class members have booked emails them, so it stays a one-click manager action.
+
+**Status:** settled. **Extends:** this Decision (42a), Decision 37 (series editing / materialisation), Decision 2 (a significant move's free cancellation). **Reuses:** `move_occurrence` (the time-change confirm is its existing booked-members path; "Move back" calls it), `generate_occurrences` (the per-day guard added to its existing slot resolution).
+
 ---
 
 ## 42b — Bulk changes to recurring classes from the list

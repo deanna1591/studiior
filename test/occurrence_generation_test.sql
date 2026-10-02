@@ -807,3 +807,99 @@ select expect_num('...and reopening makes it, because there was nothing to resur
     where series_id='0ccc0ccc-0000-0000-0000-00000000c001'
       and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.far')::date
       and status = 'scheduled')::bigint, 1);
+
+-- =============================================================================
+-- Decision 42a amendment (c) part 2 (migration 200): the top-up never re-creates
+-- a slot for a series on a day it already has a scheduled occurrence — a moved
+-- class is MOVED, not missing. Reproduces the hosted stray shape (an off-slot
+-- occurrence whose series_slot_at is its OWN time, which the unique index on
+-- (series_id, series_slot_at) cannot block when the top-up computes the
+-- canonical slot).
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','0ccc0ccc-0000-0000-0000-0000000000a1',false);  -- Prague owner
+
+-- Two future Wednesdays, well inside the 365-day horizon.
+select set_config('t.wed',  (current_date + ((3 - extract(dow from current_date)::int + 7) % 7)::int + 14)::text, false);
+select set_config('t.wed2', (current_date + ((3 - extract(dow from current_date)::int + 7) % 7)::int + 21)::text, false);
+
+-- A Wed 07:00 series (no instructor, so occurrences are open — no instructor
+-- clash to worry about). Materialises on insert.
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('0ccc0ccc-0000-0000-0000-00000000c201','0ccc0ccc-0000-0000-0000-000000000001',
+        '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01','Wed Seven',
+        '0ccc0ccc-0000-0000-0000-00000000ee01', null, 10, 50,
+        'FREQ=WEEKLY;BYDAY=WE', current_date + 7, '07:00');
+
+select expect_num('amendment-c: the Wed 07:00 series materialised t.wed at 07:00',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c201'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date
+     and (starts_at at time zone 'Europe/Prague')::time = '07:00')::bigint, 1);
+
+-- Stage the hosted stray shape: the t.wed class is at 18:00 with series_slot_at
+-- ALSO 18:00 (its own time) — as if it had been retimed and the slot_at went
+-- with it. This is exactly what the unique index cannot catch: a later top-up
+-- computes the 07:00 slot (slot_at 07:00), which does NOT collide with 18:00.
+update class_occurrences
+   set starts_at = (current_setting('t.wed')::date + time '18:00') at time zone 'Europe/Prague',
+       ends_at   = (current_setting('t.wed')::date + time '18:50') at time zone 'Europe/Prague',
+       series_slot_at = (current_setting('t.wed')::date + time '18:00') at time zone 'Europe/Prague'
+ where series_id='0ccc0ccc-0000-0000-0000-00000000c201'
+   and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date;
+
+-- Confirm the stray shape is genuinely one the unique index cannot block: no row
+-- of this series on t.wed carries the 07:00 slot_at, so only the per-day guard
+-- can stop a second 07:00 being materialised.
+select expect_num('amendment-c: no 07:00 series_slot_at exists on t.wed (index cannot block)',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c201'
+     and (series_slot_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date
+     and (series_slot_at at time zone 'Europe/Prague')::time = '07:00')::bigint, 0);
+
+-- Run the top-up.
+select generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c201');
+
+-- The per-day guard held: t.wed has exactly ONE occurrence, still the 18:00, and
+-- NO 07:00 was created beside it. (Without the guard the 07:00 would appear.)
+select expect_num('amendment-c: the top-up created NO second class on t.wed',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c201'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date
+     and status='scheduled')::bigint, 1);
+select expect_num('amendment-c: the one on t.wed is the 18:00, not a re-created 07:00',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c201'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date
+     and (starts_at at time zone 'Europe/Prague')::time = '18:00')::bigint, 1);
+-- Normal days are unaffected: t.wed2 still has its 07:00.
+select expect_num('amendment-c: a normal Wed still has its 07:00 (guard does not over-skip)',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c201'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed2')::date
+     and (starts_at at time zone 'Europe/Prague')::time = '07:00')::bigint, 1);
+
+-- The task's literal path: move_occurrence Wed 07:00 -> 18:00, then top up. Here
+-- move_occurrence keeps series_slot_at at 07:00, so the index would also block;
+-- the guard blocks regardless. Either way: no new 07:00, the 18:00 remains.
+insert into class_series (id, studio_id, location_id, class_type_id, name, room_id, instructor_id,
+   capacity, duration_minutes, rrule, starts_on, time_of_day)
+values ('0ccc0ccc-0000-0000-0000-00000000c202','0ccc0ccc-0000-0000-0000-000000000001',
+        '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01','Wed Seven B',
+        '0ccc0ccc-0000-0000-0000-00000000ee02', null, 10, 50,
+        'FREQ=WEEKLY;BYDAY=WE', current_date + 7, '07:00');
+select set_config('t.movedocc',
+  (select id::text from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c202'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date), false);
+select move_occurrence(
+  p_occurrence_id => current_setting('t.movedocc')::uuid,
+  p_starts_at => (current_setting('t.wed')::date + time '18:00') at time zone 'Europe/Prague',
+  p_ends_at   => (current_setting('t.wed')::date + time '18:50') at time zone 'Europe/Prague',
+  p_confirm => true);
+select generate_occurrences('0ccc0ccc-0000-0000-0000-00000000c202');
+select expect_num('amendment-c (move path): t.wed has one class after the top-up',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c202'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date
+     and status='scheduled')::bigint, 1);
+select expect_num('amendment-c (move path): and it is the 18:00',
+  (select count(*) from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c202'
+     and (starts_at at time zone 'Europe/Prague')::date = current_setting('t.wed')::date
+     and (starts_at at time zone 'Europe/Prague')::time = '18:00')::bigint, 1);
+
+reset role; select set_config('request.jwt.claim.sub', null, false);

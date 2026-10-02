@@ -8,6 +8,8 @@ import SeriesForm from "../form";
 import SeriesLifecycle from "../lifecycle";
 import SeriesGuarantee from "../guarantee";
 import SeriesConfirmations from "../series-confirm";
+import StrayClasses, { type Stray } from "./strays";
+import { DAYS } from "@/lib/rrule";
 import { localDates, seriesOptions } from "../data";
 import { studioToday } from "@/lib/tz";
 
@@ -67,6 +69,37 @@ export default async function EditSeries({
   const made = Number(searchParams.made);
   const skipped = Number.isFinite(expected) && Number.isFinite(made) && expected > made;
 
+  // Decision 42a amendment (c): future occurrences off the template slot — a
+  // different studio-local time, or a weekday the rule does not name. Compared
+  // in the studio's zone against the template's time_of_day and BYDAY.
+  const seriesTimeHHMM = (s.time_of_day ?? "").slice(0, 5);
+  const ruleDows = new Set(rule.days.map((c) => DAYS.findIndex((dd) => dd.code === c)));
+  const { data: futureOccs } = await supabase
+    .from("class_occurrences")
+    .select("id, starts_at, booked_count")
+    .eq("series_id", s.id).eq("status", "scheduled")
+    .gte("starts_at", new Date().toISOString())
+    .order("starts_at");
+  const strays: Stray[] = (futureOccs ?? []).flatMap((o) => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: ctx.timeZone, weekday: "short", day: "numeric", month: "short",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(new Date(o.starts_at));
+    const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    const occTime = `${g("hour")}:${g("minute")}`;
+    const dow = DAYS.findIndex((dd) => dd.short === g("weekday"));
+    const timeMismatch = !!seriesTimeHHMM && occTime !== seriesTimeHHMM;
+    const weekdayMismatch = ruleDows.size > 0 && dow >= 0 && !ruleDows.has(dow);
+    if (!timeMismatch && !weekdayMismatch) return [];
+    return [{
+      id: o.id,
+      whenLabel: `${g("weekday")} ${g("day")} ${g("month")} ${occTime}`,
+      occTime, seriesTime: seriesTimeHHMM,
+      kind: (timeMismatch ? "time" : "weekday") as "time" | "weekday",
+      booked: o.booked_count ?? 0,
+    }];
+  });
+
   return (
     <AppShell {...shell} title={s.name}
               actions={<NavLink href="/series">Back to recurring classes</NavLink>}>
@@ -110,6 +143,7 @@ export default async function EditSeries({
         </div>
       )}
       <SeriesConfirmations seriesId={s.id} instructorName={instructorName} summary={summary} />
+      <StrayClasses strays={strays} />
       <div className="mb-6 max-w-xl rounded border border-line bg-surface px-3.5 py-3">
         <SectionLabel>On the calendar now</SectionLabel>
         <p className="mt-1 text-[13px] leading-[19px] text-ink-2">

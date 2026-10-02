@@ -161,3 +161,65 @@ export async function previewSeries(_prev: EditState, fd: FormData) {
 export async function applySeries(_prev: EditState, fd: FormData) {
   return edit(fd, true);
 }
+
+export type MoveBackState = { ok: boolean; message: string } | null;
+
+/**
+ * Decision 42a amendment (c) part 3 — "Move back" on a stray. Puts one
+ * occurrence at its series' template time on that occurrence's own studio-local
+ * date, through move_occurrence (p_confirm true, because a class members have
+ * booked is emailed — a deliberate one-click manager action, never automatic).
+ * Only the time changes; the instructor and date are left as they are.
+ */
+export async function moveStrayToTemplate(_prev: MoveBackState, fd: FormData): Promise<MoveBackState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occId = String(fd.get("occurrence_id") ?? "");
+  if (!occId) return { ok: false, message: "No class given." };
+
+  const { zonedToUtc, zonedDateKey } = await import("@/lib/time");
+  const supabase = createClient();
+  const { data: occ } = await supabase
+    .from("class_occurrences")
+    .select("id, starts_at, series_id, class_series(time_of_day, duration_minutes)")
+    .eq("id", occId).maybeSingle();
+  if (!occ || !occ.series_id) return { ok: false, message: "That class is not part of a series." };
+  const series = occ.class_series as unknown as { time_of_day: string; duration_minutes: number } | null;
+  if (!series) return { ok: false, message: "That series no longer exists." };
+
+  // The template time on the occurrence's OWN date, in the studio's zone.
+  const dateKey = zonedDateKey(occ.starts_at, ctx.timeZone);
+  const hhmm = series.time_of_day.slice(0, 5);
+  const start = zonedToUtc(dateKey, hhmm, ctx.timeZone);
+  const end = new Date(start.getTime() + series.duration_minutes * 60_000);
+
+  const { data, error } = await supabase.rpc("move_occurrence", {
+    p_occurrence_id: occId,
+    p_starts_at: start.toISOString(),
+    p_ends_at: end.toISOString(),
+    p_confirm: true,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers change the timetable."
+        : /PT409/.test(m) ? "That class cannot be moved."
+        : m,
+    };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string };
+  if (!r?.ok) {
+    return {
+      ok: false,
+      message: r?.reason === "instructor_busy" ? "They already teach at the usual time."
+        : r?.reason === "room_busy" ? "The room is taken at the usual time."
+        : r?.reason === "outside_availability_dates" ? "That is outside their agreed dates."
+        : "That could not be moved back.",
+    };
+  }
+  revalidatePath(`/series/${occ.series_id}`);
+  revalidatePath("/schedule");
+  revalidatePath("/");
+  return { ok: true, message: "Moved back to the usual time." };
+}

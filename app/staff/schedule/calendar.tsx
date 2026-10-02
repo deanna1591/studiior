@@ -24,6 +24,7 @@ function initialsOf(full: string): string {
     .map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 }
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
+import { resolveDrag } from "@/lib/drag-safety";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 
@@ -69,6 +70,11 @@ const formats = {
 
 /** The left-hand column. A sentinel rather than null: a resource needs an id. */
 export const UNASSIGNED = "unassigned";
+
+/** Minutes per calendar slot — the grid's `step`, and "one full slot" for the
+ *  Day-view drag snap (a column change that moves less than this keeps its
+ *  time, so a vertical slip between columns never retimes a class). */
+const STEP_MIN = 15;
 
 export type Resource = { resourceId: string; resourceTitle: string };
 export type CalEvent = {
@@ -246,6 +252,42 @@ export default function ScheduleCalendar({
       const before = events;
       setNotice(null);
 
+      // DRAG SAFETY (Decision 42a amendment c). The strays on hosted came from a
+      // Day-view drag that moved a class to another instructor's COLUMN and, by
+      // a vertical slip, also changed its TIME — then the nightly top-up refilled
+      // the vacated slot. Two guards, on the initial (unconfirmed) call only:
+      //
+      //  (a) Day view snaps a column change back to the original time unless the
+      //      vertical movement exceeds one full slot (STEP minutes), so a slip
+      //      between columns never retimes a class.
+      //  (b) A drag that DOES change the time asks first, naming the change and
+      //      who it emails — a time change is never silent. An instructor-only
+      //      change (same time) keeps today's behaviour.
+      if (!confirm) {
+        const origStart = toStudioWall(new Date(ev.startsAt), timeZone);
+        const origEnd = toStudioWall(new Date(ev.endsAt), timeZone);
+        const { snapped, timeChanged } = resolveDrag(
+          origStart.getTime(), start.getTime(),
+          { columnChanged: target !== ev.resourceId, isDay: view === "day", stepMin: STEP_MIN });
+        if (snapped) { start = origStart; end = origEnd; }  // a sub-slot slip: keep the time
+        if (timeChanged) {
+          const fmtT = (d: Date) =>
+            `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          const dateLabel = new Intl.DateTimeFormat("en-GB", {
+            weekday: "long", day: "numeric", month: "long", timeZone,
+          }).format(fromStudioWall(start, timeZone));
+          const n = ev.bookedCount;
+          const bookedLine = n > 0
+            ? `\n\n${n} member${n === 1 ? " is" : "s are"} booked and will be emailed.`
+            : "\n\nNo members are booked.";
+          const ok = window.confirm(
+            `Move ${ev.title} from ${fmtT(origStart)} to ${fmtT(start)} on ${dateLabel}?` + bookedLine);
+          if (!ok) { setEvents(before); return; }
+          // Proceed confirmed, so move_occurrence emails without a second prompt.
+          return apply(ev, start, end, target, true);
+        }
+      }
+
       // NOTHING moves on screen until the answer comes back. The first version
       // moved the class optimistically and then reverted it if the database
       // refused — which meant an accidental two-pixel drag visibly relocated a
@@ -313,7 +355,7 @@ export default function ScheduleCalendar({
       setBlockedBy(res.blockedBy ?? null);
       setEvents(before);
     },
-    [events, timeZone],
+    [events, timeZone, view],
   );
 
   const onDrop = useCallback(
@@ -852,7 +894,7 @@ export default function ScheduleCalendar({
               + `-${String(d.getDate()).padStart(2, "0")}`;
             go(key, "day");
           }}
-          step={15}
+          step={STEP_MIN}
           timeslots={4}
           // A studio does not run at 3am, and twenty-four rows of empty night
           // is most of what the first render showed. Bounded to the working
