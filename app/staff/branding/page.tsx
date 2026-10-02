@@ -32,7 +32,7 @@ export default async function Branding() {
       .maybeSingle(),
     supabase
       .from("studio_settings")
-      .select("public_instructor_name")
+      .select("public_instructor_name, time_format")
       .eq("studio_id", ctx.studioId)
       .maybeSingle(),
   ]);
@@ -57,6 +57,7 @@ export default async function Branding() {
         loginTagline={studio?.login_tagline ?? ""}
         installWelcome={studio?.install_welcome ?? ""}
         publicInstructorName={(settings?.public_instructor_name ?? "first") as "first" | "full"}
+        timeFormat={(settings?.time_format ?? "24h") as "24h" | "12h"}
       />
     </AppShell>
   );

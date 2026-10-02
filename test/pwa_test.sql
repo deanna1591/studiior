@@ -40,14 +40,14 @@ select expect_text('studio_by_slug returns NULL welcome when unset',
 select expect_text('studio_by_slug still returns name',
   (select name from studio_by_slug('9a51-pwa')), 'PWA Studio');
 
--- The function returns EXACTLY the 14 documented columns — the two new ones and
--- nothing else new.
-select expect_num('studio_by_slug returns exactly 14 columns',
+-- The function returns EXACTLY 15 output columns — the PWA two, plus Decision
+-- 55's time_format (migration 20260832130000), and nothing else new.
+select expect_num('studio_by_slug returns exactly 15 columns',
   (select count(*) from pg_proc p
      cross join lateral unnest(coalesce(p.proargnames, '{}'::text[])) as a
     join pg_namespace n on n.oid = p.pronamespace
    where n.nspname='public' and p.proname='studio_by_slug'
-     and a <> 'p_slug')::bigint, 14);
+     and a <> 'p_slug')::bigint, 15);
 
 -- THE ANON SURFACE IS EXACTLY TWELVE — the drop+recreate of studio_by_slug (one
 -- of the twelve) must not have lost or widened its anon grant. The suite's own

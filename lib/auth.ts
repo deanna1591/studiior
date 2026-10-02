@@ -21,6 +21,8 @@ export type StaffContext = {
    *  the rail offers Publish at all — a studio that never publishes sees
    *  nothing of the feature. */
   publicationEnabled: boolean;
+  /** Decision 55: '24h' (13:00) or '12h' (1:00 PM). */
+  timeFormat: "24h" | "12h";
   currency: string;
   onboardingComplete: boolean;
   studioStatus: string;
@@ -104,6 +106,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     timeZone: row.studio_timezone,
     weekStartsOn: row.studio_week_starts_on ?? 1,
     publicationEnabled: row.publication_enabled === true,
+    timeFormat: (row.time_format === "12h" ? "12h" : "24h"),
     currency: row.studio_currency,
     studioStatus: row.studio_status,
     onboardingComplete: row.onboarding_complete === true,
@@ -136,6 +139,8 @@ export type MemberContext = {
   studioId: string;
   studioName: string;
   timeZone: string;
+  /** Decision 55: '24h' (13:00) or '12h' (1:00 PM). */
+  timeFormat: "24h" | "12h";
   status: string;
   /** Caches on members, recomputed on check-in and nightly (Business Rules §8). */
   streak: number;
@@ -165,6 +170,7 @@ export type MemberBootstrap = {
   how_to_buy: string | null;
   studio_contact_email: string | null;
   xendit_enabled: boolean;
+  time_format: "24h" | "12h";
 };
 
 /** Who is making this request, on the member PWA. */
@@ -229,7 +235,8 @@ export async function getMemberContext(): Promise<MemberContext | null> {
     studioId: row.studio_id,
     studioName: row.studio_name,
     timeZone: row.studio_timezone,
-    bootstrap: row,
+    timeFormat: (row.time_format === "12h" ? "12h" : "24h"),
+    bootstrap: { ...row, time_format: row.time_format === "12h" ? "12h" : "24h" },
   };
 }
 

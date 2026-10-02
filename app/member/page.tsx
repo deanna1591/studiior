@@ -207,11 +207,11 @@ export default async function MemberHome() {
               A place has opened in{" "}
               <span className="font-medium">{o.class_occurrences?.name}</span>
               {o.class_occurrences && <> on {day(o.class_occurrences.starts_at)} at{" "}
-                <span className="num">{fmtTime(o.class_occurrences.starts_at, ctx.timeZone)}</span></>}.
+                <span className="num">{fmtTime(o.class_occurrences.starts_at, ctx.timeZone, ctx.timeFormat)}</span></>}.
             </p>
             <p className="m-micro mt-1 text-ink-2">
               It is held for you until{" "}
-              <span className="num">{fmtTime(o.expires_at, ctx.timeZone)}</span>.
+              <span className="num">{fmtTime(o.expires_at, ctx.timeZone, ctx.timeFormat)}</span>.
             </p>
             <input type="hidden" name="offer_id" value={o.id} />
             <div className="mt-3 flex gap-2">
@@ -253,7 +253,7 @@ export default async function MemberHome() {
 
           <div className="relative flex h-full flex-col justify-between p-4">
             <span className="m-hero-tag self-start rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
-              {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone)}</span>
+              {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
             </span>
 
             <div className="flex items-end justify-between gap-3">
@@ -299,7 +299,7 @@ export default async function MemberHome() {
           {pendingUntil.get(next.occurrence_id) ? (
             <>
               {" · by "}
-              <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone)}</span>
+              <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone, ctx.timeFormat)}</span>
             </>
           ) : null}
         </p>
@@ -358,7 +358,7 @@ export default async function MemberHome() {
                 <div className="min-w-0">
                   <h1 className="m-head truncate text-[19px] leading-6 text-white">{o.name}</h1>
                   <p className="mt-0.5 truncate text-[12px] leading-4 text-white/90">
-                    <span className="num">{fmtTime(o.starts_at, ctx.timeZone)}</span>
+                    <span className="num">{fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
                     {o.instructors?.display_name ? ` \u00b7 ${o.instructors.display_name}` : ""}
                   </p>
                 </div>
@@ -405,7 +405,7 @@ export default async function MemberHome() {
                   </span>
                   <span className="m-name block truncate text-ink">{o.name}</span>
                   <span className="m-subtle block truncate text-ink-2">
-                    {day(o.starts_at)} · <span className="num">{fmtTime(o.starts_at, ctx.timeZone)}</span>
+                    {day(o.starts_at)} · <span className="num">{fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
                   </span>
                 </Link>
               </li>
@@ -521,7 +521,7 @@ export default async function MemberHome() {
                   <span className="m-body block truncate text-ink">{b.class_occurrences!.name}</span>
                   <span className="m-micro block text-ink-3">
                     {day(b.class_occurrences!.starts_at)} ·{" "}
-                    <span className="num">{fmtTime(b.class_occurrences!.starts_at, ctx.timeZone)}</span>
+                    <span className="num">{fmtTime(b.class_occurrences!.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
                   </span>
                   {pendingUntil.has(b.occurrence_id) && (
                     <span className="m-micro mt-0.5 block text-ink-2">
@@ -529,7 +529,7 @@ export default async function MemberHome() {
                       {pendingUntil.get(b.occurrence_id) ? (
                         <>
                           {" · by "}
-                          <span className="num">{fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone)}</span>
+                          <span className="num">{fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone, ctx.timeFormat)}</span>
                         </>
                       ) : null}
                     </span>

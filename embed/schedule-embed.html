@@ -401,7 +401,7 @@
     var when = new Date(c.starts_at);
     wrap.appendChild(el("div", "sd-ho-when",
       when.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: tz() })
-      + " at " + when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: tz(), timeZoneName: "short" })));
+      + " at " + when.toLocaleTimeString(undefined, { hour: is12h() ? "numeric" : "2-digit", minute: "2-digit", hour12: is12h(), timeZone: tz(), timeZoneName: "short" })));
 
     // location · class · duration · instructor — instructor OMITTED when unassigned.
     var meta = [];
@@ -437,9 +437,13 @@
   function mountNode(node) { mount.innerHTML = ""; mount.appendChild(node); }
 
   // ---- date helpers (studio-local dates come as YYYY-MM-DD strings) ----------
+  function is12h() { return DATA && DATA.studio && DATA.studio.time_format === "12h"; }
   function ampm(c) {
-    // c.time is HH:MM in the studio's own clock; render it 12-hour without a zone.
-    var p = String(c.time || "").split(":"), h = +p[0], m = p[1] || "00";
+    // c.time is canonical HH:MM in the studio's own clock. Decision 55: the studio
+    // chooses the face — 24-hour renders it verbatim, 12-hour converts it here.
+    var t = String(c.time || "");
+    if (!is12h()) return t;
+    var p = t.split(":"), h = +p[0], m = p[1] || "00";
     var ap = h < 12 ? "AM" : "PM", hh = h % 12; if (hh === 0) hh = 12;
     return hh + ":" + m + " " + ap;
   }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { fmtTime } from "@/lib/time";
+import { fmtTime, type TimeFormat } from "@/lib/time";
 
 export type Occ = {
   id: string;
@@ -22,7 +22,7 @@ export type Occ = {
  * action — "4 spaces" or "Full · 2 waiting" — not by a coloured badge. Badges
  * turn a schedule into a colour-matching exercise; this is meant to be read.
  */
-export function ScheduleRow({ o, timeZone, now }: { o: Occ; timeZone: string; now: number }) {
+export function ScheduleRow({ o, timeZone, timeFormat = "24h", now }: { o: Occ; timeZone: string; timeFormat?: TimeFormat; now: number }) {
   const past = new Date(o.starts_at).getTime() < now;
   const cancelled = o.status === "cancelled";
   const full = o.booked_count >= o.capacity;
@@ -47,7 +47,7 @@ export function ScheduleRow({ o, timeZone, now }: { o: Occ; timeZone: string; no
       } ${past ? "" : "hover:bg-paper"}`}
     >
       <span className={`num text-[13px] ${past || cancelled ? "text-ink-3" : "text-ink-2"}`}>
-        {fmtTime(o.starts_at, timeZone)}
+        {fmtTime(o.starts_at, timeZone, timeFormat)}
       </span>
 
       <span className={`min-w-0 truncate text-[14px] leading-5 ${tone} ${cancelled ? "line-through" : ""}`}>

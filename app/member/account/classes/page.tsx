@@ -68,7 +68,7 @@ export default async function Classes() {
                 <span className="min-w-0">
                   <span className="m-body block text-ink">{o.name}</span>
                   <span className="m-micro block text-ink-3">
-                    {fmtDayLong(o.starts_at, ctx.timeZone)} · {fmtTime(o.starts_at, ctx.timeZone)}
+                    {fmtDayLong(o.starts_at, ctx.timeZone)} · {fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat)}
                     {o.instructors?.display_name ? ` · ${o.instructors.display_name}` : ""}
                   </span>
                 </span>

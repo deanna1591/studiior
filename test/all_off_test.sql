@@ -287,4 +287,9 @@ select expect_true('teeth: with auto-assign ON, the engine fills the open occurr
      from class_occurrences where series_id = '0ff00ff0-0000-0000-0000-000000005043'));
 update studio_settings set auto_assign_open_classes = false where studio_id = :'S';
 
+-- Decision 55: a studio that turns nothing on shows times exactly as before —
+-- time_format defaults to '24h', so the whole clock-format feature is inert.
+select expect_true('time_format defaults to 24h (the clock is unchanged)',
+  (select time_format = '24h' from studio_settings where studio_id = :'S'));
+
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;

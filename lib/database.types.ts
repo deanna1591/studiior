@@ -6028,6 +6028,7 @@ export type Database = {
           suspension_repeat_days: number
           suspension_warn_at: number
           suspension_window_days: number
+          time_format: string
           unstaffed_deadline_hours: number
           updated_at: string
           waitlist_cutoff_minutes: number
@@ -6126,6 +6127,7 @@ export type Database = {
           suspension_repeat_days?: number
           suspension_warn_at?: number
           suspension_window_days?: number
+          time_format?: string
           unstaffed_deadline_hours?: number
           updated_at?: string
           waitlist_cutoff_minutes?: number
@@ -6224,6 +6226,7 @@ export type Database = {
           suspension_repeat_days?: number
           suspension_warn_at?: number
           suspension_window_days?: number
+          time_format?: string
           unstaffed_deadline_hours?: number
           updated_at?: string
           waitlist_cutoff_minutes?: number
@@ -7490,14 +7493,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7533,6 +7528,10 @@ export type Database = {
       flex_report: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
+      }
+      fmt_clock: {
+        Args: { p_format?: string; p_ts: string; p_tz: string }
+        Returns: string
       }
       force_commit_occurrence: {
         Args: { p_occurrence_id: string; p_reason: string }
@@ -7878,6 +7877,7 @@ export type Database = {
           studio_name: string
           studio_timezone: string
           theme_preset: Database["public"]["Enums"]["theme_preset"]
+          time_format: string
           waitlist_enabled: boolean
           xendit_enabled: boolean
         }[]
@@ -8721,6 +8721,7 @@ export type Database = {
           studio_status: string
           studio_timezone: string
           studio_week_starts_on: number
+          time_format: string
           user_id: string
         }[]
       }
@@ -8790,6 +8791,7 @@ export type Database = {
           name: string
           slug: string
           theme_preset: Database["public"]["Enums"]["theme_preset"]
+          time_format: string
           timezone: string
         }[]
       }
@@ -8897,7 +8899,6 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
-      t_book_free: { Args: { p_lead: number; p_occ: string }; Returns: Json }
       timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {
         Args: {

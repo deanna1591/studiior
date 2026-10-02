@@ -292,8 +292,15 @@ export default async function Schedule({
       new Date(o.starts_at).getTime() > now)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const unstaffedBooked = unstaffed.filter((o) => o.occ_booked > 0).length;
-  const hhmm = (mins: number) =>
-    `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  // Decision 55: the studio's clock format.
+  const hhmm = (mins: number) => {
+    const h = Math.floor(mins / 60), m = mins % 60;
+    if (ctx.timeFormat === "12h") {
+      const ap = h < 12 ? "AM" : "PM"; const h12 = h % 12 === 0 ? 12 : h % 12;
+      return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
+    }
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  };
   const shortDay = (isoDate: string) =>
     new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: ctx.timeZone })
       .format(new Date(`${isoDate}T12:00:00Z`));
@@ -575,7 +582,7 @@ export default async function Schedule({
         <ScheduleCalendar
           events={filteredEvents} resources={shown}
           classTypes={classTypes ?? []} rooms={rooms ?? []}
-          timeZone={ctx.timeZone} deadlineHours={deadlineHours}
+          timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} deadlineHours={deadlineHours}
           quietPct={Number(quietPct ?? 0.4)}
           quietWindowDays={Number(quietDays ?? 7)}
           fullPct={Number(fullPct ?? 0.95)}

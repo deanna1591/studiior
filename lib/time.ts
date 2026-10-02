@@ -35,19 +35,23 @@ export function zonedToUtc(date: string, time: string, timeZone: string): Date {
   return new Date(ms);
 }
 
-export function fmtTime(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone, hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(new Date(iso));
+// Decision 55 — the ONE clock-time formatter lives in lib/clock.mjs (plain ESM,
+// node-testable without a bundler) and is re-exported here so every caller keeps
+// importing it from @/lib/time.
+export type TimeFormat = "24h" | "12h";
+export { fmtClock } from "./clock";
+import { fmtClock } from "./clock";
+
+export function fmtTime(iso: string, timeZone: string, format: TimeFormat = "24h"): string {
+  return fmtClock(iso, timeZone, format);
 }
 
 /**
- * Decision 21 amendment — the flex confirmation deadline, short: "20:00 Mon".
- * 24-hour to match every other time in the member app (fmtTime, and CLAUDE.md's
- * rule), even though a 12-hour example was sketched in the ask.
+ * Decision 21 amendment — the flex confirmation deadline, short: "20:00 Mon"
+ * (or "8:00 PM Mon" under 12h, Decision 55).
  */
-export function fmtDeadlineShort(iso: string, timeZone: string): string {
-  const time = fmtTime(iso, timeZone);
+export function fmtDeadlineShort(iso: string, timeZone: string, format: TimeFormat = "24h"): string {
+  const time = fmtTime(iso, timeZone, format);
   const day = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short" }).format(new Date(iso));
   return `${time} ${day}`;
 }

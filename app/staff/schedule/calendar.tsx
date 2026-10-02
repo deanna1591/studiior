@@ -55,18 +55,22 @@ function makeLocalizer(weekStartsOn: number) {
   });
 }
 
-// 24-hour, like every other time in the product. react-big-calendar's default
-// is the locale's, which gave "3:30 PM" beside a roster reading "15:30".
-const formats = {
-  timeGutterFormat: "HH:mm",
-  eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
-    `${format(start, "HH:mm")}–${format(end, "HH:mm")}`,
-  selectRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
-    `${format(start, "HH:mm")}–${format(end, "HH:mm")}`,
-  dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
-    `${format(start, "d MMM")} – ${format(end, "d MMM yyyy")}`,
-  dayHeaderFormat: "EEEE d MMMM yyyy",
-};
+// Decision 55: the studio's clock format. react-big-calendar's own default is
+// the locale's; the studio chooses 24h ("13:00") or 12h ("1:00 PM"). Dates and
+// day headers are unchanged — only the clock pattern switches.
+function makeFormats(timeFormat: "24h" | "12h") {
+  const t = timeFormat === "12h" ? "h:mm a" : "HH:mm";
+  return {
+    timeGutterFormat: t,
+    eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${format(start, t)}–${format(end, t)}`,
+    selectRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${format(start, t)}–${format(end, t)}`,
+    dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${format(start, "d MMM")} – ${format(end, "d MMM yyyy")}`,
+    dayHeaderFormat: "EEEE d MMMM yyyy",
+  };
+}
 
 /** The left-hand column. A sentinel rather than null: a resource needs an id. */
 export const UNASSIGNED = "unassigned";
@@ -118,7 +122,7 @@ export default function ScheduleCalendar({
   quietPct, quietWindowDays, fullPct, showTier, coreEnabled, flexEnabled,
   assignmentConfirmations,
   anchor, today, view, minHour, maxHour, weekStartsOn,
-  instructorNames, instructorAvatars, canManage, instructorParam,
+  instructorNames, instructorAvatars, canManage, instructorParam, timeFormat = "24h",
 }: {
   events: CalEvent[];
   resources: Resource[];
@@ -137,6 +141,8 @@ export default function ScheduleCalendar({
   /** For the slot-click form. Empty means the studio has none yet. */
   classTypes: { id: string; name: string; duration_minutes: number; default_capacity: number }[];
   rooms: { id: string; name: string; capacity: number }[];
+  /** Decision 55: the studio's clock format for the gutter and event times. */
+  timeFormat?: "24h" | "12h";
   /** The two guarantee switches, for the create form's tier control. */
   coreEnabled: boolean;
   flexEnabled: boolean;
@@ -184,6 +190,7 @@ export default function ScheduleCalendar({
   // showing last week's classes under this week's dates. An effect would show
   // that frame every time.
   const localizer = useMemo(() => makeLocalizer(weekStartsOn), [weekStartsOn]);
+  const formats = useMemo(() => makeFormats(timeFormat), [timeFormat]);
   const [events, setEvents] = useState(initial);
   const [lastServed, setLastServed] = useState(initial);
   if (initial !== lastServed) {

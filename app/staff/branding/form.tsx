@@ -53,6 +53,7 @@ export default function BrandingForm({
   loginFocusX, loginFocusY,
   contactEmail, contactPhone, loginTagline: initialTagline, installWelcome: initialWelcome,
   publicInstructorName: initialNameMode,
+  timeFormat: initialTimeFormat,
 }: {
   studioName: string;
   preset: PresetKey; accent: string | null; logoUrl: string | null;
@@ -64,6 +65,7 @@ export default function BrandingForm({
   loginTagline: string;
   installWelcome: string;
   publicInstructorName: "first" | "full";
+  timeFormat: "24h" | "12h";
 }) {
   // Local state so the preview moves as they choose, before anything is saved.
   const [preset, setPreset] = useState<PresetKey>(initialPreset);
@@ -71,6 +73,7 @@ export default function BrandingForm({
   const [tagline, setTagline] = useState(initialTagline);
   const [welcome, setWelcome] = useState(initialWelcome);
   const [nameMode, setNameMode] = useState<"first" | "full">(initialNameMode);
+  const [timeFormat, setTimeFormat] = useState<"24h" | "12h">(initialTimeFormat);
 
   const [state, action] = useFormState<BrandingState, FormData>(saveBranding, null);
   const [logoState, logoAction] = useFormState<BrandingState, FormData>(uploadLogo, null);
@@ -173,6 +176,25 @@ export default function BrandingForm({
               <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded border border-line bg-surface p-2.5 hover:bg-paper">
                 <input type="radio" name="public_instructor_name" value={v}
                        checked={nameMode === v} onChange={() => setNameMode(v)} className="shrink-0" />
+                <span className="text-[13px] text-ink">{label}</span>
+              </label>
+            ))}
+          </fieldset>
+
+          {/* Decision 55: how the clock reads everywhere a member, instructor or
+              staff user sees a time. Dates are unaffected. */}
+          <fieldset className="space-y-2 border-t border-line pt-5">
+            <legend className="mb-1 text-[13px] font-medium leading-[18px] text-ink">
+              Show times as
+            </legend>
+            <p className="text-[12px] leading-4 text-ink-3">
+              Used everywhere a class time is shown — the member app, the
+              instructor portal, your emails and the website schedule.
+            </p>
+            {([["24h", "24-hour (13:00)"], ["12h", "12-hour (1:00 PM)"]] as const).map(([v, label]) => (
+              <label key={v} className="flex cursor-pointer items-center gap-2.5 rounded border border-line bg-surface p-2.5 hover:bg-paper">
+                <input type="radio" name="time_format" value={v}
+                       checked={timeFormat === v} onChange={() => setTimeFormat(v)} className="shrink-0" />
                 <span className="text-[13px] text-ink">{label}</span>
               </label>
             ))}

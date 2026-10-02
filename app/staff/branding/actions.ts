@@ -56,6 +56,11 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
   const rawName = String(fd.get("public_instructor_name") ?? "first");
   const publicInstructorName = rawName === "full" ? "full" : "first";
 
+  // Decision 55: 24-hour (13:00) or 12-hour (1:00 PM), studio-wide. Anything but
+  // the two known values falls back to the product default rather than refused.
+  const rawFmt = String(fd.get("time_format") ?? "24h");
+  const timeFormat = rawFmt === "12h" ? "12h" : "24h";
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from("studios")
@@ -76,7 +81,7 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
   // studios update above already proved it); a refused update changes nothing.
   const { error: sErr } = await supabase
     .from("studio_settings")
-    .update({ public_instructor_name: publicInstructorName })
+    .update({ public_instructor_name: publicInstructorName, time_format: timeFormat })
     .eq("studio_id", ctx.studioId);
   if (sErr) return { ok: false, message: sErr.message };
 

@@ -340,7 +340,7 @@ export default async function Book({
     const peakCancelNote =
       booked && isPeak && remaining !== null && remaining !== undefined
         ? insideFreeWindow
-          ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone)} — your peak class comes back`
+          ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone, ctx.timeFormat)} — your peak class comes back`
           : "Cancelling now still uses your peak class"
         : null;
 
@@ -364,8 +364,8 @@ export default async function Book({
       bookingId: booking?.id ?? null,
       name: o.name,
       href: `/class/${o.id}?t=${o.class_type_id}`,
-      startLabel: fmtTime(o.starts_at, ctx.timeZone),
-      endLabel: o.ends_at ? fmtTime(o.ends_at, ctx.timeZone) : null,
+      startLabel: fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat),
+      endLabel: o.ends_at ? fmtTime(o.ends_at, ctx.timeZone, ctx.timeFormat) : null,
       durationLabel: mins ? `${mins} min` : "—",
       instructor: o.instructors?.display_name ?? null,
       room: o.rooms?.name ?? null,
@@ -408,7 +408,7 @@ export default async function Book({
       {/* Decision 30 amendment: an eligible member picks their free class from a
           grouped list, fullest first, with capped classes marked. */}
       {freeFirstEligible && (
-        <FreeClassList classes={freeList} timeZone={ctx.timeZone} bookFirstFree={bookFirstFree} />
+        <FreeClassList classes={freeList} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} bookFirstFree={bookFirstFree} />
       )}
       <section aria-label="Choose a day" className="mb-4">
         <div className="mb-2.5 flex items-center gap-2">

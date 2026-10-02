@@ -112,7 +112,7 @@ export default async function History() {
                       <span className="m-micro shrink-0 text-right text-ink-3">
                         <span className="num">{day}</span> {month}
                         {v.occurrence_id && (
-                          <span className="num block">{fmtTime(v.checked_in_at, ctx.timeZone)}</span>
+                          <span className="num block">{fmtTime(v.checked_in_at, ctx.timeZone, ctx.timeFormat)}</span>
                         )}
                       </span>
                     </li>

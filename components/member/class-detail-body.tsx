@@ -45,12 +45,13 @@ export type DetailType = {
 export type DetailBooking = { id: string; status: string; waitlist_position: number | null } | null;
 
 export default function ClassDetailBody({
-  occ, type, booking, timeZone, waitlistEnabled, guest, freeFirst, pending,
+  occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
   booking: DetailBooking;
   timeZone: string;
+  timeFormat?: "24h" | "12h";
   waitlistEnabled: boolean;
   guest?: { enabled: boolean; canInvite: boolean };
   freeFirst?: FreeFirst;
@@ -75,11 +76,11 @@ export default function ClassDetailBody({
         ? `Bookings for this class are confirmed ${Math.round(
             (new Date(occ.starts_at).getTime() - new Date(pending.until).getTime()) / 3_600_000,
           )} hours before it starts.`
-        : `Bookings for this class are confirmed by ${fmtTime(pending.until, timeZone)} the evening before.`)
+        : `Bookings for this class are confirmed by ${fmtTime(pending.until, timeZone, timeFormat)} the evening before.`)
     : null;
   const waitingLabel = pending && !past
     ? (pending.until
-        ? `Waiting for confirmation · by ${fmtDeadlineShort(pending.until, timeZone)}`
+        ? `Waiting for confirmation · by ${fmtDeadlineShort(pending.until, timeZone, timeFormat)}`
         : "Waiting for confirmation")
     : null;
   const mins = occ.ends_at
@@ -104,8 +105,8 @@ export default function ClassDetailBody({
 
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="num text-[16px] font-semibold text-ink">
-          {fmtTime(occ.starts_at, timeZone)}
-          {occ.ends_at && <> – {fmtTime(occ.ends_at, timeZone)}</>}
+          {fmtTime(occ.starts_at, timeZone, timeFormat)}
+          {occ.ends_at && <> – {fmtTime(occ.ends_at, timeZone, timeFormat)}</>}
         </span>
         {mins && (
           <span className="rounded-full px-2 py-0.5 text-[11px] leading-4 text-ink-2" style={{ background: "var(--accent-chip)" }}>

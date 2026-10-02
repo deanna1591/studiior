@@ -190,7 +190,7 @@ export default async function Dashboard({
                   <div className="min-w-[560px]">
                     <Rows>
                       {(todays.data as Occ[]).map((o) => (
-                        <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} now={Date.now()} />
+                        <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} now={Date.now()} />
                       ))}
                     </Rows>
                   </div>
@@ -230,7 +230,7 @@ export default async function Dashboard({
           ) : (
             <Rows>
               {(todays.data as Occ[]).map((o) => (
-                <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} now={Date.now()} />
+                <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} now={Date.now()} />
               ))}
             </Rows>
           )}
