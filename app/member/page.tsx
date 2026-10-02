@@ -89,8 +89,10 @@ export default async function MemberHome() {
       .eq("member_id", ctx.memberId).eq("key", "install_card").maybeSingle(),
   ]);
 
-  const pendingUntil = new Map<string, string>(
-    ((pendingRows ?? []) as { occurrence_id: string; pending_until: string }[])
+  // pending_until is null for a free provisional seat (Decision 30 amendment):
+  // present in the map means "Waiting for confirmation", a value adds "· by {time}".
+  const pendingUntil = new Map<string, string | null>(
+    ((pendingRows ?? []) as { occurrence_id: string; pending_until: string | null }[])
       .map((p) => [p.occurrence_id, p.pending_until]));
 
   const ms = milestones as unknown as { total: number; next_target: number | null; to_go: number | null } | null;
@@ -293,8 +295,13 @@ export default async function MemberHome() {
           "waiting for confirmation" line the class page shows. */}
       {occ && next && pendingUntil.has(next.occurrence_id) && (
         <p className="mt-2 px-1 text-[12.5px] leading-[18px] text-ink-2">
-          Waiting for confirmation · by{" "}
-          <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone)}</span>
+          Waiting for confirmation
+          {pendingUntil.get(next.occurrence_id) ? (
+            <>
+              {" · by "}
+              <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone)}</span>
+            </>
+          ) : null}
         </p>
       )}
 
@@ -518,8 +525,13 @@ export default async function MemberHome() {
                   </span>
                   {pendingUntil.has(b.occurrence_id) && (
                     <span className="m-micro mt-0.5 block text-ink-2">
-                      Waiting for confirmation · by{" "}
-                      <span className="num">{fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone)}</span>
+                      Waiting for confirmation
+                      {pendingUntil.get(b.occurrence_id) ? (
+                        <>
+                          {" · by "}
+                          <span className="num">{fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone)}</span>
+                        </>
+                      ) : null}
                     </span>
                   )}
                 </span>

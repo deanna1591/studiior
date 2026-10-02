@@ -67,7 +67,10 @@ export default function ClassDetailBody({
   // Decision 21 amendment: the member-facing confirmation copy — always about
   // THEIR booking, never a minimum or a headcount. The "confirmed by" line
   // (hours-before vs the evening before) and the "waiting" status once booked.
-  const confirmLine = pending && !past
+  // Decision 30 amendment: a free provisional booking is pending with no time
+  // (mode 'free', until null) — it confirms the moment the class is on. The flex
+  // "confirmed by {deadline}" line is only for a flex class (until set).
+  const confirmLine = pending && !past && pending.until
     ? (pending.mode === "hours_before"
         ? `Bookings for this class are confirmed ${Math.round(
             (new Date(occ.starts_at).getTime() - new Date(pending.until).getTime()) / 3_600_000,
@@ -75,7 +78,9 @@ export default function ClassDetailBody({
         : `Bookings for this class are confirmed by ${fmtTime(pending.until, timeZone)} the evening before.`)
     : null;
   const waitingLabel = pending && !past
-    ? `Waiting for confirmation · by ${fmtDeadlineShort(pending.until, timeZone)}`
+    ? (pending.until
+        ? `Waiting for confirmation · by ${fmtDeadlineShort(pending.until, timeZone)}`
+        : "Waiting for confirmation")
     : null;
   const mins = occ.ends_at
     ? Math.round((new Date(occ.ends_at).getTime() - new Date(occ.starts_at).getTime()) / 60000)

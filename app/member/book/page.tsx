@@ -7,6 +7,7 @@ import AnnounceStrip, { type StripItem } from "@/components/member/announce-stri
 import DateStrip from "@/components/member/date-strip";
 import DayView from "@/components/member/day-view";
 import DayClasses, { type Row } from "@/components/member/day-classes";
+import FreeClassList from "@/components/member/free-class-list";
 import { bookClass, bookFirstFree, cancelBooking, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
 
@@ -89,7 +90,7 @@ export default async function Book({
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
          { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig },
-         { data: announceRaw }] =
+         { data: announceRaw }, { data: freeListRaw }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -154,8 +155,15 @@ export default async function Book({
       // Decision 27 on /book: the studio's BANNER announcements as a compact
       // strip (the amendment — kind='banner', not pinned). Same batch.
       supabase.rpc("member_announcements", { p_studio_id: ctx.studioId }),
+      // Decision 30 amendment: the free booker's list — only eligible classes,
+      // fullest first, with the capped ones marked. Same batch, no extra hop.
+      supabase.rpc("free_first_class_list", { p_studio_id: ctx.studioId }),
     ]);
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
+  const freeList = ((freeListRaw ?? []) as unknown as {
+    occurrence_id: string; name: string; starts_at: string; room_name: string | null;
+    instructor_first: string | null; headcount: number; capacity: number; free_bookable: boolean;
+  }[]);
   // BANNER announcements only reach the Book strip; What's-on posts stay Home-only.
   const bannerAnnouncements = ((announceRaw ?? []) as unknown as
     { id: string; kind: string; title: string; link_url: string | null; link_label: string | null }[])
@@ -397,6 +405,11 @@ export default async function Book({
           built-in banner (Decision 27 amendment); the "Book — first class free"
           row buttons still carry it while this member is eligible. */}
       <AnnounceStrip items={bannerAnnouncements} />
+      {/* Decision 30 amendment: an eligible member picks their free class from a
+          grouped list, fullest first, with capped classes marked. */}
+      {freeFirstEligible && (
+        <FreeClassList classes={freeList} timeZone={ctx.timeZone} bookFirstFree={bookFirstFree} />
+      )}
       <section aria-label="Choose a day" className="mb-4">
         <div className="mb-2.5 flex items-center gap-2">
           <h2 className="m-head flex-1 truncate text-[17px] leading-6 text-ink">{monthLabel}</h2>

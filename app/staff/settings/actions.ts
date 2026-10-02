@@ -698,10 +698,25 @@ export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<Pl
 
   const on = String(fd.get("free_first_class_enabled") ?? "") === "on";
   const peak = String(fd.get("free_first_peak_allowed") ?? "") === "on";
+  // Decision 30 amendment — grouped free classes. Blank = no limit / confirm on
+  // booking (today's behaviour). The CHECK constraints (>0 and >=2) are the real
+  // boundary; we normalise blanks to null here.
+  const coreOnly = String(fd.get("free_first_core_only") ?? "") === "on";
+  const capRaw = String(fd.get("free_first_seats_per_class") ?? "").trim();
+  const confRaw = String(fd.get("free_first_confirm_at") ?? "").trim();
+  const cap = capRaw === "" ? null : Math.trunc(Number(capRaw));
+  const confirmAt = confRaw === "" ? null : Math.trunc(Number(confRaw));
+  if (cap !== null && (!Number.isFinite(cap) || cap < 1))
+    return { ok: false, message: "The free-seat cap must be a whole number of at least 1, or left blank." };
+  if (confirmAt !== null && (!Number.isFinite(confirmAt) || confirmAt < 2))
+    return { ok: false, message: "Confirm-at must be at least 2 people, or left blank to confirm on booking." };
 
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
-    .update({ free_first_class_enabled: on, free_first_peak_allowed: peak })
+    .update({ free_first_class_enabled: on, free_first_peak_allowed: peak,
+              free_first_core_only: coreOnly,
+              free_first_seats_per_class: cap,
+              free_first_confirm_at: confirmAt })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };

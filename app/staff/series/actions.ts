@@ -223,3 +223,26 @@ export async function moveStrayToTemplate(_prev: MoveBackState, fd: FormData): P
   revalidatePath("/");
   return { ok: true, message: "Moved back to the usual time." };
 }
+
+// Decision 30 amendment: whether this recurring class accepts free first classes.
+// free_first_allowed is NOT a materialise-trigger column, so a direct template
+// write touches no occurrence and fires no generation; RLS (series_manager_write)
+// is the manager-up boundary.
+export async function setSeriesFreeFirst(_prev: MoveBackState, fd: FormData): Promise<MoveBackState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const seriesId = String(fd.get("series_id") ?? "");
+  const allowed = String(fd.get("free_first_allowed") ?? "") === "on";
+  if (!seriesId) return { ok: false, message: "No recurring class given." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("class_series")
+    .update({ free_first_allowed: allowed })
+    .eq("id", seriesId).select("id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing saved. Owners and managers only." };
+
+  revalidatePath(`/series/${seriesId}`);
+  revalidatePath("/series");
+  return { ok: true, message: allowed ? "Now accepts free first classes." : "No longer accepts free first classes." };
+}

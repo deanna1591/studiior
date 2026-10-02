@@ -38,10 +38,10 @@ export default async function SeriesList({
 
   const [{ data: series }, { data: settings }, { data: classTypes }, { data: roomRows }, { data: instrRows }] = await Promise.all([
     supabase.from("class_series")
-      .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, flex, minimum_bookings, class_types(name, color), rooms(name)")
+      .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, flex, minimum_bookings, free_first_allowed, class_types(name, color), rooms(name)")
       .order("status").order("time_of_day"),
     supabase.from("studio_settings")
-      .select("week_starts_on, guarantees_enabled, flex_enabled, flex_min_bookings, core_min_bookings")
+      .select("week_starts_on, guarantees_enabled, flex_enabled, flex_min_bookings, core_min_bookings, free_first_class_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
     supabase.from("rooms").select("id, name").eq("status", "active").order("name"),
@@ -203,10 +203,12 @@ export default async function SeriesList({
 
   // The live series as the bulk manager needs them: display built on the server
   // (no client timezone/rule work), tier resolved the same way as the marks.
+  const freeFirstOn = settings?.free_first_class_enabled ?? false;
   const bulkSeries: BulkSeries[] = live.map((s) => ({
     id: s.id, name: s.name, meta: meta(s), open: !s.instructor_id,
     tier: showTier ? tierOf(s.guarantee_tier, s.flex) : undefined,
     minimum: showTier ? s.minimum_bookings : null,
+    freeFirst: s.free_first_allowed ?? true,
   }));
 
   return (
@@ -241,7 +243,7 @@ export default async function SeriesList({
         <BulkManage series={bulkSeries}
                     rooms={(roomRows ?? []).map((r) => ({ id: r.id, name: r.name }))}
                     instructors={(instrRows ?? []).map((i) => ({ id: i.id, name: i.display_name }))}
-                    showTier={showTier} flexMin={flexMin} />
+                    showTier={showTier} flexMin={flexMin} freeFirstOn={freeFirstOn} />
       )}
 
       {!hideEnded && ended.length > 0 && (

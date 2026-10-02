@@ -9,6 +9,7 @@ import SeriesLifecycle from "../lifecycle";
 import SeriesGuarantee from "../guarantee";
 import SeriesConfirmations from "../series-confirm";
 import StrayClasses, { type Stray } from "./strays";
+import FreeFirstToggle from "./free-first-toggle";
 import { DAYS } from "@/lib/rrule";
 import { localDates, seriesOptions } from "../data";
 import { studioToday } from "@/lib/tz";
@@ -31,7 +32,7 @@ export default async function EditSeries({
 
   const { data: s } = await supabase
     .from("class_series")
-    .select("id, name, class_type_id, room_id, instructor_id, capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day, description, status, guarantee_tier, minimum_bookings, core_min_bookings")
+    .select("id, name, class_type_id, room_id, instructor_id, capacity, duration_minutes, rrule, starts_on, ends_on, time_of_day, description, status, guarantee_tier, minimum_bookings, core_min_bookings, free_first_allowed")
     .eq("id", params.id).maybeSingle();
   if (!s) notFound();
 
@@ -48,7 +49,7 @@ export default async function EditSeries({
       .eq("series_id", s.id).eq("status", "scheduled").gt("booked_count", 0)
       .gte("starts_at", new Date().toISOString()),
     supabase.from("studio_settings")
-      .select("guarantees_enabled, flex_enabled")
+      .select("guarantees_enabled, flex_enabled, free_first_class_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     // Decision 38: "N of M confirmed" (null when nothing has been asked).
     supabase.rpc("series_confirmation_summary", { p_series_id: s.id }),
@@ -143,6 +144,9 @@ export default async function EditSeries({
         </div>
       )}
       <SeriesConfirmations seriesId={s.id} instructorName={instructorName} summary={summary} />
+      {cfg?.free_first_class_enabled && (
+        <FreeFirstToggle seriesId={s.id} allowed={s.free_first_allowed ?? true} />
+      )}
       <StrayClasses strays={strays} />
       <div className="mb-6 max-w-xl rounded border border-line bg-surface px-3.5 py-3">
         <SectionLabel>On the calendar now</SectionLabel>

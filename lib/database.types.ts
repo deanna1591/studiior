@@ -466,6 +466,7 @@ export type Database = {
           booked_at: string
           cancelled_at: string | null
           cancelled_by: string | null
+          confirmed_at: string | null
           created_at: string
           credit_entry_id: string | null
           fee_charged_cents: number
@@ -479,6 +480,7 @@ export type Database = {
           overridden_rules: string[] | null
           override_reason: string | null
           payment_source: Database["public"]["Enums"]["payment_source"] | null
+          provisional: boolean
           release_reason:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
@@ -492,6 +494,7 @@ export type Database = {
           booked_at?: string
           cancelled_at?: string | null
           cancelled_by?: string | null
+          confirmed_at?: string | null
           created_at?: string
           credit_entry_id?: string | null
           fee_charged_cents?: number
@@ -505,6 +508,7 @@ export type Database = {
           overridden_rules?: string[] | null
           override_reason?: string | null
           payment_source?: Database["public"]["Enums"]["payment_source"] | null
+          provisional?: boolean
           release_reason?:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
@@ -518,6 +522,7 @@ export type Database = {
           booked_at?: string
           cancelled_at?: string | null
           cancelled_by?: string | null
+          confirmed_at?: string | null
           created_at?: string
           credit_entry_id?: string | null
           fee_charged_cents?: number
@@ -531,6 +536,7 @@ export type Database = {
           overridden_rules?: string[] | null
           override_reason?: string | null
           payment_source?: Database["public"]["Enums"]["payment_source"] | null
+          provisional?: boolean
           release_reason?:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
@@ -1363,6 +1369,7 @@ export type Database = {
           duration_minutes: number
           ends_on: string | null
           flex: boolean
+          free_first_allowed: boolean
           guarantee_tier: Database["public"]["Enums"]["guarantee_tier"]
           id: string
           instructor_id: string | null
@@ -1391,6 +1398,7 @@ export type Database = {
           duration_minutes: number
           ends_on?: string | null
           flex?: boolean
+          free_first_allowed?: boolean
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"]
           id?: string
           instructor_id?: string | null
@@ -1419,6 +1427,7 @@ export type Database = {
           duration_minutes?: number
           ends_on?: string | null
           flex?: boolean
+          free_first_allowed?: boolean
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"]
           id?: string
           instructor_id?: string | null
@@ -5973,7 +5982,10 @@ export type Database = {
           flex_standby_pay_cents: number
           flex_unmet_pay_cents: number
           free_first_class_enabled: boolean
+          free_first_confirm_at: number | null
+          free_first_core_only: boolean
           free_first_peak_allowed: boolean
+          free_first_seats_per_class: number | null
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
           hide_unstaffed_from_members: boolean
@@ -6068,7 +6080,10 @@ export type Database = {
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
           free_first_class_enabled?: boolean
+          free_first_confirm_at?: number | null
+          free_first_core_only?: boolean
           free_first_peak_allowed?: boolean
+          free_first_seats_per_class?: number | null
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
           hide_unstaffed_from_members?: boolean
@@ -6163,7 +6178,10 @@ export type Database = {
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
           free_first_class_enabled?: boolean
+          free_first_confirm_at?: number | null
+          free_first_core_only?: boolean
           free_first_peak_allowed?: boolean
+          free_first_seats_per_class?: number | null
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
           hide_unstaffed_from_members?: boolean
@@ -7294,6 +7312,10 @@ export type Database = {
         Returns: Json
       }
       confirm_occurrence: { Args: { p_occurrence_id: string }; Returns: Json }
+      confirm_provisional_seats_run: {
+        Args: { p_occurrence_id: string }
+        Returns: number
+      }
       confirm_series_assignments: {
         Args: { p_series_id: string }
         Returns: Json
@@ -7468,6 +7490,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
       extend_trial: {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
@@ -7508,9 +7538,41 @@ export type Database = {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
       }
+      free_first_class_list: {
+        Args: { p_studio_id: string }
+        Returns: {
+          capacity: number
+          duration_min: number
+          free_bookable: boolean
+          headcount: number
+          instructor_first: string
+          name: string
+          occurrence_id: string
+          room_name: string
+          starts_at: string
+        }[]
+      }
       free_first_eligibility: {
         Args: { p_member_id: string; p_studio_id: string }
         Returns: Json
+      }
+      free_first_eligible_classes_run: {
+        Args: {
+          p_member_id: string
+          p_min_headcount?: number
+          p_studio_id: string
+        }
+        Returns: {
+          capacity: number
+          duration_min: number
+          free_bookable: boolean
+          headcount: number
+          instructor_first: string
+          name: string
+          occurrence_id: string
+          room_name: string
+          starts_at: string
+        }[]
       }
       free_first_report: { Args: { p_studio_id: string }; Returns: Json }
       generate_all_occurrences: { Args: never; Returns: Json }
@@ -8315,6 +8377,10 @@ export type Database = {
       }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
+      release_provisional_seats_run: {
+        Args: { p_occurrence_id: string }
+        Returns: number
+      }
       render_notification: {
         Args: { p_notification_id: string }
         Returns: {
@@ -8831,6 +8897,7 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      t_book_free: { Args: { p_lead: number; p_occ: string }; Returns: Json }
       timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {
         Args: {
@@ -8981,6 +9048,7 @@ export type Database = {
         | "member_cancelled"
         | "late_cancelled"
         | "studio_released"
+        | "trial_not_confirmed"
       booking_source: "member" | "staff" | "front_desk" | "import"
       booking_status:
         | "booked"
@@ -9244,6 +9312,7 @@ export const Constants = {
         "member_cancelled",
         "late_cancelled",
         "studio_released",
+        "trial_not_confirmed",
       ],
       booking_source: ["member", "staff", "front_desk", "import"],
       booking_status: [

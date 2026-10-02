@@ -7,7 +7,7 @@ import { previewBulk, applyBulk, type BulkResult } from "./bulk-actions";
 
 export type BulkSeries = {
   id: string; name: string; meta: string; open: boolean;
-  tier?: Tier; minimum: number | null;
+  tier?: Tier; minimum: number | null; freeFirst?: boolean;
 };
 type Opt = { id: string; name: string };
 
@@ -18,6 +18,7 @@ const CHANGE_TYPES: { v: string; label: string; needsTier: boolean }[] = [
   { v: "ends_on",    label: "End date",            needsTier: false },
   { v: "starts_on",  label: "Start date",          needsTier: false },
   { v: "instructor", label: "Template instructor", needsTier: false },
+  { v: "free_first",  label: "Accepts free first classes", needsTier: false },
 ];
 
 /**
@@ -26,9 +27,10 @@ const CHANGE_TYPES: { v: string; label: string; needsTier: boolean }[] = [
  * the real database functions in a savepoint and rolls back; Apply performs it.
  */
 export default function BulkManage({
-  series, rooms, instructors, showTier, flexMin,
+  series, rooms, instructors, showTier, flexMin, freeFirstOn,
 }: {
   series: BulkSeries[]; rooms: Opt[]; instructors: Opt[]; showTier: boolean; flexMin: number;
+  freeFirstOn: boolean;
 }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [ct, setCt] = useState("minimum");
@@ -108,6 +110,14 @@ export default function BulkManage({
               <select value={v("room_id")} onChange={(e) => setV("room_id", e.target.value)}
                       className="rounded border border-line bg-paper px-2 py-1.5 text-[13px] text-ink">
                 <option value="">—</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select></label>
+          )}
+          {ct === "free_first" && (
+            <label className="flex flex-col gap-1 text-[12px] text-ink-2">To
+              <select value={v("free_first_allowed") || "on"} onChange={(e) => setV("free_first_allowed", e.target.value)}
+                      className="rounded border border-line bg-paper px-2 py-1.5 text-[13px] text-ink">
+                <option value="on">Accepts free classes</option>
+                <option value="off">No free classes</option>
               </select></label>
           )}
           {ct === "ends_on" && (
@@ -202,6 +212,11 @@ export default function BulkManage({
                 {showTier && s.tier && <span className="mr-1.5"><TierMark tier={s.tier} /></span>}
                 {s.name}
               </Link>
+              {freeFirstOn && s.freeFirst && (
+                <span className="ml-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium align-middle"
+                      style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+                      title="Accepts free first classes">free</span>
+              )}
               <span className="block text-[12px] leading-4 text-ink-3">{s.meta}</span>
             </span>
             {s.open && <span className="num shrink-0 text-[13px] text-ink-2">open</span>}

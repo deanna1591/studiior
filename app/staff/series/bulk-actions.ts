@@ -47,6 +47,7 @@ function buildChange(fd: FormData): Record<string, unknown> | { error: string } 
       return { starts_on: d };
     }
     case "instructor": return { instructor_id: v("instructor_id") };  // empty = Unassigned
+    case "free_first": return { free_first_allowed: v("free_first_allowed") === "on" };  // Decision 30 amendment
     default: return { error: "Pick what to change." };
   }
 }

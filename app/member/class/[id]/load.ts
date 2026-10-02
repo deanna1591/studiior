@@ -22,7 +22,7 @@ type Supa = Awaited<ReturnType<typeof memberScreen>>["supabase"];
 export type FreeFirst = { eligible: boolean; isFreeBooking: boolean };
 /** Decision 21 amendment: a flex class not yet decided — when it will be
  *  confirmed, and how the deadline is expressed. Null for core/always/decided. */
-export type Pending = { until: string; mode: string } | null;
+export type Pending = { until: string | null; mode: string } | null;
 
 export async function loadClassDetail(
   supabase: Supa,
@@ -41,7 +41,7 @@ export async function loadClassDetail(
   const typeQuery = (ctid: string) => supabase.from("class_types")
     .select("name, description, image_url, image_focus_x, image_focus_y").eq("id", ctid).maybeSingle();
   const bookingQuery = supabase.from("bookings")
-    .select("id, status, waitlist_position")
+    .select("id, status, waitlist_position, provisional")
     .eq("member_id", memberId).eq("occurrence_id", id)
     .in("status", ["booked", "waitlisted"]).maybeSingle();
   const guestQuery = guestPassesEnabled
@@ -65,13 +65,19 @@ export async function loadClassDetail(
     if (!occ) return null;
     const e = elig as { ok?: boolean } | null;
     const p = (pend as { deadline_at: string | null; mode: string }[] | null)?.[0];
+    const bk = (booking ?? null) as DetailBooking;
     return {
       occ: occ as unknown as DetailOccurrence,
       type: (type ?? null) as DetailType,
-      booking: (booking ?? null) as DetailBooking,
+      booking: bk,
       guest: { enabled: guestPassesEnabled, canInvite: guestPassesEnabled && (activeGuests ?? 0) === 0 },
       freeFirst: { eligible: e?.ok === true, isFreeBooking: (freeCount ?? 0) > 0 },
-      pending: p?.deadline_at ? { until: p.deadline_at, mode: p.mode } : null,
+      // Decision 21 amendment: a flex booking pending its deadline. Decision 30
+      // amendment: a free provisional booking is pending with NO time (it confirms
+      // the moment the class is on).
+      pending: p?.deadline_at
+        ? { until: p.deadline_at, mode: p.mode }
+        : ((bk as { provisional?: boolean } | null)?.provisional ? { until: null, mode: "free" } : null),
     };
   };
 
