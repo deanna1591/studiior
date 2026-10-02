@@ -40,11 +40,23 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
   const rawPhone = String(fd.get("contact_phone") ?? "").trim();
   const contactPhone = rawPhone === "" ? null : rawPhone;
 
+  // Decision 51: the sign-in sub-line and the Install-page welcome. Both
+  // nullable — blank means "show the default sentence", so a studio that never
+  // touches them reads exactly as before. Trimmed to a sane length so a pasted
+  // paragraph cannot blow out the login sheet.
+  const trimField = (k: string, max: number) => {
+    const v = String(fd.get(k) ?? "").trim();
+    return v === "" ? null : v.slice(0, max);
+  };
+  const loginTagline = trimField("login_tagline", 140);
+  const installWelcome = trimField("install_welcome", 160);
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from("studios")
     .update({ theme_preset: preset, accent_color: accent,
-              contact_email: contactEmail, contact_phone: contactPhone })
+              contact_email: contactEmail, contact_phone: contactPhone,
+              login_tagline: loginTagline, install_welcome: installWelcome })
     .eq("id", ctx.studioId)
     .select("id");
 

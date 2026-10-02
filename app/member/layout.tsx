@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { currentSlug } from "@/lib/tenant";
+import { accentRamp, neutralAccent, type PresetKey } from "@/lib/theme";
+import { iconVersion } from "@/lib/pwa";
 import type { Database } from "@/lib/database.types";
 
 /**
@@ -33,11 +35,40 @@ export async function generateMetadata(): Promise<Metadata> {
   // notFound() here costs nothing extra.
   if (!studio?.name) notFound();
 
+  // Decision 51: the member app installs as the studio's own app. The icon URLs
+  // carry ?v=<logo version> so a new logo busts the immutable icon cache.
+  const v = iconVersion(studio.logo_url);
   return {
     title: studio.name,
     applicationName: studio.name,
     appleWebApp: { capable: true, title: studio.name, statusBarStyle: "default" },
+    manifest: "/manifest.webmanifest",
+    icons: {
+      icon: [
+        { url: `/icon/192?v=${v}`, sizes: "192x192", type: "image/png" },
+        { url: `/icon/512?v=${v}`, sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: `/icon/180?v=${v}`, sizes: "180x180", type: "image/png" }],
+    },
   };
+}
+
+/** Decision 51: the browser/status-bar theme is the studio's accent, resolved
+ *  before login like the metadata above. */
+export async function generateViewport(): Promise<Viewport> {
+  const slug = currentSlug();
+  if (!slug) return {};
+  const anon = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } },
+  );
+  const { data } = await anon.rpc("studio_by_slug", { p_slug: slug });
+  const studio = Array.isArray(data) ? data[0] : data;
+  if (!studio) return {};
+  const preset = (studio.theme_preset ?? "warm") as PresetKey;
+  const accent = studio.accent_color ?? neutralAccent(preset);
+  return { themeColor: accentRamp(accent, preset).fill };
 }
 
 export default function MemberLayout({

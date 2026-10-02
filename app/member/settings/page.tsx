@@ -80,6 +80,13 @@ export default async function Settings() {
         </ul>
       </section>
 
+      <section className="mt-8 border-t border-line pt-5">
+        <h2 className="section-label mb-2 text-ink-2">Your app</h2>
+        <Link href="/install" className="m-sub font-medium" style={{ color: "var(--lime-text)" }}>
+          Add {studioName} to your home screen →
+        </Link>
+      </section>
+
       <Link href="/account" className="m-sub mt-8 block text-ink-2 underline">
         Back to your account
       </Link>

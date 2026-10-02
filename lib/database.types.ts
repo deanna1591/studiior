@@ -6297,9 +6297,11 @@ export type Database = {
           currency: string
           custom_domain: string | null
           id: string
+          install_welcome: string | null
           login_image_focus_x: number
           login_image_focus_y: number
           login_image_url: string | null
+          login_tagline: string | null
           logo_url: string | null
           name: string
           slug: string
@@ -6320,9 +6322,11 @@ export type Database = {
           currency: string
           custom_domain?: string | null
           id?: string
+          install_welcome?: string | null
           login_image_focus_x?: number
           login_image_focus_y?: number
           login_image_url?: string | null
+          login_tagline?: string | null
           logo_url?: string | null
           name: string
           slug: string
@@ -6343,9 +6347,11 @@ export type Database = {
           currency?: string
           custom_domain?: string | null
           id?: string
+          install_welcome?: string | null
           login_image_focus_x?: number
           login_image_focus_y?: number
           login_image_url?: string | null
+          login_tagline?: string | null
           logo_url?: string | null
           name?: string
           slug?: string
@@ -8689,9 +8695,11 @@ export type Database = {
           currency: string
           free_first_class_enabled: boolean
           id: string
+          install_welcome: string
           login_image_focus_x: number
           login_image_focus_y: number
           login_image_url: string
+          login_tagline: string
           logo_url: string
           name: string
           slug: string

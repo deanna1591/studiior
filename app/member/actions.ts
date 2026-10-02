@@ -207,6 +207,24 @@ export async function bringGuest(_prev: BookResult, formData: FormData): Promise
 // class free" row buttons still carry the offer while a member is eligible. The
 // old dismissFreeFirst action and its 'free_first_banner' key are gone;
 // member_dismissals stays for future per-member keys.
+
+/**
+ * Decision 51 — dismiss the one-time "Add to your home screen" Home card. A
+ * member_dismissals row (key 'install_card'), durable per member across devices
+ * (the migration-166 pattern, not localStorage); the member self-inserts under
+ * RLS. Idempotent — a second dismiss is a no-op.
+ */
+export async function dismissInstallCard(): Promise<{ ok: boolean }> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false };
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("member_dismissals")
+    .upsert({ member_id: ctx.memberId, key: "install_card" }, { onConflict: "member_id,key" });
+  if (error) return { ok: false };
+  revalidatePath("/");
+  return { ok: true };
+}
 // Decision 35 — member self check-in at the door. The client requests browser
 // geolocation on the button press and sends whatever it gets; the geofence,
 // window and waiver live in self_check_in(). Every refusal is a sentence.

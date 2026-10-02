@@ -4,7 +4,8 @@ import FocalPicker from "@/components/focal-picker";
 import { PHONE_LOGIN } from "@/lib/focal";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { PRESETS, PRESET_KEYS, type PresetKey } from "@/lib/theme";
+import { PRESETS, PRESET_KEYS, accentRamp, themeVars, type PresetKey } from "@/lib/theme";
+import { loginTagline as taglineText, installWelcome as welcomeText } from "@/lib/pwa";
 import { Notice, buttonClass, inputClass } from "@/components/ui";
 import { saveBranding, uploadLogo, uploadLoginImage, saveLoginFocus, type BrandingState } from "./actions";
 import Preview from "./preview";
@@ -14,21 +15,59 @@ function Submit({ label }: { label: string }) {
   return <button className={buttonClass} disabled={pending}>{pending ? "Saving…" : label}</button>;
 }
 
+/** A small sign-in sheet — the studio name over its tagline, on the accent — so
+ *  the tagline is previewed where members actually read it. */
+function LoginSheetPreview({ preset, accent, studioName, logoUrl, tagline }: {
+  preset: PresetKey; accent: string; studioName: string; logoUrl: string | null; tagline: string;
+}) {
+  const vars = themeVars(preset, accent) as React.CSSProperties;
+  const ramp = accentRamp(accent, preset);
+  const [from, to] = [ramp.fill, ramp.fill];
+  return (
+    <div style={vars} className="overflow-hidden rounded-xl border border-line">
+      <div className="flex flex-col items-center px-5 py-6 text-center"
+           style={{ background: `linear-gradient(160deg, ${from}, ${to})` }}>
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white p-2 shadow">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span className="text-[24px] font-semibold leading-none" style={{ color: ramp.text }}>
+              {studioName.slice(0, 1)}
+            </span>
+          )}
+        </span>
+        <p className="mt-3 text-[16px] font-semibold leading-5" style={{ color: ramp.onSolid }}>
+          {studioName}
+        </p>
+        <p className="mt-1 text-[12.5px] leading-4" style={{ color: ramp.onSolid }}>
+          {tagline}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function BrandingForm({
-  preset: initialPreset, accent: initialAccent, logoUrl, loginImageUrl,
+  studioName, preset: initialPreset, accent: initialAccent, logoUrl, loginImageUrl,
   loginFocusX, loginFocusY,
-  contactEmail, contactPhone,
+  contactEmail, contactPhone, loginTagline: initialTagline, installWelcome: initialWelcome,
 }: {
+  studioName: string;
   preset: PresetKey; accent: string | null; logoUrl: string | null;
   loginImageUrl: string | null;
   loginFocusX: number;
   loginFocusY: number;
   contactEmail: string;
   contactPhone: string;
+  loginTagline: string;
+  installWelcome: string;
 }) {
   // Local state so the preview moves as they choose, before anything is saved.
   const [preset, setPreset] = useState<PresetKey>(initialPreset);
   const [accent, setAccent] = useState(initialAccent ?? "#BEF738");
+  const [tagline, setTagline] = useState(initialTagline);
+  const [welcome, setWelcome] = useState(initialWelcome);
 
   const [state, action] = useFormState<BrandingState, FormData>(saveBranding, null);
   const [logoState, logoAction] = useFormState<BrandingState, FormData>(uploadLogo, null);
@@ -87,6 +126,36 @@ export default function BrandingForm({
               not have to pick two, and you cannot pick one that fails.
             </span>
           </label>
+
+          {/* Decision 51: the sign-in sub-line and the Install-page welcome,
+              with a live preview of the login sheet so the tagline is seen in
+              place. Blank = the default sentence (shown as the placeholder). */}
+          <fieldset className="space-y-3 border-t border-line pt-5">
+            <legend className="text-[13px] font-medium leading-[18px] text-ink">
+              Sign-in and install text
+            </legend>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] leading-[18px] text-ink-2">
+                Sign-in tagline
+              </span>
+              <input name="login_tagline" value={tagline} maxLength={140}
+                     onChange={(e) => setTagline(e.target.value)}
+                     className={inputClass} placeholder={taglineText(null)} />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] leading-[18px] text-ink-2">
+                Install welcome
+              </span>
+              <input name="install_welcome" value={welcome} maxLength={160}
+                     onChange={(e) => setWelcome(e.target.value)}
+                     className={inputClass} placeholder={welcomeText(studioName, null)} />
+              <span className="mt-1 block text-[12px] leading-4 text-ink-3">
+                Shown on your Install page, where members add the app to their home screen.
+              </span>
+            </label>
+            <LoginSheetPreview preset={preset} accent={accent} studioName={studioName}
+                               logoUrl={logoUrl} tagline={taglineText(tagline)} />
+          </fieldset>
 
           <fieldset className="space-y-3 border-t border-line pt-5">
             <legend className="sr-only">Contact details</legend>

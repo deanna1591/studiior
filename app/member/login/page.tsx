@@ -6,6 +6,7 @@ import { themeVars, accentRamp, neutralAccent, accentGradient, type PresetKey } 
 import type { Database } from "@/lib/database.types";
 import LoginForm from "./form";
 import { safeNext } from "@/lib/auth-redirect";
+import { loginTagline } from "@/lib/pwa";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +115,7 @@ export default async function MemberLogin({
               fade there costs nothing measurable. */}
           <p className={`m-body mt-2 ${image ? "m-on-photo" : ""}`}
              style={{ color: image ? "rgb(255 255 255 / 0.88)" : ramp.onSolid }}>
-            Book your classes, check in, and see your plan.
+            {loginTagline(studio?.login_tagline)}
           </p>
         </div>
 

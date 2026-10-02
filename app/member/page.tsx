@@ -13,6 +13,7 @@ import WaiverBanner from "@/components/member/waiver-banner";
 import Announcements, { type Announcement } from "@/components/member/announcements";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 import SelfCheckIn from "@/components/member/self-check-in";
+import InstallCard from "@/components/member/install-card";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export default async function MemberHome() {
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
-         { data: waiver }, { data: pendingRows }] =
+         { data: waiver }, { data: pendingRows }, { data: installRow }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -81,6 +82,11 @@ export default async function MemberHome() {
     // confirmation, with the deadline. Presence here IS "pending"; no minimum,
     // count or reason is ever returned.
     supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId }),
+    // Decision 51: has this member dismissed the "add to home screen" card? A
+    // durable member_dismissals row (key install_card). In the same batch, so
+    // Home stays two hops deep.
+    supabase.from("member_dismissals").select("key")
+      .eq("member_id", ctx.memberId).eq("key", "install_card").maybeSingle(),
   ]);
 
   const pendingUntil = new Map<string, string>(
@@ -169,6 +175,9 @@ export default async function MemberHome() {
       {/* Banner announcements sit above everything — the one filled bar on the
           screen (Decision 27 amendment). What's-on posts are at the bottom. */}
       <AnnounceStrip items={banners} />
+      {/* Decision 51: the one-time "add to home screen" card. Hides itself in
+          the installed (standalone) app and once dismissed. */}
+      <InstallCard studioName={studioName} dismissed={!!installRow} />
       {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}
