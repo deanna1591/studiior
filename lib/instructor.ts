@@ -37,6 +37,11 @@ export type InstructorContext = {
   email: string;
   role: string;
   usesPayroll: boolean;
+  /** Decision 54: the studio's week start (0=Sun..6=Sat) so My schedule pages by
+   *  week, and its clock format so the portal formats the few times it builds
+   *  client-side (the Open-classes end time). Both from my_instructor. */
+  week_starts_on: number;
+  time_format: "24h" | "12h";
   /** Unread in-app notifications, for the bell. Resolved once per screen. */
   unread: number;
 };

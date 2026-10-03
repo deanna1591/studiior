@@ -48,9 +48,13 @@ async function run(fd: FormData, dry: boolean): Promise<FillState> {
   if (!from || !to) return { ok: false, message: "Pick a start and an end date." };
   if (to < from) return { ok: false, message: "The end date is before the start date." };
 
+  // Decision 54: the "already confirmed with the instructors" tick (default on),
+  // the same bypass as the Schedule Assign panel.
+  const confirmed = String(fd.get("confirmed") ?? "") === "1";
+
   const supabase = createClient();
   const { data, error } = await supabase.rpc("assign_instructors", {
-    p_studio_id: ctx.studioId, p_from: from, p_to: to, p_dry_run: dry,
+    p_studio_id: ctx.studioId, p_from: from, p_to: to, p_dry_run: dry, p_confirmed: confirmed,
   });
   if (error) return { ok: false, message: say(error.message) };
 

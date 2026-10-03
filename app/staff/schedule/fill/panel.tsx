@@ -47,6 +47,9 @@ export default function FillPanel() {
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const [from, setFrom] = useState(iso(nextMonth));
   const [to, setTo] = useState(iso(monthEnd(nextMonth)));
+  // Decision 54: studios agree the month on paper first, so "already confirmed"
+  // is the default — the bypass tick, exactly as the Schedule Assign panel.
+  const [confirmed, setConfirmed] = useState(true);
 
   // Once applied, the preview is history — what happened is what matters.
   const shown = applied ?? preview;
@@ -90,21 +93,34 @@ export default function FillPanel() {
           <input type="date" name="to" value={to} onChange={(e) => setTo(e.target.value)}
                  className="rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
         </label>
+        <input type="hidden" name="confirmed" value={confirmed ? "1" : "0"} />
         <Btn label="Preview" tone="primary" />
         <span className="text-[12px] leading-4 text-ink-3">Nothing is written yet.</span>
       </form>
 
+      <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-[13px] leading-5 text-ink">
+        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)}
+               className="mt-0.5 shrink-0" />
+        <span>
+          Already confirmed with the instructors — don&apos;t ask them
+          <span className="mt-0.5 block text-[12px] leading-[17px] text-ink-3">
+            Leave ticked if you&apos;ve agreed the month with them already; untick to have
+            each instructor asked to confirm (Decision 38).
+          </span>
+        </span>
+      </label>
+
       {shown && !shown.ok && <Notice kind="error">{shown.message}</Notice>}
 
-      {run && <RunReport run={run} applied={isApplied} from={from} to={to} doApply={doApply} />}
+      {run && <RunReport run={run} applied={isApplied} from={from} to={to} confirmed={confirmed} doApply={doApply} />}
     </section>
   );
 }
 
 function RunReport({
-  run, applied, from, to, doApply,
+  run, applied, from, to, confirmed, doApply,
 }: {
-  run: FillRun; applied: boolean; from: string; to: string;
+  run: FillRun; applied: boolean; from: string; to: string; confirmed: boolean;
   doApply: (fd: FormData) => void;
 }) {
   const assigned = run.detail.filter((d) => d.outcome === "assigned");
@@ -202,6 +218,7 @@ function RunReport({
         <form action={doApply} className="mt-4 flex flex-wrap items-center gap-3">
           <input type="hidden" name="from" value={from} />
           <input type="hidden" name="to" value={to} />
+          <input type="hidden" name="confirmed" value={confirmed ? "1" : "0"} />
           <Btn label={`Assign ${run.assigned} class${run.assigned === 1 ? "" : "es"}`} tone="primary" />
           <span className="max-w-[46ch] text-[12px] leading-[18px] text-ink-3">
             This runs again rather than replaying the preview, so anything that

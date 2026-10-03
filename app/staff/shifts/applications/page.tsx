@@ -94,7 +94,7 @@ export default async function Applications() {
     for (const [k, v] of entries) rankByOcc.set(k, v);
   }
 
-  const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone)}`;
+  const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone, ctx.timeFormat)}`;
 
   return (
     <AppShell {...shell} title="Applications"

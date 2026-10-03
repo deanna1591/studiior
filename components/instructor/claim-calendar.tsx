@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useFormState } from "react-dom";
 import Link from "next/link";
 import { claimClass, type ClaimState } from "@/app/member/instructor/actions";
+import { fmtClock, type TimeFormat } from "@/lib/time";
 
 // The claim screen an instructor lives in — Apple Calendar's shape in the
 // studio's own accent (via lib/theme.ts, so a navy studio gets a navy screen).
@@ -45,11 +46,17 @@ function Mark({ tier, mine, size = 8 }: { tier: string; mine: boolean; size?: nu
 }
 
 export default function ClaimCalendar({
-  months, coreCap, standingCore, standingFlex, terms, currency, today, studioName,
+  months, coreCap, standingCore, standingFlex, terms, currency, today, studioName, timeFormat = "24h",
 }: {
   months: MonthBlock[]; coreCap: number; standingCore: number; standingFlex: number;
-  terms: Terms; currency: string; today: string; studioName: string;
+  terms: Terms; currency: string; today: string; studioName: string; timeFormat?: TimeFormat;
 }) {
+  // c.time is the canonical "HH:MM" (used for endTime arithmetic); format for
+  // display only, honouring the studio's clock (Decision 54 item 7).
+  const disp = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return fmtClock(h * 60 + m, "UTC", timeFormat);
+  };
   const [mi, setMi] = useState(0);
   const block = months[mi];
   const [showAll, setShowAll] = useState(false);
@@ -97,7 +104,7 @@ export default function ClaimCalendar({
   const endTime = (start: string, mins: number) => {
     const [h, m] = start.split(":").map(Number);
     const t = h * 60 + m + mins;
-    return `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+    return disp(`${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
   };
 
   const dayList = shownSelected ? (byDate.get(shownSelected) ?? []) : [];
@@ -192,7 +199,7 @@ export default function ClaimCalendar({
                   <li key={c.id}
                       className="mb-2 flex items-center gap-2.5 rounded-2xl bg-[color:var(--surface)] px-3 py-2.5"
                       style={c.mine ? { boxShadow: "0 0 0 1.5px var(--lime-text), var(--m-shadow-sm, 0 1px 2px rgba(0,0,0,.05))" } : { boxShadow: "0 1px 2px rgba(0,0,0,.05), 0 3px 10px rgba(0,0,0,.05)" }}>
-                    <span className="num w-[46px] shrink-0 text-[13.5px] font-semibold tracking-tight text-ink">{c.time}</span>
+                    <span className="num w-[46px] shrink-0 text-[13.5px] font-semibold tracking-tight text-ink">{disp(c.time)}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 text-[13.5px] font-bold tracking-tight text-ink">
                         <Mark tier={c.tier} mine={c.mine} /> <span className="truncate">{c.class_name}</span>
@@ -229,7 +236,7 @@ export default function ClaimCalendar({
                   {dayRest.map((c) => (
                     <li key={c.id} className="mb-2 flex items-center gap-2.5 rounded-2xl bg-[color:var(--surface)] px-3 py-2.5 opacity-80"
                         style={{ boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
-                      <span className="num w-[46px] shrink-0 text-[13.5px] text-ink-2">{c.time}</span>
+                      <span className="num w-[46px] shrink-0 text-[13.5px] text-ink-2">{disp(c.time)}</span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-ink-2">
                           <Mark tier={c.tier} mine={false} /> <span className="truncate">{c.class_name}</span>
@@ -275,7 +282,7 @@ export default function ClaimCalendar({
       {sheet && (
         <ClaimSheet
           row={sheet.row} over={sheet.over} cap={coreCap} studioName={studioName}
-          whenLabel={`${longDay(sheet.row.date)} · ${sheet.row.time} – ${endTime(sheet.row.time, sheet.row.duration_minutes)}${sheet.row.room ? ` · ${sheet.row.room}` : ""}`}
+          whenLabel={`${longDay(sheet.row.date)} · ${disp(sheet.row.time)} – ${endTime(sheet.row.time, sheet.row.duration_minutes)}${sheet.row.room ? ` · ${sheet.row.room}` : ""}`}
           onClose={() => setSheet(null)}
         />
       )}

@@ -3,6 +3,7 @@ import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import AnnounceStrip from "@/components/member/announce-strip";
 import { AcceptCover } from "./actions-ui";
+import ClassTag from "@/components/instructor/class-tag";
 import { notifLabel, relTime, type NotifItem } from "@/lib/instructor-notify";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ type Klass = {
   local_start: string; local_end: string; room_name: string | null;
   capacity: number; booked_count: number; status: string;
   confirmed: boolean; cover_requested: boolean;
+  tier: string | null; flex: boolean; committed: boolean; flex_deadline_short: string | null;
 };
 
 /**
@@ -84,6 +86,7 @@ export default async function InstructorHome() {
 
   const coverClasses = ((coverNeeded.data as unknown as { classes?: {
     id: string; time: string; date: string; class_name: string; room: string | null; booked: number; capacity: number;
+    tier: string | null; flex_deadline_short: string | null;
   }[] } | null)?.classes) ?? [];
   const notifs = ((notifData.data as { items?: NotifItem[] } | null)?.items ?? []).slice(0, 3);
   const announcements = (anns.data ?? []) as unknown as
@@ -107,7 +110,7 @@ export default async function InstructorHome() {
   const waiting: { key: string; label: string; href: string }[] = [];
   if (unconfirmed > 0)
     waiting.push({ key: "confirm", href: "/instructor/schedule",
-      label: `Confirm ${unconfirmed} ${unconfirmed === 1 ? "class" : "classes"} this fortnight` });
+      label: `Confirm ${unconfirmed} ${unconfirmed === 1 ? "class" : "classes"} coming up` });
   if (roster && rosterLabel)
     waiting.push({ key: "roster", href: "/instructor/month",
       label: `Your ${rosterLabel} roster is ready to confirm` });
@@ -128,7 +131,11 @@ export default async function InstructorHome() {
       {/* NEXT CLASS */}
       {next ? (
         <Link href={`/instructor/roster/${next.occurrence_id}`} className="m-card block px-4 py-4">
-          <p className="m-sub text-ink-3">Next class</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="m-sub text-ink-3">Next class</p>
+            <ClassTag tier={next.tier} flex={next.flex} committed={next.committed}
+                      flexDeadlineShort={next.flex_deadline_short} />
+          </div>
           <p className="mt-1 text-[19px] font-semibold leading-6 text-ink">{next.name}</p>
           <p className="mt-1 text-[14px] leading-5 text-ink-2">
             <span className="num">{nextDay(next.local_date)} · {next.local_start}–{next.local_end}</span>
@@ -142,10 +149,10 @@ export default async function InstructorHome() {
       ) : (
         <div className="m-card px-4 py-4">
           <p className="m-sub text-ink-3">Next class</p>
-          <p className="mt-1 text-[15px] leading-6 text-ink">Nothing in the next fortnight.</p>
-          <Link href="/instructor/schedule"
+          <p className="mt-1 text-[15px] leading-6 text-ink">Nothing coming up this week.</p>
+          <Link href="/instructor/shifts"
                 className="m-sub mt-1 inline-block underline underline-offset-4"
-                style={{ color: "var(--accent-text)" }}>See your whole schedule</Link>
+                style={{ color: "var(--accent-text)" }}>See what&apos;s on</Link>
         </div>
       )}
 
@@ -163,7 +170,10 @@ export default async function InstructorHome() {
                   <div className="flex items-baseline gap-2">
                     <span className="num shrink-0 text-[15px] font-semibold text-ink">{c.time}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] text-ink">{c.class_name}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 truncate text-[14px] text-ink">{c.class_name}</span>
+                        <ClassTag tier={c.tier} flexDeadlineShort={c.flex_deadline_short} />
+                      </span>
                       <span className="m-sub block text-ink-3">
                         {coverWhen(c.date, c.time)}{c.room ? ` · ${c.room}` : ""} · <span className="num">{c.booked}/{c.capacity}</span> booked
                       </span>

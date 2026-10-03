@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { money, type ActivityBlock } from "@/lib/dashboard";
+import { fmtTime, type TimeFormat } from "@/lib/time";
 import { Block, BlockEmpty } from "./block";
 
 /**
@@ -77,12 +78,11 @@ function Line({ i }: { i: Item }) {
 }
 
 export default function ActivityFeed({
-  a, timeZone, error,
-}: { a: ActivityBlock | null; timeZone: string; error?: string | null }) {
+  a, timeZone, timeFormat = "24h", error,
+}: { a: ActivityBlock | null; timeZone: string; timeFormat?: TimeFormat; error?: string | null }) {
   const when = (iso: string) =>
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
-    }).format(new Date(iso));
+    new Intl.DateTimeFormat("en-GB", { timeZone, day: "numeric", month: "short" })
+      .format(new Date(iso)) + " " + fmtTime(iso, timeZone, timeFormat);
 
   return (
     <Block title="Recent activity" error={error}>

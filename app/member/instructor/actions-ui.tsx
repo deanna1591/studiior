@@ -173,7 +173,7 @@ export function ApplyForShift({
   return (
     <form action={action} className="mt-2">
       <input type="hidden" name="occurrence_id" value={occurrenceId} />
-      <CardAction>Commit</CardAction>
+      <CardAction>Take this class</CardAction>
       {state && "error" in state && <Result state={state} />}
     </form>
   );
@@ -201,7 +201,7 @@ export function ClaimClass({ occurrenceId }: { occurrenceId: string }) {
           <div className="mt-2"><CardActionOutline>Ask anyway</CardActionOutline></div>
         </>
       ) : (
-        <CardAction>Claim it</CardAction>
+        <CardAction>Take this class</CardAction>
       )}
       {state && ("error" in state || "ok" in state) && <Result state={state as InstructorState} />}
     </form>

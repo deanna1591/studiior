@@ -24,7 +24,7 @@ import type { InstructorContext } from "@/lib/instructor";
 const TABS: Tab[] = [
   { href: "/instructor", label: "Home", icon: "home" },
   { href: "/instructor/schedule", label: "My schedule", icon: "calendar" },
-  { href: "/instructor/shifts", label: "Claim", icon: "ticket" },
+  { href: "/instructor/shifts", label: "Open classes", icon: "ticket" },
   { href: "/instructor/pay", label: "My pay", icon: "card" },
   { href: "/instructor/me", label: "Me", icon: "user" },
 ];

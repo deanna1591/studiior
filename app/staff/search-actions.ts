@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getStaffAccess, isManagerUp } from "@/lib/auth";
+import { fmtTime } from "@/lib/time";
 import type { SearchItem } from "@/components/dashboard/topbar";
 
 /**
@@ -72,9 +73,8 @@ export async function searchStudio(q: string): Promise<SearchItem[]> {
     out.push({
       label: o.name,
       sub: new Intl.DateTimeFormat("en-GB", {
-        timeZone: ctx.timeZone, weekday: "short", day: "numeric",
-        month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
-      }).format(new Date(o.starts_at)),
+        timeZone: ctx.timeZone, weekday: "short", day: "numeric", month: "short",
+      }).format(new Date(o.starts_at)) + " " + fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat),
       href: `/roster/${o.id}`,
       group: "Class",
     });

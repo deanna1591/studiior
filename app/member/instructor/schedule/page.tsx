@@ -3,8 +3,19 @@ import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { ConfirmWeek, ConfirmSeriesAssignments, ConfirmOrDecline } from "../actions-ui";
 import PayCheckIn from "../pay-checkin";
+import ClassTag from "@/components/instructor/class-tag";
 
 export const dynamic = "force-dynamic";
+
+/** The studio-local week start (per week_starts_on, 0=Sun..6=Sat) of the week
+ *  containing `iso`, as YYYY-MM-DD. Mirrors studio_week_start(). */
+function weekStartOf(iso: string, weekStartsOn: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  const back = (dt.getUTCDay() - weekStartsOn + 7) % 7;
+  dt.setUTCDate(dt.getUTCDate() - back);
+  return dt.toISOString().slice(0, 10);
+}
 
 type Klass = {
   occurrence_id: string; name: string; local_date: string;
@@ -12,7 +23,8 @@ type Klass = {
   capacity: number; booked_count: number; waitlist_count: number;
   status: string; cancellation_reason: string | null; cancellation_cause: string | null;
   flex: boolean; minimum_bookings: number | null; committed: boolean;
-  tier: string | null; confirmed: boolean; cover_requested: boolean;
+  tier: string | null; flex_deadline_short: string | null;
+  confirmed: boolean; cover_requested: boolean;
   checked_in: boolean; checkin_open: boolean;
 };
 
@@ -40,8 +52,10 @@ export default async function MySchedule({
   const { ctx, supabase } = await instructorScreen();
   const today = studioToday(ctx.timezone);
   const offset = Number(searchParams.w) || 0;
-  const from = shiftDate(today, offset * 7);
-  const to = shiftDate(from, 13);
+  // Decision 54: My schedule speaks in WEEKS. The current studio-local week
+  // (per the studio's week_starts_on), and Earlier/Later move one week.
+  const from = shiftDate(weekStartOf(today, ctx.week_starts_on), offset * 7);
+  const to = shiftDate(from, 6);
 
   const [week, pendingData, reqData] = await Promise.all([
     supabase.rpc("instructor_week", {
@@ -103,7 +117,7 @@ export default async function MySchedule({
   const nothing = days.length === 0;
 
   return (
-    <InstructorShell ctx={ctx} title={offset === 0 ? "My schedule" : "Later"}>
+    <InstructorShell ctx={ctx} title="My schedule">
       {week.error && (
         <div className="m-card mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)" }} role="alert">
@@ -162,19 +176,19 @@ export default async function MySchedule({
       {pendingOutside > 0 && (
         <p className="m-sub mb-3 text-ink-3">
           <span className="num">{pendingOutside}</span> more{" "}
-          {pendingOutside === 1 ? "claim is" : "claims are"} waiting on the studio,
-          later than this fortnight.
+          {pendingOutside === 1 ? "class is" : "classes are"} waiting on the studio,
+          later than this week.
         </p>
       )}
 
       {nothing ? (
         <div className="m-card px-4 py-6">
-          <p className="text-[15px] leading-6 text-ink">Nothing on this fortnight.</p>
+          <p className="text-[15px] leading-6 text-ink">Nothing on this week.</p>
           <p className="m-sub mt-1 text-ink-2">{w?.empty_hint}</p>
           <Link href="/instructor/shifts"
                 className="mt-3 inline-block text-[13px] font-medium underline underline-offset-4"
                 style={{ color: "var(--accent-text)" }}>
-            See what is going
+            See what&apos;s on
           </Link>
         </div>
       ) : (
@@ -209,7 +223,7 @@ export default async function MySchedule({
               className="m-sub text-ink-2 underline underline-offset-4">← Earlier</Link>
         {offset !== 0 && (
           <Link href="/instructor/schedule" className="m-sub text-ink-2 underline underline-offset-4">
-            This fortnight
+            This week
           </Link>
         )}
         <Link href={`/instructor/schedule?w=${offset + 1}`}
@@ -243,8 +257,6 @@ function PendingRow({ p }: { p: Pending }) {
 
 function ClassRow({ c }: { c: Klass }) {
   const off = c.status === "cancelled";
-  const waiting = !off && c.flex && !c.committed;
-  const short = waiting ? (c.minimum_bookings ?? 0) - c.booked_count : 0;
 
   return (
     <li className={`m-card px-3 py-2.5 ${off ? "opacity-70" : ""}`}>
@@ -255,8 +267,12 @@ function ClassRow({ c }: { c: Klass }) {
             {c.local_start}
           </span>
           <span className="min-w-0 flex-1">
-            <span className={`block truncate text-[15px] leading-5 text-ink ${off ? "line-through" : ""}`}>
-              {c.name}
+            <span className="flex items-center gap-2">
+              <span className={`min-w-0 truncate text-[15px] leading-5 text-ink ${off ? "line-through" : ""}`}>
+                {c.name}
+              </span>
+              <ClassTag tier={c.tier} flex={c.flex} committed={c.committed}
+                        cancelled={off} flexDeadlineShort={c.flex_deadline_short} />
             </span>
             <span className="m-sub block text-ink-3">
               {c.room_name ?? "No room"} · {c.local_start}–{c.local_end}
@@ -275,14 +291,6 @@ function ClassRow({ c }: { c: Klass }) {
               : c.cancellation_reason || "The studio cancelled it."}
           </p>
         )}
-        {waiting && (
-          <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-            Still waiting on numbers —{" "}
-            {short > 0
-              ? <>needs <span className="num">{short}</span> more to run.</>
-              : <>it has enough and is not confirmed yet.</>}
-          </p>
-        )}
         {c.cover_requested && (
           <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
             You have asked for cover. The studio decides — nothing is released
@@ -295,7 +303,7 @@ function ClassRow({ c }: { c: Klass }) {
       </Link>
       {/* Decision 28: check in for pay. A ran, committed class you have not
           checked into, while the window is open. */}
-      {!off && !waiting && c.committed && !c.checked_in && c.checkin_open && (
+      {!off && c.committed && !c.checked_in && c.checkin_open && (
         <PayCheckIn occurrenceId={c.occurrence_id} />
       )}
       {!off && c.checked_in && (

@@ -7011,6 +7011,7 @@ export type Database = {
       }
       assign_instructors: {
         Args: {
+          p_confirmed?: boolean
           p_dry_run?: boolean
           p_from?: string
           p_studio_id: string
@@ -7533,6 +7534,7 @@ export type Database = {
         Args: { p_format?: string; p_ts: string; p_tz: string }
         Returns: string
       }
+      fmt_clock_s: { Args: { p_studio: string; p_ts: string }; Returns: string }
       force_commit_occurrence: {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
@@ -7726,6 +7728,10 @@ export type Database = {
       }
       instructor_notifications: {
         Args: { p_instructor_id: string; p_limit?: number }
+        Returns: Json
+      }
+      instructor_open_classes: {
+        Args: { p_instructor_id: string }
         Returns: Json
       }
       instructor_pay_summary: {

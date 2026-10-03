@@ -24,6 +24,7 @@ function initialsOf(full: string): string {
     .map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 }
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
+import { fmtTime, fmtClock } from "@/lib/time";
 import { resolveDrag } from "@/lib/drag-safety";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -279,7 +280,7 @@ export default function ScheduleCalendar({
         if (snapped) { start = origStart; end = origEnd; }  // a sub-slot slip: keep the time
         if (timeChanged) {
           const fmtT = (d: Date) =>
-            `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+            fmtClock(d.getHours() * 60 + d.getMinutes(), timeZone, timeFormat);
           const dateLabel = new Intl.DateTimeFormat("en-GB", {
             weekday: "long", day: "numeric", month: "long", timeZone,
           }).format(fromStudioWall(start, timeZone));
@@ -780,9 +781,9 @@ export default function ScheduleCalendar({
             id: selected.id,
             title: selected.title,
             when: new Intl.DateTimeFormat("en-GB", {
-              weekday: "long", day: "numeric", month: "long",
-              hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
-            }).format(new Date(selected.startsAt)),
+              weekday: "long", day: "numeric", month: "long", timeZone,
+            }).format(new Date(selected.startsAt)) + " "
+              + fmtTime(selected.startsAt, timeZone, timeFormat),
             weekday: new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone })
               .format(new Date(selected.startsAt)),
             cancelled: selected.cancelled ?? false,

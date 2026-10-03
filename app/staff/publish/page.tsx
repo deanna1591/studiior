@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
+import { fmtTime } from "@/lib/time";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Notice, SectionLabel } from "@/components/ui";
 import PublishForm from "./publish-form";
@@ -114,10 +115,8 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
   }
 
   const when = (iso: string) =>
-    new Intl.DateTimeFormat("en-GB", {
-      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
-      timeZone: ctx.timeZone,
-    }).format(new Date(iso));
+    new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: ctx.timeZone })
+      .format(new Date(iso)) + " " + fmtTime(iso, ctx.timeZone, ctx.timeFormat);
 
   return (
     <AppShell {...shell} title="Publish">

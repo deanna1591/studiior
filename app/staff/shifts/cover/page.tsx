@@ -88,7 +88,7 @@ export default async function Cover() {
     validMap.set(r.id, valid);
   }));
 
-  const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone)}`;
+  const when = (iso: string) => `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone, ctx.timeFormat)}`;
   const away = (iso: string) => {
     const h = hoursTo(iso);
     return h < 1 ? `${Math.max(0, Math.round(h * 60))} minutes`

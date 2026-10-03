@@ -12,8 +12,8 @@ type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ out
  * there and the written iPhone steps carry it. "Open the app" is always useful:
  * after installing, someone may still be looking at this page in a browser.
  */
-export default function InstallActions({ appUrl, accentOnSolid, accentFill }: {
-  appUrl: string; accentOnSolid: string; accentFill: string;
+export default function InstallActions({ appUrl, accentOnSolid, accentFill, android = true }: {
+  appUrl: string; accentOnSolid: string; accentFill: string; android?: boolean;
 }) {
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
   const [done, setDone] = useState(false);
@@ -38,7 +38,7 @@ export default function InstallActions({ appUrl, accentOnSolid, accentFill }: {
 
   return (
     <div className="mt-5 flex flex-col gap-2.5">
-      {deferred && !done && (
+      {android && deferred && !done && (
         <button onClick={install}
                 className="m-action flex w-full items-center justify-center rounded-xl text-[16px] font-semibold"
                 style={{ background: accentFill, color: accentOnSolid }}>

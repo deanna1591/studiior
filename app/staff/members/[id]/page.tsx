@@ -269,7 +269,7 @@ export default async function MemberDetail({
               <Empty>Nothing recorded yet. Their first visit will start this off.</Empty>
             ) : (
               <>
-                <TimelineList events={journey.slice(0, JOURNEY_SHOWN)} timeZone={ctx.timeZone} />
+                <TimelineList events={journey.slice(0, JOURNEY_SHOWN)} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
                 {journey.length > JOURNEY_SHOWN && (
                   <p className="mt-3 text-[12px] leading-4 text-ink-3">
                     <span className="num">{journey.length - JOURNEY_SHOWN}</span> earlier
@@ -460,9 +460,8 @@ export default async function MemberDetail({
         }) => ({
           id: r.id, kind: r.kind, occurred_at: r.occurred_at,
           occurredLabel: new Intl.DateTimeFormat("en-GB", {
-            day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-            timeZone: ctx.timeZone,
-          }).format(new Date(r.occurred_at)),
+            day: "numeric", month: "short", timeZone: ctx.timeZone,
+          }).format(new Date(r.occurred_at)) + " " + fmtTime(r.occurred_at, ctx.timeZone, ctx.timeFormat),
           className: r.class_occurrences?.name ?? null,
           status: r.status,
           voided_reason: r.voided_reason,

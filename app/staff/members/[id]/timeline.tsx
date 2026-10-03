@@ -1,5 +1,5 @@
 import { formatMoney } from "@/lib/plans";
-import { dayMonthParts, fmtTime } from "@/lib/time";
+import { dayMonthParts, fmtTime, type TimeFormat } from "@/lib/time";
 
 type Ev = {
   id: string;
@@ -29,7 +29,7 @@ const DOT: Record<string, string> = {
   membership_changed: "var(--lime-text)",
 };
 
-export function TimelineList({ events, timeZone }: { events: Ev[]; timeZone: string }) {
+export function TimelineList({ events, timeZone, timeFormat = "24h" }: { events: Ev[]; timeZone: string; timeFormat?: TimeFormat }) {
   const groups: { label: string; items: Ev[] }[] = [];
   for (const e of events) {
     const label = new Intl.DateTimeFormat("en-GB", {
@@ -66,7 +66,7 @@ export function TimelineList({ events, timeZone }: { events: Ev[]; timeZone: str
                       {e.title}
                       {e.type === "attended" && (
                         <span className="ml-1.5 num text-[11px] text-ink-3">
-                          {fmtTime(e.occurred_at, timeZone)}
+                          {fmtTime(e.occurred_at, timeZone, timeFormat)}
                         </span>
                       )}
                     </span>

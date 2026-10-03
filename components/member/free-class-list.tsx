@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { fmtTime, zonedDateKey } from "@/lib/time";
 import type { BookResult } from "@/app/member/actions";
@@ -110,10 +111,16 @@ export default function FreeClassList({
             const isBooked = booked === c.occurrence_id;
             const muted = !c.free_bookable;
             return (
+              // The whole row opens the class page (same detail as a regular
+              // booking row); the inline Book-free button sits above the overlay
+              // link and books directly. A form/button cannot nest in an anchor,
+              // so the link is an absolute overlay.
               <li key={c.occurrence_id}
-                  className="flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3"
+                  className="relative flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3"
                   style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06), 0 6px 20px rgb(26 21 18 / 0.05)",
                            opacity: muted && !isBooked ? 0.72 : 1 }}>
+                <Link href={`/class/${c.occurrence_id}`} className="absolute inset-0 rounded-2xl"
+                      aria-label={`Open ${c.name}`} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="num text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</span>
@@ -130,15 +137,15 @@ export default function FreeClassList({
                   </div>
                 </div>
                 {isBooked ? (
-                  <span className="shrink-0 text-[12.5px] font-medium text-ink-2">Waiting for confirmation</span>
+                  <span className="relative z-10 shrink-0 text-[12.5px] font-medium text-ink-2">Waiting for confirmation</span>
                 ) : c.free_bookable ? (
                   <button onClick={() => book(c.occurrence_id)} disabled={pending}
-                          className="m-press shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold disabled:opacity-60"
+                          className="m-press relative z-10 shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold disabled:opacity-60"
                           style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
                     {pending ? "…" : "Book free"}
                   </button>
                 ) : (
-                  <span className="shrink-0 text-[12px] text-ink-3">Full for free classes</span>
+                  <span className="relative z-10 shrink-0 text-[12px] text-ink-3">Full for free classes</span>
                 )}
               </li>
             );

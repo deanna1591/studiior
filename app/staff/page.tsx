@@ -209,7 +209,7 @@ export default async function Dashboard({
           {/* 4.8 and 4.9 */}
           <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
             <HealthWidget h={data.health} error={data.healthError} />
-            <ActivityFeed a={data.activity} timeZone={ctx.timeZone} error={data.activityError} />
+            <ActivityFeed a={data.activity} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} error={data.activityError} />
           </div>
 
           {/* 4.11 and 4.10 */}

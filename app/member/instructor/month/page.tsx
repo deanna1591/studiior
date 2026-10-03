@@ -2,6 +2,7 @@ import Link from "next/link";
 import { instructorScreen, studioToday } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { ConfirmMonth, AskForCover } from "../actions-ui";
+import ClassTag from "@/components/instructor/class-tag";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ type Klass = {
   local_start: string; local_end: string; room_name: string | null;
   capacity: number; booked_count: number; status: string;
   cover_status: string | null; added_after_roster: boolean;
+  tier: string | null; flex_deadline_short: string | null;
 };
 type Roster = {
   month: string; label: string; state: "draft" | "empty" | "unconfirmed" | "confirmed";
@@ -108,7 +110,10 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
                           {c.local_start}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[15px] leading-5 text-ink">{c.name}</span>
+                          <span className="flex items-center gap-2">
+                            <span className="min-w-0 truncate text-[15px] leading-5 text-ink">{c.name}</span>
+                            <ClassTag tier={c.tier} flexDeadlineShort={c.flex_deadline_short} />
+                          </span>
                           <span className="m-sub block text-ink-3">
                             {c.room_name ?? "No room"} · {c.local_start}–{c.local_end}
                             {c.added_after_roster && " · added since your roster"}

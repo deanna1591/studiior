@@ -72,7 +72,7 @@ export default async function Shifts() {
   }));
 
   const when = (iso: string) =>
-    `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone)}`;
+    `${fmtDayLong(iso, ctx.timeZone)}, ${fmtTime(iso, ctx.timeZone, ctx.timeFormat)}`;
 
   return (
     <AppShell {...shell} title="Open shifts">

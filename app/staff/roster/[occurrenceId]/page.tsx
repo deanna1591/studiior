@@ -128,7 +128,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
       {/* The facts of the class, as a line of text rather than a row of stat
           cards. Four numbers do not need four boxes. */}
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
-        {day} at <span className="num text-ink">{fmtTime(occ.starts_at, ctx.timeZone)}</span>
+        {day} at <span className="num text-ink">{fmtTime(occ.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
         {" · "}{occ.instructors?.display_name ?? "No instructor"}
         {occ.rooms?.name ? ` · ${occ.rooms.name}` : ""}
         {" · "}

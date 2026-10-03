@@ -2,6 +2,7 @@ import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { AskForCover, CheckIn } from "../../actions-ui";
+import ClassTag from "@/components/instructor/class-tag";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ type Member = {
 type Roster = {
   occurrence_id: string; name: string; local_time: string; local_date: string;
   capacity: number; booked: number; status: string;
+  tier: string | null; flex_deadline_short: string | null;
   members: Member[]; can_check_in: boolean; withheld: string;
 };
 
@@ -59,10 +61,13 @@ export default async function RosterPage({ params }: { params: { id: string } })
 
   return (
     <InstructorShell ctx={ctx} title={r.name}>
-      <p className="m-sub -mt-3 mb-4 text-ink-2">
-        {day} at <span className="num">{r.local_time}</span> ·{" "}
-        <span className="num">{r.booked}</span>/<span className="num">{r.capacity}</span> booked
-      </p>
+      <div className="-mt-3 mb-4 flex items-center gap-2">
+        <p className="m-sub text-ink-2">
+          {day} at <span className="num">{r.local_time}</span> ·{" "}
+          <span className="num">{r.booked}</span>/<span className="num">{r.capacity}</span> booked
+        </p>
+        <ClassTag tier={r.tier} flexDeadlineShort={r.flex_deadline_short} />
+      </div>
 
       {r.members.length === 0 ? (
         <div className="m-card px-4 py-6">
