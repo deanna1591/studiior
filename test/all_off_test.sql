@@ -292,4 +292,10 @@ update studio_settings set auto_assign_open_classes = false where studio_id = :'
 select expect_true('time_format defaults to 24h (the clock is unchanged)',
   (select time_format = '24h' from studio_settings where studio_id = :'S'));
 
+-- Decision 46: "no availability means not available" defaults OFF, so an
+-- instructor with nothing on file is still available and the engine assigns as
+-- before (instructor_available_at_run's step 3 is unchanged when the switch is off).
+select expect_true('assign_requires_availability defaults false (availability reads unchanged)',
+  (select assign_requires_availability = false from studio_settings where studio_id = :'S'));
+
 do $$ begin raise notice 'all_off_test: all assertions passed'; end $$;

@@ -40,7 +40,7 @@ export default async function Availability({ params }: { params: { id: string } 
   }
 
   const [{ data: week }, { data: commitment }, { data: load },
-         { data: types }, { data: quals }] = await Promise.all([
+         { data: types }, { data: quals }, { data: scfg }] = await Promise.all([
     supabase.rpc("instructor_availability_week", { p_instructor_id: i.id }),
     supabase.from("instructor_commitments")
       .select("id, starts_on, ends_on, min_per_week, target_per_week, shift_preference")
@@ -50,7 +50,10 @@ export default async function Availability({ params }: { params: { id: string } 
       .eq("status", "active").order("name"),
     supabase.from("instructor_class_types").select("class_type_id")
       .eq("instructor_id", i.id),
+    supabase.from("studio_settings").select("assign_requires_availability")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
+  const requireEndDate = scfg?.assign_requires_availability ?? false;
 
   const w = (week ?? {}) as {
     days?: Day[]; effective_from?: string | null; effective_to?: string | null;
@@ -81,6 +84,7 @@ export default async function Availability({ params }: { params: { id: string } 
             effectiveFrom={w.effective_from ?? null}
             effectiveTo={w.effective_to ?? null}
             canEdit={manager || isThem}
+            requireEndDate={requireEndDate}
           />
         </section>
 

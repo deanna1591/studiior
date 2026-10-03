@@ -901,6 +901,28 @@ export async function saveAutoAssign(_prev: PlainState, fd: FormData): Promise<P
   };
 }
 
+// Decision 46 — "no stated availability means not available", a per-tenant
+// switch, off by default. When on, the automatic assigners never place an
+// instructor who has not told the studio when they can teach.
+export async function saveRequireAvailability(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("assign_requires_availability") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ assign_requires_availability: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. An instructor is only assigned inside their stated availability; standing patterns now need an end date."
+      : "Off. An instructor with no availability on file can be assigned anywhere.",
+  };
+}
+
 export async function saveHideUnstaffed(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

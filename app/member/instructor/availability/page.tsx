@@ -30,15 +30,24 @@ export default async function AvailabilityPage({
   nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
   const period = searchParams.p ?? nextMonth.toISOString().slice(0, 10);
 
-  const { data } = await supabase.rpc("availability_submission_week", {
-    p_instructor_id: ctx.instructor_id, p_period_start: period,
-  });
+  const [{ data }, { data: pub }] = await Promise.all([
+    supabase.rpc("availability_submission_week", {
+      p_instructor_id: ctx.instructor_id, p_period_start: period,
+    }),
+    // Decision 46: a published month is locked to the instructor. A
+    // schedule_publications row exists only when publication is on AND the month
+    // was published — the same source submit_availability's PT409 uses, and
+    // readable by staff (which an instructor is).
+    supabase.from("schedule_publications").select("id")
+      .eq("studio_id", ctx.studio_id).eq("month", period).maybeSingle(),
+  ]);
   const sub = data as unknown as {
     status: string; note: string | null; period_start: string; days: Day[];
   } | null;
 
   const status = sub?.status ?? "none";
-  const locked = status === "approved";
+  const publishedLock = !!pub;
+  const locked = status === "approved" || publishedLock;
   const label = new Intl.DateTimeFormat("en-GB", {
     month: "long", year: "numeric", timeZone: "UTC",
   }).format(new Date(`${period}T12:00:00Z`));
@@ -70,7 +79,12 @@ export default async function AvailabilityPage({
         locked={locked}
       />
 
-      {locked && (
+      {publishedLock ? (
+        <p className="m-sub mt-5 text-ink-3">
+          This month&rsquo;s schedule is already published — ask the studio if
+          something has changed. Your booking and class emails are unaffected.
+        </p>
+      ) : locked && (
         <p className="m-sub mt-5 text-ink-3">
           This month is approved and the studio is scheduling around it. To
           change it, ask them to reopen the month.

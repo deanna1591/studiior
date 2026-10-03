@@ -53,6 +53,8 @@ export default function BlockPanel({
   // and the dropdown read the SAME row. Until it lands, fall back to the click
   // snapshot so nothing is blank.
   const [live, setLive] = useState<CurrentStaffing | null>(null);
+  // Decision 46: under the switch, a not-available entry reads "(not available)".
+  const [requiresAvail, setRequiresAvail] = useState(false);
   const eff = {
     instructorId: live ? live.instructorId : facts.instructorId,
     instructorName: live ? live.instructorName : facts.instructorName,
@@ -83,7 +85,7 @@ export default function BlockPanel({
     assignCandidates(facts.id).then((r) => {
       if (!alive) return;
       if ("error" in r) setLoadError(r.error);
-      else { setCandidates(r.candidates); setLive(r.current); }
+      else { setCandidates(r.candidates); setLive(r.current); setRequiresAvail(r.requiresAvailability); }
     });
     return () => { alive = false; };
   }, [facts.id, canManage]);
@@ -115,7 +117,9 @@ export default function BlockPanel({
   const label = (c: AssignCandidate) => {
     const bits: string[] = [];
     if (!c.qualified) bits.push("not down to teach this");
-    if (!c.free) bits.push("outside the hours they gave us");
+    // Under Decision 46's switch, "not available" is a real state (no hours on
+    // file is unavailable); otherwise it is the softer "outside the hours".
+    if (!c.free) bits.push(requiresAvail ? "not available" : "outside the hours they gave us");
     return bits.length ? ` — ${bits.join(", ")}` : "";
   };
 

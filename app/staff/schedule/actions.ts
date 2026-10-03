@@ -31,19 +31,23 @@ export type CurrentStaffing = {
  */
 export async function assignCandidates(
   occurrenceId: string,
-): Promise<{ candidates: AssignCandidate[]; pendingApplications: number; current: CurrentStaffing } | { error: string }> {
+): Promise<{ candidates: AssignCandidate[]; pendingApplications: number; current: CurrentStaffing; requiresAvailability: boolean } | { error: string }> {
   const ctx = await getStaffContext();
   if (!ctx) return { error: "You are not signed in." };
 
   const supabase = createClient();
-  const [{ data: occ }, { count }] = await Promise.all([
+  const [{ data: occ }, { count }, { data: scfg }] = await Promise.all([
     supabase.from("class_occurrences")
       .select("id, class_type_id, starts_at, ends_at, status, instructor_id, staffing, booked_count, capacity, waitlist_count")
       .eq("id", occurrenceId).maybeSingle(),
     supabase.from("shift_applications")
       .select("id", { count: "exact", head: true })
       .eq("occurrence_id", occurrenceId).eq("status", "pending"),
+    // Decision 46: label a not-available entry "(not available)" under the switch.
+    supabase.from("studio_settings").select("assign_requires_availability")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
+  const requiresAvailability = scfg?.assign_requires_availability ?? false;
   if (!occ) return { error: "That class no longer exists." };
   // Resolve the current instructor's name from the same read, so the header can
   // name whoever is on it without trusting the (possibly stale) click snapshot.
@@ -64,10 +68,10 @@ export async function assignCandidates(
   // A still-scheduled class has candidates — to fill it when unstaffed, or to
   // swap the instructor when it is assigned. A cancelled class has none.
   if (occ.status !== "scheduled") {
-    return { candidates: [], pendingApplications: count ?? 0, current };
+    return { candidates: [], pendingApplications: count ?? 0, current, requiresAvailability };
   }
   const candidates = await computeAssignCandidates(supabase, occ, ctx.timeZone);
-  return { candidates, pendingApplications: count ?? 0, current };
+  return { candidates, pendingApplications: count ?? 0, current, requiresAvailability };
 }
 
 export type BlockedBy = {

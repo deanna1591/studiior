@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, inputClass } from "@/components/ui";
 import { saveAvailability, type AvailState } from "./actions";
@@ -26,14 +26,25 @@ const INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
  * make a half-applied week reachable, and a half-applied week quietly changes
  * who the scheduler says can teach.
  */
+/** Last day of next month, YYYY-MM-DD — the one-tap end date under Decision 46. */
+function lastDayNextMonth(): string {
+  const n = new Date();
+  const d = new Date(n.getFullYear(), n.getMonth() + 2, 0);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 export default function WeekEditor({
-  instructorId, initial, effectiveFrom, effectiveTo, canEdit, submission,
+  instructorId, initial, effectiveFrom, effectiveTo, canEdit, requireEndDate = false, submission,
 }: {
   instructorId: string;
   initial: Day[];
   effectiveFrom: string | null;
   effectiveTo: string | null;
   canEdit: boolean;
+  /** Decision 46: under the switch a standing pattern must carry an end date. */
+  requireEndDate?: boolean;
   /**
    * Present when this is a MONTH being submitted for approval rather than the
    * studio's standing pattern. Same grid, same copy-to-days, different verb and
@@ -46,6 +57,8 @@ export default function WeekEditor({
     Array.from({ length: 7 }, (_, d) => initial.find((x) => x.day === d) ?? { day: d, ranges: [] }));
   const [copyFrom, setCopyFrom] = useState<number | null>(null);
   const [copyTo, setCopyTo] = useState<number[]>([]);
+  const [endDate, setEndDate] = useState(effectiveTo ?? "");
+  const formRef = useRef<HTMLFormElement>(null);
   const [patternState, patternAction] = useFormState<AvailState, FormData>(saveAvailability, null);
   const [subState, subAction] = useFormState<MyState, FormData>(submitAvailability, null);
   const state: AvailState | MyState = submission ? subState : patternState;
@@ -63,8 +76,10 @@ export default function WeekEditor({
     setCopyTo([]);
   };
 
+  const hasRows = initial.length > 0;
+
   return (
-    <form action={action}>
+    <form action={action} ref={formRef}>
       <input type="hidden" name="instructor_id" value={instructorId} />
       <input type="hidden" name="days" value={JSON.stringify(days)} />
       {submission && <input type="hidden" name="period_start" value={submission.periodStart} />}
@@ -196,6 +211,20 @@ export default function WeekEditor({
           </button>
         </div>
       )}
+      {canEdit && !submission && requireEndDate && !effectiveTo && hasRows && (
+        <div className="mt-5 rounded-lg border-l-[3px] border-amber-deep bg-amber-tint px-3 py-2.5">
+          <p className="text-[13px] leading-[19px] text-ink">
+            This pattern has no end date, so it counts as available every week
+            {effectiveFrom ? ` from ${effectiveFrom}` : ""}. The studio now checks
+            availability month by month — give it an end date.
+          </p>
+          <button type="button"
+            onClick={() => { setEndDate(lastDayNextMonth()); requestAnimationFrame(() => formRef.current?.requestSubmit()); }}
+            className="mt-2 rounded-lg border border-line-2 bg-surface px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-paper">
+            End it on {lastDayNextMonth()}
+          </button>
+        </div>
+      )}
       {canEdit && !submission && (
         <div className="mt-5 flex flex-wrap items-end gap-4 border-t border-line pt-4">
           <label className="text-[13px] leading-[20px] text-ink-2">
@@ -204,8 +233,10 @@ export default function WeekEditor({
                    className={inputClass} />
           </label>
           <label className="text-[13px] leading-[20px] text-ink-2">
-            <span className="mb-1 block">until</span>
-            <input type="date" name="effective_to" defaultValue={effectiveTo ?? ""}
+            <span className="mb-1 block">until{requireEndDate && <span className="text-coral"> *</span>}</span>
+            <input type="date" name="effective_to" value={endDate}
+                   onChange={(e) => setEndDate(e.target.value)}
+                   required={requireEndDate}
                    className={inputClass} />
           </label>
           <Save />
@@ -220,11 +251,9 @@ export default function WeekEditor({
       )}
       {canEdit && !submission && (
         <p className="mt-2 text-[12px] leading-[18px] text-ink-3">
-          Left blank, this pattern is open-ended. It deliberately does not follow
-          the commitment below: these dates decide who the scheduler may offer a
-          class to, and an agreement reaching its end date must not quietly take
-          somebody off the roster. Availability never unassigns anyone from a
-          class they have already been given.
+          {requireEndDate
+            ? "This studio checks availability month by month, so a standing pattern needs an end date. These dates decide who the scheduler may offer a class to; availability never unassigns anyone from a class they have already been given."
+            : "Left blank, this pattern is open-ended. It deliberately does not follow the commitment below: these dates decide who the scheduler may offer a class to, and an agreement reaching its end date must not quietly take somebody off the roster. Availability never unassigns anyone from a class they have already been given."}
         </p>
       )}
     </form>

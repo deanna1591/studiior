@@ -6065,6 +6065,7 @@ export type Database = {
       studio_settings: {
         Row: {
           adjacency_minutes: number
+          assign_requires_availability: boolean
           assignment_confirmations: boolean
           auto_assign_open_classes: boolean
           availability_due_day: number
@@ -6164,6 +6165,7 @@ export type Database = {
         }
         Insert: {
           adjacency_minutes?: number
+          assign_requires_availability?: boolean
           assignment_confirmations?: boolean
           auto_assign_open_classes?: boolean
           availability_due_day?: number
@@ -6263,6 +6265,7 @@ export type Database = {
         }
         Update: {
           adjacency_minutes?: number
+          assign_requires_availability?: boolean
           assignment_confirmations?: boolean
           auto_assign_open_classes?: boolean
           availability_due_day?: number
@@ -7644,6 +7647,22 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_txt: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
       }
       extend_membership: {
         Args: {

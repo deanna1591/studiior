@@ -27,14 +27,23 @@ export default async function EditInstructor({ params }: { params: { id: string 
 
   // The Pay section only exists for a studio that runs payroll (Decision 22) —
   // a studio paying in its own books sees nothing of it.
-  const [{ data: usesPayroll }, { data: versions }, { count: activeCount }] = await Promise.all([
+  const [{ data: usesPayroll }, { data: versions }, { count: activeCount }, { data: cycle }] = await Promise.all([
     supabase.rpc("studio_uses_payroll", { p_studio_id: ctx.studioId }),
     supabase.from("instructor_rate_versions")
       .select("effective_from, base_rate_cents, per_head_rate_cents, per_head_threshold, full_house_bonus_cents, private_rate_cents, duo_rate_cents, trio_rate_cents, pay_tier")
       .eq("instructor_id", params.id).order("effective_from", { ascending: false }),
     supabase.from("instructors").select("id", { count: "exact", head: true })
       .eq("studio_id", ctx.studioId).eq("status", "active"),
+    // Decision 46: the collected month's availability state for this instructor.
+    supabase.rpc("availability_cycle", { p_studio_id: ctx.studioId }),
   ]);
+  const cStatus = (((cycle as { instructors?: { instructor_id: string; status: string }[] } | null)?.instructors) ?? [])
+    .find((r) => r.instructor_id === params.id)?.status;
+  const availabilityLine =
+    cStatus === "submitted" ? "Availability for next month: submitted · waiting for you"
+    : cStatus === "approved" ? "Availability for next month: approved"
+    : cStatus === "changes_requested" ? "Availability for next month: sent back"
+    : "Availability for next month: nothing yet";
   const payrollOn = usesPayroll === true;
   const history = (versions ?? []) as RateVersion[];
   const today = new Date().toISOString().slice(0, 10);
@@ -46,7 +55,11 @@ export default async function EditInstructor({ params }: { params: { id: string 
 
   return (
     <AppShell {...shell} title={i.display_name} actions={<><NavLink href={`/instructors/${i.id}/availability`}>Availability &amp; commitment</NavLink>{" "}<NavLink href="/instructors">Back to instructors</NavLink></>}>
-      <p className="mb-5 text-[13px] leading-[20px] text-ink-2">{i.status}</p>
+      <p className="mb-1 text-[13px] leading-[20px] text-ink-2">{i.status}</p>
+      <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
+        {availabilityLine}{" "}
+        <NavLink href="/availability">Review</NavLink>
+      </p>
       <InstructorForm mode="edit" draft={{
         id: i.id, display_name: i.display_name, bio: i.bio, avatar_url: i.avatar_url,
         color: i.color, certifications: certs, status: i.status, hasLogin: i.staff_id != null }} />
