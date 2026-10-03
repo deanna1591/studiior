@@ -7431,6 +7431,18 @@ export type Database = {
         Returns: Json
       }
       dashboard_pct_floor: { Args: never; Returns: number }
+      dashboard_recent_bookings: {
+        Args: { p_limit?: number; p_studio_id: string }
+        Returns: {
+          class_name: string
+          detail: string
+          happened_at: string
+          kind: string
+          member_name: string
+          starts_at: string
+          when_label: string
+        }[]
+      }
       dashboard_revenue: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
@@ -9016,6 +9028,19 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      tier_suggestions: {
+        Args: { p_studio_id: string }
+        Returns: {
+          avg_booked: number
+          below_or_met: number
+          class_name: string
+          considered: number
+          current_tier: string
+          sentence: string
+          series_id: string
+          suggested_tier: string
+        }[]
+      }
       timetable_horizon: { Args: { p_studio_id: string }; Returns: Json }
       unconfirmed_summary: {
         Args: {

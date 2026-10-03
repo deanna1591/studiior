@@ -5,6 +5,7 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
 import { SetupRow, ArchivedSection } from "@/components/setup-list";
 import { TierMark, tierOf, tierWords, tierPhrase } from "@/components/tier-mark";
+import type { TierSuggestion } from "@/lib/dashboard";
 import { parseRrule, describeRule } from "@/lib/rrule";
 import { studioToday } from "@/lib/tz";
 import ViewTabs from "./tabs";
@@ -36,7 +37,7 @@ export default async function SeriesList({
     : searchParams.view === "list" ? "list"
     : cookies().get("series_view")?.value === "grid" ? "grid" : "list";
 
-  const [{ data: series }, { data: settings }, { data: classTypes }, { data: roomRows }, { data: instrRows }] = await Promise.all([
+  const [{ data: series }, { data: settings }, { data: classTypes }, { data: roomRows }, { data: instrRows }, { data: suggestRows }] = await Promise.all([
     supabase.from("class_series")
       .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, flex, minimum_bookings, free_first_allowed, class_types(name, color), rooms(name)")
       .order("status").order("time_of_day"),
@@ -46,6 +47,9 @@ export default async function SeriesList({
     supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
     supabase.from("rooms").select("id, name").eq("status", "active").order("name"),
     supabase.from("instructors").select("id, display_name").eq("status", "active").order("display_name"),
+    // Decision 56 — the same tier suggestions the dashboard shows, as a strip
+    // at the top of the list a studio actually changes a tier from.
+    supabase.rpc("tier_suggestions", { p_studio_id: ctx.studioId }),
   ]);
 
   const today = studioToday(ctx.timeZone);
@@ -56,6 +60,26 @@ export default async function SeriesList({
   const showTier = (settings?.guarantees_enabled ?? false) || (settings?.flex_enabled ?? false);
   const flexMin = settings?.flex_min_bookings ?? 1;
   const coreMin = settings?.core_min_bookings ?? 1;
+
+  // Decision 56 — the tier suggestions as a strip at the top. Hidden when none;
+  // the whole page is manager-up already, so no extra gate.
+  const suggestions = (suggestRows ?? []) as TierSuggestion[];
+  const suggestStrip = suggestions.length > 0 ? (
+    <div className="mb-5 rounded border border-line bg-surface px-3.5 py-3">
+      <h2 className="section-label mb-2 text-ink-2">Suggestions</h2>
+      <ul className="space-y-1.5">
+        {suggestions.map((s) => (
+          <li key={s.series_id} className="flex items-baseline gap-3 text-[13px] leading-[19px] text-ink">
+            <span className="min-w-0 flex-1">{s.sentence}</span>
+            <Link href={`/series/${s.series_id}`}
+                  className="shrink-0 text-[12px] leading-4 text-lime-text underline underline-offset-4 hover:text-lime-text2">
+              Open class
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : null;
 
   // The FILTER — tier (resolved the same way as the marks, so it can never
   // disagree with the ● / ○ beside a name) and class type, combinable. In the
@@ -188,6 +212,7 @@ export default async function SeriesList({
           <Link href="/schedule" className="text-lime-text underline underline-offset-4">schedule</Link>{" "}
           answers that, with instructors and bookings on it.
         </p>
+        {suggestStrip}
         {filters}
         <SeriesGrid
           series={forGrid}
@@ -229,6 +254,7 @@ export default async function SeriesList({
         topped up every night, so a member can always book a month ahead. One-off classes are added
         from the schedule instead.
       </p>
+      {suggestStrip}
       {summary}
       {filters}
 

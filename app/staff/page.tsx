@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { todaysBrief } from "@/lib/brief";
-import { dashboardData, narrativeFor, revenueWindow, studioToday } from "@/lib/dashboard";
+import { dashboardData, narrativeFor, recentBookings, revenueWindow, studioToday } from "@/lib/dashboard";
 import { searchStudio } from "@/app/staff/search-actions";
 import MorningBrief from "@/components/morning-brief";
 import InsightsPanel from "@/components/dashboard/insights-panel";
@@ -12,6 +12,8 @@ import RevenueWidget from "@/components/dashboard/revenue-widget";
 import Heatmap from "@/components/dashboard/heatmap";
 import HealthWidget from "@/components/dashboard/health-widget";
 import ActivityFeed from "@/components/dashboard/activity-feed";
+import RecentBookings from "@/components/dashboard/recent-bookings";
+import TierSuggestions from "@/components/dashboard/tier-suggestions";
 import Tasks from "@/components/dashboard/tasks";
 import MonthSnapshot from "@/components/dashboard/month-snapshot";
 import { Block, BlockEmpty } from "@/components/dashboard/block";
@@ -52,12 +54,16 @@ export default async function Dashboard({
   const { ctx, supabase, shell } = screen;
 
   const manager = isManagerUp(ctx.role);
+  // Bookings are desk work (Decision 56): the Recent bookings block is desk-up,
+  // so front desk sees it too, through its own fetch (it does not load the full
+  // manager dashboard). An instructor sees neither.
+  const deskUp = manager || ctx.role === "front_desk";
   const today = studioToday(ctx.timeZone);
   const days = revenueWindow(searchParams.rev);
 
   // Two hops for the whole screen. staffScreen() is the first; everything
   // below is one batch that waits on nothing else in it.
-  const [brief, data, todays] = await Promise.all([
+  const [brief, data, todays, settings, deskRecent] = await Promise.all([
     manager ? todaysBrief(supabase, ctx.studioId, ctx.timeZone) : Promise.resolve(null),
     manager
       ? dashboardData(supabase, ctx.studioId, ctx.timeZone, {
@@ -77,7 +83,19 @@ export default async function Dashboard({
       .gte("starts_at", dayStart(new Date(), ctx.timeZone).toISOString())
       .lt("starts_at", addDays(dayStart(new Date(), ctx.timeZone), 1).toISOString())
       .order("starts_at"),
+    // Whether the studio uses tiers at all — the suggestions block is hidden
+    // entirely when neither guarantees nor flex is on (Decision 56).
+    manager
+      ? supabase.from("studio_settings")
+          .select("guarantees_enabled, flex_enabled")
+          .eq("studio_id", ctx.studioId).maybeSingle()
+      : Promise.resolve(null),
+    // Front desk's own booking feed (the manager path gets it inside `data`).
+    !manager && deskUp ? recentBookings(supabase, ctx.studioId) : Promise.resolve(null),
   ]);
+
+  const showTierBlock = manager
+    && ((settings?.data?.guarantees_enabled ?? false) || (settings?.data?.flex_enabled ?? false));
 
   const dayLabel = relativeDayName(`${today}T12:00:00Z`, ctx.timeZone)
     ?? fmtDayLong(`${today}T12:00:00Z`, ctx.timeZone);
@@ -212,6 +230,13 @@ export default async function Dashboard({
             <ActivityFeed a={data.activity} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} error={data.activityError} />
           </div>
 
+          {/* Decision 56 — the bookings beside the activity feed, and the tier
+              suggestions below them (shown only where the studio uses tiers). */}
+          <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <RecentBookings rows={data.recent} error={data.recentError} />
+            {showTierBlock && <TierSuggestions rows={data.tiers} error={data.tiersError} />}
+          </div>
+
           {/* 4.11 and 4.10 */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Tasks t={data.tasks} error={data.tasksError} />
@@ -233,6 +258,14 @@ export default async function Dashboard({
                 <ScheduleRow key={o.id} o={o} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} now={Date.now()} />
               ))}
             </Rows>
+          )}
+
+          {/* Decision 56 — the booking feed is desk work, so front desk sees
+              it. Instructors (not desk-up) get nothing here. */}
+          {deskUp && deskRecent && (
+            <div className="mt-6">
+              <RecentBookings rows={deskRecent.rows} error={deskRecent.error} />
+            </div>
           )}
         </section>
       )}

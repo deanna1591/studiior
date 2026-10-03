@@ -123,7 +123,7 @@ export async function dashboardData(
 
   const [
     kpis, revenue, heatmap, health, activity, tasks, month, absent,
-    nRevenue, nAttendance, nLead, challengeKpi, guestKpi,
+    nRevenue, nAttendance, nLead, challengeKpi, guestKpi, recent, tiers,
   ] = await Promise.all([
     supabase.rpc("dashboard_kpis", { p_studio_id: studioId }),
     supabase.rpc("dashboard_revenue", { p_studio_id: studioId, p_from: from, p_to: today }),
@@ -142,6 +142,10 @@ export async function dashboardData(
     // Decision 26. Null (and so appended to nothing) unless the studio runs guest
     // passes and has had at least one guest.
     supabase.rpc("dashboard_guest_kpi", { p_studio_id: studioId }),
+    // Decision 56. The newest bookings/cancellations (30, sliced to 10 on the
+    // client) and the tier suggestions — zero rows when neither tier is on.
+    supabase.rpc("dashboard_recent_bookings", { p_studio_id: studioId, p_limit: 30 }),
+    supabase.rpc("tier_suggestions", { p_studio_id: studioId }),
   ]);
 
   // A FAILED QUERY MUST NOT LOOK LIKE AN EMPTY STUDIO. schedule_range() raised
@@ -182,8 +186,57 @@ export async function dashboardData(
       attendance: nAttendance.data as Narrative | null,
       lead: nLead.data as Narrative | null,
     },
+    recent: (recent.data ?? []) as RecentBookingItem[],
+    recentError: err(recent),
+    tiers: (tiers.data ?? []) as TierSuggestion[],
+    tiersError: err(tiers),
   };
 }
+
+/**
+ * Decision 56. The booking feed for front desk, who do not load the full
+ * manager dashboard but may read bookings (the RPC is desk-up). Same shape as
+ * the manager path's `recent`, fetched on its own.
+ */
+export async function recentBookings(
+  supabase: SupabaseClient<Database>,
+  studioId: string,
+) {
+  const r = await supabase.rpc("dashboard_recent_bookings", { p_studio_id: studioId, p_limit: 30 });
+  return { rows: (r.data ?? []) as RecentBookingItem[], error: r.error?.message ?? null };
+}
+
+/**
+ * Decision 56. The newest bookings and cancellations across the studio — the
+ * member app's activity, at the desk. No amounts (bookings are not money). The
+ * when_label is built in SQL through fmt_clock, so it already honours the
+ * studio's 12h/24h setting and this side never formats a time.
+ */
+export type RecentBookingItem = {
+  kind: "booked" | "booked_free" | "cancelled" | "cancelled_late" | "class_cancelled";
+  member_name: string | null;
+  class_name: string;
+  starts_at: string;
+  when_label: string;
+  happened_at: string;
+  detail: string | null;
+};
+
+/**
+ * Decision 56. Decision 22's core minimum read backwards — a suggestion the
+ * owner acts on by opening the series, never applied automatically. Computed
+ * on read; nothing is stored.
+ */
+export type TierSuggestion = {
+  series_id: string;
+  class_name: string;
+  current_tier: string;
+  suggested_tier: string;
+  considered: number;
+  below_or_met: number;
+  avg_booked: number;
+  sentence: string;
+};
 
 export type RevenueBlock = {
   from: string; to: string; days: number; currency: string;
