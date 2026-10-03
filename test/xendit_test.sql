@@ -4,7 +4,7 @@
 -- UUID space e40d, checked free (119 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
--- surface is EXACTLY twelve, naming xendit_webhook; begin_purchase snapshots the
+-- surface is EXACTLY thirteen, still naming xendit_webhook; begin_purchase snapshots the
 -- amount from the plan and refuses a recurring plan / a non-member; a callback
 -- with a WRONG token raises PT401 and stores NO event; a SUCCEEDED callback
 -- activates the plan (credits + expiry, exactly as a manual payment) and writes
@@ -91,12 +91,12 @@ select expect_num('member cannot read the provider secrets', current_setting('t.
 select expect_num('owner reads its own provider row', current_setting('t.owner_reads')::bigint, 1);
 
 -- =============================================================================
--- 2. Anon surface is EXACTLY twelve, and xendit_webhook is one of them.
+-- 2. Anon surface is EXACTLY thirteen, and xendit_webhook is one of them.
 -- =============================================================================
-select expect_num('anon surface is exactly twelve',
+select expect_num('anon surface is exactly thirteen',
   (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%'), 12);
+      and p.proname not like 'expect\_%'), 13);
 select expect_true('xendit_webhook is anon-executable',
   has_function_privilege('anon', 'xendit_webhook(jsonb, text)'::regprocedure, 'execute'));
 

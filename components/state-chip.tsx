@@ -21,6 +21,12 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   refunded: { label: "Refunded" },
   unpaid: { label: "Unpaid" },
   frozen: { label: "Paused" },
+  // campaign status (Decision 50)
+  draft: { label: "Draft" },
+  scheduled: { label: "Scheduled", warn: true },
+  sending: { label: "Sending", warn: true },
+  sent: { label: "Sent" },
+  cancelled: { label: "Cancelled" },
 };
 
 export function StateChip({ state }: { state: string }) {

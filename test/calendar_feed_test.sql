@@ -277,10 +277,10 @@ select expect_true('...with the occurrence as a VEVENT UID',
 -- =============================================================================
 -- The expect_% helpers this suite defines are PUBLIC-executable by Postgres
 -- default; they are excluded, as public_schedule_test does.
-select expect_num('exactly twelve real functions are executable by anon',
+select expect_num('exactly thirteen real functions are executable by anon',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%' and p.proname not in ('login','ve_count','seq_of'))::bigint, 12);
+      and p.proname not like 'expect\_%' and p.proname not in ('login','ve_count','seq_of'))::bigint, 13);
 select expect_true('calendar_feed is one of them',
   has_function_privilege('anon', 'calendar_feed(text)'::regprocedure, 'execute'));
 -- Decision 40: xendit_webhook is the twelfth anon surface.

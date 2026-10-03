@@ -688,6 +688,120 @@ export type Database = {
           },
         ]
       }
+      campaign_recipients: {
+        Row: {
+          campaign_id: string
+          member_id: string
+          notification_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          member_id: string
+          notification_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          member_id?: string
+          notification_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          audience: Json
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          recipient_count: number
+          scheduled_for: string | null
+          sent_at: string | null
+          status: string
+          studio_id: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: Json
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          recipient_count?: number
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string
+          studio_id: string
+          subject?: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: Json
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          recipient_count?: number
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string
+          studio_id?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_participants: {
         Row: {
           audience: Database["public"]["Enums"]["challenge_audience"]
@@ -3669,6 +3783,8 @@ export type Database = {
           last_visit_at: string | null
           lifetime_visits: number
           marketing_opt_in: boolean
+          marketing_token: string
+          marketing_unsubscribed_at: string | null
           phone: string | null
           preferred_name: string | null
           source: string | null
@@ -3700,6 +3816,8 @@ export type Database = {
           last_visit_at?: string | null
           lifetime_visits?: number
           marketing_opt_in?: boolean
+          marketing_token?: string
+          marketing_unsubscribed_at?: string | null
           phone?: string | null
           preferred_name?: string | null
           source?: string | null
@@ -3731,6 +3849,8 @@ export type Database = {
           last_visit_at?: string | null
           lifetime_visits?: number
           marketing_opt_in?: boolean
+          marketing_token?: string
+          marketing_unsubscribed_at?: string | null
           phone?: string | null
           preferred_name?: string | null
           source?: string | null
@@ -7126,6 +7246,16 @@ export type Database = {
         Args: { p_kind: string; p_studio_id: string }
         Returns: Json
       }
+      campaign_audience: {
+        Args: { p_filter: Json; p_studio_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          member_id: string
+        }[]
+      }
+      campaign_status: { Args: { p_campaign_id: string }; Returns: Json }
       cancel_booking: {
         Args: { p_booking_id: string }
         Returns: Database["public"]["CompositeTypes"]["cancel_result"]
@@ -7136,6 +7266,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_campaign: { Args: { p_campaign_id: string }; Returns: Json }
       cancel_occurrence: {
         Args: {
           p_cause?: Database["public"]["Enums"]["cancellation_cause"]
@@ -7513,22 +7644,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_txt: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
       }
       extend_membership: {
         Args: {
@@ -8044,6 +8159,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      member_portal_url: {
+        Args: { p_path: string; p_studio_id: string }
+        Returns: string
+      }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
       member_waiver_current: {
         Args: { p_member_id: string; p_studio_id: string }
@@ -8122,6 +8241,10 @@ export type Database = {
       }
       normalize_email_key: { Args: { p_email: string }; Returns: string }
       notification_api_key: { Args: never; Returns: string }
+      notification_envelope_domain: {
+        Args: { p_template: string }
+        Returns: string
+      }
       notification_ics: { Args: { p_notification_id: string }; Returns: string }
       notification_setting: { Args: { p_key: string }; Returns: string }
       notification_wanted: {
@@ -8614,6 +8737,11 @@ export type Database = {
         }
         Returns: Json
       }
+      send_campaign: {
+        Args: { p_campaign_id: string; p_when?: string }
+        Returns: Json
+      }
+      send_campaign_test: { Args: { p_campaign_id: string }; Returns: Json }
       send_due_notifications: { Args: never; Returns: Json }
       send_message: {
         Args: { p_message_id: string }
@@ -8641,6 +8769,7 @@ export type Database = {
       }
       send_via_resend: {
         Args: {
+          p_from_domain?: string
           p_from_name: string
           p_html: string
           p_ics?: string
@@ -9052,6 +9181,13 @@ export type Database = {
       }
       unfreeze_membership: { Args: { p_membership_id: string }; Returns: Json }
       unpublish_announcement: { Args: { p_id: string }; Returns: Json }
+      unsubscribe_marketing: {
+        Args: { p_token: string }
+        Returns: {
+          already: boolean
+          studio_name: string
+        }[]
+      }
       update_announcement: {
         Args: {
           p_audience: string
