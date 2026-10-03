@@ -10,6 +10,8 @@ import { MessageLink } from "@/components/message-link";
 import InviteToApp from "@/components/invite-to-app";
 import { formatMoney } from "@/lib/plans";
 import { dayMonthParts, fmtTime } from "@/lib/time";
+import { studioToday } from "@/lib/dashboard";
+import MembershipActions from "./membership-actions-panel";
 import { TimelineList } from "./timeline";
 import NotesPanel from "./records/notes";
 import GoalsPanel from "./records/goals";
@@ -63,7 +65,7 @@ export default async function MemberDetail({
     { data: docs }, { data: standing }, { data: infractions },
   ] = await Promise.all([
     supabase.from("memberships")
-      .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, membership_plans(name, type)")
+      .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, freeze_end, membership_plans(name, type)")
       .eq("member_id", params.id).order("starts_on", { ascending: false }),
     supabase.from("credit_ledger")
       .select("id, delta, reason, balance_after, created_at")
@@ -381,6 +383,20 @@ export default async function MemberDetail({
                   </div>
                 )}
               </div>
+            )}
+            {/* Decision 49: the five membership actions, manager-up. Front desk
+                sees the membership but no controls (the RPCs refuse them anyway).
+                Past memberships stay read-only. */}
+            {manager && live && (
+              <MembershipActions
+                membershipId={live.id}
+                frozen={live.status === "frozen"}
+                frozenUntil={live.freeze_end}
+                priceCents={live.price_cents}
+                currency={live.currency}
+                expiresOn={live.expires_on}
+                today={studioToday(ctx.timeZone)}
+              />
             )}
             {past.length > 0 && (
               <p className="mt-2 text-[11px] leading-4 text-ink-3">

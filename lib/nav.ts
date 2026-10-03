@@ -122,6 +122,8 @@ export function railGroups(
       items: manager
         ? [
             { href: "/plans", label: "Plans" },
+            // Decision 49. Every plan purchase, with the membership actions.
+            { href: "/sales", label: "Sales" },
             // §9 challenges — shown once the studio turns the switch on in
             // Settings or already has one (Decisions 24/25: no trace otherwise).
             ...(hasChallenges ? [{ href: "/challenges", label: "Challenges" }] : []),

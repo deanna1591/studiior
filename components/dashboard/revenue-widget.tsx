@@ -102,6 +102,14 @@ export default function RevenueWidget({
             <span className="num">{r.counts.memberships_sold}</span> memberships sold
             in the same period.
           </p>
+
+          {/* Decision 49: the purchases behind the figure, one row each. */}
+          <Link
+            href="/sales?month=this"
+            className="mt-2 inline-block text-[12px] font-medium leading-4 text-lime-text underline underline-offset-4 hover:text-lime-text2"
+          >
+            See every purchase &rarr;
+          </Link>
         </>
       )}
     </Block>

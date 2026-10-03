@@ -43,9 +43,16 @@ export default async function RevenuePage({
       {...shell}
       title="Revenue"
       actions={
-        <Link href="/" className="text-[13px] text-ink-3 underline underline-offset-4 hover:text-ink">
-          Back to the dashboard
-        </Link>
+        <>
+          {/* Decision 49: revenue is the shape of the money; Sales is every
+              purchase behind it, with the membership actions. */}
+          <Link href="/sales" className="text-[13px] leading-[18px] text-lime-text underline underline-offset-4 hover:text-lime-text2">
+            See every purchase →
+          </Link>
+          <Link href="/" className="text-[13px] text-ink-3 underline underline-offset-4 hover:text-ink">
+            Back to the dashboard
+          </Link>
+        </>
       }
     >
       <RevenueWidget

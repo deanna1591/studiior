@@ -7465,6 +7465,14 @@ export type Database = {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
       }
+      end_membership: {
+        Args: {
+          p_keep_credits?: boolean
+          p_membership_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       end_series: {
         Args: { p_confirm?: boolean; p_ends_on?: string; p_series_id: string }
         Returns: Json
@@ -7492,6 +7500,30 @@ export type Database = {
       evaluate_commitment: { Args: { p_occurrence_id: string }; Returns: Json }
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
+        Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_txt: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      extend_membership: {
+        Args: {
+          p_membership_id: string
+          p_new_expires_on: string
+          p_reason: string
+        }
         Returns: Json
       }
       extend_trial: {
@@ -7576,6 +7608,10 @@ export type Database = {
         }[]
       }
       free_first_report: { Args: { p_studio_id: string }; Returns: Json }
+      freeze_membership: {
+        Args: { p_membership_id: string; p_until: string }
+        Returns: Json
+      }
       generate_all_occurrences: { Args: never; Returns: Json }
       generate_all_occurrences_for: {
         Args: { p_studio_id: string }
@@ -7846,6 +7882,14 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: number
       }
+      mark_membership_paid: {
+        Args: {
+          p_amount_cents: number
+          p_membership_id: string
+          p_method?: string
+        }
+        Returns: Json
+      }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
@@ -7962,6 +8006,30 @@ export type Database = {
         Returns: {
           occurrence_id: string
           pending_until: string
+        }[]
+      }
+      member_plan_overview: {
+        Args: { p_studio_id: string }
+        Returns: {
+          credits_remaining: number
+          current_plan_name: string
+          email: string
+          expires_on: string
+          first_name: string
+          had_free_class: boolean
+          has_ever_paid: boolean
+          health_band: string
+          health_reason: string
+          id: string
+          last_name: string
+          last_visit_at: string
+          lifetime_visits: number
+          membership_id: string
+          membership_status: string
+          plan_state: string
+          plan_type: string
+          status: string
+          user_id: string
         }[]
       }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
@@ -8383,6 +8451,15 @@ export type Database = {
       }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
+      refund_membership: {
+        Args: {
+          p_amount_cents?: number
+          p_end?: boolean
+          p_membership_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       release_provisional_seats_run: {
         Args: { p_occurrence_id: string }
         Returns: number
@@ -8451,6 +8528,40 @@ export type Database = {
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
       run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
+      sales_history: {
+        Args: {
+          p_from: string
+          p_plan_id?: string
+          p_status?: string
+          p_studio_id: string
+          p_to: string
+        }
+        Returns: {
+          amount_cents: number
+          bought_on: string
+          currency: string
+          expires_on: string
+          member_id: string
+          member_name: string
+          membership_id: string
+          payment_source: string
+          plan_id: string
+          plan_name: string
+          plan_type: string
+          sale_status: string
+          starts_on: string
+        }[]
+      }
+      sales_totals: {
+        Args: {
+          p_from: string
+          p_plan_id?: string
+          p_status?: string
+          p_studio_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       say_count: { Args: { n: number }; Returns: string }
       schedule_range: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
@@ -8914,6 +9025,7 @@ export type Database = {
         }
         Returns: Json
       }
+      unfreeze_membership: { Args: { p_membership_id: string }; Returns: Json }
       unpublish_announcement: { Args: { p_id: string }; Returns: Json }
       update_announcement: {
         Args: {
