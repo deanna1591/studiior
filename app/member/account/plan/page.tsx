@@ -82,7 +82,10 @@ export default async function Plan() {
         <section className="m-card p-4">
           <h2 className="m-head text-[24px] leading-8 text-ink">{live.membership_plans?.name}</h2>
           <p className="m-sub mt-1 text-ink-2">
-            <span className="num">{formatMoney(live.price_cents, live.currency)}</span>
+            {/* Decision 61: a complimentary membership shows no price. */}
+            {live.complimentary
+              ? <>Complimentary</>
+              : <span className="num">{formatMoney(live.price_cents, live.currency)}</span>}
             {live.status !== "active" && <> · {live.status.replace("_", " ")}</>}
           </p>
 

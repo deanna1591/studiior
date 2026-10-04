@@ -12,6 +12,8 @@ import { formatMoney } from "@/lib/plans";
 import { dayMonthParts, fmtTime } from "@/lib/time";
 import { studioToday } from "@/lib/dashboard";
 import MembershipActions from "./membership-actions-panel";
+import GrantComplimentary from "./grant-complimentary";
+import { StateChip } from "@/components/state-chip";
 import { TimelineList } from "./timeline";
 import NotesPanel from "./records/notes";
 import GoalsPanel from "./records/goals";
@@ -65,7 +67,7 @@ export default async function MemberDetail({
     { data: docs }, { data: standing }, { data: infractions },
   ] = await Promise.all([
     supabase.from("memberships")
-      .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, freeze_end, membership_plans(name, type)")
+      .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, freeze_end, complimentary, membership_plans(name, type)")
       .eq("member_id", params.id).order("starts_on", { ascending: false }),
     supabase.from("credit_ledger")
       .select("id, delta, reason, balance_after, created_at")
@@ -136,6 +138,12 @@ export default async function MemberDetail({
     ? (await supabase.storage.from("member-avatars")
         .createSignedUrl(m.avatar_url, 300)).data?.signedUrl ?? null
     : null;
+
+  // Decision 61: active plans a manager can grant complimentary (incl. staff-only).
+  const { data: grantablePlans } = manager
+    ? await supabase.from("membership_plans").select("id, name, type")
+        .eq("studio_id", ctx.studioId).eq("status", "active").order("name")
+    : { data: [] as { id: string; name: string; type: string }[] };
 
   const live = (memberships ?? []).find(
     (x) => !["cancelled", "expired"].includes(x.status));
@@ -347,13 +355,19 @@ export default async function MemberDetail({
               </Empty>
             ) : (
               <div className="rounded-xl px-3 py-2.5" style={{ background: "var(--paper)" }}>
-                <div className="text-[14px] leading-5 text-ink">{live.membership_plans?.name}</div>
+                <div className="flex items-center gap-2 text-[14px] leading-5 text-ink">
+                  {live.membership_plans?.name}
+                  {live.complimentary && <StateChip state="complimentary" />}
+                </div>
                 <div className="mt-0.5 text-[12px] leading-4 text-ink-3">
-                  <span className="num">{formatMoney(live.price_cents, live.currency)}</span>
+                  {/* Decision 61: a complimentary membership has no price. */}
+                  {live.complimentary
+                    ? <>Complimentary</>
+                    : <span className="num">{formatMoney(live.price_cents, live.currency)}</span>}
                   {" · "}{live.status.replace("_", " ")}
                   {live.renews_on && <> · renews {d(live.renews_on)}</>}
-                  {live.expires_on && <> · expires {d(live.expires_on)}</>}
-                  {!live.auto_renew && <> · will not renew</>}
+                  {live.expires_on && <> · {live.complimentary ? "until" : "expires"} {d(live.expires_on)}</>}
+                  {!live.auto_renew && !live.complimentary && <> · will not renew</>}
                 </div>
                 <div className="mt-2 text-[13px] leading-[18px] text-ink">
                   {live.membership_plans?.type === "recurring" && live.credits_remaining === null
@@ -396,7 +410,13 @@ export default async function MemberDetail({
                 currency={live.currency}
                 expiresOn={live.expires_on}
                 today={studioToday(ctx.timeZone)}
+                complimentary={!!live.complimentary}
               />
+            )}
+            {/* Decision 61: grant a free, ongoing membership. Manager-up; works
+                whether or not they already have a (different) plan. */}
+            {manager && (
+              <GrantComplimentary memberId={params.id} plans={grantablePlans ?? []} />
             )}
             {past.length > 0 && (
               <p className="mt-2 text-[11px] leading-4 text-ink-3">

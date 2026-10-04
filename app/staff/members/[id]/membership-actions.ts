@@ -33,6 +33,25 @@ function result(
   return { ok: true, sentence: r.sentence ?? "Done." };
 }
 
+// Decision 61: grant a complimentary (free, ongoing) membership. The RPC
+// returns {message} rather than {sentence}, so it maps its own result.
+export async function grantComplimentary(
+  memberId: string, planId: string, endsOn: string | null, reason: string,
+): Promise<MembershipActionResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("grant_complimentary_membership", {
+    p_member_id: memberId,
+    p_plan_id: planId,
+    p_ends_on: endsOn || undefined,
+    p_reason: reason.trim(),
+  });
+  if (error) return { error: error.message };
+  const r = data as { message?: string } | null;
+  if (!r?.message) return { error: "That could not be done." };
+  revalidate();
+  return { ok: true, sentence: r.message };
+}
+
 export async function endMembership(
   id: string, keepCredits: boolean, reason: string,
 ): Promise<MembershipActionResult> {

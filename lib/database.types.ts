@@ -4100,6 +4100,8 @@ export type Database = {
           cancel_at: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
+          complimentary: boolean
+          complimentary_reason: string | null
           created_at: string
           credits_remaining: number | null
           credits_reset_at: string | null
@@ -4128,6 +4130,8 @@ export type Database = {
           cancel_at?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
+          complimentary?: boolean
+          complimentary_reason?: string | null
           created_at?: string
           credits_remaining?: number | null
           credits_reset_at?: string | null
@@ -4156,6 +4160,8 @@ export type Database = {
           cancel_at?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
+          complimentary?: boolean
+          complimentary_reason?: string | null
           created_at?: string
           credits_remaining?: number | null
           credits_reset_at?: string | null
@@ -7659,6 +7665,22 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { code: string; label: string; sql: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       extend_membership: {
         Args: {
           p_membership_id: string
@@ -7765,6 +7787,15 @@ export type Database = {
       }
       generate_occurrences: {
         Args: { p_from?: string; p_horizon_days?: number; p_series_id: string }
+        Returns: Json
+      }
+      grant_complimentary_membership: {
+        Args: {
+          p_ends_on?: string
+          p_member_id: string
+          p_plan_id: string
+          p_reason?: string
+        }
         Returns: Json
       }
       guarantee_report: {
@@ -8164,6 +8195,7 @@ export type Database = {
       member_plan_overview: {
         Args: { p_studio_id: string }
         Returns: {
+          complimentary: boolean
           credits_remaining: number
           current_plan_name: string
           email: string

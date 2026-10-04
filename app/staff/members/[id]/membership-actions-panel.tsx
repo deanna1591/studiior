@@ -38,6 +38,7 @@ function fmtDate(value: string | null | undefined): string | null {
 
 export default function MembershipActions({
   membershipId, frozen, frozenUntil, priceCents, currency, expiresOn, today, compact,
+  complimentary = false,
 }: {
   membershipId: string;
   frozen: boolean;
@@ -47,6 +48,7 @@ export default function MembershipActions({
   expiresOn?: string | null;
   today: string;
   compact?: boolean;
+  complimentary?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<Key | null>(null);
@@ -107,8 +109,10 @@ export default function MembershipActions({
         <TB k="end">End</TB>
         {frozen ? <TB k="unfreeze">Unfreeze</TB> : <TB k="freeze">Freeze</TB>}
         <TB k="extend">Extend</TB>
-        <TB k="paid">Mark paid</TB>
-        <TB k="refund">Record refund</TB>
+        {/* Decision 61: a complimentary membership is not a sale — nothing to
+            pay or refund. */}
+        {!complimentary && <TB k="paid">Mark paid</TB>}
+        {!complimentary && <TB k="refund">Record refund</TB>}
       </div>
 
       {open === "end" && (

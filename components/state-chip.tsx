@@ -10,6 +10,8 @@
  * per Decision 49's own instruction.
  */
 const CHIP: Record<string, { label: string; warn?: boolean }> = {
+  // Decision 61: a granted free membership — not a sale.
+  complimentary: { label: "Complimentary" },
   // plan_state (member_plan_overview)
   on_plan: { label: "On a plan" },
   expiring: { label: "Expiring", warn: true },

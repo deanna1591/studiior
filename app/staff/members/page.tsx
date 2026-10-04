@@ -47,7 +47,7 @@ type Row = {
   health_band: string; health_reason: string; user_id: string | null;
   current_plan_name: string | null; plan_type: string | null;
   expires_on: string | null; credits_remaining: number | null;
-  plan_state: string;
+  plan_state: string; complimentary: boolean;
 };
 
 export default async function Members({
@@ -92,6 +92,8 @@ export default async function Members({
 
   // The plan filter is an AND on top of the health filter.
   if (planSpec) shown = shown.filter((m) => planSpec.match(m.plan_state));
+  // Decision 61: "Complimentary" is a flag, not a plan_state.
+  else if (planFilter === "complimentary") shown = shown.filter((m) => m.complimentary);
 
   const count = (bands: Band[]) =>
     all.filter((m) => bands.includes(bandOf(m.health_band))).length;
@@ -186,6 +188,15 @@ export default async function Members({
                 </Pill>
               );
             })}
+            {(() => {
+              const n = all.filter((m) => m.complimentary).length;
+              return (
+                <Pill href={href({ plan: "complimentary" })} active={planFilter === "complimentary"}>
+                  Complimentary
+                  {n > 0 && <span className="num ml-1.5 opacity-60">{n}</span>}
+                </Pill>
+              );
+            })()}
           </PillRow>
         </div>
       }
@@ -309,6 +320,7 @@ function PlanLine({ m, timeZone }: { m: Row; timeZone: string }) {
     <>
       <span className="text-ink-2">{m.current_plan_name ?? "—"}</span>
       {detail.map((d, i) => <span key={i}>· {d}</span>)}
+      {m.complimentary && <StateChip state="complimentary" />}
       {(ps === "expiring" || ps === "expired") && <StateChip state={ps} />}
     </>
   );
