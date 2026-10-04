@@ -71,6 +71,7 @@ insert into membership_plans (id, studio_id, name, type, price_cents, currency, 
   ('c061c061-0000-0000-0000-000000000102',:A,'10-Class Pack','class_pack',550000,'CZK',null,null,10,180,'public','active'),
   ('c061c061-0000-0000-0000-000000000103',:A,'Old Pack','class_pack',500000,'CZK',null,null,5,90,'public','archived'),
   ('c061c061-0000-0000-0000-000000000104',:A,'8 a Month','recurring',400000,'CZK','month',8,null,null,'public','active'),
+  ('c061c061-0000-0000-0000-000000000105',:A,'Comp Nobody','recurring',0,'CZK','month',null,null,null,'staff_only','active'),
   ('c061c061-0000-0000-0000-000000000201',:B,'B Plan','class_pack',300000,'CZK',null,null,5,90,'public','active');
 
 -- Members on A, plus one on B.
@@ -206,6 +207,30 @@ select expect_true('member_plan_overview: comp member on_plan + complimentary',
 select expect_true('member_plan_overview: a non-comp member is complimentary=false',
   exists(select 1 from member_plan_overview(:A) o
           where o.id='c061c061-0000-0000-0000-00000000a006' and not o.complimentary));
+
+-- =============================================================================
+-- 4b. A member can READ their own comp plan, even when it is staff-only
+--     (Decision 61 follow-up / migration 225). The app shows the plan name.
+-- =============================================================================
+reset role;
+insert into auth.users (id) values ('c061c061-0000-0000-0000-0000000000c5');
+insert into profiles (id, email) values ('c061c061-0000-0000-0000-0000000000c5','c061-login@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, waiver_signed_at) values
+  ('c061c061-0000-0000-0000-00000000a008',:A,'c061c061-0000-0000-0000-0000000000c5','Lena','Login','c061-login@example.com','active',now());
+-- Owner grants the staff-only unlimited comp to the logged-in member.
+set role authenticated;
+select set_config('request.jwt.claim.sub','c061c061-0000-0000-0000-0000000000a1',false);
+select grant_complimentary_membership('c061c061-0000-0000-0000-00000000a008','c061c061-0000-0000-0000-000000000101', null, 'owner');
+reset role;
+-- As that MEMBER, the staff-only plan they are on is readable (name + type).
+set role authenticated;
+select set_config('request.jwt.claim.sub','c061c061-0000-0000-0000-0000000000c5',false);
+select expect_true('a member can read the name/type of their own staff-only comp plan',
+  exists(select 1 from membership_plans where id='c061c061-0000-0000-0000-000000000101'
+         and name='Complimentary — Team' and type='recurring'));
+select expect_num('...and still cannot read a staff-only plan they are NOT on',
+  (select count(*) from membership_plans where id='c061c061-0000-0000-0000-000000000105'), 0);
+reset role;
 
 -- =============================================================================
 -- 5. The sweep rolls a comp recurring, never past_due
