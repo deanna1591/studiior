@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { currentSlug } from "@/lib/tenant";
+import { safeNext } from "@/lib/auth-redirect";
 import type { Database } from "@/lib/database.types";
 import SignupForm from "./form";
 import FinishForm from "./finish";
@@ -69,9 +70,16 @@ export default async function Signup({
         </p>
       )}
       <SignupForm next={searchParams.next} />
-      <a href="/login" className="m-body mt-6 inline-block text-lime-text underline underline-offset-4">
-        Already have an account? Sign in
-      </a>
+      {(() => {
+        // Decision 57: carry ?next to the sign-in link too (buyer bounce-back).
+        const next = safeNext(searchParams.next);
+        const nextQ = next !== "/" ? `?next=${encodeURIComponent(next)}` : "";
+        return (
+          <a href={`/login${nextQ}`} className="m-body mt-6 inline-block text-lime-text underline underline-offset-4">
+            Already have an account? Sign in
+          </a>
+        );
+      })()}
     </main>
   );
 }

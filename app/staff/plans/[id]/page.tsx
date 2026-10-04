@@ -5,6 +5,9 @@ import { AppShell, Denied, NavLink, Notice } from "@/components/ui";
 import { formatMoney, type PlanType } from "@/lib/plans";
 import PlanForm, { type PlanDraft } from "../plan-form";
 import PlanLifecycle from "./lifecycle";
+import WebsiteLink from "./website-link";
+import { memberOrigin } from "@/lib/tenant";
+import { buyUrl } from "@/lib/member-urls";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +35,7 @@ export default async function EditPlan({
     .maybeSingle();
   if (!plan) notFound();
 
-  const [{ data: classTypes }, { count: liveCount }, { data: settings }, { data: seats }, { data: usesSeatCaps }] =
+  const [{ data: classTypes }, { count: liveCount }, { data: settings }, { data: seats }, { data: usesSeatCaps }, { data: studioRow }] =
     await Promise.all([
       supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
       supabase
@@ -50,6 +53,8 @@ export default async function EditPlan({
       supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
       // 142: whether seat caps are on at all is one predicate.
       supabase.rpc("studio_uses_seat_caps", { p_studio_id: ctx.studioId }),
+      // Decision 57: the studio slug, to build the member-host website buy link.
+      supabase.from("studios").select("slug").eq("id", ctx.studioId).maybeSingle(),
     ]);
 
   const active = liveCount ?? 0;
@@ -97,6 +102,16 @@ export default async function EditPlan({
           : " · on sale"}
       </p>
       {searchParams.saved && <Notice kind="ok">Saved.</Notice>}
+      {/* Decision 57: the website buy link. One-time plans get the link + Copy;
+          a recurring plan points at Part B; an archived plan gets no link. */}
+      {plan.status !== "archived" && (plan.type === "class_pack" || plan.type === "drop_in") && studioRow?.slug && (
+        <WebsiteLink url={buyUrl(memberOrigin(studioRow.slug), plan.id)} />
+      )}
+      {plan.status !== "archived" && plan.type === "recurring" && (
+        <p className="mb-5 rounded border border-line bg-paper px-3 py-2 text-[13px] leading-relaxed text-ink-2">
+          Online buying for recurring plans comes with subscriptions (Part B).
+        </p>
+      )}
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
                 activeMemberships={active} mode="edit"
                 seatCaps={seatCaps} taken={taken} peakHours={peakHours} conversionOn={conversionOn} />

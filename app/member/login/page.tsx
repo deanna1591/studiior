@@ -32,6 +32,10 @@ export default async function MemberLogin({
   searchParams: { next?: string; error?: string };
 }) {
   const slug = currentSlug();
+  // Decision 57: carry ?next across to the signup link too, so a buyer who
+  // opened /buy/{plan} and clicks "Create an account" still lands back on it.
+  const next = safeNext(searchParams?.next);
+  const nextQ = next !== "/" ? `?next=${encodeURIComponent(next)}` : "";
 
   const anon = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -123,10 +127,10 @@ export default async function MemberLogin({
             to refract. Over the accent gradient this is a solid sheet: blur over
             a flat field is fog with a compositor layer attached. */}
         <div className={`${image ? "m-glass" : "m-panel"} px-5 pb-8 pt-6`}>
-          <LoginForm onImage={!!image} next={safeNext(searchParams?.next)} />
+          <LoginForm onImage={!!image} next={next} />
 
           <Link
-            href="/signup"
+            href={`/signup${nextQ}`}
             className={`m-action mt-3 flex w-full items-center justify-center rounded-xl border text-[16px] font-semibold ${
               image ? "border-white/45 text-white" : "border-line-2 bg-surface text-ink"
             }`}
