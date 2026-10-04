@@ -35,7 +35,7 @@ export default async function InstructorHome() {
   const [ty, tm] = today.split("-").map(Number);
   const nextMonthISO = new Date(Date.UTC(ty, tm, 1)).toISOString().slice(0, 10);
 
-  const [week, rosters, changes, coverNeeded, notifData, anns, settings, availSub] = await Promise.all([
+  const [week, rosters, changes, coverNeeded, notifData, anns, settings, availSub, nextTeach] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: today, p_to: shiftDate(today, 13),
     }),
@@ -56,15 +56,41 @@ export default async function InstructorHome() {
       .eq("studio_id", ctx.studio_id).maybeSingle(),
     supabase.from("availability_submissions").select("status")
       .eq("instructor_id", ctx.instructor_id).eq("period_start", nextMonthISO).maybeSingle(),
+    // Decision 58: when this fortnight is empty, open on the next week they teach.
+    supabase.rpc("instructor_next_teaching_week", { p_instructor_id: ctx.instructor_id }),
   ]);
 
-  const w = week.data as { classes?: Klass[] } | null;
+  const w = week.data as { classes?: Klass[]; confirmations_on?: boolean } | null;
+  const confirmationsOn = w?.confirmations_on ?? false;
   const classes = (w?.classes ?? [])
     .filter((c) => c.status === "scheduled")
     .sort((a, b) =>
       (a.local_date + a.local_start).localeCompare(b.local_date + b.local_start));
-  const next = classes[0] ?? null;
-  const unconfirmed = classes.filter((c) => !c.confirmed && !c.cover_requested).length;
+  let next = classes[0] ?? null;
+  // Decision 58: nothing in the next fortnight — name and show the next week
+  // this instructor actually teaches, rather than "nothing coming up".
+  let nextWeekLabel: string | null = null;
+  if (!next) {
+    const nw = nextTeach.data as string | null;
+    if (nw) {
+      const { data: fw } = await supabase.rpc("instructor_week", {
+        p_instructor_id: ctx.instructor_id, p_from: nw, p_to: shiftDate(nw, 6),
+      });
+      const fclasses = ((fw as { classes?: Klass[] } | null)?.classes ?? [])
+        .filter((c) => c.status === "scheduled")
+        .sort((a, b) => (a.local_date + a.local_start).localeCompare(b.local_date + b.local_start));
+      next = fclasses[0] ?? null;
+      if (next) {
+        nextWeekLabel = new Intl.DateTimeFormat("en-GB", {
+          timeZone: "UTC", day: "numeric", month: "short",
+        }).format(new Date(`${nw}T00:00:00Z`));
+      }
+    }
+  }
+  // Decision 58: no confirm prompt at all when the switch is off.
+  const unconfirmed = confirmationsOn
+    ? classes.filter((c) => !c.confirmed && !c.cover_requested).length
+    : 0;
 
   const roster = (rosters.data ?? [])[0] ?? null;
   const rosterLabel = roster
@@ -132,7 +158,9 @@ export default async function InstructorHome() {
       {next ? (
         <Link href={`/instructor/roster/${next.occurrence_id}`} className="m-card block px-4 py-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="m-sub text-ink-3">Next class</p>
+            <p className="m-sub text-ink-3">
+              {nextWeekLabel ? <>Next class · week of <span className="num">{nextWeekLabel}</span></> : "Next class"}
+            </p>
             <ClassTag tier={next.tier} flex={next.flex} committed={next.committed}
                       flexDeadlineShort={next.flex_deadline_short} />
           </div>

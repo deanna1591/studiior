@@ -630,11 +630,13 @@ export default function ScheduleCalendar({
                   Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}
                 </span>
               )}
-              {/* Decision 38: assigned-class confirmation state, when asked. */}
-              {event.assignmentConfirmed && (
+              {/* Decision 38: assigned-class confirmation state, when asked.
+                  Decision 58: hidden entirely when the studio has confirmations
+                  off (no "unconfirmed" marks). */}
+              {assignmentConfirmations && event.assignmentConfirmed && (
                 <span title="The instructor confirmed" style={{ color: "var(--lime-text)" }}>✓</span>
               )}
-              {event.assignmentAwaiting && (
+              {assignmentConfirmations && event.assignmentAwaiting && (
                 <span className="text-ink-3" title="Awaiting the instructor's confirmation">awaiting</span>
               )}
             </span>
@@ -776,6 +778,7 @@ export default function ScheduleCalendar({
       {selected && (
         <BlockPanel
           canManage={canManage}
+          confirmationsOn={assignmentConfirmations}
           rosterHref={`/roster/${selected.id}`}
           facts={{
             id: selected.id,

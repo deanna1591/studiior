@@ -2,7 +2,7 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, NavLink, SectionLabel } from "@/components/ui";
 import { fmtTime, fmtDayLong } from "@/lib/time";
-import { DecideCoverForm } from "./form";
+import { DecideCoverForm, ApproveAgreedForm } from "./form";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function Cover() {
     );
   }
 
-  const [{ data: pending }, { data: settled }, { data: instructors }, { data: settings }] =
+  const [{ data: pending }, { data: agreed }, { data: settled }, { data: instructors }, { data: settings }] =
     await Promise.all([
       supabase.from("cover_requests")
         // ONE string literal, not a concatenation. `"a, " + "b"` is typed
@@ -37,6 +37,14 @@ export default async function Cover() {
                  instructors!cover_requests_instructor_id_fkey(display_name),
                  class_occurrences(id, name, starts_at, ends_at, booked_count, rooms(name))`)
         .eq("status", "pending").order("requested_at"),
+      // Decision 58: a named colleague agreed to cover (auto-accept off) — staff
+      // approve with one tap.
+      supabase.from("cover_requests")
+        .select(`id, covered_by,
+                 instructors!cover_requests_instructor_id_fkey(display_name),
+                 taker:instructors!cover_requests_covered_by_fkey(display_name),
+                 class_occurrences(name, starts_at)`)
+        .eq("status", "accepted_pending").order("requested_at"),
       supabase.from("cover_requests")
         .select(`id, status, resolution, decided_at,
                  instructors!cover_requests_instructor_id_fkey(display_name),
@@ -147,6 +155,31 @@ export default async function Cover() {
           </p>
           <ul className="space-y-3">
             {urgent.map((r) => <Card key={r.id} r={r} loud />)}
+          </ul>
+        </section>
+      )}
+
+      {(agreed ?? []).length > 0 && (
+        <section className="mb-7">
+          <SectionLabel>Agreed — approve</SectionLabel>
+          <p className="mb-3 text-[13px] leading-[20px] text-ink-2">
+            A colleague was asked in particular and said yes. Approve to make the swap.
+          </p>
+          <ul className="space-y-3">
+            {(agreed ?? []).map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl bg-paper p-4">
+                <div>
+                  <p className="text-[15px] font-semibold leading-6 text-ink">{r.class_occurrences?.name}</p>
+                  <p className="mt-0.5 text-[13px] leading-[20px] text-ink-2">
+                    {r.class_occurrences && <span className="num">{when(r.class_occurrences.starts_at)}</span>}
+                    {" · "}
+                    Asked {r.instructors?.display_name ?? "an instructor"} ·{" "}
+                    <span className="font-medium text-ink">{r.taker?.display_name ?? "a colleague"}</span> confirmed
+                  </p>
+                </div>
+                {r.covered_by && <ApproveAgreedForm requestId={r.id} takerId={r.covered_by} />}
+              </li>
+            ))}
           </ul>
         </section>
       )}

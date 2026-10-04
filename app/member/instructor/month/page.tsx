@@ -39,10 +39,14 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
     ? `${searchParams.m}-01`
     : (() => { const d = new Date(`${today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + 1); return d.toISOString().slice(0, 10); })();
 
-  const { data, error } = await supabase.rpc("my_month_roster", {
-    p_instructor_id: ctx.instructor_id, p_month: monthKey,
-  });
+  const [{ data, error }, { data: colleaguesData }] = await Promise.all([
+    supabase.rpc("my_month_roster", { p_instructor_id: ctx.instructor_id, p_month: monthKey }),
+    // Decision 58: who an "ask for cover" can be directed to.
+    supabase.rpc("instructor_colleagues", { p_instructor_id: ctx.instructor_id }),
+  ]);
   const r = data as unknown as Roster | null;
+  const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string }[])
+    .map((c) => ({ id: c.instructor_id, name: c.display_name }));
 
   const byDay = new Map<string, Klass[]>();
   for (const c of r?.classes ?? []) {
@@ -134,7 +138,7 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
                         Cover approved — this one is being reassigned.
                       </p>
                     )}
-                    {!c.cover_status && <AskForCover occurrenceId={c.occurrence_id} compact />}
+                    {!c.cover_status && <AskForCover occurrenceId={c.occurrence_id} compact colleagues={colleagues} />}
                   </li>
                 ))}
               </ul>

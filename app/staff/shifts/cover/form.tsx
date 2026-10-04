@@ -17,6 +17,29 @@ function Btn({ label, tone = "quiet" }: { label: string; tone?: "primary" | "qui
 }
 
 /**
+ * Decision 58 — a named colleague agreed to cover and the studio approves it.
+ * One tap: approveCover(mode=assign, instructor_id=the colleague).
+ */
+export function ApproveAgreedForm({
+  requestId, takerId,
+}: { requestId: string; takerId: string }) {
+  const [state, action] = useFormState<CoverState, FormData>(approveCover, null);
+  return (
+    <div className="shrink-0 text-right">
+      {state && <Notice kind={state.ok ? "ok" : "error"}>{state.message}</Notice>}
+      {!state?.ok && (
+        <form action={action}>
+          <input type="hidden" name="request_id" value={requestId} />
+          <input type="hidden" name="mode" value="assign" />
+          <input type="hidden" name="instructor_id" value={takerId} />
+          <Btn label="Approve" tone="primary" />
+        </form>
+      )}
+    </div>
+  );
+}
+
+/**
  * The instructor's side: ask, and be able to take it back.
  *
  * The reason field is optional and the copy says what happens next, because the

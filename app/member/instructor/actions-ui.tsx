@@ -4,9 +4,11 @@ import { useFormState } from "react-dom";
 import { PrimaryButton, CardAction, CardActionOutline, QuietButton } from "@/components/member/ui";
 import {
   confirmMyWeek, confirmMyMonth, askForCover, applyForShift, claimClass, acceptCover, withdrawApplication, checkInMember,
-  confirmAssignment, confirmSeriesAssignments, declineAssignment,
+  confirmAssignment, confirmSeriesAssignments, declineAssignment, confirmCover, cantCover,
   type InstructorState, type ClaimState,
 } from "./actions";
+
+export type Colleague = { id: string; name: string };
 
 
 function Result({ state }: { state: InstructorState }) {
@@ -108,7 +110,24 @@ export function ConfirmMonth({
   );
 }
 
-export function AskForCover({ occurrenceId, compact = false }: { occurrenceId: string; compact?: boolean }) {
+/** Decision 58: an optional "Ask someone in particular". Empty = everyone. */
+function ColleaguePicker({ colleagues }: { colleagues: Colleague[] }) {
+  if (colleagues.length === 0) return null;
+  return (
+    <label className="m-sub mt-2 block text-ink-2">
+      Ask someone in particular (optional)
+      <select name="ask_instructor_id"
+              className="m-tap mt-1 w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink">
+        <option value="">Anyone who can take it</option>
+        {colleagues.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+export function AskForCover({
+  occurrenceId, compact = false, colleagues = [],
+}: { occurrenceId: string; compact?: boolean; colleagues?: Colleague[] }) {
   const [state, action] = useFormState<InstructorState, FormData>(askForCover, null);
   // On the month roster there are twenty of these in a column; the form opens
   // on demand there. A native <details> — no state to lose.
@@ -123,7 +142,8 @@ export function AskForCover({ occurrenceId, compact = false }: { occurrenceId: s
           <input name="reason" required aria-label="Why"
                  placeholder="Why — the studio decides from this"
                  className="m-tap w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink placeholder:text-ink-3" />
-          <div className="mt-2"><CardActionOutline>Ask the studio for cover</CardActionOutline></div>
+          <ColleaguePicker colleagues={colleagues} />
+          <div className="mt-2"><CardActionOutline>Ask for cover</CardActionOutline></div>
           <Result state={state} />
         </form>
       </details>
@@ -138,13 +158,42 @@ export function AskForCover({ occurrenceId, compact = false }: { occurrenceId: s
       <input id="reason" name="reason" required
              placeholder="Why — the studio decides from this"
              className="m-tap mt-1 w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink placeholder:text-ink-3" />
-      <div className="mt-2"><CardActionOutline>Ask the studio</CardActionOutline></div>
+      <ColleaguePicker colleagues={colleagues} />
+      <div className="mt-2"><CardActionOutline>Ask for cover</CardActionOutline></div>
       <p className="m-sub mt-1.5 text-ink-3">
-        You stay down to teach it until somebody approves. Nothing is released
-        automatically, however close it is.
+        You stay down to teach it until somebody takes it and the studio arranges
+        it. Nothing is released automatically, however close it is.
       </p>
       <Result state={state} />
     </form>
+  );
+}
+
+/**
+ * Decision 58 — a cover a colleague was asked to take, on their Open classes
+ * screen. "Confirm I'll cover" accepts it (final at an auto-accept studio, or
+ * pending the studio's approval); "Can't" opens it to everyone.
+ */
+export function DirectedCover({
+  occurrenceId, requestId,
+}: { occurrenceId: string; requestId: string }) {
+  const [cState, cAction] = useFormState<InstructorState, FormData>(confirmCover, null);
+  const [dState, dAction] = useFormState<InstructorState, FormData>(cantCover, null);
+  return (
+    <div className="mt-2">
+      <div className="flex gap-2">
+        <form action={cAction} className="flex-1">
+          <input type="hidden" name="occurrence_id" value={occurrenceId} />
+          <CardAction>Confirm I&rsquo;ll cover</CardAction>
+        </form>
+        <form action={dAction} className="flex-1">
+          <input type="hidden" name="request_id" value={requestId} />
+          <CardActionOutline>Can&rsquo;t</CardActionOutline>
+        </form>
+      </div>
+      <Result state={cState} />
+      <Result state={dState} />
+    </div>
   );
 }
 

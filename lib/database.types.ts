@@ -1683,6 +1683,7 @@ export type Database = {
       }
       cover_requests: {
         Row: {
+          asked_instructor_id: string | null
           covered_by: string | null
           created_at: string
           decided_at: string | null
@@ -1700,6 +1701,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          asked_instructor_id?: string | null
           covered_by?: string | null
           created_at?: string
           decided_at?: string | null
@@ -1717,6 +1719,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          asked_instructor_id?: string | null
           covered_by?: string | null
           created_at?: string
           decided_at?: string | null
@@ -1734,6 +1737,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cover_requests_asked_instructor_id_fkey"
+            columns: ["asked_instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cover_requests_covered_by_fkey"
             columns: ["covered_by"]
@@ -7591,6 +7601,7 @@ export type Database = {
         Args: { p_reason?: string; p_request_id: string }
         Returns: Json
       }
+      decline_directed_cover: { Args: { p_request_id: string }; Returns: Json }
       decline_shift_application: {
         Args: { p_application_id: string; p_reason?: string }
         Returns: Json
@@ -7647,22 +7658,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_txt: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
       }
       extend_membership: {
         Args: {
@@ -7890,6 +7885,13 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: string
       }
+      instructor_colleagues: {
+        Args: { p_instructor_id: string }
+        Returns: {
+          display_name: string
+          instructor_id: string
+        }[]
+      }
       instructor_confirm_class: {
         Args: { p_occurrence_id: string }
         Returns: Json
@@ -7906,6 +7908,10 @@ export type Database = {
       }
       instructor_month_vevents: {
         Args: { p_instructor_id: string; p_month: string; p_studio_id: string }
+        Returns: string
+      }
+      instructor_next_teaching_week: {
+        Args: { p_instructor_id: string; p_today?: string }
         Returns: string
       }
       instructor_notifications: {
@@ -8636,7 +8642,11 @@ export type Database = {
         Returns: Json
       }
       request_cover: {
-        Args: { p_occurrence_id: string; p_reason?: string }
+        Args: {
+          p_ask_instructor_id?: string
+          p_occurrence_id: string
+          p_reason?: string
+        }
         Returns: Json
       }
       request_series_confirmations: {

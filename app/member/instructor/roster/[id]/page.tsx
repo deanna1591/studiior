@@ -32,10 +32,14 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const { data, error } = await supabase.rpc("instructor_roster", {
-    p_occurrence_id: params.id,
-  });
+  const [{ data, error }, { data: colleaguesData }] = await Promise.all([
+    supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
+    // Decision 58: who an "ask for cover" can be directed to.
+    supabase.rpc("instructor_colleagues", { p_instructor_id: ctx.instructor_id }),
+  ]);
   const r = data as Roster | null;
+  const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string }[])
+    .map((c) => ({ id: c.instructor_id, name: c.display_name }));
 
   if (error || !r) {
     return (
@@ -143,7 +147,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
         </ul>
       )}
 
-      {r.status === "scheduled" && <AskForCover occurrenceId={r.occurrence_id} />}
+      {r.status === "scheduled" && <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} />}
 
       <p className="m-sub mt-5 text-ink-3">{r.withheld}</p>
     </InstructorShell>

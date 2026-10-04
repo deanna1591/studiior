@@ -206,11 +206,15 @@ select expect_num('teeth: with guarantees ON and a rate on file, the identical c
 
 -- Teeth for the weekly-confirmation gate: turn it ON and the login instructor
 -- with an in-window class on the ask day IS asked — so the zero above was the
--- switch being off, not the sweep having nobody to email.
-update studio_settings set week_confirm_enabled = true where studio_id = :'S';
+-- switch being off, not the sweep having nobody to email. Decision 58 recouples
+-- the weekly sweep to assignment_confirmations (confirmations off silences the
+-- whole confirmation surface), so the teeth now sets BOTH switches.
+update studio_settings set week_confirm_enabled = true, assignment_confirmations = true where studio_id = :'S';
 select run_sweep('week_confirmations (on)', 'select sweep_week_confirmations()');
 select expect_num('teeth: with weekly confirmation ON, the login instructor IS asked to confirm',
   (select count(*) from notifications where studio_id = :'S' and template_key = 'week_confirm_ask'), 1);
+-- Back to the inert defaults for the rest of the canary.
+update studio_settings set week_confirm_enabled = false, assignment_confirmations = false where studio_id = :'S';
 
 -- =============================================================================
 -- Decision 33 amendment (167): the instructor booking alert. On defaults

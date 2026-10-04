@@ -1,10 +1,47 @@
 import { instructorScreen, studioToday } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
-import { ApplyForShift, WithdrawApplication } from "../actions-ui";
+import { ApplyForShift, WithdrawApplication, DirectedCover } from "../actions-ui";
 import ClaimCalendar, { type MonthBlock, type Terms } from "@/components/instructor/claim-calendar";
 import ClassTag from "@/components/instructor/class-tag";
 
 export const dynamic = "force-dynamic";
+
+type Directed = {
+  request_id: string; occurrence_id: string; name: string; when_label: string;
+  room_name: string | null; booked_count: number; capacity: number;
+  asked_by_name: string; tier: string | null; flex_deadline_short: string | null;
+};
+
+/**
+ * Decision 58: cover a colleague asked YOU to take, at the top of Open classes.
+ * "{Name} asked you to cover …" with Confirm I'll cover / Can't.
+ */
+function DirectedCovers({ items }: { items: Directed[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="mb-5">
+      <div className="m-card px-4 py-3.5" style={{ boxShadow: "0 0 0 1.5px var(--lime-text)" }}>
+        <p className="text-[15px] font-semibold leading-[22px] text-ink">Asked to cover</p>
+        <p className="m-sub mt-0.5 text-ink-3">
+          A colleague asked you in particular. Confirm and the studio arranges it.
+        </p>
+        <ul className="mt-3 space-y-2">
+          {items.map((c) => (
+            <li key={c.request_id} className="rounded-xl border border-line px-3 py-2.5">
+              <p className="text-[14px] leading-5 text-ink">
+                <span className="font-semibold">{c.asked_by_name}</span> asked you to cover {c.name}
+              </p>
+              <p className="m-sub mt-0.5 text-ink-3">
+                {c.when_label}{c.room_name ? ` · ${c.room_name}` : ""} · <span className="num">{c.booked_count}/{c.capacity}</span> booked
+              </p>
+              <DirectedCover occurrenceId={c.occurrence_id} requestId={c.request_id} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
 
 type Horizon = {
   horizon_days: number; core_cap: number;
@@ -30,6 +67,10 @@ export default async function ShiftsPage() {
   const { ctx, supabase } = await instructorScreen();
   const { data: claimingOn } = await supabase.rpc("claiming_enabled", { p_studio_id: ctx.studio_id });
 
+  // Decision 58: cover directed to this instructor, shown in both models.
+  const { data: ocData } = await supabase.rpc("instructor_open_classes", { p_instructor_id: ctx.instructor_id });
+  const directed = ((ocData as { directed_covers?: Directed[] } | null)?.directed_covers) ?? [];
+
   // ---- CLAIMING MODEL -------------------------------------------------------
   if (claimingOn) {
     const [{ data }, { data: t }] = await Promise.all([
@@ -41,7 +82,8 @@ export default async function ShiftsPage() {
     const mineCount = months.reduce((n, m) => n + m.classes.filter((c) => c.mine).length, 0);
 
     return (
-      <InstructorShell ctx={ctx} title="Open classes" badges={{ "/instructor/shifts": mineCount }}>
+      <InstructorShell ctx={ctx} title="Open classes" badges={{ "/instructor/shifts": mineCount + directed.length }}>
+        <DirectedCovers items={directed} />
         <ClaimCalendar
           months={months}
           coreCap={hz?.core_cap ?? 0}
@@ -58,15 +100,10 @@ export default async function ShiftsPage() {
   }
 
   // ---- ASSIGNED MODEL (Decision 17 open classes) ----------------------------
-  const [{ data: openData }, pendingData] = await Promise.all([
-    // instructor_open_classes formats the when-label with the studio's clock and
-    // carries the core/flex tag (Decision 54).
-    supabase.rpc("instructor_open_classes", { p_instructor_id: ctx.instructor_id }),
-    // Classes already put forward — the class has left the open list, so without
-    // this they would vanish. Shown as "waiting on the studio" so nothing a
-    // committed instructor is holding ever reads as lost.
-    supabase.rpc("instructor_pending_claims", { p_instructor_id: ctx.instructor_id }),
-  ]);
+  // instructor_open_classes was already fetched above (ocData) for directed
+  // covers; reuse it for the open-shift list rather than asking twice.
+  const openData = ocData;
+  const pendingData = await supabase.rpc("instructor_pending_claims", { p_instructor_id: ctx.instructor_id });
 
   type Open = {
     occurrence_id: string; name: string; local_date: string; local_start: string;
@@ -87,7 +124,8 @@ export default async function ShiftsPage() {
   const openList = open.filter((o) => !pendingIds.has(o.occurrence_id));
 
   return (
-    <InstructorShell ctx={ctx} title="Open classes" badges={{ "/instructor/shifts": pending.length }}>
+    <InstructorShell ctx={ctx} title="Open classes" badges={{ "/instructor/shifts": pending.length + directed.length }}>
+      <DirectedCovers items={directed} />
       {pending.length > 0 && (
         <section className="mb-5">
           <h2 className="m-sub mb-2 text-ink-3">Waiting on the studio</h2>

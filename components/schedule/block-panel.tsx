@@ -39,11 +39,14 @@ export type BlockFacts = {
  * closes on click or Escape.
  */
 export default function BlockPanel({
-  facts, canManage, rosterHref, onAssigned, onUnassigned, onClose,
+  facts, canManage, rosterHref, confirmationsOn = false, onAssigned, onUnassigned, onClose,
 }: {
   facts: BlockFacts;
   canManage: boolean;
   rosterHref: string;
+  // Decision 58: the studio's assignment_confirmations. When off there is no ask
+  // to suppress, so the "already confirmed" bypass tick is not shown.
+  confirmationsOn?: boolean;
   onAssigned: (instructorId: string, instructorName: string) => void;
   onUnassigned: () => void;
   onClose: () => void;
@@ -132,7 +135,7 @@ export default function BlockPanel({
     fd.set("instructor_id", unassigning ? "" : who);
     fd.set("scope", scope);
     if (scope === "until") fd.set("until", until);
-    if (confirmed && !unassigning) fd.set("confirmed", "on");
+    if (confirmed && !unassigning && confirmationsOn) fd.set("confirmed", "on");
     setMsg(null);
     start(async () => {
       const r = await assignOccurrencesForPeriod(null, fd);
@@ -258,8 +261,9 @@ export default function BlockPanel({
                   )}
                 </div>
 
-                {/* Decision 38 bypass — ticked by default, hidden when unassigning. */}
-                {!unassigning && (
+                {/* Decision 38 bypass — ticked by default, hidden when
+                    unassigning or when the studio has confirmations off. */}
+                {!unassigning && confirmationsOn && (
                   <label className="mt-2.5 flex items-start gap-2 text-[12.5px] leading-[18px] text-ink-2">
                     <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5" />
                     <span>Already confirmed with the instructor — don&rsquo;t ask them</span>

@@ -71,16 +71,64 @@ export async function askForCover(
 ): Promise<InstructorState> {
   const reason = String(form.get("reason") ?? "").trim();
   if (!reason) return { error: "Say why, so the studio can decide." };
+  // Decision 58: an optional "ask someone in particular". Empty = everyone.
+  const asked = String(form.get("ask_instructor_id") ?? "").trim();
   const supabase = createClient();
-  const { error } = await supabase.rpc("request_cover", {
+  const { data, error } = await supabase.rpc("request_cover", {
     p_occurrence_id: String(form.get("occurrence_id")),
     p_reason: reason,
+    p_ask_instructor_id: asked || undefined,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    const m = error.message;
+    return { error: /PT400/.test(m) ? "That colleague cannot be asked to cover." : m };
+  }
   revalidatePath("/instructor");
   revalidatePath("/instructor/month");
   revalidatePath("/instructor/schedule");
-  return { ok: "Asked. The studio decides — you are still down to teach it until they do." };
+  const r = (data ?? {}) as { directed?: boolean };
+  return {
+    ok: r.directed
+      ? "Asked. They confirm from their end, and the studio arranges it — you are still down to teach it until then."
+      : "Asked. The studio decides — you are still down to teach it until they do.",
+  };
+}
+
+/**
+ * Decision 58 — the named colleague's "Confirm I'll cover". accept_cover reads
+ * the request directed to them: final at once at an auto-accept studio, or
+ * recorded for the studio to approve otherwise. The right sentence for each.
+ */
+export async function confirmCover(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("accept_cover", {
+    p_occurrence_id: String(form.get("occurrence_id")),
+  });
+  if (error) {
+    const m = error.message;
+    return { error: /PT403/.test(m) ? "Somebody else was asked first."
+      : /PT409/.test(m) ? "That cover has already been answered."
+      : /PT422/.test(m) ? "That class is not open to take." : m };
+  }
+  const r = (data ?? {}) as { ok?: boolean; final?: boolean; reason?: string };
+  if (!r.ok) return { error: r.reason === "instructor_busy" ? "You are already teaching then." : "That could not be arranged." };
+  revalidatePath("/instructor"); revalidatePath("/instructor/shifts"); revalidatePath("/instructor/schedule");
+  return { ok: r.final ? "Done — you're teaching it." : "Confirmed — the studio will approve it." };
+}
+
+/** Decision 58 — the named colleague's "Can't": it opens to everyone. */
+export async function cantCover(_prev: InstructorState, form: FormData): Promise<InstructorState> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("decline_directed_cover", {
+    p_request_id: String(form.get("request_id")),
+  });
+  if (error) {
+    const m = error.message;
+    return { error: /PT403/.test(m) ? "That cover was not directed to you."
+      : /PT409/.test(m) ? "That cover has already been answered." : m };
+  }
+  revalidatePath("/instructor"); revalidatePath("/instructor/shifts");
+  return { ok: "No problem — it's open to the rest of the team now." };
 }
 
 /**

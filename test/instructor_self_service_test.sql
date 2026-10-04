@@ -80,16 +80,20 @@ insert into studios (id, name, slug, timezone, currency, status) values
 select set_config('t.today', (now() at time zone 'Europe/Prague')::date::text, false);
 -- These studios RUN the instructor confirmation/availability workflow, which is
 -- opt-in and off by default since migration 142 — so they turn it on explicitly.
+-- Decision 58 recouples the weekly-confirmation sweep to assignment_confirmations
+-- (confirmations off silences the whole confirmation surface), so both studios
+-- that exercise the weekly cycle turn it on too.
 insert into studio_settings
-  (studio_id, availability_due_day, week_confirm_enabled, availability_reminders_enabled,
+  (studio_id, availability_due_day, week_confirm_enabled, assignment_confirmations,
+   availability_reminders_enabled,
    week_confirm_ask_dow, week_confirm_remind_dow, week_confirm_escalate_dow,
    week_confirm_escalate_days)
 values
-  ('1f5e1f5e-0000-0000-0000-000000000001', 20, true, true,
+  ('1f5e1f5e-0000-0000-0000-000000000001', 20, true, true, true,
    extract(dow from current_setting('t.today')::date)::int,
    extract(dow from current_setting('t.today')::date)::int,
    extract(dow from current_setting('t.today')::date)::int, 3),
-  ('1f5e1f5e-0000-0000-0000-000000000002', 5, true, true,
+  ('1f5e1f5e-0000-0000-0000-000000000002', 5, true, true, true,
    extract(dow from current_setting('t.today')::date + 1)::int,
    extract(dow from current_setting('t.today')::date + 1)::int,
    extract(dow from current_setting('t.today')::date + 1)::int, 7);
@@ -158,7 +162,12 @@ select expect_true('...and the engine still reads it',
     (current_date + 8 + time '09:00') at time zone 'Europe/Prague',
     (current_date + 8 + time '09:50') at time zone 'Europe/Prague'));
 
--- Six classes next week, so there is something to assign and later to confirm.
+-- Six classes NEXT WEEK, so there is something to assign and later to confirm.
+-- Anchored to the studio's own week start + 11 days (pre-existing date-fragility
+-- fix): current_date+8 lands in week+2 on some weekdays (missing the ask window)
+-- and inside the escalation window [+7,+10) on others (leaving a stray
+-- week_unconfirmed that a later section counts). +11 is inside the ask window
+-- [+7,+13] and outside the escalation window on every weekday.
 reset role;
 insert into class_occurrences
   (studio_id, location_id, class_type_id, room_id, name, capacity,
@@ -168,8 +177,8 @@ select '1f5e1f5e-0000-0000-0000-000000000001','1f5e1f5e-0000-0000-0000-000000000
        (case when i % 2 = 0 then '1f5e1f5e-0000-0000-0000-00000000ee01'
                             else '1f5e1f5e-0000-0000-0000-00000000ee02' end)::uuid,
        'Reformer', 10,
-       ((current_date + 8) + time '09:00' + make_interval(hours => i)) at time zone 'Europe/Prague',
-       ((current_date + 8) + time '09:50' + make_interval(hours => i)) at time zone 'Europe/Prague',
+       ((studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date) + 11) + time '09:00' + make_interval(hours => i)) at time zone 'Europe/Prague',
+       ((studio_week_start('1f5e1f5e-0000-0000-0000-000000000001', current_date) + 11) + time '09:50' + make_interval(hours => i)) at time zone 'Europe/Prague',
        'scheduled', 'open'
   from generate_series(0,5) i;
 

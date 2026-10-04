@@ -51,11 +51,30 @@ export default async function MySchedule({
 }: { searchParams: { w?: string } }) {
   const { ctx, supabase } = await instructorScreen();
   const today = studioToday(ctx.timezone);
-  const offset = Number(searchParams.w) || 0;
-  // Decision 54: My schedule speaks in WEEKS. The current studio-local week
-  // (per the studio's week_starts_on), and Earlier/Later move one week.
-  const from = shiftDate(weekStartOf(today, ctx.week_starts_on), offset * 7);
+  const currentWeek = weekStartOf(today, ctx.week_starts_on);
+
+  // Decision 58: with no ?w, open on the next week this instructor actually
+  // teaches — the current week if it holds a class, else the first future one.
+  // Earlier/Later (an explicit ?w) are honoured as-is.
+  let offset = Number(searchParams.w) || 0;
+  let nextWeekLine: string | null = null;
+  if (searchParams.w === undefined) {
+    const { data: nw } = await supabase.rpc("instructor_next_teaching_week", {
+      p_instructor_id: ctx.instructor_id,
+    });
+    if (nw && (nw as string) !== currentWeek) {
+      offset = Math.round(
+        (Date.parse(`${nw}T00:00:00Z`) - Date.parse(`${currentWeek}T00:00:00Z`)) / (7 * 86400000));
+    }
+  }
+  // Decision 54: My schedule speaks in WEEKS. Earlier/Later move one week.
+  const from = shiftDate(currentWeek, offset * 7);
   const to = shiftDate(from, 6);
+  if (offset !== 0 && searchParams.w === undefined) {
+    nextWeekLine = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "UTC", day: "numeric", month: "short",
+    }).format(new Date(`${from}T00:00:00Z`));
+  }
 
   const [week, pendingData, reqData] = await Promise.all([
     supabase.rpc("instructor_week", {
@@ -68,8 +87,12 @@ export default async function MySchedule({
     supabase.rpc("instructor_assignment_requests", { p_instructor_id: ctx.instructor_id }),
   ]);
 
-  const w = week.data as { state: string; classes: Klass[]; empty_hint: string } | null;
+  const w = week.data as { state: string; classes: Klass[]; empty_hint: string; confirmations_on: boolean } | null;
   const classes = w?.classes ?? [];
+  // Decision 58: one flag hides every confirm control. When off, the requests
+  // reader already returns nothing; this silences the derived "Confirm week"
+  // banner and the per-class "Confirmed." line too.
+  const confirmationsOn = w?.confirmations_on ?? false;
   const allPending = (pendingData.data ?? []) as unknown as Pending[];
   // Pending claims that fall inside this two-week view sit in the day list; the
   // rest are summarised so the instructor still knows they are outstanding.
@@ -93,8 +116,9 @@ export default async function MySchedule({
       timeZone: "UTC", weekday: "long", day: "numeric", month: "short",
     }).format(new Date(`${iso}T00:00:00Z`));
 
-  const unconfirmed = classes.filter(
-    (c) => c.status === "scheduled" && !c.confirmed && !c.cover_requested);
+  const unconfirmed = confirmationsOn
+    ? classes.filter((c) => c.status === "scheduled" && !c.confirmed && !c.cover_requested)
+    : [];
 
   // Decision 38: assigned classes needing confirmation, grouped by series.
   type Req = {
@@ -126,6 +150,14 @@ export default async function MySchedule({
           </p>
           <p className="num mt-1 text-[11px] leading-4 text-ink-2">{week.error.message}</p>
         </div>
+      )}
+
+      {/* Decision 58: this week was empty, so we opened on the next week they
+          teach. Name it. */}
+      {nextWeekLine && (
+        <p className="mb-4 text-[13px] leading-[19px] text-ink-2">
+          Your next class is in the week of <span className="num">{nextWeekLine}</span>.
+        </p>
       )}
 
       {/* Decision 38: classes the studio ASSIGNED that are waiting on your
@@ -209,7 +241,7 @@ export default async function MySchedule({
                       b.klass?.local_start ?? b.pending!.local_start))
                   .map((row, i) =>
                     row.klass
-                      ? <ClassRow key={row.klass.occurrence_id} c={row.klass} />
+                      ? <ClassRow key={row.klass.occurrence_id} c={row.klass} confirmationsOn={confirmationsOn} />
                       : <PendingRow key={`p-${row.pending!.occurrence_id}-${i}`} p={row.pending!} />
                   )}
               </ul>
@@ -255,7 +287,7 @@ function PendingRow({ p }: { p: Pending }) {
   );
 }
 
-function ClassRow({ c }: { c: Klass }) {
+function ClassRow({ c, confirmationsOn }: { c: Klass; confirmationsOn: boolean }) {
   const off = c.status === "cancelled";
 
   return (
@@ -297,7 +329,7 @@ function ClassRow({ c }: { c: Klass }) {
             until they do.
           </p>
         )}
-        {!off && !c.cover_requested && c.confirmed && (
+        {confirmationsOn && !off && !c.cover_requested && c.confirmed && (
           <p className="mt-1.5 text-[12px] leading-[17px] text-ink-3">Confirmed.</p>
         )}
       </Link>
