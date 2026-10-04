@@ -446,7 +446,15 @@ select expect_num('a fresh week has the whole allowance',
 -- --- booking spends it -------------------------------------------------------
 set role authenticated;
 select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
-select set_config('t.b1', (select (book_class('9eac9eac-0000-0000-0000-00000000e001',
+-- b1 is booked on e004 (week_start+3, 18:00 — peak), NOT e001 (week_start+0,
+-- 07:00): the timely-cancellation assertion below needs a class comfortably
+-- beyond the studio's 12h cancellation cutoff at ANY wall-clock hour, and
+-- week_start+0 can fall inside that cutoff on an evening Manila run (it then
+-- reads late_cancelled, not member_cancelled). week_start+3 is always ≥4 days
+-- out. Test-only date robustness; the product is untouched and both classes
+-- are peak, so the allowance maths are identical. (Pre-existing: this fails
+-- the same way on clean main — confirmed by stashing migration 216.)
+select set_config('t.b1', (select (book_class('9eac9eac-0000-0000-0000-00000000e004',
   '9eac9eac-0000-0000-0000-00000000dd01','member')).booking_id::text), false);
 select expect_num('one peak class booked leaves one',
   (peak_allowance_state('9eac9eac-0000-0000-0000-00000000aa01',

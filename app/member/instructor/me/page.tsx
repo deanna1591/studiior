@@ -4,6 +4,8 @@ import InstructorShell from "@/components/instructor/shell";
 import { SignOut } from "@/components/member/sign-out";
 import { CalendarFeedControl } from "@/components/member/calendar-feed";
 import { mintFeed, revokeFeed } from "@/lib/feed-actions";
+import PhotoUpload from "@/components/instructor/photo-upload";
+import { uploadMyPhoto, removeMyPhoto } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,18 @@ export default async function MePage() {
 
   return (
     <InstructorShell ctx={ctx} title="Me">
+      {/* Decision 60: your photo — members see it on the class list and it is on
+          the studio's website. Upload it yourself from here. */}
+      <div className="mb-4">
+        <PhotoUpload
+          variant="portal"
+          name={ctx.display_name}
+          currentUrl={ctx.avatar_url}
+          upload={async (fd) => { "use server"; return uploadMyPhoto(fd); }}
+          remove={async () => { "use server"; return removeMyPhoto(); }}
+        />
+      </div>
+
       <div className="m-card px-4 py-4">
         <p className="m-sub text-ink-3">Classes taught here</p>
         <p className="m-stat mt-1 text-ink">{r?.classes_taught ?? 0}</p>

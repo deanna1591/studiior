@@ -4,6 +4,8 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink, SectionLabel } from "@/components/ui";
 import ArchiveControls from "@/app/staff/archive-form";
 import InstructorForm from "../form";
+import PhotoUpload from "@/components/instructor/photo-upload";
+import { uploadInstructorPhoto, removeInstructorPhoto } from "../actions";
 import RatePanel, { type RateVersion } from "./rate-panel";
 import { availabilityLine, type SubmissionStatus } from "@/lib/availability-line";
 import { standingCoverage } from "@/lib/availability-standing";
@@ -75,6 +77,18 @@ export default async function EditInstructor({ params }: { params: { id: string 
         {availabilityLineView.text}{" "}
         <NavLink href={availabilityLineView.href}>{availabilityLineView.linkLabel}</NavLink>
       </p>
+      <div className="mb-5 max-w-md">
+        <SectionLabel>Photo</SectionLabel>
+        <div className="mt-2">
+          <PhotoUpload
+            variant="staff"
+            name={i.display_name}
+            currentUrl={i.avatar_url}
+            upload={async (fd) => { "use server"; return uploadInstructorPhoto(i.id, fd); }}
+            remove={async () => { "use server"; return removeInstructorPhoto(i.id); }}
+          />
+        </div>
+      </div>
       <InstructorForm mode="edit" draft={{
         id: i.id, display_name: i.display_name, bio: i.bio, avatar_url: i.avatar_url,
         color: i.color, certifications: certs, status: i.status, hasLogin: i.staff_id != null }} />

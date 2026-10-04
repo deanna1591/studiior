@@ -32,13 +32,14 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
         <textarea name="bio" rows={3} defaultValue={draft.bio ?? ""} className={inputClass}
                   placeholder="A couple of lines for the member app." />
       </Field>
-      <Field label="Photo URL">
-        <input name="avatar_url" type="url" defaultValue={draft.avatar_url ?? ""}
-               className={inputClass} placeholder="https://…" />
-        <p className="mt-1 text-xs text-ink-3">
-          A link for now — uploading files is not built yet.
+      {/* Decision 60: the photo is uploaded, not pasted. On CREATE there is no
+          instructor id yet to key the storage path, so the Upload control lives
+          on the edit page — a new instructor gets a photo right after adding. */}
+      {mode === "create" && (
+        <p className="rounded border border-line bg-paper px-3 py-2 text-xs leading-relaxed text-ink-2">
+          Add a photo after you add the instructor — it uploads from their page.
         </p>
-      </Field>
+      )}
       <Field label="Certifications">
         <textarea name="certifications" rows={3} className={inputClass}
                   defaultValue={draft.certifications.join("\n")}

@@ -149,7 +149,9 @@ export async function saveInstructor(_prev: SetupState, fd: FormData): Promise<S
   const row = {
     display_name,
     bio: nullable(fd, "bio"),
-    avatar_url: nullable(fd, "avatar_url"),
+    // Decision 60: the photo is managed by uploadInstructorPhoto/removeInstructorPhoto,
+    // never through this form — so saving the details here must not touch
+    // avatar_url (leaving it in would null the photo on every save).
     color: nullable(fd, "color"),
     // One per line or comma separated, whichever the owner types.
     certifications: text(fd, "certifications").split(/[\n,]/).map((c) => c.trim()).filter(Boolean),
