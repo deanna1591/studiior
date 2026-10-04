@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { zonedToUtc } from "@/lib/time";
-import { memberOrigin } from "@/lib/tenant";
+import { staffMemberOrigin } from "@/lib/member-urls-server";
 import { standaloneFlexSentence, outsideHoursSentence } from "@/lib/flex-copy";
 import { standbyText, openingHoursText } from "@/app/staff/series/shared";
 
@@ -250,6 +250,6 @@ export async function inviteMemberToApp(_prev: InviteState, fd: FormData): Promi
   return {
     ok: true,
     message: `Send this link to ${row.email}. It works once and expires in 14 days.`,
-    link: studio?.slug ? `${memberOrigin(studio.slug)}/claim/${row.token}` : undefined,
+    link: studio?.slug ? `${await staffMemberOrigin(supabase, studio.slug)}/claim/${row.token}` : undefined,
   };
 }

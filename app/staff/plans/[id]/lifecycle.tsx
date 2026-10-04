@@ -21,9 +21,9 @@ function Btn({ label, danger }: { label: string; danger?: boolean }) {
 }
 
 export default function PlanLifecycle({
-  id, status, activeMemberships,
+  id, status, totalMemberships,
 }: {
-  id: string; status: string; activeMemberships: number;
+  id: string; status: string; totalMemberships: number;
 }) {
   const [archiveState, archiveAction] = useFormState<PlanFormState, FormData>(setPlanStatus, null);
   const [deleteState, deleteAction] = useFormState<PlanFormState, FormData>(deletePlan, null);
@@ -49,16 +49,30 @@ export default function PlanLifecycle({
           <Btn label={status === "active" ? "Archive plan" : "Restore plan"} />
         </form>
 
-        {activeMemberships === 0 ? (
+        {/* Decision 57 follow-up: the FK blocks deletion on ANY membership (any
+            status), so the Delete button shows only when there are NONE at all.
+            Otherwise the sentence + an Archive-instead button (when still
+            active) — never a Delete button that would hit the raw FK error. */}
+        {totalMemberships === 0 ? (
           <form action={deleteAction}>
             <input type="hidden" name="id" value={id} />
             <Btn label="Delete permanently" danger />
           </form>
         ) : (
-          <span className="text-sm text-ink-3">
-            Cannot be deleted — {activeMemberships} member
-            {activeMemberships === 1 ? " is" : "s are"} on it. Archive instead.
-          </span>
+          <>
+            <span className="text-sm text-ink-3">
+              This plan has {totalMemberships} membership{totalMemberships === 1 ? "" : "s"} on it,
+              so it can&rsquo;t be deleted. Archive it instead — archived plans can&rsquo;t be bought
+              and keep their history.
+            </span>
+            {status === "active" && (
+              <form action={archiveAction}>
+                <input type="hidden" name="id" value={id} />
+                <input type="hidden" name="status" value="archived" />
+                <Btn label="Archive instead" />
+              </form>
+            )}
+          </>
         )}
       </div>
 

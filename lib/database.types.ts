@@ -8046,6 +8046,7 @@ export type Database = {
       mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       member_announcements: { Args: { p_studio_id: string }; Returns: Json }
+      member_app_domain: { Args: never; Returns: string }
       member_booking_window_days: {
         Args: { p_member_id: string }
         Returns: number

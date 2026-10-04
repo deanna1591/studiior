@@ -160,6 +160,12 @@ function explain(error: { code?: string; message: string }): string {
   if (/row-level security/i.test(error.message) || error.code === "42501") {
     return "Your role cannot change plans. Owners and managers only.";
   }
+  // Decision 57 follow-up: a belt for the plan-delete FK. guard_plan_delete
+  // raises PT409 with the sentence before the FK is ever reached, so this fires
+  // only if that guard is somehow absent — never the raw constraint name.
+  if (error.code === "23503" && /memberships_plan_id_fkey/.test(error.message)) {
+    return "This plan has memberships on it, so it can't be deleted. Archive it instead — archived plans can't be bought and keep their history.";
+  }
   return error.message;
 }
 

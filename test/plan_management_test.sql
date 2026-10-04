@@ -38,6 +38,23 @@ end $$;
 -- "allowed" and pass while the policy is doing its job — and an application
 -- that only checks for an error would tell the user their edit saved when it
 -- did not. So a write counts as allowed only if it actually changed something.
+-- Decision 57 follow-up: assert a statement raises a specific SQLSTATE whose
+-- message contains a needle (used for the PT409 delete-guard sentence).
+create or replace function expect_error(label text, sql text, want_code text, needle text)
+returns void language plpgsql as $$
+begin
+  execute sql;
+  raise exception 'FAIL  %  expected % (%), nothing raised', label, want_code, needle;
+exception
+  when others then
+    if sqlstate = want_code and position(needle in sqlerrm) > 0 then
+      raise notice 'PASS  %  (% — %)', label, want_code, needle;
+    else
+      raise exception 'FAIL  %  expected % containing "%", got % "%"',
+        label, want_code, needle, sqlstate, sqlerrm;
+    end if;
+end $$;
+
 create or replace function expect_write(label text, sql text, want_ok boolean)
 returns void language plpgsql as $$
 declare got_ok boolean; n int;
@@ -102,7 +119,12 @@ values
   ('77777777-0000-0000-0000-00000000ba01','77777777-0000-0000-0000-000000000001',
    'Unlimited Monthly','recurring',280000,'CZK','month',null),
   ('77777777-0000-0000-0000-00000000ba02','77777777-0000-0000-0000-000000000001',
-   'Unsold Plan','recurring',150000,'CZK','month',4);
+   'Unsold Plan','recurring',150000,'CZK','month',4),
+  -- Decision 57 follow-up: a plan whose ONLY membership is cancelled. The old
+  -- guard counted status NOT IN ('cancelled','expired') = 0 and let the delete
+  -- reach the raw memberships_plan_id_fkey error; the fix counts ALL.
+  ('77777777-0000-0000-0000-00000000ba03','77777777-0000-0000-0000-000000000001',
+   'Cancelled Pack','class_pack',500000,'CZK',null,null);
 
 -- Mona bought the first plan at 2800.00 CZK. That number is now hers.
 insert into memberships
@@ -110,7 +132,11 @@ insert into memberships
 values
   ('77777777-0000-0000-1111-000000000001','77777777-0000-0000-0000-000000000001',
    '77777777-0000-0000-0000-0000000000d1','77777777-0000-0000-0000-00000000ba01',
-   'active', 280000, 'CZK', current_date);
+   'active', 280000, 'CZK', current_date),
+  -- One CANCELLED membership on Cancelled Pack, and nothing else.
+  ('77777777-0000-0000-1111-000000000003','77777777-0000-0000-0000-000000000001',
+   '77777777-0000-0000-0000-0000000000d1','77777777-0000-0000-0000-00000000ba03',
+   'cancelled', 500000, 'CZK', current_date);
 
 set role authenticated;
 
@@ -142,7 +168,7 @@ select expect_write('manager can delete a plan nobody bought',
 -- Front desk sells plans, so §9 lets them VIEW. Writing is Owner and Manager.
 select login('77777777-0000-0000-0000-0000000000a3');   -- front desk
 select expect_num('front desk CAN see plans (§9, they sell them)',
-  (select count(*) from membership_plans), 3);
+  (select count(*) from membership_plans), 4);
 select expect_write('front desk CANNOT create a plan',
   $$insert into membership_plans (studio_id, name, type, price_cents, currency)
     values ('77777777-0000-0000-0000-000000000001','Desk Made','class_pack',50000,'CZK')$$, false);
@@ -212,6 +238,25 @@ select expect_num('the membership survives archiving',
     where plan_id = '77777777-0000-0000-0000-00000000ba01' and status = 'active'), 1);
 
 -- =============================================================================
+-- 3b. Decision 57 follow-up — a plan whose only membership is CANCELLED still
+--     can't be deleted, and the DB gives the sentence (PT409), not the raw FK.
+-- =============================================================================
+-- The regression: ba03 has one cancelled membership and nothing else. The old
+-- guard would have let this through to memberships_plan_id_fkey (23503). The
+-- fix counts ALL memberships and raises PT409 with the exact sentence.
+select expect_error('deleting a plan with only a cancelled membership is PT409, not the FK',
+  $$delete from membership_plans where id = '77777777-0000-0000-0000-00000000ba03'$$,
+  'PT409', 'so it can''t be deleted. Archive it instead');
+select expect_num('Cancelled Pack is still there',
+  (select count(*) from membership_plans where id = '77777777-0000-0000-0000-00000000ba03'), 1);
+
+-- A plan nobody ever bought still deletes cleanly (Unsold Plan, no memberships).
+select expect_write('a plan with no memberships at all deletes',
+  $$delete from membership_plans where id = '77777777-0000-0000-0000-00000000ba02'$$, true);
+select expect_num('Unsold Plan is gone',
+  (select count(*) from membership_plans where id = '77777777-0000-0000-0000-00000000ba02'), 0);
+
+-- =============================================================================
 -- 4. Editing a price does not reprice anybody — §7.1
 -- =============================================================================
 
@@ -233,9 +278,10 @@ select expect_write('owner drops the plan price to 99000',
 select expect_num('Mona is still on 280000, not silently discounted either',
   (select price_cents from memberships where id = '77777777-0000-0000-1111-000000000001'), 280000);
 
-select expect_num('no membership anywhere drifted from its plan snapshot',
+select expect_num('no membership on this plan drifted from its 280000 snapshot',
   (select count(*) from memberships ms
     where ms.studio_id = '77777777-0000-0000-0000-000000000001'
+      and ms.plan_id = '77777777-0000-0000-0000-00000000ba01'
       and ms.price_cents <> 280000), 0);
 
 -- =============================================================================
