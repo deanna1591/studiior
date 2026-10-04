@@ -5,6 +5,8 @@ import { AppShell, Denied, NavLink, SectionLabel } from "@/components/ui";
 import ArchiveControls from "@/app/staff/archive-form";
 import InstructorForm from "../form";
 import RatePanel, { type RateVersion } from "./rate-panel";
+import { availabilityLine, type SubmissionStatus } from "@/lib/availability-line";
+import { standingCoverage } from "@/lib/availability-standing";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +39,26 @@ export default async function EditInstructor({ params }: { params: { id: string 
     // Decision 46: the collected month's availability state for this instructor.
     supabase.rpc("availability_cycle", { p_studio_id: ctx.studioId }),
   ]);
-  const cStatus = (((cycle as { instructors?: { instructor_id: string; status: string }[] } | null)?.instructors) ?? [])
+  // Decision 46 follow-up: same line as the Instructors list, same helper — a
+  // standing pattern (entered admin-side, no submission) is not "nothing yet".
+  const cyc = cycle as {
+    period_start?: string; period_end?: string;
+    instructors?: { instructor_id: string; status: string }[];
+  } | null;
+  const cStatus = (cyc?.instructors ?? [])
     .find((r) => r.instructor_id === params.id)?.status;
-  const availabilityLine =
-    cStatus === "submitted" ? "Availability for next month: submitted · waiting for you"
-    : cStatus === "approved" ? "Availability for next month: approved"
-    : cStatus === "changes_requested" ? "Availability for next month: sent back"
-    : "Availability for next month: nothing yet";
+  const periodStart = cyc?.period_start ?? "";
+  const periodEnd = cyc?.period_end ?? "";
+  const monthLabel = periodStart
+    ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+        .format(new Date(`${periodStart}T12:00:00Z`))
+    : "";
+  const standing = (periodStart && periodEnd)
+    ? (await standingCoverage(supabase, ctx.studioId, periodStart, periodEnd)).get(params.id) ?? null
+    : null;
+  const availabilityLineView = availabilityLine({
+    submissionStatus: (cStatus ?? "none") as SubmissionStatus, monthLabel, standing, instructorId: params.id,
+  });
   const payrollOn = usesPayroll === true;
   const history = (versions ?? []) as RateVersion[];
   const today = new Date().toISOString().slice(0, 10);
@@ -57,8 +72,8 @@ export default async function EditInstructor({ params }: { params: { id: string 
     <AppShell {...shell} title={i.display_name} actions={<><NavLink href={`/instructors/${i.id}/availability`}>Availability &amp; commitment</NavLink>{" "}<NavLink href="/instructors">Back to instructors</NavLink></>}>
       <p className="mb-1 text-[13px] leading-[20px] text-ink-2">{i.status}</p>
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
-        {availabilityLine}{" "}
-        <NavLink href="/availability">Review</NavLink>
+        {availabilityLineView.text}{" "}
+        <NavLink href={availabilityLineView.href}>{availabilityLineView.linkLabel}</NavLink>
       </p>
       <InstructorForm mode="edit" draft={{
         id: i.id, display_name: i.display_name, bio: i.bio, avatar_url: i.avatar_url,

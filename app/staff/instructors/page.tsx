@@ -3,6 +3,8 @@ import { staffScreen } from "@/lib/screen";
 import Link from "next/link";
 import { AppShell, Denied } from "@/components/ui";
 import { SetupShell, SetupRow, ArchivedSection } from "@/components/setup-list";
+import { availabilityLine, type SubmissionStatus } from "@/lib/availability-line";
+import { standingCoverage } from "@/lib/availability-standing";
 
 export const dynamic = "force-dynamic";
 
@@ -25,17 +27,30 @@ export default async function InstructorsList() {
     supabase.rpc("availability_cycle", { p_studio_id: ctx.studioId }),
   ]);
 
-  // Decision 46: per-instructor state for the line on each row.
-  const cycleRows = ((cycle as { instructors?: { instructor_id: string; status: string }[] } | null)?.instructors) ?? [];
+  // Decision 46 follow-up: the submission state is only half of it — an owner
+  // who entered the week admin-side wrote a STANDING PATTERN (no submission), so
+  // the line has to count that too. availability_cycle's status never looks at
+  // the pattern; standingCoverage reads it directly under RLS (manager-up).
+  const cyc = cycle as {
+    period_start?: string; period_end?: string;
+    instructors?: { instructor_id: string; status: string }[];
+  } | null;
+  const cycleRows = cyc?.instructors ?? [];
   const stateOf = new Map(cycleRows.map((r) => [r.instructor_id, r.status]));
-  const availabilityLine = (id: string): string => {
-    switch (stateOf.get(id)) {
-      case "submitted": return "Availability: submitted · waiting for you";
-      case "approved": return "Availability: approved";
-      case "changes_requested": return "Availability: sent back";
-      default: return "Availability: nothing yet";
-    }
-  };
+  const periodStart = cyc?.period_start ?? "";
+  const periodEnd = cyc?.period_end ?? "";
+  const monthLabel = periodStart
+    ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+        .format(new Date(`${periodStart}T12:00:00Z`))
+    : "";
+  const standing = (periodStart && periodEnd)
+    ? await standingCoverage(supabase, ctx.studioId, periodStart, periodEnd)
+    : new Map();
+  const lineFor = (id: string): string =>
+    availabilityLine({
+      submissionStatus: (stateOf.get(id) ?? "none") as SubmissionStatus,
+      monthLabel, standing: standing.get(id) ?? null, instructorId: id,
+    }).text;
 
   // Split rather than greyed in place. An archived instructor among the live
   // ones reads as a broken row; below its own heading it reads as somebody who
@@ -74,7 +89,7 @@ export default async function InstructorsList() {
     >
       {live.map((p) => (
         <SetupRow key={p.id} href={`/instructors/${p.id}`} name={p.display_name}
-                  meta={`${meta(p)} · ${availabilityLine(p.id)}`} />
+                  meta={`${meta(p)} · ${lineFor(p.id)}`} />
       ))}
     </SetupShell>
   );

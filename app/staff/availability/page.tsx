@@ -3,6 +3,8 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, SectionLabel } from "@/components/ui";
 import ReviewControls from "./review";
+import { standingNote } from "@/lib/availability-line";
+import { standingCoverage } from "@/lib/availability-standing";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,13 @@ export default async function AvailabilityInbox({
   const month = fmt(cycle.period_start, { month: "long", year: "numeric" });
   const due = fmt(cycle.due_on, { day: "numeric", month: "long" });
 
+  // Decision 46 follow-up: an instructor "not sent yet" whose weekly pattern
+  // was entered admin-side is NOT missing — note it beside their name.
+  const standing = cycle.period_start
+    ? await standingCoverage(supabase, ctx.studioId, cycle.period_start,
+        (cycle as { period_end?: string }).period_end ?? cycle.period_start)
+    : new Map();
+
   const missing = cycle.instructors.filter(
     (i) => i.status !== "submitted" && i.status !== "approved");
   const waiting = cycle.instructors.filter((i) => i.status === "submitted");
@@ -117,7 +126,8 @@ export default async function AvailabilityInbox({
                   className="flex flex-wrap items-baseline justify-between gap-x-4 px-3.5 py-2.5">
                 <span className="text-[14px] leading-5 text-ink">{i.name}</span>
                 <span className="text-[12px] leading-4 text-ink-3">
-                  {LABEL[i.status] ?? i.status}
+                  {standingNote(standing.get(i.instructor_id) ?? null)
+                    || (LABEL[i.status] ?? i.status)}
                   {!i.has_login && " · no login, so no reminder can reach them"}
                 </span>
               </li>
