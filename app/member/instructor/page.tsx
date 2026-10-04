@@ -52,7 +52,7 @@ export default async function InstructorHome() {
     supabase.rpc("cover_available_to", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("instructor_notifications", { p_instructor_id: ctx.instructor_id, p_limit: 6 }),
     supabase.rpc("instructor_announcements", { p_studio_id: ctx.studio_id }),
-    supabase.from("studio_settings").select("availability_due_day")
+    supabase.from("studio_settings").select("availability_due_day, cover_escalation_hours")
       .eq("studio_id", ctx.studio_id).maybeSingle(),
     supabase.from("availability_submissions").select("status")
       .eq("instructor_id", ctx.instructor_id).eq("period_start", nextMonthISO).maybeSingle(),
@@ -103,6 +103,9 @@ export default async function InstructorHome() {
   // and is not yet in. Shown until it is submitted; changes_requested is handled
   // by its own item above, so this covers only "not sent yet" and "draft".
   const dueDay = (settings.data?.availability_due_day as number | null) ?? 20;
+  // Decision 59: the cover rule, stated under the next-week card when
+  // confirmations are off (with them on, Home already has its confirm prompt).
+  const coverHours = (settings.data?.cover_escalation_hours as number | null) ?? 4;
   const availStatus = (availSub.data?.status as string | null) ?? "none";
   const availDue = availStatus === "none" || availStatus === "draft";
   const nextMonthLabel = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" })
@@ -137,7 +140,8 @@ export default async function InstructorHome() {
   if (unconfirmed > 0)
     waiting.push({ key: "confirm", href: "/instructor/schedule",
       label: `Confirm ${unconfirmed} ${unconfirmed === 1 ? "class" : "classes"} coming up` });
-  if (roster && rosterLabel)
+  // Decision 59: no "confirm the roster" prompt when confirmations are off.
+  if (confirmationsOn && roster && rosterLabel)
     waiting.push({ key: "roster", href: "/instructor/month",
       label: `Your ${rosterLabel} roster is ready to confirm` });
   if (availChanges)
@@ -182,6 +186,14 @@ export default async function InstructorHome() {
                 className="m-sub mt-1 inline-block underline underline-offset-4"
                 style={{ color: "var(--accent-text)" }}>See what&apos;s on</Link>
         </div>
+      )}
+
+      {/* Decision 59: the one rule, when confirmations are off. */}
+      {!confirmationsOn && next && (
+        <p className="mt-2 px-1 text-[12.5px] leading-[18px] text-ink-3">
+          Can&rsquo;t make a class? Ask for cover at least <span className="num">{coverHours}</span> hours
+          before it starts — you can ask a colleague directly and they confirm from their phone.
+        </p>
       )}
 
       {/* COVER NEEDED NOW — urgent, first come. */}

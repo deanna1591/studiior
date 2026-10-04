@@ -1088,6 +1088,15 @@ insert into peak_windows (studio_id, day_of_week, starts_at, ends_at)
 select '9eac9eac-0000-0000-0000-000000000001', d, time '00:00', time '23:59'
   from generate_series(0, 6) d;
 
+-- A FRESH peak allowance for this one booking, so the section does not depend on
+-- how earlier bookings in the suite landed. `now() + 13 hours` crosses the
+-- studio-local day (and so the allowance period) at some times of day, which
+-- otherwise left the member already exhausted and the booking refused — a
+-- pre-existing time-of-day fragility, nothing to do with what is under test
+-- here (the free-window reminder for a booking that spent a slot).
+delete from peak_allowance_ledger
+ where member_id = '9eac9eac-0000-0000-0000-00000000dd01';
+
 set role authenticated;
 select set_config('request.jwt.claim.sub','9eac9eac-0000-0000-0000-0000000000b1',false);
 select set_config('t.br', (select (book_class('9eac9eac-0000-0000-0000-0000000009d1',

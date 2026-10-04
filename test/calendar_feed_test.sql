@@ -261,15 +261,15 @@ reset role;
 -- publish_month queued a month_roster notice to instructor I2 (who has a login);
 -- notification_ics builds the whole-month multi-event calendar from it.
 select expect_true('a month_roster notice was queued to the instructor',
-  exists(select 1 from notifications where template_key = 'month_roster'
+  exists(select 1 from notifications where template_key in ('month_roster', 'month_roster_plain')
            and studio_id = 'feedfeed-0000-0000-0000-000000000002'));
 select expect_true('its .ics is a multi-event VCALENDAR carrying the month''s class',
   (select notification_ics(id) from notifications
-     where template_key = 'month_roster' and studio_id = 'feedfeed-0000-0000-0000-000000000002' limit 1)
+     where template_key in ('month_roster', 'month_roster_plain') and studio_id = 'feedfeed-0000-0000-0000-000000000002' limit 1)
     ~ 'BEGIN:VCALENDAR');
 select expect_true('...with the occurrence as a VEVENT UID',
   (select notification_ics(id) from notifications
-     where template_key = 'month_roster' and studio_id = 'feedfeed-0000-0000-0000-000000000002' limit 1)
+     where template_key in ('month_roster', 'month_roster_plain') and studio_id = 'feedfeed-0000-0000-0000-000000000002' limit 1)
     ~ 'UID:feedfeed-0000-0000-0000-00000000a003');
 
 -- =============================================================================

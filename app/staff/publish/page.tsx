@@ -5,7 +5,7 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Notice, SectionLabel } from "@/components/ui";
 import PublishForm from "./publish-form";
 import ClearMonthButton from "./clear-month";
-import { confirmRosterFor, carryForwardNow } from "./actions";
+import { confirmRosterFor, carryForwardNow, resendMonthRoster } from "./actions";
 import { buttonQuietClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ function rosterState(i: Facts["instructors"][number]) {
  * Publishing with holes is allowed and warned, never blocked. An open shift is
  * a real state and Decision 17 handles it.
  */
-export default async function PublishPage({ searchParams }: { searchParams: { m?: string; just?: string; err?: string; carried?: string; cleared_n?: string; tpl?: string } }) {
+export default async function PublishPage({ searchParams }: { searchParams: { m?: string; just?: string; err?: string; carried?: string; cleared_n?: string; tpl?: string; resent?: string } }) {
   const screen = await staffScreen("/publish");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -92,6 +92,12 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
   const facts = previews.map((p) => p.data as unknown as Facts | null);
   const failed = previews.find((p) => p.error)?.error ?? null;
 
+  // Decision 59: with confirmations off there is no "confirm the month" to
+  // track — the roster email just states the schedule and the cover rule.
+  const { data: cfg } = await supabase.from("studio_settings")
+    .select("assignment_confirmations").eq("studio_id", ctx.studioId).maybeSingle();
+  const confirmationsOn = cfg?.assignment_confirmations ?? false;
+
   // The selected month: ?m=YYYY-MM, else the first draft, else this month.
   const wanted = searchParams.m ? `${searchParams.m}-01` : null;
   const selected =
@@ -135,6 +141,7 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
       )}
 
       {searchParams.err && <Notice kind="error">{searchParams.err}</Notice>}
+      {searchParams.resent && <Notice kind="ok">{searchParams.resent}</Notice>}
       {searchParams.carried === "1" && <Notice kind="ok">Rosters carried forward. Anything not carried is listed below with why.</Notice>}
       {searchParams.cleared_n && (
         <Notice kind="ok">
@@ -206,7 +213,7 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
               </div>
             </div>
 
-            {selected.published && selected.instructors.length > 0 && (
+            {selected.published && selected.instructors.length > 0 && confirmationsOn && (
               <p className="mt-5 text-[13px] leading-[19px] text-ink-2">
                 <span className="num">{selected.instructors.filter((i) => i.confirmed_at).length}</span> of{" "}
                 <span className="num">{selected.instructors.length}</span> have confirmed the month.
@@ -214,6 +221,22 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
                   <> Somebody with no login cannot confirm from the app — you can confirm for them once they have said yes.</>
                 )}
               </p>
+            )}
+
+            {/* Decision 59: re-send the month's schedule email (the publish-time
+                send is once-per-month, and at Reform it went out before most
+                instructors had logins). */}
+            {selected.published && selected.instructors.length > 0 && (
+              <form action={resendMonthRoster} className={confirmationsOn ? "mt-3" : "mt-5"}>
+                <input type="hidden" name="month" value={selected.month} />
+                <button className={buttonQuietClass}>Send this month&rsquo;s schedule to instructors</button>
+                <p className="mt-1.5 max-w-[60ch] text-[12px] leading-[17px] text-ink-3">
+                  One email to each instructor with a login and a class this month.
+                  {confirmationsOn
+                    ? " It asks them to confirm."
+                    : " It states their classes and the cover rule — no confirmation asked."}
+                </p>
+              </form>
             )}
 
             {selected.instructors.length > 0 && (
@@ -229,11 +252,14 @@ export default async function PublishPage({ searchParams }: { searchParams: { m?
                     <span className="flex shrink-0 items-center gap-3">
                       <span className="num text-right text-[12px] leading-4 text-ink-2">
                         {i.classes} {i.classes === 1 ? "class" : "classes"}
-                        {selected.published && (
+                        {selected.published && confirmationsOn && (
                           <span className="block text-ink-3">{rosterState(i)}</span>
                         )}
+                        {selected.published && !confirmationsOn && !i.reachable && (
+                          <span className="block text-ink-3">no login</span>
+                        )}
                       </span>
-                      {selected.published && !i.confirmed_at && (
+                      {selected.published && confirmationsOn && !i.confirmed_at && (
                         <form action={confirmRosterFor}>
                           <input type="hidden" name="month" value={selected.month} />
                           <input type="hidden" name="instructor_id" value={i.instructor_id} />

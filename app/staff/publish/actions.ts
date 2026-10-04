@@ -35,6 +35,37 @@ export async function publishMonth(_prev: PublishState, fd: FormData): Promise<P
 }
 
 /**
+ * Decision 59 — re-send the month's schedule email to every instructor with a
+ * login and a class that month. Keyed per send, so it goes again; names the
+ * instructors with no login, who cannot be emailed.
+ */
+export async function resendMonthRoster(fd: FormData): Promise<void> {
+  const ctx = await getStaffContext();
+  if (!ctx) redirect("/login");
+  const month = String(fd.get("month") ?? "");
+  if (!/^\d{4}-\d{2}-01$/.test(month)) return;
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resend_month_roster", {
+    p_studio_id: ctx.studioId, p_month: month,
+  });
+  if (error) {
+    const msg = /PT403/.test(error.message) ? "Only owners and managers send the schedule."
+      : /PT409/.test(error.message) ? "That month is not published yet."
+      : error.message;
+    redirect(`/publish?m=${month.slice(0, 7)}&err=${encodeURIComponent(msg)}`);
+  }
+  const r = data as unknown as { sent: number; no_login: { name: string }[] };
+  const sent = r?.sent ?? 0;
+  const noLogin = r?.no_login ?? [];
+  const sentence = `Sent to ${sent} ${sent === 1 ? "instructor" : "instructors"}.`
+    + (noLogin.length > 0
+      ? ` ${noLogin.length} ${noLogin.length === 1 ? "has" : "have"} no login yet: ${noLogin.map((x) => x.name).join(", ")}.`
+      : "");
+  revalidatePath("/publish");
+  redirect(`/publish?m=${month.slice(0, 7)}&resent=${encodeURIComponent(sentence)}`);
+}
+
+/**
  * The studio records a yes given some other way — a text, a word at the desk.
  * confirm_month_roster() allows manager-up on the instructor's behalf, the
  * same as confirm_week() does, and audits who did it.

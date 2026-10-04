@@ -8216,6 +8216,16 @@ export type Database = {
         Args: { p_at: string; p_studio_id: string }
         Returns: boolean
       }
+      month_roster_lines: {
+        Args: { p_month: string; p_studio_id: string }
+        Returns: {
+          display_name: string
+          instructor_id: string
+          lines: string
+          lines_html: string
+          n: number
+        }[]
+      }
       move_occurrence: {
         Args: {
           p_clear_instructor?: boolean
@@ -8651,6 +8661,10 @@ export type Database = {
       }
       request_series_confirmations: {
         Args: { p_series_id: string }
+        Returns: Json
+      }
+      resend_month_roster: {
+        Args: { p_month: string; p_studio_id: string }
         Returns: Json
       }
       resolve_checkin_code: {

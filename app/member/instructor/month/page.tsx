@@ -16,6 +16,7 @@ type Klass = {
 type Roster = {
   month: string; label: string; state: "draft" | "empty" | "unconfirmed" | "confirmed";
   classes: Klass[]; count: number; notified_at: string | null; confirmed_at: string | null;
+  confirmations_on: boolean;
   added_since: number; empty_hint: string;
 };
 
@@ -75,11 +76,13 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
         </div>
       )}
 
-      {r?.state === "unconfirmed" && (
+      {/* Decision 59: no "confirm the month" prompt when confirmations are off —
+          the roster is just the schedule and the cover rule. */}
+      {r?.confirmations_on && r?.state === "unconfirmed" && (
         <ConfirmMonth instructorId={ctx.instructor_id} month={r.month} label={r.label}
                       count={r.count} flagged={flagged} />
       )}
-      {r?.state === "confirmed" && (
+      {r?.confirmations_on && r?.state === "confirmed" && (
         <p className="m-card mb-4 px-4 py-3 text-[13px] leading-[19px] text-ink-2">
           Confirmed. Ask for cover on any class below if something changes — the
           studio decides, and you are down to teach it until they do.

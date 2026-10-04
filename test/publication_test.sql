@@ -290,7 +290,7 @@ select expect_num('...and NEXT month, with nobody booked, stays a draft',
     where studio_id='9b159b15-0000-0000-0000-000000000001' and month = current_setting('t.a_m1')::date), 0);
 select expect_num('auto-publishing emailed nobody',
   (select count(*) from notifications where studio_id='9b159b15-0000-0000-0000-000000000001'
-      and template_key = 'month_roster'), 0);
+      and template_key in ('month_roster', 'month_roster_plain')), 0);
 select expect_true('...and the rows say they were automatic',
   (select bool_and(auto) from schedule_publications where studio_id='9b159b15-0000-0000-0000-000000000001'));
 
@@ -448,23 +448,23 @@ select expect_num('...one instructor emailed there', (current_setting('t.pub_b')
 reset role;
 
 select expect_num('exactly three roster emails across both studios',
-  (select count(*) from notifications where template_key = 'month_roster'
+  (select count(*) from notifications where template_key in ('month_roster', 'month_roster_plain')
       and studio_id in ('9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-000000000002')), 3);
 select expect_num('Ana''s lists her three classes',
   (select array_length(string_to_array(payload ->> 'roster', E'\n'), 1) from notifications
-    where template_key = 'month_roster' and user_id = '9b159b15-0000-0000-0000-0000000000a2'), 3);
+    where template_key in ('month_roster', 'month_roster_plain') and user_id = '9b159b15-0000-0000-0000-0000000000a2'), 3);
 select expect_num('Bo''s lists his two (the open one went back to being open)',
   (select array_length(string_to_array(payload ->> 'roster', E'\n'), 1) from notifications
-    where template_key = 'month_roster' and user_id = '9b159b15-0000-0000-0000-0000000000a3'), 2);
+    where template_key in ('month_roster', 'month_roster_plain') and user_id = '9b159b15-0000-0000-0000-0000000000a3'), 2);
 select expect_true('...and Ana''s roster names none of Bo''s classes',
   (select payload ->> 'roster' not like '%Reformer Near%' and payload ->> 'roster' not like '%Reformer Far%'
-     from notifications where template_key = 'month_roster' and user_id = '9b159b15-0000-0000-0000-0000000000a2'));
+     from notifications where template_key in ('month_roster', 'month_roster_plain') and user_id = '9b159b15-0000-0000-0000-0000000000a2'));
 select expect_true('Bel''s roster is B''s class and nothing of A''s',
   (select payload ->> 'roster' like '%Manila Mat%' and payload ->> 'roster' not like '%Reformer%'
-     from notifications where template_key = 'month_roster' and user_id = '9b159b15-0000-0000-0000-0000000000b2'));
+     from notifications where template_key in ('month_roster', 'month_roster_plain') and user_id = '9b159b15-0000-0000-0000-0000000000b2'));
 select expect_true('the roster carries the studio''s wall-clock time',
   (select payload ->> 'roster' like '%07:00%' from notifications
-    where template_key = 'month_roster' and user_id = '9b159b15-0000-0000-0000-0000000000a2'));
+    where template_key in ('month_roster', 'month_roster_plain') and user_id = '9b159b15-0000-0000-0000-0000000000a2'));
 select expect_num('three roster rows for A: Ana and Bo notified, Cai not',
   (select count(*) from roster_confirmations where studio_id='9b159b15-0000-0000-0000-000000000001'
       and month = current_setting('t.a_m1')::date), 3);
@@ -482,7 +482,7 @@ select expect_true('publishing again says it already was', (current_setting('t.a
 select expect_num('...and sent nobody anything', (current_setting('t.again')::jsonb ->> 'notified')::bigint, 0);
 reset role;
 select expect_num('...still three roster emails',
-  (select count(*) from notifications where template_key = 'month_roster'
+  (select count(*) from notifications where template_key in ('month_roster', 'month_roster_plain')
       and studio_id in ('9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-000000000002')), 3);
 select expect_num('...and still one publication row', (select count(*) from schedule_publications
     where studio_id='9b159b15-0000-0000-0000-000000000001' and month = current_setting('t.a_m1')::date), 1);
