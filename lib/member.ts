@@ -82,7 +82,7 @@ export async function membershipState(
 ) {
   const { data } = await supabase
     .from("memberships")
-    .select("id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, complimentary, membership_plans(name, type)")
+    .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, complimentary, membership_plans(name, type, billing_interval)")
     .eq("member_id", memberId)
     .order("starts_on", { ascending: false });
 

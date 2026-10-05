@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isOneTimePlan, INTRO_USED_SENTENCE } from "../lib/plan-kind.mjs";
+import { isOneTimePlan, isOnlineBuyable, INTRO_USED_SENTENCE } from "../lib/plan-kind.mjs";
+
+test("a recurring plan is online-buyable (Decision 66) but NOT one-time", () => {
+  assert.equal(isOnlineBuyable("recurring"), true);
+  assert.equal(isOneTimePlan("recurring"), false);
+});
+
+test("the one-time plans are all online-buyable", () => {
+  for (const t of ["class_pack", "drop_in", "trial"]) assert.equal(isOnlineBuyable(t), true);
+});
+
+test("an unknown type is not online-buyable", () => {
+  assert.equal(isOnlineBuyable("something_else"), false);
+});
 
 test("a trial is a one-time plan (Decision 62)", () => {
   assert.equal(isOneTimePlan("trial"), true);

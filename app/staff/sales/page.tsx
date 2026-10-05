@@ -30,7 +30,7 @@ const STATUSES: [string, string][] = [
 
 type Sale = {
   membership_id: string; member_id: string; member_name: string;
-  plan_id: string; plan_name: string; plan_type: string;
+  plan_id: string; plan_name: string; plan_type: string; is_renewal: boolean;
   amount_cents: number; currency: string; payment_source: string;
   bought_on: string; starts_on: string | null; expires_on: string | null;
   sale_status: string;
@@ -201,7 +201,9 @@ export default async function Sales({
                   </td>
                   <td className="px-3 py-2.5">
                     <span className="block">{s.plan_name}</span>
-                    <span className="block text-[11px] leading-4 text-ink-3">{s.plan_type.replace("_", " ")}</span>
+                    <span className="block text-[11px] leading-4 text-ink-3">
+                      {s.plan_type.replace("_", " ")}{s.is_renewal && " · renewal"}
+                    </span>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{s.payment_source}</td>
                   <td className="num px-3 py-2.5 text-right">{formatMoney(s.amount_cents, s.currency)}</td>

@@ -7161,6 +7161,7 @@ export type Database = {
           payment_session_id: string | null
           plan_id: string | null
           product_order_id: string | null
+          renews_membership_id: string | null
           status: string
           studio_id: string
           updated_at: string
@@ -7180,6 +7181,7 @@ export type Database = {
           payment_session_id?: string | null
           plan_id?: string | null
           product_order_id?: string | null
+          renews_membership_id?: string | null
           status?: string
           studio_id: string
           updated_at?: string
@@ -7199,6 +7201,7 @@ export type Database = {
           payment_session_id?: string | null
           plan_id?: string | null
           product_order_id?: string | null
+          renews_membership_id?: string | null
           status?: string
           studio_id?: string
           updated_at?: string
@@ -7231,6 +7234,13 @@ export type Database = {
             columns: ["product_order_id"]
             isOneToOne: false
             referencedRelation: "product_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_renews_membership_id_fkey"
+            columns: ["renews_membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
@@ -7386,6 +7396,10 @@ export type Database = {
         Returns: Json
       }
       advance_membership_period: {
+        Args: { p_membership_id: string }
+        Returns: Json
+      }
+      advance_membership_period_run: {
         Args: { p_membership_id: string }
         Returns: Json
       }
@@ -8990,6 +9004,10 @@ export type Database = {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json
       }
+      resend_reply_to: {
+        Args: { p_address: string; p_from_name: string }
+        Returns: string
+      }
       resolve_checkin_code: {
         Args: { p_code: string }
         Returns: {
@@ -9042,6 +9060,7 @@ export type Database = {
           bought_on: string
           currency: string
           expires_on: string
+          is_renewal: boolean
           member_id: string
           member_name: string
           membership_id: string
@@ -9515,6 +9534,7 @@ export type Database = {
         Returns: Json
       }
       sweep_instructor_confirmations: { Args: never; Returns: Json }
+      sweep_membership_expiring: { Args: never; Returns: Json }
       sweep_membership_periods: { Args: never; Returns: Json }
       sweep_no_shows: { Args: never; Returns: Json }
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }

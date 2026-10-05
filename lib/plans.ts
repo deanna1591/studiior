@@ -47,7 +47,7 @@ export const PLAN_TYPE_HINT: Record<PlanType, string> = {
 // Decision 57/62: the one-time-plan predicate and the intro-once sentence live
 // in a pure .mjs so `node --test` can reach them; re-exported here so the app
 // keeps importing them from @/lib/plans.
-export { isOneTimePlan, INTRO_USED_SENTENCE } from "./plan-kind";
+export { isOneTimePlan, isOnlineBuyable, INTRO_USED_SENTENCE } from "./plan-kind";
 
 export const VISIBILITY_LABEL: Record<string, string> = {
   public: "Public — members can see and buy it",

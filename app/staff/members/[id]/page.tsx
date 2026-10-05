@@ -367,8 +367,15 @@ export default async function MemberDetail({
                   {" · "}{live.status.replace("_", " ")}
                   {live.renews_on && <> · renews {d(live.renews_on)}</>}
                   {live.expires_on && <> · {live.complimentary ? "until" : "expires"} {d(live.expires_on)}</>}
-                  {!live.auto_renew && !live.complimentary && <> · will not renew</>}
+                  {!live.auto_renew && !live.complimentary && live.membership_plans?.type !== "recurring" && <> · will not renew</>}
                 </div>
+                {/* Decision 66: a recurring membership bought online is one period
+                    at a time — the member renews by hand. */}
+                {live.membership_plans?.type === "recurring" && !live.auto_renew && !live.complimentary && (
+                  <div className="mt-1 text-[12px] leading-4 text-ink-3">
+                    Online · one period at a time{live.renews_on && <> · ends {d(live.renews_on)}</>}
+                  </div>
+                )}
                 <div className="mt-2 text-[13px] leading-[18px] text-ink">
                   {live.membership_plans?.type === "recurring" && live.credits_remaining === null
                     ? "Unlimited classes"

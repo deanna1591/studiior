@@ -2,7 +2,7 @@ import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
-import { formatMoney, isOneTimePlan, INTRO_USED_SENTENCE } from "@/lib/plans";
+import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
 import BuyPlan from "./buy";
 
@@ -12,6 +12,17 @@ export default async function Plan() {
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
   const { live, all } = await membershipState(supabase, ctx.memberId);
+
+  // Decision 66: a recurring membership can be renewed by hand online in its
+  // last week, or while past-due inside Decision 4's grace (past_due IS the
+  // in-grace state — the existing handling cancels it at grace end).
+  const renewable =
+    !!live &&
+    live.membership_plans?.type === "recurring" &&
+    settings.xenditEnabled &&
+    (live.status === "past_due" ||
+      (!!live.renews_on &&
+        new Date(live.renews_on + "T00:00:00") <= new Date(Date.now() + 7 * 864e5)));
 
   const from = dayStart(new Date(), ctx.timeZone, 0);
   const to = addDays(from, 30);
@@ -105,6 +116,19 @@ export default async function Plan() {
             ) : live.expires_on ? (
               <p className="m-sub text-ink-2">Runs until {d(live.expires_on)}.</p>
             ) : <p className="m-sub text-ink-2">No end date.</p>}
+
+            {/* Decision 66: renewing is the member's action. When the studio
+                takes online payments and the recurring membership is in its last
+                week (or already past-due, inside grace), offer the one-time
+                checkout — a success extends this membership by one period. */}
+            {renewable && (
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="m-sub text-ink">
+                  Your {live.membership_plans?.name} ends {live.renews_on && d(live.renews_on)} — renew for another {live.membership_plans?.billing_interval ?? "period"}.
+                </p>
+                <BuyPlan planId={live.plan_id} />
+              </div>
+            )}
           </div>
 
           {/* Peak — only when the studio runs peak allowances and this member has one. */}
@@ -153,12 +177,10 @@ export default async function Plan() {
                 : p.type === "trial"
                 ? [`${p.credits ?? 1} class${(p.credits ?? 1) === 1 ? "" : "es"}`,
                    p.validity_days ? `use within ${p.validity_days} days` : null]
+                // Decision 66: recurring is sold one period at a time online —
+                // say the per-period allowance and that there is no auto-charge.
                 : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
-                   p.billing_interval
-                     ? `billed ${(p.billing_interval_count ?? 1) > 1
-                          ? `every ${p.billing_interval_count} ${p.billing_interval}s`
-                          : `per ${p.billing_interval}`}`
-                     : null];
+                   `one ${p.billing_interval ?? "period"} — renew by hand`];
               return (
                 <li key={p.id} className="m-card p-4">
                   <div className="flex items-baseline justify-between gap-3">
@@ -169,11 +191,11 @@ export default async function Plan() {
                   </div>
                   {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
                   <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
-                  {/* Decision 40: buy a one-time plan online when the studio has
-                      Xendit connected. Recurring plans stay at the desk (Part B).
-                      Decision 62: a trial is a one-time plan; show the intro-once
-                      sentence in place of Buy when the member has already had it. */}
-                  {settings.xenditEnabled && isOneTimePlan(p.type) && (
+                  {/* Decision 40/66: buy online when the studio has Xendit — a
+                      pack, drop-in, trial, or a recurring plan one period at a
+                      time (renew by hand). Decision 62: show the intro-once
+                      sentence in place of Buy when the member has already had the trial. */}
+                  {settings.xenditEnabled && isOnlineBuyable(p.type) && (
                     p.type === "trial" && settings.trialUsed ? (
                       <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
                         {INTRO_USED_SENTENCE}

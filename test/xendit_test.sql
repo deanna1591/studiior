@@ -5,7 +5,8 @@
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY thirteen, still naming xendit_webhook; begin_purchase snapshots the
--- amount from the plan and refuses a recurring plan / a non-member; a callback
+-- amount from the plan, admits a recurring plan (one period, Decision 66) and
+-- refuses a non-member; a callback
 -- with a WRONG token raises PT401 and stores NO event; a SUCCEEDED callback
 -- activates the plan (credits + expiry, exactly as a manual payment) and writes
 -- the xendit payments row; a REPLAY is a duplicate with no second activation; an
@@ -101,18 +102,19 @@ select expect_true('xendit_webhook is anon-executable',
   has_function_privilege('anon', 'xendit_webhook(jsonb, text)'::regprocedure, 'execute'));
 
 -- =============================================================================
--- 3. begin_purchase snapshots the amount from the plan; refuses recurring / non-member.
+-- 3. begin_purchase snapshots the amount from the plan; admits recurring (one
+--    period, Decision 66); refuses a non-member.
 -- =============================================================================
 set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
 select set_config('t.pid1', (select purchase_id::text from xendit_begin_purchase(
   'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc001')), false);
 select set_config('t.amt1', (select amount_cents::text from xendit_purchases where id=current_setting('t.pid1')::uuid), false);
 
-do $$ begin
-  begin perform xendit_begin_purchase('e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc002');
-    perform set_config('t.recurring','no_raise',false);
-  exception when others then perform set_config('t.recurring', sqlstate, false); end;
-end $$;
+-- Decision 66: a recurring plan is now admitted (bought one period at a time);
+-- it begins a purchase at the plan's price, no renews_membership_id (this
+-- member holds no membership on it yet).
+select set_config('t.pidrec', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cc002')), false);
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 -- A non-member (no members row here for e02) is refused.
@@ -128,7 +130,12 @@ end $$;
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 select expect_num('begin_purchase snapshots the plan amount (₱1,400 = 140000)', current_setting('t.amt1')::bigint, 140000);
-select expect_text('a recurring plan is refused (PT422)', current_setting('t.recurring'), 'PT422');
+-- Decision 66: a recurring plan is admitted as one period at the plan price,
+-- with no renews_membership_id for a member who holds none yet.
+select expect_num('a recurring plan begins at its price (one period, Decision 66)',
+  (select amount_cents from xendit_purchases where id=current_setting('t.pidrec')::uuid)::bigint, 250000);
+select expect_text('the recurring begin stamps no renews_membership_id',
+  coalesce((select renews_membership_id::text from xendit_purchases where id=current_setting('t.pidrec')::uuid),'null'), 'null');
 select expect_text('a non-member is refused begin_purchase (PT403)', current_setting('t.nonmember'), 'PT403');
 select expect_text('a non-member is refused checkout_context (PT403)', current_setting('t.cc_nonmember'), 'PT403');
 

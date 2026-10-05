@@ -6,7 +6,7 @@ import { anonStudio } from "@/lib/anon-studio";
 import { createClient } from "@/lib/supabase/server";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
-import { formatMoney, isOneTimePlan, INTRO_USED_SENTENCE } from "@/lib/plans";
+import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { buyPath } from "@/lib/member-urls";
 import BuyPlan from "../../account/plan/buy";
@@ -19,6 +19,7 @@ type Plan = {
   id: string; name: string; description: string | null; type: string;
   price_cents: number; currency: string; credits: number | null;
   validity_days: number | null; visibility: string; status: string;
+  credits_per_period: number | null; billing_interval: string | null;
 };
 
 /** Reads the plan under the member's own RLS (plans_member_read = this studio,
@@ -27,7 +28,7 @@ type Plan = {
 async function readPlan(supabase: ReturnType<typeof createClient>, planId: string): Promise<Plan | null> {
   if (!UUID.test(planId)) return null;
   const { data } = await supabase.from("membership_plans")
-    .select("id, name, description, type, price_cents, currency, credits, validity_days, visibility, status")
+    .select("id, name, description, type, price_cents, currency, credits, validity_days, visibility, status, credits_per_period, billing_interval")
     .eq("id", planId).maybeSingle();
   return (data as Plan | null) ?? null;
 }
@@ -38,7 +39,20 @@ async function readPlan(supabase: ReturnType<typeof createClient>, planId: strin
 // is a one-time plan, so it is buyable here too — the intro-once check is
 // separate, so its refusal can say something different.
 const isBuyable = (p: Plan) =>
-  isOneTimePlan(p.type) && p.visibility === "public" && p.status === "active";
+  isOnlineBuyable(p.type) && p.visibility === "public" && p.status === "active";
+
+// Decision 66: a recurring plan is bought as a single period. Its "includes" is
+// the per-period allowance (null = unlimited, Decision 12) plus the one line
+// that says there is no auto-charge — you renew by hand.
+const PERIOD_WORD: Record<string, string> = { week: "week", month: "month", year: "year" };
+function recurringIncludes(p: Plan): (string | null)[] {
+  const per = p.billing_interval ? PERIOD_WORD[p.billing_interval] ?? "period" : "period";
+  return [
+    p.credits_per_period == null ? "Unlimited classes"
+      : `${p.credits_per_period} class${p.credits_per_period === 1 ? "" : "es"} a ${per}`,
+    `one ${per} — renew by hand`,
+  ];
+}
 
 export async function generateMetadata({ params }: { params: { plan: string } }): Promise<Metadata> {
   const studio = await anonStudio();
@@ -135,7 +149,9 @@ export default async function Buy({ params }: { params: { plan: string } }) {
   }
 
   // What the plan includes and its expiry rule, mirroring /account/plan.
-  const includes = plan.type === "drop_in"
+  const includes = plan.type === "recurring"
+    ? recurringIncludes(plan)
+    : plan.type === "drop_in"
     ? ["Single class", plan.validity_days ? `use within ${plan.validity_days} days` : null]
     // class_pack and trial are both a count of classes over a window.
     : [plan.credits != null ? `${plan.credits} class${plan.credits === 1 ? "" : "es"}` : null,
@@ -165,7 +181,11 @@ export default async function Buy({ params }: { params: { plan: string } }) {
         <p className="m-sub mt-2 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
 
         {alreadyHas && !introUsed && (
-          <p className="m-sub mt-3 text-ink-2">You already have {plan.name} — buying again adds to it.</p>
+          <p className="m-sub mt-3 text-ink-2">
+            {plan.type === "recurring"
+              ? <>You already have {plan.name} — this renews it for another period.</>
+              : <>You already have {plan.name} — buying again adds to it.</>}
+          </p>
         )}
 
         {introUsed ? (

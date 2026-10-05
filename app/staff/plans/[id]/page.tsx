@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink, Notice } from "@/components/ui";
-import { formatMoney, isOneTimePlan, type PlanType } from "@/lib/plans";
+import { formatMoney, isOnlineBuyable, type PlanType } from "@/lib/plans";
 import PlanForm, { type PlanDraft } from "../plan-form";
 import PlanLifecycle from "./lifecycle";
 import WebsiteLink from "./website-link";
@@ -105,15 +105,11 @@ export default async function EditPlan({
           : " · on sale"}
       </p>
       {searchParams.saved && <Notice kind="ok">Saved.</Notice>}
-      {/* Decision 57: the website buy link. One-time plans get the link + Copy;
-          a recurring plan points at Part B; an archived plan gets no link. */}
-      {plan.status !== "archived" && isOneTimePlan(plan.type) && studioRow?.slug && (
+      {/* Decision 57/66: the website buy link. Every online-buyable plan gets
+          the link + Copy — a pack, drop-in, trial, or a recurring plan sold one
+          period at a time (Decision 66). An archived plan gets no link. */}
+      {plan.status !== "archived" && isOnlineBuyable(plan.type) && studioRow?.slug && (
         <WebsiteLink url={buyUrl(await staffMemberOrigin(supabase, studioRow.slug), plan.id)} />
-      )}
-      {plan.status !== "archived" && plan.type === "recurring" && (
-        <p className="mb-5 rounded border border-line bg-paper px-3 py-2 text-[13px] leading-relaxed text-ink-2">
-          Online buying for recurring plans comes with subscriptions (Part B).
-        </p>
       )}
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
                 activeMemberships={active} mode="edit"
