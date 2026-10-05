@@ -6714,6 +6714,7 @@ export type Database = {
           accent_color: string | null
           archived_at: string | null
           brand_color: string | null
+          checkin_slug: string | null
           contact_email: string | null
           contact_phone: string | null
           country: string | null
@@ -6739,6 +6740,7 @@ export type Database = {
           accent_color?: string | null
           archived_at?: string | null
           brand_color?: string | null
+          checkin_slug?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           country?: string | null
@@ -6764,6 +6766,7 @@ export type Database = {
           accent_color?: string | null
           archived_at?: string | null
           brand_color?: string | null
+          checkin_slug?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           country?: string | null
@@ -7615,6 +7618,7 @@ export type Database = {
         Args: { p_bucket: number; p_member_id: string }
         Returns: string
       }
+      checkin_slug_studio: { Args: { p_slug: string }; Returns: string }
       choose_pay_at_desk: { Args: { p_booking_id: string }; Returns: Json }
       claim_guarantee_terms: {
         Args: { p_instructor_id: string }
@@ -7925,6 +7929,7 @@ export type Database = {
         Args: { p_confirm?: boolean; p_ends_on?: string; p_series_id: string }
         Returns: Json
       }
+      ensure_checkin_slug: { Args: { p_studio_id: string }; Returns: string }
       ensure_pay_period: {
         Args: { p_on: string; p_studio_id: string }
         Returns: {
@@ -8279,6 +8284,15 @@ export type Database = {
       instructor_reliability: {
         Args: { p_instructor_id: string }
         Returns: Json
+      }
+      instructor_resolve_code: {
+        Args: { p_code: string; p_occurrence_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          member_id: string
+        }[]
       }
       instructor_roster: { Args: { p_occurrence_id: string }; Returns: Json }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
@@ -8967,6 +8981,7 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: number
       }
+      remint_checkin_slug: { Args: { p_studio_id: string }; Returns: string }
       remove_instructor_login: {
         Args: { p_instructor_id: string }
         Returns: Json

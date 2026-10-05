@@ -290,16 +290,66 @@ export async function checkInMember(
 ): Promise<InstructorState> {
   const supabase = createClient();
   const occurrenceId = String(form.get("occurrence_id"));
+  // Decision 35 §4/§5: an instructor checking a member in is 'instructor', not
+  // 'staff' (a human at the desk). The roster reads this as "Scanned".
   const { error } = await supabase.from("check_ins").insert({
     studio_id: String(form.get("studio_id")),
     booking_id: String(form.get("booking_id")),
     member_id: String(form.get("member_id")),
     occurrence_id: occurrenceId,
-    method: "staff",
+    method: "instructor",
   });
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") return { ok: "In." };               // already checked in
+    if (error.code === "PT422") return { error: "They need to sign the studio waiver first." };
+    return { error: error.message };
+  }
   revalidatePath(`/instructor/roster/${occurrenceId}`);
   return { ok: "In." };
+}
+
+/**
+ * Decision 35 §4 — the camera scan. Resolve the member's 8-char rotating code
+ * (from their personal QR) against THIS occurrence via instructor_resolve_code
+ * (guarded on the occurrence's own instructor or a manager, AND the window
+ * open), then check them in with method='instructor' through the same
+ * studio-staff policy the button uses — so the waiver trigger fires here too.
+ * The typed-code box stays the always-works path; this is the fast path.
+ */
+export async function scanCheckIn(
+  studioId: string, occurrenceId: string, code: string,
+): Promise<InstructorState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("instructor_resolve_code", {
+    p_occurrence_id: occurrenceId, p_code: code,
+  });
+  if (error) {
+    if (error.code === "PT403") return { error: "That's not your class." };
+    if (error.code === "PT409") return { error: "The check-in window is closed for this class." };
+    if (error.code === "PT402") return { error: "This studio isn't active right now." };
+    if (error.code === "PT404") return { error: "That class could not be found." };
+    return { error: error.message };
+  }
+  const rows = (data ?? []) as { member_id: string; first_name: string; last_name: string }[];
+  if (rows.length === 0) return { error: "That code didn't match anyone booked into this class." };
+  const m = rows[0];
+
+  const { data: booking } = await supabase.from("bookings").select("id")
+    .eq("occurrence_id", occurrenceId).eq("member_id", m.member_id)
+    .in("status", ["booked", "attended"]).maybeSingle();
+  if (!booking) return { error: `${m.first_name} isn't booked into this class.` };
+
+  const { error: insErr } = await supabase.from("check_ins").insert({
+    studio_id: studioId, booking_id: booking.id, member_id: m.member_id,
+    occurrence_id: occurrenceId, method: "instructor",
+  });
+  if (insErr) {
+    if (insErr.code === "23505") return { ok: `${m.first_name} is already in.` };
+    if (insErr.code === "PT422") return { error: `${m.first_name} needs to sign the studio waiver first.` };
+    return { error: insErr.message };
+  }
+  revalidatePath(`/instructor/roster/${occurrenceId}`);
+  return { ok: `${m.first_name} ${m.last_name} — in.` };
 }
 
 

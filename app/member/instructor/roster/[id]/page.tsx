@@ -3,6 +3,7 @@ import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { AskForCover, CheckIn } from "../../actions-ui";
 import ClassTag from "@/components/instructor/class-tag";
+import ScanCheckIn from "@/components/instructor/scan-check-in";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,13 @@ export default async function RosterPage({ params }: { params: { id: string } })
         </p>
         <ClassTag tier={r.tier} flexDeadlineShort={r.flex_deadline_short} />
       </div>
+
+      {/* Decision 35 §4: scan a member's QR to check them in. Shown only when
+          the check-in window is open and somebody is booked (there is nobody to
+          scan otherwise). The typed/tap Check in on each row stays below. */}
+      {r.can_check_in && r.members.some((m) => !m.checked_in && m.booking_status === "booked") && (
+        <ScanCheckIn studioId={ctx.studio_id} occurrenceId={r.occurrence_id} />
+      )}
 
       {r.members.length === 0 ? (
         <div className="m-card px-4 py-6">

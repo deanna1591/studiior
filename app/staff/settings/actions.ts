@@ -968,3 +968,19 @@ export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise
   revalidatePath("/settings"); revalidatePath("/");
   return { ok: true, message: "Saved." };
 }
+
+/**
+ * Decision 35 §3 — re-mint the printed check-in code. A fresh slug, so the old
+ * printout stops working. Manager-up (the DB function guards it too).
+ */
+export async function remintCheckinCode(_prev: PlainState, _fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const supabase = createClient();
+  const { error } = await supabase.rpc("remint_checkin_slug", { p_studio_id: ctx.studioId });
+  if (error) {
+    return { ok: false, message: /PT403/.test(error.message) ? "Owners and managers only." : error.message };
+  }
+  revalidatePath("/settings/studio/checkin-code/print");
+  return { ok: true, message: "New code minted. Re-print it — the old printout no longer works." };
+}
