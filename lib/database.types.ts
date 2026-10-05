@@ -7921,6 +7921,10 @@ export type Database = {
       }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
+      instructor_month_covered: {
+        Args: { p_instructor_id: string; p_period_start: string }
+        Returns: string
+      }
       instructor_month_ics: {
         Args: { p_month: string; p_studio_id: string }
         Returns: string

@@ -42,15 +42,25 @@ export default async function AvailabilityPage({
       .eq("studio_id", ctx.studio_id).eq("month", period).maybeSingle(),
   ]);
   const sub = data as unknown as {
-    status: string; note: string | null; period_start: string; days: Day[];
+    status: string; source?: string; note: string | null;
+    period_start: string; pattern_ends_on?: string | null; days: Day[];
   } | null;
 
   const status = sub?.status ?? "none";
+  const source = sub?.source ?? "none";
   const publishedLock = !!pub;
-  const locked = status === "approved" || publishedLock;
+  // Decision 46 amendment: the studio entered a standing weekly pattern and no
+  // submission exists — show it read-only (the studio owns it), never the "not
+  // sent yet" line. A published month takes precedence (its lock sentence wins).
+  const patternMode = source === "pattern" && !publishedLock;
+  const locked = status === "approved" || publishedLock || patternMode;
   const label = new Intl.DateTimeFormat("en-GB", {
     month: "long", year: "numeric", timeZone: "UTC",
   }).format(new Date(`${period}T12:00:00Z`));
+  const patternThrough = sub?.pattern_ends_on
+    ? ` through ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+        .format(new Date(`${sub.pattern_ends_on}T12:00:00Z`))}`
+    : "";
 
   return (
     <InstructorShell ctx={ctx} title={`Availability — ${label}`} bare>
@@ -59,7 +69,7 @@ export default async function AvailabilityPage({
         ‹ Me
       </Link>
 
-      {status === "changes_requested" && sub?.note && (
+      {status === "changes_requested" && source === "submission" && sub?.note && (
         <div className="mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)", background: "var(--coral-tint)" }}>
           <p className="m-sub text-ink-2">The studio asked for a change:</p>
@@ -68,7 +78,9 @@ export default async function AvailabilityPage({
       )}
 
       <p className="mb-5 text-[13px] leading-5 text-ink-2">
-        {STATUS_LINE[status] ?? STATUS_LINE.none}{" "}{statusHelp(status, locked)}
+        {patternMode
+          ? <>The studio has your {label} availability on file — weekly pattern{patternThrough}. Ask the studio if something has changed.</>
+          : <>{STATUS_LINE[status] ?? STATUS_LINE.none}{" "}{statusHelp(status, locked)}</>}
       </p>
 
       <PhoneAvailabilityEditor
@@ -84,7 +96,7 @@ export default async function AvailabilityPage({
           This month&rsquo;s schedule is already published — ask the studio if
           something has changed. Your booking and class emails are unaffected.
         </p>
-      ) : locked && (
+      ) : status === "approved" && (
         <p className="m-sub mt-5 text-ink-3">
           This month is approved and the studio is scheduling around it. To
           change it, ask them to reopen the month.

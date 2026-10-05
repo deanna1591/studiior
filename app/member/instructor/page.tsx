@@ -35,7 +35,7 @@ export default async function InstructorHome() {
   const [ty, tm] = today.split("-").map(Number);
   const nextMonthISO = new Date(Date.UTC(ty, tm, 1)).toISOString().slice(0, 10);
 
-  const [week, rosters, changes, coverNeeded, notifData, anns, settings, availSub, nextTeach] = await Promise.all([
+  const [week, rosters, changes, coverNeeded, notifData, anns, settings, availCovered, nextTeach, availPub] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: today, p_to: shiftDate(today, 13),
     }),
@@ -54,10 +54,16 @@ export default async function InstructorHome() {
     supabase.rpc("instructor_announcements", { p_studio_id: ctx.studio_id }),
     supabase.from("studio_settings").select("availability_due_day, cover_escalation_hours")
       .eq("studio_id", ctx.studio_id).maybeSingle(),
-    supabase.from("availability_submissions").select("status")
-      .eq("instructor_id", ctx.instructor_id).eq("period_start", nextMonthISO).maybeSingle(),
+    // Decision 46 amendment: the ONE definition of "on file" — a submission OR a
+    // covering standing pattern the studio entered. 'none' means genuinely due.
+    supabase.rpc("instructor_month_covered", {
+      p_instructor_id: ctx.instructor_id, p_period_start: nextMonthISO }),
     // Decision 58: when this fortnight is empty, open on the next week they teach.
     supabase.rpc("instructor_next_teaching_week", { p_instructor_id: ctx.instructor_id }),
+    // Decision 46 amendment: a published next month is never asked for (an actual
+    // schedule_publications row, not month_published which is true publication-off).
+    supabase.from("schedule_publications").select("id")
+      .eq("studio_id", ctx.studio_id).eq("month", nextMonthISO).maybeSingle(),
   ]);
 
   const w = week.data as { classes?: Klass[]; confirmations_on?: boolean } | null;
@@ -106,8 +112,14 @@ export default async function InstructorHome() {
   // Decision 59: the cover rule, stated under the next-week card when
   // confirmations are off (with them on, Home already has its confirm prompt).
   const coverHours = (settings.data?.cover_escalation_hours as number | null) ?? 4;
-  const availStatus = (availSub.data?.status as string | null) ?? "none";
-  const availDue = availStatus === "none" || availStatus === "draft";
+  // Decision 46 amendment: "due" only when NO submission AND NO covering pattern
+  // AND not published. On file (submitted/approved/pattern) → a quiet line, not a
+  // nag. changes_requested keeps its own "asked for changes" item above.
+  const availCoveredState = (availCovered.data as string | null) ?? "none";
+  const availPublished = !!availPub.data;
+  const availDue = availCoveredState === "none" && !availPublished;
+  const availOnFile = availCoveredState === "submitted"
+    || availCoveredState === "approved" || availCoveredState === "pattern";
   const nextMonthLabel = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" })
     .format(new Date(`${nextMonthISO}T00:00:00Z`));
   const dueLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
@@ -243,6 +255,14 @@ export default async function InstructorHome() {
             ))}
           </ul>
         </section>
+      )}
+
+      {/* Decision 46 amendment: the month's availability is on file — a quiet
+          line, not a nag (the studio entered a pattern, or it is submitted). */}
+      {availOnFile && (
+        <p className="mt-4 px-1 text-[12.5px] leading-[18px] text-ink-3">
+          {nextMonthLabel}: on file.
+        </p>
       )}
 
       {/* RECENT NOTIFICATIONS */}

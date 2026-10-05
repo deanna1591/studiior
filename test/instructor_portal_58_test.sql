@@ -46,7 +46,11 @@ values ('58c0c058-0000-0000-0000-000000000001', true, false, 4, true);
 insert into locations (id, studio_id, name, is_primary) values
   ('58c0c058-0000-0000-0000-00000000000a','58c0c058-0000-0000-0000-000000000001','Main',true);
 insert into rooms (id, studio_id, location_id, name, capacity) values
-  ('58c0c058-0000-0000-0000-0000000ee0a1','58c0c058-0000-0000-0000-000000000001','58c0c058-0000-0000-0000-00000000000a','R',10);
+  ('58c0c058-0000-0000-0000-0000000ee0a1','58c0c058-0000-0000-0000-000000000001','58c0c058-0000-0000-0000-00000000000a','R',10),
+  -- A second room so the week-confirm fixture (a0c2) cannot collide with the
+  -- now()+N-day occurrences in room R: when today is a Monday, studio_week_start
+  -- +9 lands on the same day as now()+9d and the times overlap (occ_room_no_overlap).
+  ('58c0c058-0000-0000-0000-0000000ee0a2','58c0c058-0000-0000-0000-000000000001','58c0c058-0000-0000-0000-00000000000a','R2',10);
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
   ('58c0c058-0000-0000-0000-0000000cc0a1','58c0c058-0000-0000-0000-000000000001','Reformer',50,10);
 insert into studio_staff (id, studio_id, user_id, email, role) values
@@ -175,7 +179,7 @@ update studio_settings set assignment_confirmations = true where studio_id='58c0
 -- Wednesday of NEXT week (studio_week_start+9), so it is always inside the
 -- sweep's [+7, +13] "week ahead" window whatever today's weekday is.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
-values ('58c0c058-0000-0000-0000-00000000a0c2','58c0c058-0000-0000-0000-000000000001','58c0c058-0000-0000-0000-00000000000a','58c0c058-0000-0000-0000-0000000cc0a1','58c0c058-0000-0000-0000-0000000ee0a1','58c0c058-0000-0000-0000-0000000d00d2','Reformer',10,0,
+values ('58c0c058-0000-0000-0000-00000000a0c2','58c0c058-0000-0000-0000-000000000001','58c0c058-0000-0000-0000-00000000000a','58c0c058-0000-0000-0000-0000000cc0a1','58c0c058-0000-0000-0000-0000000ee0a2','58c0c058-0000-0000-0000-0000000d00d2','Reformer',10,0,
         (studio_week_start('58c0c058-0000-0000-0000-000000000001', (now() at time zone 'Europe/Prague')::date) + 9 || ' 10:00')::timestamp at time zone 'Europe/Prague',
         (studio_week_start('58c0c058-0000-0000-0000-000000000001', (now() at time zone 'Europe/Prague')::date) + 9 || ' 10:50')::timestamp at time zone 'Europe/Prague','scheduled');
 update studio_settings
