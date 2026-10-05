@@ -30,7 +30,7 @@ export default async function Plan() {
   // three reads that actually need a query: the ledger, the active-guest count
   // (only when guest passes are on), and the peak slots.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }] =
+  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }] =
     await Promise.all([
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
@@ -48,7 +48,11 @@ export default async function Plan() {
       supabase.from("membership_plans")
         .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count")
         .eq("visibility", "public").eq("status", "active").order("sort_order"),
+      // Decision 24: which public plans are full. A row only for a capped plan
+      // at a seat-caps studio; absent means uncapped or the switch is off.
+      supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
     ]);
+  const seatOf = new Map((seats ?? []).map((s) => [s.plan_id, s]));
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
 
@@ -169,6 +173,13 @@ export default async function Plan() {
           <h2 className="section-label text-ink-2">{live ? "Other plans" : "Plans"}</h2>
           <ul className="mt-3 space-y-3">
             {(catalogue ?? []).map((p) => {
+              // Decision 24: a full capped plan either hides from members
+              // ('hide') or shows as full, sellable at the desk only
+              // ('staff_only'). The renewal of a plan you already hold is a
+              // separate control at the top and is never cap-gated.
+              const seat = seatOf.get(p.id);
+              const full = !!seat?.is_full;
+              if (full && seat?.on_limit_reached === "hide") return null;
               const includes = p.type === "class_pack"
                 ? [p.credits != null ? `${p.credits} classes` : null,
                    p.validity_days ? `use within ${p.validity_days} days` : null]
@@ -199,6 +210,10 @@ export default async function Plan() {
                     p.type === "trial" && settings.trialUsed ? (
                       <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
                         {INTRO_USED_SENTENCE}
+                      </p>
+                    ) : full ? (
+                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+                        This plan is full — ask the studio.
                       </p>
                     ) : (
                       <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} /></div>

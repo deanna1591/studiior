@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Xendit adapter — Decision 40 Part A, migrations 20260831800000 / 20260831810000
 -- =============================================================================
--- UUID space e40d, checked free (119 assertions). Run after `supabase db reset`.
+-- UUID space e40d, checked free (136 assertions). Run after `supabase db reset`.
 --
 -- Covers: a member cannot read the provider row (owner-only RLS); the anon
 -- surface is EXACTLY thirteen, still naming xendit_webhook; begin_purchase snapshots the
@@ -14,7 +14,9 @@
 -- the member; an unknown reference is ignored and stores nothing; the owner-
 -- triggered apply activates and refuses a non-manager; the reconcile sweep
 -- expires a stale pending, leaves a fresh one, and refuses a signed-in user; and
--- member_bootstrap.xendit_enabled is true while has_payment_provider stays false.
+-- member_bootstrap.xendit_enabled is true while has_payment_provider stays false;
+-- and (Decision 24/57/66, §23) a full capped plan refuses begin with PT409
+-- "{plan} is full." while a renewal of an existing holder is never cap-gated.
 -- Teeth on every guard.
 -- =============================================================================
 \set ON_ERROR_STOP on
@@ -785,5 +787,77 @@ drop function e40d_boom();
 -- the early return on 'succeeded' in _apply fails "no second membership".
 -- Reverting award_conversion_bonus_run to call the GUARDED member_first_class
 -- makes §22 fail with cv_state = 'PT403' — the exact production 500.
+
+-- =============================================================================
+-- §23 — Decision 24/57/66: a full capped plan refuses a NEW place at BEGIN, a
+-- renewal never counts as a new place (migration 20260832350000).
+-- =============================================================================
+update studio_settings set seat_caps_enabled = true where studio_id = 'e40de40d-0000-0000-0000-000000000001';
+
+-- A capped recurring plan ("Founding"), cap 2, hide-from-members when full.
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, billing_interval,
+                              visibility, status, max_active_members, on_limit_reached) values
+  ('e40de40d-0000-0000-0000-0000000cf001','e40de40d-0000-0000-0000-000000000001','Founding','recurring',
+   300000,'PHP','month','public','active',2,'hide');
+
+-- Two holders fill the two places.
+insert into auth.users (id) values
+  ('e40de40d-0000-0000-0000-000000000e0a'),
+  ('e40de40d-0000-0000-0000-000000000e0b');
+insert into profiles (id, email) select id, id::text||'@example.com'
+  from auth.users where id in ('e40de40d-0000-0000-0000-000000000e0a','e40de40d-0000-0000-0000-000000000e0b');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status) values
+  ('e40de40d-0000-0000-0000-00000000dd0a','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-000000000e0a','Hold','A','hold-a@example.com','active'),
+  ('e40de40d-0000-0000-0000-00000000dd0b','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-000000000e0b','Hold','B','hold-b@example.com','active');
+insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on) values
+  ('e40de40d-0000-0000-0000-00000000fa0a','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd0a','e40de40d-0000-0000-0000-0000000cf001','active',300000,'PHP',current_date),
+  ('e40de40d-0000-0000-0000-00000000fa0b','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd0b','e40de40d-0000-0000-0000-0000000cf001','active',300000,'PHP',current_date);
+
+select expect_num('plan_seats_taken counts the two live holders', plan_seats_taken('e40de40d-0000-0000-0000-0000000cf001')::bigint, 2);
+
+-- mem One holds no place: begin is refused, "{plan} is full." (the cap == taken).
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+do $$ begin
+  begin perform xendit_begin_purchase('e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cf001');
+    perform set_config('t.capfull','no_raise',false); perform set_config('t.capmsg','',false);
+  exception when others then
+    perform set_config('t.capfull', sqlstate, false); perform set_config('t.capmsg', sqlerrm, false);
+  end;
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('a full capped plan refuses begin with PT409', current_setting('t.capfull'), 'PT409');
+select expect_text('...naming the plan: "{plan} is full."', current_setting('t.capmsg'), 'Founding is full.');
+select expect_num('...and no checkout row was created', (select count(*) from xendit_purchases where plan_id='e40de40d-0000-0000-0000-0000000cf001' and member_id='e40de40d-0000-0000-0000-00000000dd01'), 0);
+
+-- One place frees up (holder B cancels): taken 1 < 2, begin succeeds for mem One.
+update memberships set status='cancelled' where id='e40de40d-0000-0000-0000-00000000fa0b';
+select expect_num('a cancelled membership is not a live place', plan_seats_taken('e40de40d-0000-0000-0000-0000000cf001')::bigint, 1);
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.capok', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cf001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('a place free → begin succeeds (a checkout row exists)',
+  (select exists(select 1 from xendit_purchases where id=current_setting('t.capok')::uuid)));
+select expect_true('...with no renews_membership_id (a new place, not a renewal)',
+  (select renews_membership_id is null from xendit_purchases where id=current_setting('t.capok')::uuid));
+
+-- RENEWAL never counts as a new place: mem One now holds Founding live, and the
+-- plan is at (indeed over) its cap — begin still succeeds and stamps the renewal.
+insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, current_period_end) values
+  ('e40de40d-0000-0000-0000-00000000fa01','e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-00000000dd01','e40de40d-0000-0000-0000-0000000cf001','active',300000,'PHP',current_date, now()+interval '20 days');
+update memberships set status='active' where id='e40de40d-0000-0000-0000-00000000fa0b';  -- A + B + One = 3, over cap 2
+select expect_num('the plan is now over its cap', plan_seats_taken('e40de40d-0000-0000-0000-0000000cf001')::bigint, 3);
+set role authenticated; select set_config('request.jwt.claim.sub','e40de40d-0000-0000-0000-000000000e01',false);
+select set_config('t.renew', (select purchase_id::text from xendit_begin_purchase(
+  'e40de40d-0000-0000-0000-000000000001','e40de40d-0000-0000-0000-0000000cf001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('a renewal is never refused by the cap, even over cap',
+  (select exists(select 1 from xendit_purchases where id=current_setting('t.renew')::uuid)));
+select expect_true('...and it stamps renews_membership_id (extends, not a new place)',
+  (select renews_membership_id = 'e40de40d-0000-0000-0000-00000000fa01' from xendit_purchases where id=current_setting('t.renew')::uuid));
+
+-- Teeth: removing the `v_renew is null` guard would make the renewal above fail
+-- with PT409; removing the whole cap block would make "a full capped plan
+-- refuses begin" return no_raise.
 
 select 'xendit_test: all assertions passed' as result;

@@ -164,11 +164,22 @@ export default async function Buy({ params }: { params: { plan: string } }) {
   const introUsed = plan.type === "trial" && settings.trialUsed;
 
   // Decision 57: a second pack is a legitimate purchase — say so when they
-  // already hold this plan live.
-  const { data: held } = await supabase.from("memberships")
-    .select("id").eq("member_id", ctx.memberId).eq("plan_id", plan.id)
-    .not("status", "in", "(cancelled,expired)").limit(1);
-  const alreadyHas = (held ?? []).length > 0;
+  // already hold this plan live. Decision 24: a capped plan that is full takes
+  // no NEW place online (plan_seats, the member-callable reader). A renewal is
+  // never a new place and is never gated — begin treats a recurring plan the
+  // member already holds (active/past_due) as a renewal and skips the cap, so
+  // this screen must too, or it would hide the Buy a renewal needs.
+  const [{ data: held }, { data: seats }] = await Promise.all([
+    supabase.from("memberships")
+      .select("status").eq("member_id", ctx.memberId).eq("plan_id", plan.id)
+      .not("status", "in", "(cancelled,expired)"),
+    supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
+  ]);
+  const heldRows = held ?? [];
+  const alreadyHas = heldRows.length > 0;
+  const isRenewal = plan.type === "recurring" &&
+    heldRows.some((h) => h.status === "active" || h.status === "past_due");
+  const full = !isRenewal && (seats ?? []).some((s) => s.plan_id === plan.id && s.is_full);
 
   return (
     <Frame>
@@ -191,6 +202,10 @@ export default async function Buy({ params }: { params: { plan: string } }) {
         {introUsed ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
             {INTRO_USED_SENTENCE}
+          </p>
+        ) : full ? (
+          <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+            This plan is full — ask the studio.
           </p>
         ) : (
           <div className="mt-5 flex justify-end">
