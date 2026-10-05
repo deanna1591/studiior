@@ -7,6 +7,7 @@ import InstructorForm from "../form";
 import PhotoUpload from "@/components/instructor/photo-upload";
 import { uploadInstructorPhoto, removeInstructorPhoto } from "../actions";
 import RatePanel, { type RateVersion } from "./rate-panel";
+import LoginPanel from "./login-panel";
 import { availabilityLine, type SubmissionStatus } from "@/lib/availability-line";
 import { standingCoverage } from "@/lib/availability-standing";
 
@@ -61,6 +62,24 @@ export default async function EditInstructor({ params }: { params: { id: string 
   const availabilityLineView = availabilityLine({
     submissionStatus: (cStatus ?? "none") as SubmissionStatus, monthLabel, standing, instructorId: params.id,
   });
+  // Decision 64: the app-login line. Load the linked staff row (if any) for the
+  // email + when they signed in. instructors.staff_id is nulled on removal, so a
+  // set staff_id is a live login or a pending invite.
+  let login: { email: string; signedInLabel: string | null } | null = null;
+  if (i.staff_id) {
+    const { data: ss } = await supabase.from("studio_staff")
+      .select("email, user_id, joined_at, status").eq("id", i.staff_id).maybeSingle();
+    if (ss && ss.status !== "removed") {
+      login = {
+        email: ss.email,
+        signedInLabel: ss.user_id && ss.joined_at
+          ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: ctx.timeZone })
+              .format(new Date(ss.joined_at))
+          : null,
+      };
+    }
+  }
+
   const payrollOn = usesPayroll === true;
   const history = (versions ?? []) as RateVersion[];
   const today = new Date().toISOString().slice(0, 10);
@@ -91,7 +110,11 @@ export default async function EditInstructor({ params }: { params: { id: string 
       </div>
       <InstructorForm mode="edit" draft={{
         id: i.id, display_name: i.display_name, bio: i.bio, avatar_url: i.avatar_url,
-        color: i.color, certifications: certs, status: i.status, hasLogin: i.staff_id != null }} />
+        color: i.color, certifications: certs, status: i.status, hasLogin: login != null }} />
+
+      {i.status === "active" && (
+        <LoginPanel instructorId={i.id} email={login?.email ?? null} login={login} />
+      )}
 
       {payrollOn && (
         <div className="mt-8">

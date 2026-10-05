@@ -6403,6 +6403,7 @@ export type Database = {
           id: string
           invited_at: string | null
           joined_at: string | null
+          removed_at: string | null
           role: Database["public"]["Enums"]["staff_role"]
           status: string
           studio_id: string
@@ -6415,6 +6416,7 @@ export type Database = {
           id?: string
           invited_at?: string | null
           joined_at?: string | null
+          removed_at?: string | null
           role: Database["public"]["Enums"]["staff_role"]
           status?: string
           studio_id: string
@@ -6427,6 +6429,7 @@ export type Database = {
           id?: string
           invited_at?: string | null
           joined_at?: string | null
+          removed_at?: string | null
           role?: Database["public"]["Enums"]["staff_role"]
           status?: string
           studio_id?: string
@@ -8652,6 +8655,10 @@ export type Database = {
       release_provisional_seats_run: {
         Args: { p_occurrence_id: string }
         Returns: number
+      }
+      remove_instructor_login: {
+        Args: { p_instructor_id: string }
+        Returns: Json
       }
       render_notification: {
         Args: { p_notification_id: string }
