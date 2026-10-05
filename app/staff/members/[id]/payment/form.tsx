@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import { INTRO_USED_SENTENCE } from "@/lib/plans";
 import { recordPayment, type PayState } from "./actions";
 
 type Plan = {
@@ -32,12 +33,14 @@ const METHODS = [
 ];
 
 export default function PaymentForm({
-  memberId, plans, bookings, currency,
+  memberId, plans, bookings, currency, trialUsed = false,
 }: {
   memberId: string;
   plans: Plan[];
   bookings: Booking[];
   currency: string;
+  /** Decision 62: the member has already had the studio's intro offer. */
+  trialUsed?: boolean;
 }) {
   const [state, action] = useFormState<PayState, FormData>(recordPayment, null);
   const [kind, setKind] = useState<"plan" | "dropin" | "other">("plan");
@@ -81,7 +84,14 @@ export default function PaymentForm({
               </option>
             ))}
           </select>
-          {chosen?.holds ? (
+          {/* Decision 62: an intro offer is bought once per person. The sale is
+              refused by activate_purchase (PT409); say so before it is attempted.
+              A sentence, so ink on the coral tint with a coral rule. */}
+          {chosen?.type === "trial" && trialUsed ? (
+            <p className="mt-1.5 rounded border-l-2 border-coral bg-coral-tint px-2 py-1.5 text-[12px] leading-[18px] text-ink">
+              {INTRO_USED_SENTENCE}
+            </p>
+          ) : chosen?.holds ? (
             <p className="mt-1.5 text-[12px] leading-[18px] text-ink-3">
               They are already on this plan, so this renews it — the period moves
               on and no new place is taken.

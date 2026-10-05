@@ -21,7 +21,7 @@ export default async function RecordPayment({ params }: { params: { id: string }
   const { ctx, supabase, shell } = screen;
 
   const [{ data: member }, { data: plans }, { data: unpaid }, { data: studio },
-         { data: seats }, { data: held }] =
+         { data: seats }, { data: held }, { data: trialHeld }] =
     await Promise.all([
       supabase.from("members").select("id, first_name, last_name").eq("id", params.id).maybeSingle(),
       supabase.from("membership_plans")
@@ -43,10 +43,16 @@ export default async function RecordPayment({ params }: { params: { id: string }
       // not warn that a full plan is closed to somebody already inside it.
       supabase.from("memberships").select("plan_id")
         .eq("member_id", params.id).not("status", "in", "(cancelled,expired)"),
+      // Decision 62: has this member EVER held a trial membership (any status)?
+      // If so, a trial plan cannot be sold to them again — activate_purchase
+      // refuses it, and the form says so before the sale is attempted.
+      supabase.from("memberships").select("plan_id, membership_plans!inner(type)")
+        .eq("member_id", params.id).eq("membership_plans.type", "trial").limit(1),
     ]);
 
   const seatOf = new Map((seats ?? []).map((r) => [r.plan_id, r]));
   const holdsPlan = new Set((held ?? []).map((m) => m.plan_id));
+  const trialUsed = (trialHeld ?? []).length > 0;
 
   if (!member) notFound();
 
@@ -63,6 +69,7 @@ export default async function RecordPayment({ params }: { params: { id: string }
         <PaymentForm
           memberId={params.id}
           currency={studio?.currency ?? "USD"}
+          trialUsed={trialUsed}
           plans={(plans ?? []).map((p) => ({
             id: p.id, name: p.name, type: p.type,
             price_cents: p.price_cents, currency: p.currency,

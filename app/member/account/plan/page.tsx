@@ -2,7 +2,7 @@ import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
-import { formatMoney } from "@/lib/plans";
+import { formatMoney, isOneTimePlan, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
 import BuyPlan from "./buy";
 
@@ -170,9 +170,17 @@ export default async function Plan() {
                   {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
                   <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
                   {/* Decision 40: buy a one-time plan online when the studio has
-                      Xendit connected. Recurring plans stay at the desk (Part B). */}
-                  {settings.xenditEnabled && (p.type === "class_pack" || p.type === "drop_in") && (
-                    <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} /></div>
+                      Xendit connected. Recurring plans stay at the desk (Part B).
+                      Decision 62: a trial is a one-time plan; show the intro-once
+                      sentence in place of Buy when the member has already had it. */}
+                  {settings.xenditEnabled && isOneTimePlan(p.type) && (
+                    p.type === "trial" && settings.trialUsed ? (
+                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+                        {INTRO_USED_SENTENCE}
+                      </p>
+                    ) : (
+                      <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} /></div>
+                    )
                   )}
                 </li>
               );

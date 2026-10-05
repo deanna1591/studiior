@@ -44,6 +44,11 @@ export const PLAN_TYPE_HINT: Record<PlanType, string> = {
     "A plan in its own right, not a flag on someone — it converts to a paid plan or it expires. Usually a few classes over a short window.",
 };
 
+// Decision 57/62: the one-time-plan predicate and the intro-once sentence live
+// in a pure .mjs so `node --test` can reach them; re-exported here so the app
+// keeps importing them from @/lib/plans.
+export { isOneTimePlan, INTRO_USED_SENTENCE } from "./plan-kind";
+
 export const VISIBILITY_LABEL: Record<string, string> = {
   public: "Public — members can see and buy it",
   hidden: "Hidden — sellable by staff, not listed to members",

@@ -6,7 +6,7 @@ import { anonStudio } from "@/lib/anon-studio";
 import { createClient } from "@/lib/supabase/server";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
-import { formatMoney } from "@/lib/plans";
+import { formatMoney, isOneTimePlan, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { buyPath } from "@/lib/member-urls";
 import BuyPlan from "../../account/plan/buy";
@@ -34,9 +34,11 @@ async function readPlan(supabase: ReturnType<typeof createClient>, planId: strin
 
 // The exact buyability predicate from /account/plan: a one-time plan, public
 // and active. (Online payment being set up — xenditEnabled — is checked
-// separately so its refusal can say something different.)
+// separately so its refusal can say something different.) Decision 62: a trial
+// is a one-time plan, so it is buyable here too — the intro-once check is
+// separate, so its refusal can say something different.
 const isBuyable = (p: Plan) =>
-  (p.type === "class_pack" || p.type === "drop_in") && p.visibility === "public" && p.status === "active";
+  isOneTimePlan(p.type) && p.visibility === "public" && p.status === "active";
 
 export async function generateMetadata({ params }: { params: { plan: string } }): Promise<Metadata> {
   const studio = await anonStudio();
@@ -133,10 +135,17 @@ export default async function Buy({ params }: { params: { plan: string } }) {
   }
 
   // What the plan includes and its expiry rule, mirroring /account/plan.
-  const includes = plan.type === "class_pack"
-    ? [plan.credits != null ? `${plan.credits} classes` : null,
-       plan.validity_days ? `use within ${plan.validity_days} days` : null]
-    : ["Single class", plan.validity_days ? `use within ${plan.validity_days} days` : null];
+  const includes = plan.type === "drop_in"
+    ? ["Single class", plan.validity_days ? `use within ${plan.validity_days} days` : null]
+    // class_pack and trial are both a count of classes over a window.
+    : [plan.credits != null ? `${plan.credits} class${plan.credits === 1 ? "" : "es"}` : null,
+       plan.validity_days ? `use within ${plan.validity_days} days` : null];
+
+  // Decision 62: an intro offer is bought once per person. Show the sentence in
+  // place of Buy when this member has already had the studio's trial. The
+  // database refuses either way (activate_purchase / xendit_begin_purchase); the
+  // screen just says why before the member taps.
+  const introUsed = plan.type === "trial" && settings.trialUsed;
 
   // Decision 57: a second pack is a legitimate purchase — say so when they
   // already hold this plan live.
@@ -155,13 +164,19 @@ export default async function Buy({ params }: { params: { plan: string } }) {
         {plan.description && <p className="m-body mt-3 text-ink">{plan.description}</p>}
         <p className="m-sub mt-2 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
 
-        {alreadyHas && (
+        {alreadyHas && !introUsed && (
           <p className="m-sub mt-3 text-ink-2">You already have {plan.name} — buying again adds to it.</p>
         )}
 
-        <div className="mt-5 flex justify-end">
-          <BuyPlan planId={plan.id} />
-        </div>
+        {introUsed ? (
+          <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+            {INTRO_USED_SENTENCE}
+          </p>
+        ) : (
+          <div className="mt-5 flex justify-end">
+            <BuyPlan planId={plan.id} />
+          </div>
+        )}
       </section>
     </Frame>
   );

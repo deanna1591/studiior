@@ -171,6 +171,7 @@ export type MemberBootstrap = {
   studio_contact_email: string | null;
   xendit_enabled: boolean;
   time_format: "24h" | "12h";
+  trial_used: boolean;
 };
 
 /** Who is making this request, on the member PWA. */

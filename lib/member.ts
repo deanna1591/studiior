@@ -68,6 +68,9 @@ export async function memberScreen() {
       xenditEnabled: b?.xendit_enabled ?? false,
       howToBuy: b?.how_to_buy ?? null,
       studioContactEmail: b?.studio_contact_email ?? null,
+      // Decision 62: the member has already had the studio's intro offer, so a
+      // trial plan shows the "first-timers" sentence in place of Buy.
+      trialUsed: b?.trial_used ?? false,
     },
   };
 }

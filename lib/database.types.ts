@@ -7665,22 +7665,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { code: string; label: string; sql: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_membership: {
         Args: {
           p_membership_id: string
@@ -8112,6 +8096,7 @@ export type Database = {
           studio_timezone: string
           theme_preset: Database["public"]["Enums"]["theme_preset"]
           time_format: string
+          trial_used: boolean
           waitlist_enabled: boolean
           xendit_enabled: boolean
         }[]

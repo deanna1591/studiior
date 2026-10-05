@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, NavLink, Notice } from "@/components/ui";
-import { formatMoney, type PlanType } from "@/lib/plans";
+import { formatMoney, isOneTimePlan, type PlanType } from "@/lib/plans";
 import PlanForm, { type PlanDraft } from "../plan-form";
 import PlanLifecycle from "./lifecycle";
 import WebsiteLink from "./website-link";
@@ -107,7 +107,7 @@ export default async function EditPlan({
       {searchParams.saved && <Notice kind="ok">Saved.</Notice>}
       {/* Decision 57: the website buy link. One-time plans get the link + Copy;
           a recurring plan points at Part B; an archived plan gets no link. */}
-      {plan.status !== "archived" && (plan.type === "class_pack" || plan.type === "drop_in") && studioRow?.slug && (
+      {plan.status !== "archived" && isOneTimePlan(plan.type) && studioRow?.slug && (
         <WebsiteLink url={buyUrl(await staffMemberOrigin(supabase, studioRow.slug), plan.id)} />
       )}
       {plan.status !== "archived" && plan.type === "recurring" && (
