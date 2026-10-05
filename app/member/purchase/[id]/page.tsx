@@ -13,17 +13,19 @@ export default async function Purchase({ params }: { params: { id: string } }) {
     await memberScreen();
 
   const { data: purchase } = await supabase
-    .from("xendit_purchases").select("status").eq("id", params.id).maybeSingle();
+    .from("xendit_purchases").select("status, product_order_id").eq("id", params.id).maybeSingle();
+  const kind = purchase?.product_order_id ? "product" : "plan";
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
                  studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
-      <Link href="/account/plan" className="m-sub m-press mb-3 inline-flex items-center gap-1 text-ink-2">
-        <Icon name="chevron-left" size={16} /> Plans
+      <Link href={kind === "product" ? "/shop" : "/account/plan"}
+            className="m-sub m-press mb-3 inline-flex items-center gap-1 text-ink-2">
+        <Icon name="chevron-left" size={16} /> {kind === "product" ? "Shop" : "Plans"}
       </Link>
       <h1 className="m-title mb-4 text-ink">Your payment</h1>
       {purchase ? (
-        <PurchasePoll id={params.id} initialStatus={purchase.status} />
+        <PurchasePoll id={params.id} initialStatus={purchase.status} kind={kind} />
       ) : (
         <div className="m-card p-5 text-center">
           <p className="text-[16px] font-semibold text-ink">We couldn’t find that payment</p>

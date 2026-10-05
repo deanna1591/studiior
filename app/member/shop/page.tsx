@@ -3,6 +3,7 @@ import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney } from "@/lib/plans";
+import BuyProduct from "./buy";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,13 @@ type ShopItem = {
 };
 
 export default async function Shop() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
+  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl, settings } =
     await memberScreen();
   const { data } = await supabase.rpc("member_shop", { p_studio_id: ctx.studioId });
   const items = (data ?? []) as ShopItem[];
+  // Decision 63b: when the studio takes online payments, members buy here and
+  // collect at the desk; otherwise the shop is a listing ("ask at the desk").
+  const canBuy = settings.xenditEnabled;
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
@@ -24,7 +28,9 @@ export default async function Shop() {
         <Icon name="chevron-left" size={16} /> Account
       </Link>
       <h1 className="m-title mb-1 text-ink">Shop</h1>
-      <p className="m-sub mb-4 text-ink-2">Pick up and pay at the front desk.</p>
+      <p className="m-sub mb-4 text-ink-2">
+        {canBuy ? "Buy here, collect at the front desk." : "Pick up and pay at the front desk."}
+      </p>
 
       {items.length === 0 ? (
         <div className="m-card p-5 text-center">
@@ -49,7 +55,13 @@ export default async function Shop() {
                       ? <span className="ml-2"><span className="num">{p.stock_left}</span> left</span>
                       : null}
                 </p>
-                <p className="m-micro mt-1 text-ink-3">Ask at the front desk.</p>
+                {canBuy && !p.sold_out ? (
+                  <BuyProduct productId={p.id} max={p.stock_left} />
+                ) : (
+                  <p className="m-micro mt-1 text-ink-3">
+                    {canBuy ? "Sold out — ask the studio when it’s back." : "Ask at the front desk."}
+                  </p>
+                )}
               </div>
             </li>
           ))}

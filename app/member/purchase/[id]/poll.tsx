@@ -15,7 +15,11 @@ const TERMINAL = ["succeeded", "failed", "expired", "cancelled"];
  * to once per 5s per purchase, so a ~6s cadence never over-asks — which recovers
  * a payment whose webhook was late or never delivered.
  */
-export default function PurchasePoll({ id, initialStatus }: { id: string; initialStatus: string | null }) {
+export default function PurchasePoll({ id, initialStatus, kind = "plan" }:
+  { id: string; initialStatus: string | null; kind?: "plan" | "product" }) {
+  const isProduct = kind === "product";
+  const backHref = isProduct ? "/shop" : "/account/plan";
+  const backLabel = isProduct ? "Back to the shop" : "Back to plans";
   const [status, setStatus] = useState<string | null>(initialStatus);
   const [timedOut, setTimedOut] = useState(false);
   const started = useRef(Date.now());
@@ -47,9 +51,14 @@ export default function PurchasePoll({ id, initialStatus }: { id: string; initia
           <Icon name="tick" size={22} />
         </div>
         <p className="text-[16px] font-semibold text-ink">You’re all set</p>
-        <p className="m-sub mt-1 text-ink-2">Your payment went through and your plan is ready.</p>
-        <Link href="/account/plan" className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
-          See your plan
+        <p className="m-sub mt-1 text-ink-2">
+          {isProduct
+            ? "Your payment went through. Pick it up at the front desk whenever suits you."
+            : "Your payment went through and your plan is ready."}
+        </p>
+        <Link href={isProduct ? "/account/orders" : "/account/plan"}
+              className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
+          {isProduct ? "See your orders" : "See your plan"}
         </Link>
       </div>
     );
@@ -59,9 +68,11 @@ export default function PurchasePoll({ id, initialStatus }: { id: string; initia
     return (
       <div className="m-card p-5 text-center">
         <p className="text-[16px] font-semibold text-ink">Payment didn’t go through</p>
-        <p className="m-sub mt-1 text-ink-2">Nothing was charged and no plan was added.</p>
-        <Link href="/account/plan" className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
-          Back to plans
+        <p className="m-sub mt-1 text-ink-2">
+          {isProduct ? "Nothing was charged." : "Nothing was charged and no plan was added."}
+        </p>
+        <Link href={backHref} className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
+          {backLabel}
         </Link>
       </div>
     );
@@ -75,8 +86,8 @@ export default function PurchasePoll({ id, initialStatus }: { id: string; initia
           This is taking longer than usual. If you completed the payment, we’ll email you once it’s confirmed —
           you don’t need to pay again.
         </p>
-        <Link href="/account/plan" className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
-          Back to plans
+        <Link href={backHref} className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
+          {backLabel}
         </Link>
       </div>
     );

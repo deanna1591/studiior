@@ -7159,7 +7159,8 @@ export type Database = {
           member_id: string
           payment_link_url: string | null
           payment_session_id: string | null
-          plan_id: string
+          plan_id: string | null
+          product_order_id: string | null
           status: string
           studio_id: string
           updated_at: string
@@ -7177,7 +7178,8 @@ export type Database = {
           member_id: string
           payment_link_url?: string | null
           payment_session_id?: string | null
-          plan_id: string
+          plan_id?: string | null
+          product_order_id?: string | null
           status?: string
           studio_id: string
           updated_at?: string
@@ -7195,7 +7197,8 @@ export type Database = {
           member_id?: string
           payment_link_url?: string | null
           payment_session_id?: string | null
-          plan_id?: string
+          plan_id?: string | null
+          product_order_id?: string | null
           status?: string
           studio_id?: string
           updated_at?: string
@@ -7221,6 +7224,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_product_order_id_fkey"
+            columns: ["product_order_id"]
+            isOneToOne: false
+            referencedRelation: "product_orders"
             referencedColumns: ["id"]
           },
           {
@@ -9620,6 +9630,14 @@ export type Database = {
           p_session_id: string
         }
         Returns: undefined
+      }
+      xendit_begin_product_purchase: {
+        Args: { p_product_id: string; p_quantity: number; p_studio_id: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          purchase_id: string
+        }[]
       }
       xendit_begin_purchase: {
         Args: { p_plan_id: string; p_studio_id: string }
