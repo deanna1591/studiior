@@ -63,7 +63,11 @@ export default async function Sales({
   const from = `${ym}-01`;
   const to = `${ym}-${String(lastDay).padStart(2, "0")}`;
 
-  const planId = searchParams.plan || null;
+  // Decision 63: a "Merchandise" filter. sales_history returns merch rows when
+  // no plan is filtered (merch has no plan), so Merchandise = fetch all + keep
+  // only the merch rows, with totals recomputed from them.
+  const merchOnly = searchParams.plan === "merch";
+  const planId = merchOnly ? null : (searchParams.plan || null);
   const status = searchParams.status || null;
 
   const [{ data: plans }, salesRes, totalsRes] = await Promise.all([
@@ -78,8 +82,13 @@ export default async function Sales({
     }),
   ]);
 
-  const sales = (salesRes.data ?? []) as Sale[];
-  const totals = (totalsRes.data ?? null) as Totals | null;
+  let sales = (salesRes.data ?? []) as Sale[];
+  let totals = (totalsRes.data ?? null) as Totals | null;
+  if (merchOnly) {
+    sales = sales.filter((s) => s.plan_type === "merch");
+    const gross = sales.reduce((a, s) => a + s.amount_cents, 0);
+    totals = totals ? { ...totals, count: sales.length, gross_cents: gross, refunded_cents: 0, net_cents: gross } : null;
+  }
   const error = salesRes.error?.message ?? totalsRes.error?.message ?? null;
 
   const exportQuery = new URLSearchParams();
@@ -121,6 +130,7 @@ export default async function Sales({
             <select name="plan" defaultValue={planId ?? ""}
                     className="rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink">
               <option value="">All plans</option>
+              <option value="merch">Merchandise</option>
               {(plans ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
@@ -179,13 +189,15 @@ export default async function Sales({
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {sales.map((s) => (
-                <tr key={s.membership_id} className="align-top text-[13px] leading-5 text-ink">
+              {sales.map((s, i) => (
+                <tr key={s.membership_id ?? `merch-${i}`} className="align-top text-[13px] leading-5 text-ink">
                   <td className="px-3 py-2.5">
-                    <Link href={`/members/${s.member_id}`}
-                          className="text-ink underline underline-offset-4 decoration-line-2 hover:decoration-ink">
-                      {s.member_name}
-                    </Link>
+                    {s.member_id ? (
+                      <Link href={`/members/${s.member_id}`}
+                            className="text-ink underline underline-offset-4 decoration-line-2 hover:decoration-ink">
+                        {s.member_name}
+                      </Link>
+                    ) : <span className="text-ink-2">{s.member_name}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     <span className="block">{s.plan_name}</span>
@@ -198,15 +210,17 @@ export default async function Sales({
                   <td className="px-3 py-2.5 text-ink-2">{d(s.expires_on)}</td>
                   <td className="px-3 py-2.5"><StateChip state={s.sale_status} /></td>
                   <td className="px-3 py-2.5">
-                    <MembershipActions
-                      compact
-                      membershipId={s.membership_id}
-                      frozen={s.sale_status === "frozen"}
-                      priceCents={s.amount_cents}
-                      currency={s.currency}
-                      expiresOn={s.expires_on}
-                      today={todayStr}
-                    />
+                    {s.plan_type !== "merch" && s.membership_id && (
+                      <MembershipActions
+                        compact
+                        membershipId={s.membership_id}
+                        frozen={s.sale_status === "frozen"}
+                        priceCents={s.amount_cents}
+                        currency={s.currency}
+                        expiresOn={s.expires_on}
+                        today={todayStr}
+                      />
+                    )}
                   </td>
                 </tr>
               ))}

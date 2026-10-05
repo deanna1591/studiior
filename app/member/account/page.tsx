@@ -19,9 +19,20 @@ export default async function Account() {
     await memberScreen();
   const { live } = await membershipState(supabase, ctx.memberId);
 
+  // Decision 63: the Shop entry appears only when the studio has products, and
+  // My orders only when this member has ordered something.
+  const [{ data: shop }, { data: orders }] = await Promise.all([
+    supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
+    supabase.rpc("member_orders"),
+  ]);
+  const hasProducts = Array.isArray(shop) && shop.length > 0;
+  const hasOrders = Array.isArray(orders) && orders.length > 0;
+
   const rows: { href: string; label: string; sub: string }[] = [
     { href: "/account/classes", label: "Your classes", sub: "Every class you have booked, and what happened" },
     { href: "/account/plan", label: "Your plan", sub: "Membership, credits, guest passes and peak classes" },
+    ...(hasProducts ? [{ href: "/shop", label: "Shop", sub: "Things the studio sells, picked up at the front desk" }] : []),
+    ...(hasOrders ? [{ href: "/account/orders", label: "My orders", sub: "What you have bought, and whether it is ready" }] : []),
     { href: "/account/payments", label: "Payments", sub: "What you have paid, and for what" },
     { href: "/account/pay", label: "How you pay", sub: "Your cards, or how the studio takes payment" },
     { href: "/account/profile", label: "Your details", sub: "Name, photo, phone, emergency contact" },

@@ -39,7 +39,7 @@ export default async function MemberHome() {
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
-         { data: waiver }, { data: pendingRows }, { data: installRow }] =
+         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -87,7 +87,11 @@ export default async function MemberHome() {
     // Home stays two hops deep.
     supabase.from("member_dismissals").select("key")
       .eq("member_id", ctx.memberId).eq("key", "install_card").maybeSingle(),
+    // Decision 63: whether the studio sells merchandise (the Shop card appears
+    // only when at least one active product exists — inert otherwise).
+    supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
   ]);
+  const hasShop = Array.isArray(shopItems) && (shopItems as unknown[]).length > 0;
 
   // pending_until is null for a free provisional seat (Decision 30 amendment):
   // present in the map means "Waiting for confirmation", a value adds "· by {time}".
@@ -446,6 +450,17 @@ export default async function MemberHome() {
             <span className="m-micro block text-ink-3">
               <span className="num">{ms.total}</span> classes so far · next is <span className="num">{ms.next_target}</span>
             </span>
+          </span>
+          <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
+        </Link>
+      )}
+
+      {/* Decision 63: Shop — only when the studio sells something. */}
+      {hasShop && (
+        <Link href="/shop" className="m-card m-press mt-2.5 flex items-center gap-3 p-4">
+          <span className="min-w-0 flex-1">
+            <span className="m-body block font-semibold text-ink">Shop</span>
+            <span className="m-micro block text-ink-3">Socks, water, merch — pick up at the front desk</span>
           </span>
           <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
         </Link>

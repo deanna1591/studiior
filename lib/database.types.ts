@@ -4711,6 +4711,7 @@ export type Database = {
           method_note: string | null
           next_retry_at: string | null
           paid_at: string | null
+          product_order_id: string | null
           promo_code_id: string | null
           provider: Database["public"]["Enums"]["payment_provider"]
           recorded_by: string | null
@@ -4745,6 +4746,7 @@ export type Database = {
           method_note?: string | null
           next_retry_at?: string | null
           paid_at?: string | null
+          product_order_id?: string | null
           promo_code_id?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
           recorded_by?: string | null
@@ -4779,6 +4781,7 @@ export type Database = {
           method_note?: string | null
           next_retry_at?: string | null
           paid_at?: string | null
+          product_order_id?: string | null
           promo_code_id?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
           recorded_by?: string | null
@@ -4827,6 +4830,13 @@ export type Database = {
             columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_product_order_id_fkey"
+            columns: ["product_order_id"]
+            isOneToOne: false
+            referencedRelation: "product_orders"
             referencedColumns: ["id"]
           },
           {
@@ -5182,6 +5192,173 @@ export type Database = {
             foreignKeyName: "platform_subscriptions_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: true
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_orders: {
+        Row: {
+          channel: string
+          collected_at: string | null
+          collected_by: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          member_id: string | null
+          product_id: string
+          quantity: number
+          status: string
+          studio_id: string
+          unit_price_cents: number
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          collected_at?: string | null
+          collected_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          id?: string
+          member_id?: string | null
+          product_id: string
+          quantity: number
+          status?: string
+          studio_id: string
+          unit_price_cents: number
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          collected_at?: string | null
+          collected_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          member_id?: string | null
+          product_id?: string
+          quantity?: number
+          status?: string
+          studio_id?: string
+          unit_price_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_orders_collected_by_fkey"
+            columns: ["collected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_orders_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          low_stock_threshold: number | null
+          name: string
+          photo_url: string | null
+          price_cents: number
+          sort_order: number
+          status: string
+          stock: number
+          studio_id: string
+          track_stock: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          description?: string | null
+          id?: string
+          low_stock_threshold?: number | null
+          name: string
+          photo_url?: string | null
+          price_cents: number
+          sort_order?: number
+          status?: string
+          stock?: number
+          studio_id: string
+          track_stock?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          low_stock_threshold?: number | null
+          name?: string
+          photo_url?: string | null
+          price_cents?: number
+          sort_order?: number
+          status?: string
+          stock?: number
+          studio_id?: string
+          track_stock?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
             referencedRelation: "studios"
             referencedColumns: ["id"]
           },
@@ -5764,6 +5941,78 @@ export type Database = {
           },
           {
             foreignKeyName: "shift_applications_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delta: number
+          id: string
+          note: string | null
+          order_id: string | null
+          product_id: string
+          reason: string
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          id?: string
+          note?: string | null
+          order_id?: string | null
+          product_id: string
+          reason: string
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          id?: string
+          note?: string | null
+          order_id?: string | null
+          product_id?: string
+          reason?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "product_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -7117,6 +7366,15 @@ export type Database = {
         }
         Returns: string
       }
+      adjust_stock: {
+        Args: {
+          p_delta: number
+          p_note?: string
+          p_product_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       advance_membership_period: {
         Args: { p_membership_id: string }
         Returns: Json
@@ -8065,6 +8323,7 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_order_collected: { Args: { p_order_id: string }; Returns: Json }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
@@ -8167,6 +8426,7 @@ export type Database = {
         Args: { p_from?: string; p_studio_id: string }
         Returns: Json
       }
+      member_orders: { Args: never; Returns: Json }
       member_peak_slots: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: {
@@ -8214,6 +8474,7 @@ export type Database = {
         Args: { p_path: string; p_studio_id: string }
         Returns: string
       }
+      member_shop: { Args: { p_studio_id: string }; Returns: Json }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
       member_waiver_current: {
         Args: { p_member_id: string; p_studio_id: string }
@@ -8417,6 +8678,15 @@ export type Database = {
         }[]
       }
       plan_seats_taken: { Args: { p_plan_id: string }; Returns: number }
+      product_low_stock: {
+        Args: { p_studio_id: string }
+        Returns: {
+          name: string
+          product_id: string
+          stock: number
+          threshold: number
+        }[]
+      }
       provision_studio: {
         Args: {
           p_country: string
@@ -8637,11 +8907,24 @@ export type Database = {
         }
         Returns: Json
       }
+      record_product_sale: {
+        Args: {
+          p_member_id?: string
+          p_method?: string
+          p_method_note?: string
+          p_product_id: string
+          p_quantity: number
+          p_reference?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       record_refund: {
         Args: {
           p_amount_cents?: number
           p_payment_id: string
           p_reason?: string
+          p_restock?: boolean
         }
         Returns: Json
       }

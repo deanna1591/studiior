@@ -63,7 +63,7 @@ export default async function Dashboard({
 
   // Two hops for the whole screen. staffScreen() is the first; everything
   // below is one batch that waits on nothing else in it.
-  const [brief, data, todays, settings, deskRecent] = await Promise.all([
+  const [brief, data, todays, settings, deskRecent, lowStockRes] = await Promise.all([
     manager ? todaysBrief(supabase, ctx.studioId, ctx.timeZone) : Promise.resolve(null),
     manager
       ? dashboardData(supabase, ctx.studioId, ctx.timeZone, {
@@ -92,7 +92,10 @@ export default async function Dashboard({
       : Promise.resolve(null),
     // Front desk's own booking feed (the manager path gets it inside `data`).
     !manager && deskUp ? recentBookings(supabase, ctx.studioId) : Promise.resolve(null),
+    // Decision 63: products running low (desk-up; empty when nothing tracked is low).
+    deskUp ? supabase.rpc("product_low_stock", { p_studio_id: ctx.studioId }) : Promise.resolve(null),
   ]);
+  const lowStock = ((lowStockRes?.data ?? []) as { product_id: string; name: string; stock: number }[]);
 
   const showTierBlock = manager
     && ((settings?.data?.guarantees_enabled ?? false) || (settings?.data?.flex_enabled ?? false));
@@ -237,6 +240,18 @@ export default async function Dashboard({
             {showTierBlock && <TierSuggestions rows={data.tiers} error={data.tiersError} />}
           </div>
 
+          {/* Decision 63 — merchandise running low. */}
+          {lowStock.length > 0 && (
+            <div className="mb-6 rounded border-l-2 border-coral bg-coral-tint px-3 py-2.5">
+              <p className="mb-1 text-[12px] font-medium text-ink-2">Running low</p>
+              {lowStock.map((p) => (
+                <p key={p.product_id} className="text-[13px] text-ink">
+                  {p.name}: <span className="num">{p.stock}</span> left
+                </p>
+              ))}
+            </div>
+          )}
+
           {/* 4.11 and 4.10 */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Tasks t={data.tasks} error={data.tasksError} />
@@ -262,6 +277,17 @@ export default async function Dashboard({
 
           {/* Decision 56 — the booking feed is desk work, so front desk sees
               it. Instructors (not desk-up) get nothing here. */}
+          {/* Decision 63 — merchandise running low (front desk sees it too). */}
+          {lowStock.length > 0 && (
+            <div className="mt-6 rounded border-l-2 border-coral bg-coral-tint px-3 py-2.5">
+              <p className="mb-1 text-[12px] font-medium text-ink-2">Running low</p>
+              {lowStock.map((p) => (
+                <p key={p.product_id} className="text-[13px] text-ink">
+                  {p.name}: <span className="num">{p.stock}</span> left
+                </p>
+              ))}
+            </div>
+          )}
           {deskUp && deskRecent && (
             <div className="mt-6">
               <RecentBookings rows={deskRecent.rows} error={deskRecent.error} />

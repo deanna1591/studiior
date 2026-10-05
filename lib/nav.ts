@@ -114,23 +114,27 @@ export function railGroups(
         : [],
     },
 
-    // What the studio sells. Manager-up. Plans is always here for a manager, so
-    // the group never goes empty on Challenges being off — but the drop-empty
-    // rule below is what makes that safe rather than assumed.
+    // What the studio sells. Decision 63: Shop is desk-up (front desk sells and
+    // collects merchandise); Plans/Sales/Campaigns are manager-up. The group
+    // never goes empty for a manager; for front desk it holds Shop alone.
     {
       heading: "Selling",
-      items: manager
-        ? [
-            { href: "/plans", label: "Plans" },
-            // Decision 49. Every plan purchase, with the membership actions.
-            { href: "/sales", label: "Sales" },
-            // Decision 50. Write to a filtered, consented group of members.
-            { href: "/campaigns", label: "Campaigns" },
-            // §9 challenges — shown once the studio turns the switch on in
-            // Settings or already has one (Decisions 24/25: no trace otherwise).
-            ...(hasChallenges ? [{ href: "/challenges", label: "Challenges" }] : []),
-          ]
-        : [],
+      items: [
+        // Decision 63 — merchandise: inventory + desk sales + to-collect.
+        ...(desk ? [{ href: "/shop", label: "Shop" }] : []),
+        ...(manager
+          ? [
+              { href: "/plans", label: "Plans" },
+              // Decision 49. Every plan purchase, with the membership actions.
+              { href: "/sales", label: "Sales" },
+              // Decision 50. Write to a filtered, consented group of members.
+              { href: "/campaigns", label: "Campaigns" },
+              // §9 challenges — shown once the studio turns the switch on in
+              // Settings or already has one (Decisions 24/25: no trace otherwise).
+              ...(hasChallenges ? [{ href: "/challenges", label: "Challenges" }] : []),
+            ]
+          : []),
+      ],
     },
 
     // The studio itself — the rooms and class types classes are made of, the
