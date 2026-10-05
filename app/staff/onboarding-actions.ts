@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { clampInt } from "@/lib/booking-rules";
 
 export type ActionState = { error: string } | null;
 
@@ -147,17 +148,12 @@ export async function saveBookingBasics(_prev: ActionState, fd: FormData): Promi
   const ctx = await getStaffContext();
   if (!ctx) return { error: "Not signed in." };
 
-  const int = (k: string, fallback: number) => {
-    const n = Number(String(fd.get(k) ?? "").trim());
-    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
-  };
-
   const supabase = createClient();
   const { data, error } = await supabase
     .from("studio_settings")
     .update({
-      booking_window_days: int("booking_window_days", 30),
-      cancellation_cutoff_minutes: int("cancellation_cutoff_minutes", 720),
+      booking_window_days: clampInt(fd.get("booking_window_days"), 30),
+      cancellation_cutoff_minutes: clampInt(fd.get("cancellation_cutoff_minutes"), 720),
       require_waiver: fd.get("require_waiver") === "on",
       // This is what stops the wizard blocking every other screen.
       onboarding_completed_at: new Date().toISOString(),

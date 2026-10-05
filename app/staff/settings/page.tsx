@@ -22,6 +22,7 @@ export default async function Settings() {
   const groups: { href: string; label: string; sub: string }[] = [
     { href: "/settings/studio", label: "Studio", sub: "Opening hours" },
     { href: "/settings/timetable", label: "Timetable", sub: "How far ahead classes run, and publishing each month" },
+    { href: "/settings/booking", label: "Booking rules", sub: "How far ahead members book, the cancellation cut-off, and the waiver" },
     { href: "/settings/guarantees", label: "Guarantees & flex", sub: "When a class runs regardless, and what it owes the instructor" },
     { href: "/settings/fair-use", label: "Peak & fair use", sub: "Peak hours, repeated late cancellations, and places on a plan" },
     { href: "/settings/features", label: "Member features", sub: "Challenges and guest passes" },

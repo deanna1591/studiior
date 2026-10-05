@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { clampInt, cutoffMinutes } from "@/lib/booking-rules";
 
 export type HorizonResult =
   | { ok: true; days: number; cutoff: string; deleted: number; created: number;
@@ -940,4 +941,30 @@ export async function saveHideUnstaffed(_prev: PlainState, fd: FormData): Promis
       ? "On. A class with no instructor is hidden from members and the website until you assign someone."
       : "Off. Unstaffed classes are shown to members.",
   };
+}
+
+/**
+ * Settings → Booking rules. The same three fields /welcome sets (window,
+ * cancellation cut-off, waiver) plus the late-cancel-consumes-credit switch,
+ * for a studio that already finished onboarding — so, unlike saveBookingBasics,
+ * it does NOT touch onboarding_completed_at and does not redirect. The cut-off
+ * is entered as hours + minutes and stored as total minutes.
+ */
+export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({
+      booking_window_days: clampInt(fd.get("booking_window_days"), 30),
+      cancellation_cutoff_minutes: cutoffMinutes(fd.get("cutoff_hours"), fd.get("cutoff_minutes")),
+      require_waiver: fd.get("require_waiver") === "on",
+      late_cancel_consumes_credit: fd.get("late_cancel_consumes_credit") === "on",
+    })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings"); revalidatePath("/");
+  return { ok: true, message: "Saved." };
 }
