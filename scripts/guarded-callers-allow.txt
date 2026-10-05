@@ -27,3 +27,4 @@ generate_morning_brief -> instructor_weekly_load    # service sweep; is_service_
 set_instructor_availability -> set_instructor_availability_rows  # self-or-manager writer for that instructor; guard passes
 sweep_week_confirmations -> instructor_week          # service sweep; is_service_context passes
 withdraw_from_shift -> request_cover                 # instructor withdraws their OWN shift -> request_cover(own occurrence), auth_instructor_id matches; the foreign-instructor call inside request_cover is the one that was fixed
+queue_availability_reminders -> instructor_month_covered  # called from sweep_availability_reminders (service context); instructor_month_covered is_service_context passes
