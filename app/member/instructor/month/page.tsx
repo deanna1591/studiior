@@ -46,8 +46,8 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
     supabase.rpc("instructor_colleagues", { p_instructor_id: ctx.instructor_id }),
   ]);
   const r = data as unknown as Roster | null;
-  const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string }[])
-    .map((c) => ({ id: c.instructor_id, name: c.display_name }));
+  const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string; has_login: boolean }[])
+    .map((c) => ({ id: c.instructor_id, name: c.display_name, hasLogin: c.has_login }));
 
   const byDay = new Map<string, Klass[]>();
   for (const c of r?.classes ?? []) {

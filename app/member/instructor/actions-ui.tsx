@@ -8,7 +8,7 @@ import {
   type InstructorState, type ClaimState,
 } from "./actions";
 
-export type Colleague = { id: string; name: string };
+export type Colleague = { id: string; name: string; hasLogin: boolean };
 
 
 function Result({ state }: { state: InstructorState }) {
@@ -110,7 +110,10 @@ export function ConfirmMonth({
   );
 }
 
-/** Decision 58: an optional "Ask someone in particular". Empty = everyone. */
+/** Decision 58: an optional "Ask someone in particular". Empty = everyone.
+ *  The amendment lists EVERY active instructor; one without an app login is shown
+ *  disabled with "— no app login yet" (a directed ask would reach nobody, and
+ *  request_cover refuses it). */
 function ColleaguePicker({ colleagues }: { colleagues: Colleague[] }) {
   if (colleagues.length === 0) return null;
   return (
@@ -119,15 +122,18 @@ function ColleaguePicker({ colleagues }: { colleagues: Colleague[] }) {
       <select name="ask_instructor_id"
               className="m-tap mt-1 w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink">
         <option value="">Anyone who can take it</option>
-        {colleagues.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        {colleagues.map((c) =>
+          c.hasLogin
+            ? <option key={c.id} value={c.id}>{c.name}</option>
+            : <option key={c.id} value={c.id} disabled>{c.name} — no app login yet</option>)}
       </select>
     </label>
   );
 }
 
 export function AskForCover({
-  occurrenceId, compact = false, colleagues = [],
-}: { occurrenceId: string; compact?: boolean; colleagues?: Colleague[] }) {
+  occurrenceId, compact = false, colleagues = [], autoAccept = false,
+}: { occurrenceId: string; compact?: boolean; colleagues?: Colleague[]; autoAccept?: boolean }) {
   const [state, action] = useFormState<InstructorState, FormData>(askForCover, null);
   // On the month roster there are twenty of these in a column; the form opens
   // on demand there. A native <details> — no state to lose.
@@ -161,8 +167,8 @@ export function AskForCover({
       <ColleaguePicker colleagues={colleagues} />
       <div className="mt-2"><CardActionOutline>Ask for cover</CardActionOutline></div>
       <p className="m-sub mt-1.5 text-ink-3">
-        You stay down to teach it until somebody takes it and the studio arranges
-        it. Nothing is released automatically, however close it is.
+        You stay down to teach it until a colleague confirms or the studio
+        arranges cover.{autoAccept && " If the person you ask confirms, it’s theirs."}
       </p>
       <Result state={state} />
     </form>

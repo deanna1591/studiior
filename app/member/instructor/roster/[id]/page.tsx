@@ -32,14 +32,18 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data, error }, { data: colleaguesData }] = await Promise.all([
+  const [{ data, error }, { data: colleaguesData }, { data: settings }] = await Promise.all([
     supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
     // Decision 58: who an "ask for cover" can be directed to.
     supabase.rpc("instructor_colleagues", { p_instructor_id: ctx.instructor_id }),
+    // Decision 58 amendment: whether a directed confirm is final at once.
+    supabase.from("studio_settings").select("cover_auto_accept_enabled")
+      .eq("studio_id", ctx.studio_id).maybeSingle(),
   ]);
   const r = data as Roster | null;
-  const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string }[])
-    .map((c) => ({ id: c.instructor_id, name: c.display_name }));
+  const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string; has_login: boolean }[])
+    .map((c) => ({ id: c.instructor_id, name: c.display_name, hasLogin: c.has_login }));
+  const autoAccept = settings?.cover_auto_accept_enabled ?? false;
 
   if (error || !r) {
     return (
@@ -147,7 +151,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
         </ul>
       )}
 
-      {r.status === "scheduled" && <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} />}
+      {r.status === "scheduled" && <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} autoAccept={autoAccept} />}
 
       <p className="m-sub mt-5 text-ink-3">{r.withheld}</p>
     </InstructorShell>

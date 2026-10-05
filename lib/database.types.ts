@@ -7904,6 +7904,7 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: {
           display_name: string
+          has_login: boolean
           instructor_id: string
         }[]
       }

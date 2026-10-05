@@ -227,10 +227,42 @@ select expect_true('next teaching week: no classes → null',
 -- =============================================================================
 -- (3) Directed cover.
 -- =============================================================================
+-- Amendment: a no-login instructor exists, and the picker shows EVERY active
+-- instructor with has_login. I5 has no staff_id → no login.
+insert into instructors (id, studio_id, display_name, staff_id) values
+  ('58c0c058-0000-0000-0000-0000000d00d5','58c0c058-0000-0000-0000-000000000001','No Login Nina', null);
+select expect_num('picker: all active instructors (I2,I3,I4,I5), not only those with a login',
+  (select count(*) from instructor_colleagues('58c0c058-0000-0000-0000-0000000d00d1'))::bigint, 4);
+select expect_false('picker: the no-login colleague is has_login=false',
+  (select has_login from instructor_colleagues('58c0c058-0000-0000-0000-0000000d00d1')
+    where instructor_id='58c0c058-0000-0000-0000-0000000d00d5'));
+select expect_true('picker: a login colleague is has_login=true',
+  (select has_login from instructor_colleagues('58c0c058-0000-0000-0000-0000000d00d1')
+    where instructor_id='58c0c058-0000-0000-0000-0000000d00d2'));
+
 -- A future class assigned to I1, 10 DAYS out (lead time proves close-enough is
 -- bypassed for a directed accept). I1 asks I2 in particular.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
 values ('58c0c058-0000-0000-0000-00000000c001','58c0c058-0000-0000-0000-000000000001','58c0c058-0000-0000-0000-00000000000a','58c0c058-0000-0000-0000-0000000cc0a1','58c0c058-0000-0000-0000-0000000ee0a1','58c0c058-0000-0000-0000-0000000d00d1','Reformer',10,2, now()+interval '10 days', now()+interval '10 days'+interval '50 min','scheduled');
+
+-- Amendment: asking a no-login colleague is refused PT400 by name (before any
+-- cover_requests row). c001 stays clean for the real ask below.
+set role authenticated;
+select set_config('request.jwt.claim.sub','58c0c058-0000-0000-0000-0000000000d1',false);  -- I1
+select expect_raises('ask a no-login colleague → PT400', 'PT400',
+  $$ select request_cover('58c0c058-0000-0000-0000-00000000c001', null, '58c0c058-0000-0000-0000-0000000d00d5') $$);
+reset role;
+do $$ declare m text; begin
+  set role authenticated; perform set_config('request.jwt.claim.sub','58c0c058-0000-0000-0000-0000000000d1',false);
+  begin perform request_cover('58c0c058-0000-0000-0000-00000000c001', null, '58c0c058-0000-0000-0000-0000000d00d5');
+  exception when others then m := sqlerrm; end;
+  reset role; perform set_config('t.nologin_msg', coalesce(m,'(none)'), false);
+end $$;
+select expect_text('...the PT400 names the colleague and points at inviting them',
+  current_setting('t.nologin_msg'),
+  'No Login Nina doesn''t have an app login yet — ask the studio to invite them.');
+select expect_num('...no cover request was created by the refused ask',
+  (select count(*) from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c001')::bigint, 0);
 
 set role authenticated;
 select set_config('request.jwt.claim.sub','58c0c058-0000-0000-0000-0000000000d1',false);  -- I1
@@ -240,12 +272,29 @@ reset role;
 select expect_text('...the request records the asked colleague',
   (select asked_instructor_id::text from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c001'),
   '58c0c058-0000-0000-0000-0000000d00d2');
-select expect_num('...exactly ONE cover_available to I2',
-  (select count(*) from notifications where template_key='cover_available'
+-- RED-provable: the directed ask queues the dedicated cover_asked, NOT the
+-- generic cover_available. Reverting the template switch makes this fail (1→0).
+select expect_num('...exactly ONE cover_asked to I2 (not the generic cover_available)',
+  (select count(*) from notifications where template_key='cover_asked'
      and user_id='58c0c058-0000-0000-0000-0000000000d2')::bigint, 1);
-select expect_num('...and none to I3 (not broadcast)',
+select expect_num('...and ZERO generic cover_available to I2',
   (select count(*) from notifications where template_key='cover_available'
+     and user_id='58c0c058-0000-0000-0000-0000000000d2')::bigint, 0);
+select expect_num('...and none to I3 (not broadcast)',
+  (select count(*) from notifications where template_key in ('cover_asked','cover_available')
      and user_id='58c0c058-0000-0000-0000-0000000000d3')::bigint, 0);
+-- The cover_asked payload carries the class fields and the portal href.
+select expect_text('...cover_asked names the class and the requester',
+  (select payload ->> 'class_name' || '|' || (payload ->> 'requester_name')
+     from notifications where template_key='cover_asked' and user_id='58c0c058-0000-0000-0000-0000000000d2'),
+  'Reformer|Ivy One');
+select expect_text('...and carries the 2-booked phrase and the reason',
+  (select (payload ->> 'booked_phrase') || '|' || (payload ->> 'reason_line')
+     from notifications where template_key='cover_asked' and user_id='58c0c058-0000-0000-0000-0000000000d2'),
+  '2 booked|swap please. ');
+select expect_true('...and the href is the instructor portal /instructor/shifts link',
+  (select (payload ->> 'href') like 'https://%/instructor/shifts'
+     from notifications where template_key='cover_asked' and user_id='58c0c058-0000-0000-0000-0000000000d2'));
 
 -- The directed ask shows in I2's Open classes directed_covers, with asked_by_name.
 select expect_num('I2 sees the directed ask in Open classes',
@@ -276,9 +325,12 @@ select expect_text('...the class is now I2''s',
 select expect_text('...the request is approved, covered by I2',
   (select status || ':' || covered_by::text from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c001'),
   'approved:58c0c058-0000-0000-0000-0000000d00d2');
-select expect_num('...the requester I1 was told it is covered',
-  (select count(*) from notifications where template_key='cover_approved'
+select expect_num('...the requester I1 got cover_asked_confirmed (auto-accept final)',
+  (select count(*) from notifications where template_key='cover_asked_confirmed'
      and user_id='58c0c058-0000-0000-0000-0000000000d1')::bigint, 1);
+select expect_true('...the message reads "{Bo Two} is covering {Reformer} … you''re off it"',
+  (select (payload ->> 'message') like 'Bo Two is covering Reformer on %— you''re off it.'
+     from notifications where template_key='cover_asked_confirmed' and user_id='58c0c058-0000-0000-0000-0000000000d1'));
 select expect_num('...and it is audited as auto_covered',
   (select count(*) from audit_logs where action='cover.auto_covered'
      and entity_id=(select id from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c001'))::bigint, 1);
@@ -300,6 +352,11 @@ select expect_text('...the request is accepted_pending, covered_by I2',
 select expect_num('...staff were told it needs approval',
   (select count(*) from notifications where template_key='cover_needs_approval'
      and studio_id='58c0c058-0000-0000-0000-000000000001')::bigint, 1);
+select expect_true('...and the requester I1 got cover_asked_confirmed "agreed … the studio will confirm"',
+  (select (payload ->> 'message') like 'Bo Two agreed to cover Reformer on %; the studio will confirm.'
+     from notifications where template_key='cover_asked_confirmed'
+       and user_id='58c0c058-0000-0000-0000-0000000000d1'
+       and dedupe_key='cover_asked_confirmed:'||(select id from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c002')));
 select expect_false('...the class is still I1''s until approved',
   (select instructor_id = '58c0c058-0000-0000-0000-0000000d00d2' from class_occurrences where id='58c0c058-0000-0000-0000-00000000c002'));
 -- Owner approves the accepted_pending row.
@@ -325,8 +382,9 @@ select expect_true('I2 says Can''t → opens to everyone',
 reset role;
 select expect_true('...the ask is cleared, still pending (open to all)',
   (select asked_instructor_id is null and status='pending' from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c003'));
-select expect_num('...the requester was told',
-  (select count(*) from notifications where template_key='cover_colleague_declined'
+select expect_num('...the requester got cover_asked_declined',
+  (select count(*) from notifications where template_key='cover_asked_declined'
+     and dedupe_key='cover_asked_declined:'||(select id from cover_requests where occurrence_id='58c0c058-0000-0000-0000-00000000c003')
      and user_id='58c0c058-0000-0000-0000-0000000000d1')::bigint, 1);
 
 -- Escalation sweep opens an unanswered directed request after the hours.
@@ -337,8 +395,9 @@ values ('58c0c058-0000-0000-0000-00000000cc04','58c0c058-0000-0000-0000-00000000
 select sweep_cover_escalations();
 select expect_true('escalation sweep opens an unanswered directed request past the hours',
   (select asked_instructor_id is null and status='pending' from cover_requests where id='58c0c058-0000-0000-0000-00000000cc04'));
-select expect_num('...and the requester was told',
-  (select count(*) from notifications where dedupe_key='cover_colleague_timeout:58c0c058-0000-0000-0000-00000000cc04')::bigint, 1);
+select expect_num('...and the requester got cover_asked_declined',
+  (select count(*) from notifications where template_key='cover_asked_declined'
+     and dedupe_key='cover_asked_declined:58c0c058-0000-0000-0000-00000000cc04')::bigint, 1);
 
 -- An everyone-cover keeps the close-enough rule (PT409 at 10 days, auto-accept on).
 update studio_settings set cover_auto_accept_enabled = true where studio_id='58c0c058-0000-0000-0000-000000000001';
