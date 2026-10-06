@@ -6715,6 +6715,8 @@ export type Database = {
       studios: {
         Row: {
           accent_color: string | null
+          android_package: string | null
+          android_sha256_fingerprints: string | null
           archived_at: string | null
           brand_color: string | null
           checkin_slug: string | null
@@ -6726,6 +6728,8 @@ export type Database = {
           custom_domain: string | null
           id: string
           install_welcome: string | null
+          ios_bundle_id: string | null
+          ios_team_id: string | null
           login_image_focus_x: number
           login_image_focus_y: number
           login_image_url: string | null
@@ -6741,6 +6745,8 @@ export type Database = {
         }
         Insert: {
           accent_color?: string | null
+          android_package?: string | null
+          android_sha256_fingerprints?: string | null
           archived_at?: string | null
           brand_color?: string | null
           checkin_slug?: string | null
@@ -6752,6 +6758,8 @@ export type Database = {
           custom_domain?: string | null
           id?: string
           install_welcome?: string | null
+          ios_bundle_id?: string | null
+          ios_team_id?: string | null
           login_image_focus_x?: number
           login_image_focus_y?: number
           login_image_url?: string | null
@@ -6767,6 +6775,8 @@ export type Database = {
         }
         Update: {
           accent_color?: string | null
+          android_package?: string | null
+          android_sha256_fingerprints?: string | null
           archived_at?: string | null
           brand_color?: string | null
           checkin_slug?: string | null
@@ -6778,6 +6788,8 @@ export type Database = {
           custom_domain?: string | null
           id?: string
           install_welcome?: string | null
+          ios_bundle_id?: string | null
+          ios_team_id?: string | null
           login_image_focus_x?: number
           login_image_focus_y?: number
           login_image_url?: string | null
@@ -7961,10 +7973,6 @@ export type Database = {
       }
       expect_num: {
         Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       expect_true: {
@@ -9453,10 +9461,14 @@ export type Database = {
         Args: { p_slug: string }
         Returns: {
           accent_color: string
+          android_package: string
+          android_sha256_fingerprints: string
           currency: string
           free_first_class_enabled: boolean
           id: string
           install_welcome: string
+          ios_bundle_id: string
+          ios_team_id: string
           login_image_focus_x: number
           login_image_focus_y: number
           login_image_url: string

@@ -35,6 +35,7 @@ export default async function Settings() {
   ];
   if (ctx.role === "owner") {
     groups.push({ href: "/branding", label: "Member app", sub: "Colours, logo and the photograph members see" });
+    groups.push({ href: "/settings/store-apps", label: "Store apps", sub: "Android & iPhone app verification for the app stores" });
   }
 
   return (

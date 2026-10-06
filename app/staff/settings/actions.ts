@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { clampInt, cutoffMinutes } from "@/lib/booking-rules";
+import { parseFingerprints, isPackageId, isTeamId } from "@/lib/well-known";
 
 export type HorizonResult =
   | { ok: true; days: number; cutoff: string; deleted: number; created: number;
@@ -987,4 +988,43 @@ export async function remintCheckinCode(_prev: PlainState, _fd: FormData): Promi
   }
   revalidatePath("/settings/studio/checkin-code/print");
   return { ok: true, message: "New code minted. Re-print it — the old printout no longer works." };
+}
+
+/**
+ * Decision 52a — store the per-tenant app-store identifiers (owner only, via the
+ * studios RLS). Fingerprints are normalised (upper, comma-joined) through the
+ * pure parseFingerprints; shapes are validated with the same helpers the DB
+ * CHECK constraints use, so a bad value is a friendly message, not a raw error.
+ */
+export async function saveStoreApps(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const trimOrNull = (v: FormDataEntryValue | null) => {
+    const s = String(v ?? "").trim();
+    return s === "" ? null : s;
+  };
+  const pkg = trimOrNull(fd.get("android_package"));
+  const team = (() => { const s = trimOrNull(fd.get("ios_team_id")); return s ? s.toUpperCase() : null; })();
+  const bundle = trimOrNull(fd.get("ios_bundle_id"));
+  const fpRaw = String(fd.get("android_sha256_fingerprints") ?? "");
+  const fp = parseFingerprints(fpRaw);
+
+  if (pkg && !isPackageId(pkg)) return { ok: false, message: "Android package name looks wrong — it should be like app.studiior.yourstudio." };
+  if (bundle && !isPackageId(bundle)) return { ok: false, message: "iOS bundle ID looks wrong — it should be like app.studiior.yourstudio." };
+  if (team && !isTeamId(team)) return { ok: false, message: "Apple Team ID should be 10 letters/numbers, e.g. ABCDE12345." };
+  if (fp.invalid.length > 0) return { ok: false, message: `These fingerprints aren't valid SHA-256 values: ${fp.invalid.join(", ")}` };
+
+  const { data, error } = await createClient().from("studios")
+    .update({
+      android_package: pkg,
+      android_sha256_fingerprints: fp.valid.length ? fp.valid.join(",") : null,
+      ios_team_id: team,
+      ios_bundle_id: bundle,
+    })
+    .eq("id", ctx.studioId).select("id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners only." };
+  revalidatePath("/settings/store-apps");
+  return { ok: true, message: "Saved." };
 }

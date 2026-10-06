@@ -61,5 +61,9 @@ export const config = {
   // host's own subtree, and a Stripe webhook has no tenant host to be rewritten
   // for — it arrives at one fixed URL and resolves its tenant from the signed
   // payload's account field instead.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
+  // Decision 52a: `.well-known` is excluded so the store-verification route
+  // handlers (/.well-known/assetlinks.json and /apple-app-site-association) are
+  // never rewritten into /member or session-refreshed — they must be served
+  // directly, host-aware, with no redirect.
+  matcher: ["/((?!api|\\.well-known|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
 };
