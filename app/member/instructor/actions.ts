@@ -81,6 +81,8 @@ export async function askForCover(
   });
   if (error) {
     const m = error.message;
+    // FIX B: request_cover refuses a started class (PT422) even on a stale page.
+    if (/already started/i.test(m)) return { error: "This class has started — call the studio." };
     return { error: /PT400/.test(m) ? "That colleague cannot be asked to cover." : m };
   }
   revalidatePath("/instructor");

@@ -219,4 +219,20 @@ select expect_num('...and R was told what they still hold',
   (select count(*) from notifications where template_key='availability_narrowed_instructor'
      and user_id='c0e5c0e5-0000-0000-0000-0000000000d1')::bigint, 1);
 
+-- FIX B (Decision 58): a cover request for a class that has ALREADY STARTED is
+-- refused (PT422), so the rule holds even from a stale instructor page. (The
+-- future-urgent-window success + auto-accept is asserted in sections 2a/3 above.)
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
+values ('c0e5c0e5-0000-0000-0000-000000c00099','c0e5c0e5-0000-0000-0000-000000000001','c0e5c0e5-0000-0000-0000-00000000000a','c0e5c0e5-0000-0000-0000-0000000cc0a1','c0e5c0e5-0000-0000-0000-0000000ee0a1','c0e5c0e5-0000-0000-0000-0000000d00d1','Reformer',10,0, now()-interval '1 hour', now()-interval '10 min','scheduled');
+set role authenticated;
+select set_config('request.jwt.claim.sub','c0e5c0e5-0000-0000-0000-0000000000d1',false);  -- R, the instructor
+do $$
+declare ok boolean := false;
+begin
+  begin perform request_cover('c0e5c0e5-0000-0000-0000-000000c00099','too late, sorry');
+  exception when sqlstate 'PT422' then ok := true; end;
+  perform expect_true('request_cover refuses a class that has already started', ok);
+end $$;
+reset role;
+
 select 'cover_auto_test: all assertions passed' as done;

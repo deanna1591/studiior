@@ -6,6 +6,7 @@ import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/compon
 import Link from "next/link";
 import { bookClass, bookFirstFree, cancelBooking, selfCheckIn } from "@/app/member/actions";
 import ClassButton from "@/components/member/class-button";
+import { classSheetView } from "@/lib/class-sheet";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
@@ -47,7 +48,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
-  checkedIn = false, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
+  checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -63,15 +64,34 @@ export default function ClassDetailBody({
   /** Decision 68: checked in by any door; whether self check-in can run; and
    *  the studio's check-in window, so the page can offer "Check in now". */
   checkedIn?: boolean;
+  /** FIX A: when the member checked in, for the "You're checked in · {time}" line. */
+  checkedInAt?: string | null;
   selfCheckinAvailable?: boolean;
   opensBeforeMin?: number;
   closesAfterMin?: number;
 }) {
-  const booked = booking?.status === "booked";
-  const waiting = booking?.status === "waitlisted";
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
   const past = new Date(occ.starts_at).getTime() < Date.now();
+
+  // FIX A: the member's OWN relationship to the class wins over capacity — the
+  // same resolver the schedule uses. attended → checked_in (grey, no actions);
+  // booked → checkin (in window) / reserved (outside); waitlisted → leave.
+  const view = classSheetView({
+    bookingStatus: booking?.status ?? null,
+    flexPending: !!(pending && pending.until),
+    checkedIn,
+    startsMs: new Date(occ.starts_at).getTime(),
+    endsMs: occ.ends_at ? new Date(occ.ends_at).getTime() : null,
+    opensBeforeMin, closesAfterMin,
+    full, waitlistEnabled,
+    freeFirstEligible: freeFirst?.eligible === true,
+  });
+  const isCheckedIn = view.state === "checked_in";
+  const isWaitlisted = view.state === "waitlisted";
+  // An actionable booking (not a completed check-in): checkin / reserved /
+  // waiting_confirmation / waitlisted.
+  const hasBooking = view.hideCapacity && !isCheckedIn;
 
   // Decision 21 amendment: the member-facing confirmation copy — always about
   // THEIR booking, never a minimum or a headcount. The "confirmed by" line
@@ -130,32 +150,36 @@ export default function ClassDetailBody({
       )}
 
       <div className="m-card mt-4 p-4">
+        {/* FIX A: the member's own status wins over capacity. checked_in is a
+            greyed, non-clickable line with the check-in time; the capacity line
+            is hidden for anyone with their own booking. */}
         <p className="m-sub mb-3 text-ink-2">
-          {past ? "This class has already started."
-            : booked ? (waitingLabel ?? "You're booked in.")
-            : waiting ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the waitlist.</>
+          {past && !view.hideCapacity ? "This class has already started."
+            : isCheckedIn ? <>You&rsquo;re checked in{checkedInAt && <> · <span className="num">{fmtTime(checkedInAt, timeZone, timeFormat)}</span></>}</>
+            : isWaitlisted ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the waitlist.</>
+            : hasBooking ? (waitingLabel ?? "You're booked in.")
             : full ? <>Fully booked{(occ.waitlist_count ?? 0) > 0 && <> · <span className="num">{occ.waitlist_count}</span> waiting</>}</>
             : <><span className="num font-medium text-ink">{spaces}</span> {spaces === 1 ? "place" : "places"} left</>}
         </p>
 
         {/* Decision 21 amendment: the confirmation deadline, shown before booking
             on a flex class not yet decided. m-sub, no icon, no badge. */}
-        {confirmLine && !booked && !waiting && (
+        {confirmLine && !view.hideCapacity && (
           <p className="m-sub mb-3 text-ink-3">{confirmLine}</p>
         )}
 
-        {past ? null : booked || waiting ? (
+        {past || isCheckedIn ? null : hasBooking ? (
           <>
             {/* Decision 68: the one button — but the page keeps its own status
                 line and Cancel, so here it adds only the new affordance:
-                Check in now (in the window) → Checked in. Nothing for the plain
-                reserved / waiting states the line above already expresses. */}
+                Check in now (in the window). Nothing for the plain reserved /
+                waiting states the line above already expresses. */}
             <div className="mb-3 flex justify-start empty:hidden">
               <ClassButton
                 occurrenceId={occ.id}
                 bookingId={booking!.id}
                 classHref={`/class/${occ.id}`}
-                bookingStatus={booked ? "booked" : "waitlisted"}
+                bookingStatus={isWaitlisted ? "waitlisted" : "booked"}
                 flexPending={!!(pending && pending.until)}
                 checkedIn={checkedIn}
                 startsAt={occ.starts_at}
@@ -171,9 +195,9 @@ export default function ClassDetailBody({
             </div>
             <ActionForm action={cancelBooking}>
               <input type="hidden" name="booking_id" value={booking!.id} />
-              <CardActionOutline>{booked ? "Cancel booking" : "Leave the list"}</CardActionOutline>
+              <CardActionOutline>{isWaitlisted ? "Leave the list" : "Cancel booking"}</CardActionOutline>
             </ActionForm>
-            {booked && (
+            {!isWaitlisted && (
               <a href={`/class/${occ.id}/ics`}
                  className="m-press mt-2 block text-center text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
                 Add to calendar
@@ -213,7 +237,7 @@ export default function ClassDetailBody({
 
       {/* Decision 30's conversion moment: they've booked their free class, so
           tell them what comes next rather than leaving the space empty. */}
-      {freeFirst?.isFreeBooking && booked && !past && (
+      {freeFirst?.isFreeBooking && (hasBooking || isCheckedIn) && !past && (
         <Link href="/account/plan" className="m-card m-press mt-3 flex items-center gap-3 p-4">
           <span className="flex-1">
             <span className="block text-[15px] font-medium leading-5 text-ink">This one&rsquo;s on us 🎉</span>
@@ -225,7 +249,7 @@ export default function ClassDetailBody({
         </Link>
       )}
 
-      {guest?.canInvite && !past && !waiting && (
+      {guest?.canInvite && !past && !isWaitlisted && (
         <GuestInvite occurrenceId={occ.id} />
       )}
 

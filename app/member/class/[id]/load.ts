@@ -33,7 +33,7 @@ export async function loadClassDetail(
   classTypeId?: string | null,
 ): Promise<{ occ: DetailOccurrence; type: DetailType; booking: DetailBooking;
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
-  checkedIn: boolean; selfCheckinAvailable: boolean } | null> {
+  checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean } | null> {
 
   const occQuery = supabase
     .from("class_occurrences")
@@ -47,9 +47,11 @@ export async function loadClassDetail(
     // Decision 68: 'attended' keeps the row so the page reads "Checked in".
     .in("status", ["booked", "waitlisted", "attended"]).maybeSingle();
   // Decision 68: the member's own check-in for this class (self RLS), so the
-  // class page shows "Checked in" after any door — self, scan or desk.
-  const checkinQuery = supabase.from("check_ins").select("id", { count: "exact", head: true })
-    .eq("member_id", memberId).eq("occurrence_id", id);
+  // class page shows "Checked in" after any door — self, scan or desk — with the
+  // time it happened (FIX A).
+  const checkinQuery = supabase.from("check_ins").select("checked_in_at")
+    .eq("member_id", memberId).eq("occurrence_id", id)
+    .order("checked_in_at", { ascending: false }).limit(1).maybeSingle();
   const guestQuery = guestPassesEnabled
     ? supabase.from("guest_passes").select("id", { count: "exact", head: true })
         .eq("host_member_id", memberId).in("status", ["invited", "confirmed"])
@@ -67,7 +69,7 @@ export async function loadClassDetail(
 
   const finish = (occ: Record<string, unknown> | null, type: unknown, booking: unknown,
                   activeGuests: number | null, elig: unknown, freeCount: number | null,
-                  pend: unknown, checkinCount: number | null) => {
+                  pend: unknown, checkinRow: { checked_in_at: string } | null) => {
     if (!occ) return null;
     const e = elig as { ok?: boolean } | null;
     const p = (pend as { deadline_at: string | null; mode: string }[] | null)?.[0];
@@ -82,7 +84,8 @@ export async function loadClassDetail(
       freeFirst: { eligible: e?.ok === true, isFreeBooking: (freeCount ?? 0) > 0 },
       // Decision 68: checked in by any door, and whether the geofenced self
       // check-in can run (else the button falls back to the desk code).
-      checkedIn: (checkinCount ?? 0) > 0 || bk?.status === "attended",
+      checkedIn: checkinRow != null || bk?.status === "attended",
+      checkedInAt: checkinRow?.checked_in_at ?? null,
       selfCheckinAvailable: loc
         ? (loc.self_checkin_requires_location === false || (loc.latitude != null && loc.longitude != null))
         : false,
@@ -97,16 +100,16 @@ export async function loadClassDetail(
 
   if (classTypeId) {
     // One wave: nothing waits on the occurrence.
-    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { count: checkinCount }] =
+    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }] =
       await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery]);
-    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinCount);
+    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow);
   }
 
   // No hint (deep link / refresh): occurrence, booking and guest in parallel;
   // then type, the one read that needs the occurrence's class_type_id.
-  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { count: checkinCount }] =
+  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }] =
     await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery]);
   if (!occ) return null;
   const { data: type } = occ.class_type_id ? await typeQuery(occ.class_type_id) : { data: null };
-  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinCount);
+  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow);
 }

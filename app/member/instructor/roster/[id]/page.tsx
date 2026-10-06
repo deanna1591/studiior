@@ -4,6 +4,7 @@ import InstructorShell from "@/components/instructor/shell";
 import { AskForCover, CheckIn } from "../../actions-ui";
 import ClassTag from "@/components/instructor/class-tag";
 import ScanCheckIn from "@/components/instructor/scan-check-in";
+import { coverRequestAllowed } from "@/lib/cover-window";
 
 export const dynamic = "force-dynamic";
 
@@ -33,15 +34,24 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data, error }, { data: colleaguesData }, { data: settings }] = await Promise.all([
+  const [{ data, error }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }] = await Promise.all([
     supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
     // Decision 58: who an "ask for cover" can be directed to.
     supabase.rpc("instructor_colleagues", { p_instructor_id: ctx.instructor_id }),
     // Decision 58 amendment: whether a directed confirm is final at once.
     supabase.from("studio_settings").select("cover_auto_accept_enabled")
       .eq("studio_id", ctx.studio_id).maybeSingle(),
+    // FIX B: the class start instant, so cover is offered only before it starts.
+    supabase.from("class_occurrences").select("starts_at").eq("id", params.id).maybeSingle(),
+    supabase.from("studios").select("contact_email, contact_phone").eq("id", ctx.studio_id).maybeSingle(),
   ]);
   const r = data as Roster | null;
+  // FIX B: a cover request is only open before the class starts (comparing
+  // instants; request_cover refuses a started class too, even on a stale page).
+  const coverOpen = occRow?.starts_at
+    ? coverRequestAllowed(Date.now(), new Date(occRow.starts_at).getTime())
+    : true;
+  const studioContact = [studio?.contact_email, studio?.contact_phone].filter(Boolean).join(" · ");
   const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string; has_login: boolean }[])
     .map((c) => ({ id: c.instructor_id, name: c.display_name, hasLogin: c.has_login }));
   const autoAccept = settings?.cover_auto_accept_enabled ?? false;
@@ -159,7 +169,16 @@ export default async function RosterPage({ params }: { params: { id: string } })
         </ul>
       )}
 
-      {r.status === "scheduled" && <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} autoAccept={autoAccept} />}
+      {r.status === "scheduled" && (coverOpen ? (
+        <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} autoAccept={autoAccept} />
+      ) : (
+        <div className="m-card mt-5 px-4 py-3">
+          <p className="text-[15px] leading-6 text-ink">
+            This class has started. If you can&rsquo;t teach it, call the studio.
+          </p>
+          {studioContact && <p className="m-sub mt-1 text-ink-2">{studioContact}</p>}
+        </div>
+      ))}
 
       <p className="m-sub mt-5 text-ink-3">{r.withheld}</p>
     </InstructorShell>

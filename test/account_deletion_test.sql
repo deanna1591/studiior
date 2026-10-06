@@ -189,6 +189,17 @@ begin
   perform expect_true('account_deleted email queued to the old address',
     (select exists(select 1 from notifications where template_key='account_deleted'
        and payload->>'to_email'='d-one@example.com')));
+
+  -- FIX 0: the address is stored LITERALLY on the row (payload to_email), and
+  -- render_notification resolves it from the payload — NOT re-resolved from the
+  -- (now scrubbed) members row — so the email still reaches the pre-scrub address.
+  perform expect_text('render_notification uses the stored pre-scrub address after the scrub',
+    (select to_email from render_notification(
+       (select id from notifications where template_key='account_deleted'
+          and member_id='de1e0000-0000-0000-0000-0000000e1001' limit 1))),
+    'd-one@example.com');
+  perform expect_true('the scrubbed member row no longer holds that address',
+    (select email <> 'd-one@example.com' from members where id='de1e0000-0000-0000-0000-0000000e1001'));
 end $$;
 
 -- === Deleted member absent from staff list / campaign audience / roster ======
