@@ -40,7 +40,7 @@ export default function TimingPanel({
                  defaultValue={dueDay} className={`${inputClass} w-24`} />
         </label>
         <label className="text-[13px] leading-[20px] text-ink-2">
-          <span className="mb-1 block">Escalate unconfirmed classes within</span>
+          <span className="mb-1 block">Remind the studio after</span>
           <input name="week_confirm_escalate_days" type="number" min={1} max={14} required
                  defaultValue={escalateDays} className={`${inputClass} w-24`} />
         </label>

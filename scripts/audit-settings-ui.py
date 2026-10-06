@@ -35,6 +35,7 @@ def classify(col):
     return hits_read, hits_write
 
 SKIP = {"id","studio_id","created_at","updated_at","is_demo","plan_id","member_id"}
+WRITTEN_COLS = set()   # Decision 71 rule 3: every written settings column, both tables.
 for table in ("studio_settings", "membership_plans"):
     print("=" * 78)
     print(table.upper())
@@ -52,6 +53,7 @@ for table in ("studio_settings", "membership_plans"):
     for n, t, d, r in read_only: print("    %-34s %s" % (n, ", ".join(sorted(set(r))[:2])))
     print("\n--- HAS A WRITE PATH (%d)" % len(written))
     print("    " + ", ".join(n for n, *_ in written))
+    WRITTEN_COLS.update(n for n, *_ in written)
     print()
 
 # ---------------------------------------------------------------------------
@@ -88,4 +90,52 @@ print("    (each is granted to authenticated and writes, yet nothing calls it �
 print("     either it needs a screen, or its grant should be revoked. Check each.)")
 for n in orphans:
     print("    %s" % n)
+print()
+
+# ---------------------------------------------------------------------------
+# Decision 71, RULE 3: the settings registry (lib/settings-registry.mjs) is the
+# source of truth for what a studio can change. Every studio_settings /
+# membership_plans column with a write path must be named by a registry entry —
+# as an `id` or in a `columns: [...]` list — or it is a setting with no home in
+# the new Settings, which the audit refuses. A documented SKIP3 covers columns
+# that are written but are NOT user-facing settings: system/flow flags, locale
+# fields shown read-only, and the plan↔Stripe sync ids.
+# ---------------------------------------------------------------------------
+SKIP3 = {
+    "onboarding_completed_at",  # system flag, set by the onboarding wizard
+    "week_starts_on",           # studio locale (onboarding); read-only in Settings
+    "booking_cutoff_minutes",   # legacy/bootstrap-read, no settings editor
+    "waitlist_enabled",         # bootstrap-read flag, no settings editor
+    "max_future_bookings",      # unused cap, no editor
+    "stripe_product_id",        # plan↔Stripe sync, never user-entered
+    "stripe_price_id",          # plan↔Stripe sync, never user-entered
+}
+
+print("=" * 78)
+print("REGISTRY (Decision 71) — every written settings column must be registered")
+print("=" * 78)
+reg_path = "lib/settings-registry.mjs"
+try:
+    reg = open(reg_path, encoding="utf8").read()
+except FileNotFoundError:
+    print("\n    MISSING %s — the registry must exist." % reg_path)
+    sys.exit(1)
+
+registered = set(re.findall(r'\bid:\s*"([^"]+)"', reg))
+for block in re.findall(r'columns:\s*\[(.*?)\]', reg, re.S):
+    registered |= set(re.findall(r'"([a-z_]+)"', block))
+
+missing = sorted(c for c in WRITTEN_COLS if c not in registered and c not in SKIP3)
+skipped = sorted(c for c in WRITTEN_COLS if c in SKIP3)
+print("\n--- skipped (written, but not a user-facing setting) (%d)" % len(skipped))
+print("    " + (", ".join(skipped) or "-"))
+print("\n--- NOT IN THE REGISTRY (%d)" % len(missing))
+if missing:
+    print("    (each is a settings column with a write path and no registry entry —")
+    print("     add it to lib/settings-registry.mjs, as an id or a columns[] member.)")
+    for c in missing:
+        print("    %s" % c)
+    print()
+    sys.exit(1)
+print("    none — every written settings column is in the registry.")
 print()

@@ -1,68 +1,7 @@
-import { isManagerUp } from "@/lib/auth";
-import { staffScreen } from "@/lib/screen";
-import { AppShell, Denied, SectionLabel } from "@/components/ui";
-import TimingPanel from "../timing";
-import CarryForwardPanel from "../carry-forward";
-import ClaimingPanel from "../claiming";
-import AutoAssignPanel from "../auto-assign";
-import RequireAvailabilityPanel from "../require-availability";
-import CoverPanel from "../cover";
-import BookingAlertsPanel from "../booking-alerts";
-import AssignmentConfirmationsPanel from "../assignment-confirmations";
-import ClassRemindersPanel from "../class-reminders";
-import SettingsBack from "../back";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function InstructorSettings() {
-  const screen = await staffScreen("/settings");
-  if (screen.gate) return screen.gate;
-  const { ctx, supabase, shell } = screen;
-  if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Instructors"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
-
-  const { data: settings } = await supabase.from("studio_settings")
-    .select("availability_due_day, week_confirm_escalate_days, week_confirm_enabled, availability_reminders_enabled, carry_forward_enabled, roster_confirm_days, claiming_enabled, core_claim_default_cap, cover_auto_accept_enabled, cover_escalation_hours, instructor_booking_alerts, assignment_confirmations, instructor_class_reminders, auto_assign_open_classes, assign_requires_availability")
-    .eq("studio_id", ctx.studioId).maybeSingle();
-
-  return (
-    <AppShell {...shell} title="Instructors">
-      <SettingsBack />
-      <SectionLabel>Availability and confirmations</SectionLabel>
-      <div className="mt-3"><TimingPanel
-        dueDay={settings?.availability_due_day ?? 20}
-        escalateDays={settings?.week_confirm_escalate_days ?? 3}
-        weekConfirm={settings?.week_confirm_enabled ?? false}
-        availReminders={settings?.availability_reminders_enabled ?? false} /></div>
-      <div className="mt-8"><SectionLabel>How classes get staffed</SectionLabel></div>
-      <div className="mt-3">
-        <AutoAssignPanel enabled={settings?.auto_assign_open_classes ?? false} />
-      </div>
-      <div className="mt-3">
-        <RequireAvailabilityPanel enabled={settings?.assign_requires_availability ?? false} />
-      </div>
-      <div className="mt-3">
-        <ClaimingPanel enabled={settings?.claiming_enabled ?? false} defaultCap={settings?.core_claim_default_cap ?? 3} />
-      </div>
-      <div className="mt-8"><SectionLabel>Cover</SectionLabel></div>
-      <div className="mt-3">
-        <CoverPanel enabled={settings?.cover_auto_accept_enabled ?? false} hours={settings?.cover_escalation_hours ?? 4} />
-      </div>
-      <div className="mt-8"><SectionLabel>Carry-forward</SectionLabel></div>
-      <div className="mt-3">
-        <CarryForwardPanel enabled={settings?.carry_forward_enabled ?? false} days={settings?.roster_confirm_days ?? 5} />
-      </div>
-      <div className="mt-8"><SectionLabel>Booking alerts</SectionLabel></div>
-      <div className="mt-3">
-        <BookingAlertsPanel enabled={settings?.instructor_booking_alerts ?? false} />
-      </div>
-      <div className="mt-8"><SectionLabel>Assignment confirmations</SectionLabel></div>
-      <div className="mt-3">
-        <AssignmentConfirmationsPanel enabled={settings?.assignment_confirmations ?? false} />
-      </div>
-      <div className="mt-8"><SectionLabel>Class reminders</SectionLabel></div>
-      <div className="mt-3">
-        <ClassRemindersPanel enabled={settings?.instructor_class_reminders ?? false} />
-      </div>
-    </AppShell>
-  );
+// Decision 71 — this settings group was merged; its content moved. Redirect to
+// the new page and section.
+export default function Redirect() {
+  redirect("/settings/classes#availability");
 }

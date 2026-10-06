@@ -2,14 +2,15 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
+import { GROUPS } from "@/lib/settings-registry";
+import SettingsSearch from "@/components/staff/settings-search";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Settings is a hub — a list that leads to one screen per group, rather than
- * ten stacked panels that had grown into a wall you scrolled past. A hub (not a
- * persistent side-nav) is also what keeps a settings screen to rail + content
- * at iPad width instead of three columns that do not fit.
+ * Decision 71 — Settings is a home page: one search box over the whole registry,
+ * then six group cards, each listing its sections as links. The old flat
+ * 14-link list is gone; each group is now ONE scrolling page.
  */
 export default async function Settings() {
   const screen = await staffScreen("/settings");
@@ -19,40 +20,32 @@ export default async function Settings() {
     return <AppShell {...shell} title="Settings"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
   }
 
-  const groups: { href: string; label: string; sub: string }[] = [
-    { href: "/settings/studio", label: "Studio", sub: "Opening hours" },
-    { href: "/settings/timetable", label: "Timetable", sub: "How far ahead classes run, and publishing each month" },
-    { href: "/settings/booking", label: "Booking rules", sub: "How far ahead members book, the cancellation cut-off, and the waiver" },
-    { href: "/settings/guarantees", label: "Guarantees & flex", sub: "When a class runs regardless, and what it owes the instructor" },
-    { href: "/settings/fair-use", label: "Peak & fair use", sub: "Peak hours, repeated late cancellations, and places on a plan" },
-    { href: "/settings/features", label: "Member features", sub: "Challenges and guest passes" },
-    { href: "/settings/instructors", label: "Instructors", sub: "When the month is due, and when to chase confirmations" },
-    { href: "/settings/payroll", label: "Payroll", sub: "How often instructors are paid, and when the period closes" },
-    { href: "/settings/location", label: "Location & self check-in", sub: "Where the studio is, so members can check in from their phone" },
-    { href: "/settings/closures", label: "Closures", sub: "Days you are shut — nothing is generated, and members are told" },
-    { href: "/settings/stripe", label: "Card payments", sub: "Take card payments online (optional — a studio can take cash)" },
-    { href: "/settings/xendit", label: "Xendit payments", sub: "Take online payments in the Philippines (packs and drop-ins)" },
-  ];
-  if (ctx.role === "owner") {
-    groups.push({ href: "/branding", label: "Member app", sub: "Colours, logo and the photograph members see" });
-    groups.push({ href: "/settings/store-apps", label: "Store apps", sub: "Android & iPhone app verification for the app stores" });
-  }
-
   return (
     <AppShell {...shell} title="Settings">
-      <ul className="s-card max-w-2xl divide-y divide-line overflow-hidden">
-        {groups.map((g) => (
-          <li key={g.href}>
-            <Link href={g.href} className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-paper">
-              <span className="min-w-0">
-                <span className="block text-[14px] font-semibold text-ink">{g.label}</span>
-                <span className="block text-[12px] leading-[17px] text-ink-3">{g.sub}</span>
-              </span>
-              <span className="shrink-0 text-ink-3">→</span>
+      <div className="mb-6">
+        <SettingsSearch />
+      </div>
+
+      <div className="grid max-w-4xl gap-3 sm:grid-cols-2">
+        {GROUPS.map((g) => (
+          <div key={g.id} className="s-card overflow-hidden p-4">
+            <Link href={g.route} className="text-[15px] font-semibold text-ink hover:underline">
+              {g.label}
             </Link>
-          </li>
+            <p className="mt-0.5 text-[12px] leading-[17px] text-ink-3">{g.description}</p>
+            <ul className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
+              {g.sections.map((s) => (
+                <li key={s.anchor}>
+                  <Link href={`${g.route}#${s.anchor}`}
+                        className="text-[12.5px] text-ink-2 underline decoration-line underline-offset-2 hover:text-ink">
+                    {s.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
     </AppShell>
   );
 }

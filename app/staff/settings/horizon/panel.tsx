@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonClass, inputClass } from "@/components/ui";
-import { previewHorizon, applyHorizon, type SettingsState } from "./actions";
+import { previewHorizon, applyHorizon, type SettingsState } from "../actions";
 
 function Submit({ label, busy }: { label: string; busy: string }) {
   const { pending } = useFormStatus();
@@ -29,7 +29,7 @@ export default function HorizonPanel({
   return (
     <div className="max-w-xl">
       <p className="mb-4 max-w-[58ch] text-[13px] leading-[20px] text-ink-2">
-        Recurring classes are materialised this far ahead and topped up every
+        Recurring classes are generated this far ahead and topped up every
         night. Right now <span className="num text-ink">{scheduled}</span> classes are on
         the calendar{furthest && <>, the last on <span className="num text-ink">{furthest}</span></>}.
         Sixty days is this month and the next — how most studios plan, and the

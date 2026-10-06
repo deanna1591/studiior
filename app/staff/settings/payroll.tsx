@@ -58,7 +58,7 @@ export default function PayrollPanel(
             need it — monthly uses the calendar month, twice-monthly the day above. */}
         {anchorShown && (
           <label className="mt-3 block">
-            <span className="mb-1 block text-[13px] font-medium text-ink">Cycle anchor</span>
+            <span className="mb-1 block text-[13px] font-medium text-ink">Pay cycle starts on</span>
             <input name="pay_period_anchor" type="date" defaultValue={anchor ?? ""} className={field} />
             <span className="mt-1 block text-[12px] text-ink-3">
               The reference date the {m} cycle counts from. Leave blank to use the existing schedule.

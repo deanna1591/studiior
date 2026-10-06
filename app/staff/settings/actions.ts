@@ -671,28 +671,9 @@ export async function saveHowToBuy(_prev: PlainState, fd: FormData): Promise<Pla
   return { ok: true, message: raw ? "Saved. Members see this under your plans." : "Saved. Members see the default." };
 }
 
-// Decision 36: how far ahead members can book. studio_settings.booking_window_days
-// had no writer but the onboarding wizard, so a studio could never change it
-// after setup. A membership plan's own window overrides this (book_class 2.1.2 /
-// member_booking_window_days), which the help text says.
-export async function saveBookingWindow(_prev: PlainState, fd: FormData): Promise<PlainState> {
-  const ctx = await getStaffContext();
-  if (!ctx) return { ok: false, message: "You are not signed in." };
-
-  const n = Number(String(fd.get("booking_window_days") ?? "").trim());
-  if (!Number.isFinite(n) || n < 1 || n > 730) {
-    return { ok: false, message: "Give a number of days between 1 and 730." };
-  }
-  const supabase = createClient();
-  const { data, error } = await supabase.from("studio_settings")
-    .update({ booking_window_days: Math.floor(n) })
-    .eq("studio_id", ctx.studioId).select("studio_id");
-  if (error) return { ok: false, message: error.message };
-  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
-
-  revalidatePath("/settings");
-  return { ok: true, message: "Saved. A membership plan's own window still overrides this." };
-}
+// Decision 71: the booking window has ONE editor now — BookingRulesPanel on
+// /settings/booking (saveBookingRules). The standalone saveBookingWindow /
+// BookingWindowPanel was the duplicate on the old Timetable page and is removed.
 
 export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
@@ -1026,5 +1007,27 @@ export async function saveStoreApps(_prev: PlainState, fd: FormData): Promise<Pl
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners only." };
   revalidatePath("/settings/store-apps");
+  return { ok: true, message: "Saved." };
+}
+
+/**
+ * Decision 71 — a post-onboarding editor for the studio NAME (owner only; the
+ * studios RLS is owner-write, so a manager's update affects 0 rows and is told
+ * "Owners only"). The member app address, time zone, currency and country stay
+ * read-only here and are changed by contacting Studiior — the slug decides the
+ * member host and the locale fields govern every day boundary, so neither is a
+ * self-serve edit in V1.
+ */
+export async function saveStudioName(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const name = String(fd.get("name") ?? "").trim();
+  if (!name) return { ok: false, message: "Give your studio a name." };
+
+  const { data, error } = await createClient().from("studios")
+    .update({ name }).eq("id", ctx.studioId).select("id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners only." };
+  revalidatePath("/settings/studio"); revalidatePath("/");
   return { ok: true, message: "Saved." };
 }

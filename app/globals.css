@@ -791,3 +791,13 @@ body {
   .m-day-enter { animation: none !important; transition: none !important; }
   .m-press:active { transform: none; }
 }
+
+/* Decision 71 — brief highlight when a settings search jumps to a section. */
+@keyframes settings-flash {
+  0% { background: var(--accent-chip); }
+  100% { background: transparent; }
+}
+.settings-flash { animation: settings-flash 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .settings-flash { animation: none; }
+}

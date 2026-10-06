@@ -72,7 +72,7 @@ export default function LocationPanel({ loc }: { loc: Loc }) {
           <span className="mt-1 block text-[12px] text-ink-3">How close they must be. Default 200.</span>
         </label>
         <label className="block">
-          <span className="mb-1 block text-[13px] font-medium text-ink">Accuracy cap (metres)</span>
+          <span className="mb-1 block text-[13px] font-medium text-ink">Ignore GPS readings less accurate than (metres)</span>
           <input name="accuracy_cap" defaultValue={loc?.self_checkin_accuracy_cap_m ?? 150} className={field}
                  inputMode="numeric" />
           <span className="mt-1 block text-[12px] text-ink-3">A phone vaguer than this is asked to try again. Default 150.</span>

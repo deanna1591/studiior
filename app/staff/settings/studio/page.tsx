@@ -1,17 +1,18 @@
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
-import Link from "next/link";
-import { AppShell, Denied, SectionLabel } from "@/components/ui";
+import { AppShell, Denied } from "@/components/ui";
+import { staffMemberOrigin } from "@/lib/member-urls-server";
 import OpeningHoursPanel from "../opening-hours";
+import LocationPanel from "../location-panel";
+import StudioIdentityPanel from "../studio-identity";
 import SettingsBack from "../back";
+import SettingsSection from "@/components/staff/settings-section";
+import SettingsSummaryRow from "@/components/staff/settings-summary";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Decision 44 — Settings → Studio. Currently the one opening window; per-weekday
- * hours and closures-by-date are deferred (the existing Closures screen is
- * unchanged).
- */
+/** Decision 71 — Studio group: identity, opening hours, self check-in, and the
+ *  standalone check-in code and closures. */
 export default async function StudioSettings() {
   const screen = await staffScreen("/settings");
   if (screen.gate) return screen.gate;
@@ -20,33 +21,52 @@ export default async function StudioSettings() {
     return <AppShell {...shell} title="Studio"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
   }
 
-  const { data } = await supabase.from("studio_settings")
-    .select("open_time, close_time").eq("studio_id", ctx.studioId).maybeSingle();
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: studio }, { data: settings }, { data: loc }, { count: closures }] = await Promise.all([
+    supabase.from("studios").select("name, slug, timezone, currency, country").eq("id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("open_time, close_time").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("locations")
+      .select("name, address, latitude, longitude, self_checkin_radius_m, self_checkin_accuracy_cap_m, self_checkin_requires_location")
+      .eq("studio_id", ctx.studioId).eq("is_primary", true).maybeSingle(),
+    supabase.from("studio_closures").select("id", { count: "exact", head: true }).eq("studio_id", ctx.studioId).gte("ends_on", today),
+  ]);
 
-  // Postgres returns "HH:MM:SS"; a native time input wants "HH:MM".
+  const origin = await staffMemberOrigin(supabase, studio?.slug ?? "");
+  const host = origin.replace(/^https?:\/\//, "");
+  const slug = studio?.slug ?? "";
+  const memberDomain = host.startsWith(`${slug}.`) ? host.slice(slug.length + 1) : host;
   const hhmm = (t: string | null | undefined) => (t ? t.slice(0, 5) : null);
 
   return (
     <AppShell {...shell} title="Studio">
       <SettingsBack />
-      <SectionLabel>Opening hours</SectionLabel>
-      <div className="mt-3">
-        <OpeningHoursPanel open={hhmm(data?.open_time)} close={hhmm(data?.close_time)} />
-      </div>
 
-      {/* Decision 35 §3 — the printed check-in QR for the wall. */}
-      <div className="mt-8">
-        <SectionLabel>Check-in code</SectionLabel>
-        <p className="mt-2 max-w-2xl text-[13px] leading-[19px] text-ink-3">
-          A printable QR members scan to check in from their phone, inside the
-          class window. Set the primary location&rsquo;s coordinates below for the
-          door check to work.
-        </p>
-        <Link href="/settings/studio/checkin-code/print"
-              className="mt-3 inline-block rounded border border-line bg-surface px-3.5 py-2 text-[14px] font-medium text-ink hover:bg-paper">
-          Print check-in code →
-        </Link>
-      </div>
+      <SettingsSection id="identity" title="Studio details">
+        <StudioIdentityPanel
+          name={studio?.name ?? ""} slug={slug} timezone={studio?.timezone ?? ""}
+          currency={studio?.currency ?? ""} country={studio?.country ?? null}
+          canEditName={ctx.role === "owner"} memberDomain={memberDomain} />
+      </SettingsSection>
+
+      <SettingsSection id="opening-hours" title="Opening hours">
+        <OpeningHoursPanel open={hhmm(settings?.open_time)} close={hhmm(settings?.close_time)} />
+      </SettingsSection>
+
+      <SettingsSection id="location" title="Location & self check-in">
+        <LocationPanel loc={loc ?? null} />
+      </SettingsSection>
+
+      <SettingsSection id="checkin-code" title="Check-in code">
+        <SettingsSummaryRow title="Printable check-in code"
+          state="A QR for the wall — members scan it to check in inside the class window."
+          href="/settings/studio/checkin-code/print" cta="Print" />
+      </SettingsSection>
+
+      <SettingsSection id="closures" title="Closures">
+        <SettingsSummaryRow title="Closures & holidays"
+          state={(closures ?? 0) === 0 ? "No upcoming closures." : `${closures} upcoming closure${closures === 1 ? "" : "s"}.`}
+          href="/settings/closures" cta="Manage" />
+      </SettingsSection>
     </AppShell>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonQuietClass } from "@/components/ui";
-import { saveWaiver, type PlainState } from "./actions";
+import { saveWaiver, type PlainState } from "../actions";
 
 function Save() {
   const { pending } = useFormStatus();
