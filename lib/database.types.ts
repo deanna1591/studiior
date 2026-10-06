@@ -6212,6 +6212,7 @@ export type Database = {
           expires_at: string
           id: string
           instructor_id: string | null
+          invited_name: string | null
           role: Database["public"]["Enums"]["staff_role"]
           studio_id: string
           token_hash: string
@@ -6225,6 +6226,7 @@ export type Database = {
           expires_at: string
           id?: string
           instructor_id?: string | null
+          invited_name?: string | null
           role?: Database["public"]["Enums"]["staff_role"]
           studio_id: string
           token_hash: string
@@ -6238,6 +6240,7 @@ export type Database = {
           expires_at?: string
           id?: string
           instructor_id?: string | null
+          invited_name?: string | null
           role?: Database["public"]["Enums"]["staff_role"]
           studio_id?: string
           token_hash?: string
@@ -7971,14 +7974,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       extend_membership: {
         Args: {
           p_membership_id: string
@@ -8354,6 +8349,14 @@ export type Database = {
       }
       invite_members_bulk: {
         Args: { p_days?: number; p_member_ids?: string[]; p_studio_id: string }
+        Returns: Json
+      }
+      invite_staff: {
+        Args: {
+          p_email: string
+          p_name?: string
+          p_role: Database["public"]["Enums"]["staff_role"]
+        }
         Returns: Json
       }
       is_desk_up: { Args: { target: string }; Returns: boolean }
@@ -9010,6 +9013,7 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: Json
       }
+      remove_staff: { Args: { p_staff_id: string }; Returns: Json }
       render_notification: {
         Args: { p_notification_id: string }
         Returns: {
@@ -9349,6 +9353,13 @@ export type Database = {
         }
         Returns: Json
       }
+      set_staff_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["staff_role"]
+          p_staff_id: string
+        }
+        Returns: Json
+      }
       set_studio_complimentary: {
         Args: { p_note: string; p_studio_id: string }
         Returns: undefined
@@ -9535,6 +9546,18 @@ export type Database = {
         Returns: number
       }
       studio_setup_state: { Args: { p_studio_id: string }; Returns: Json }
+      studio_team: {
+        Args: { p_studio_id: string }
+        Returns: {
+          email: string
+          is_self: boolean
+          last_sign_in_at: string
+          name: string
+          role: Database["public"]["Enums"]["staff_role"]
+          staff_id: string
+          status: string
+        }[]
+      }
       studio_today: { Args: { p_studio_id: string }; Returns: string }
       studio_unconfirmed_pay_count: {
         Args: { p_studio_id: string }

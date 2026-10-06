@@ -21,7 +21,6 @@ export default async function CommunicationsSettings() {
     supabase.from("studios").select("theme_preset, logo_url, contact_email").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("studio_settings").select("public_instructor_name, time_format").eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
-  const owner = ctx.role === "owner";
 
   const look = [
     studio?.theme_preset ? `${studio.theme_preset[0].toUpperCase()}${studio.theme_preset.slice(1)} theme` : null,
@@ -38,7 +37,7 @@ export default async function CommunicationsSettings() {
       <SettingsSection id="member-app" title="Member app look & contact">
         <SettingsSummaryRow title="Member app appearance, names, times & contact"
           state={look}
-          href="/branding" cta="Open member app" ownerLocked={!owner} />
+          href="/branding" cta="Open member app" />
       </SettingsSection>
 
       <SettingsSection id="campaign" title="Campaign sending domain">

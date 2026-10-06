@@ -75,6 +75,15 @@ test('searchSettings("") is empty', () => {
   assert.deepEqual(searchSettings("   "), []);
 });
 
+test("Decision 70 — a Team entry exists in the Studio group and is searchable", () => {
+  const team = SETTINGS.find((s) => s.id === "team");
+  assert.ok(team, "no Team entry");
+  assert.equal(team.group, "studio");
+  assert.equal(team.standalone, "/settings/team");
+  assert.ok(searchSettings("manager").some((s) => s.id === "team"), '"manager" did not find Team');
+  assert.ok(searchSettings("invite").some((s) => s.id === "team"), '"invite" did not find Team');
+});
+
 test("searchSettings caps at 8", () => {
   // "a" matches many via label/synonym/group; must never exceed 8.
   assert.ok(searchSettings("a").length <= 8);

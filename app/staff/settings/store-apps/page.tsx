@@ -1,4 +1,5 @@
 import { staffScreen } from "@/lib/screen";
+import { isManagerUp } from "@/lib/auth";
 import { AppShell, Denied, SectionLabel } from "@/components/ui";
 import SettingsBack from "../back";
 import StoreAppsForm from "./form";
@@ -8,15 +9,15 @@ import { parseFingerprints, assetlinksFor, aasaFor } from "@/lib/well-known";
 export const dynamic = "force-dynamic";
 
 /**
- * Settings → Store apps (owner only — the studios RLS is owner-write). The four
- * per-tenant store identifiers, and a read-only status block showing the two
- * verification URLs on this studio's member host and whether each is served.
+ * Settings → Store apps (Decision 70(b): owner OR manager — the studios RLS is
+ * now owner-or-manager). The four per-tenant store identifiers, and a read-only
+ * status block showing the two verification URLs and whether each is served.
  */
 export default async function StoreAppsSettings() {
   const screen = await staffScreen("/settings");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
-  if (ctx.role !== "owner") {
+  if (!isManagerUp(ctx.role)) {
     return <AppShell {...shell} title="Store apps"><Denied what="Store apps" role={ctx.role} /></AppShell>;
   }
 

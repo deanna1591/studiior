@@ -37,6 +37,8 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 
 ¹ Public fields only — name, logo, address, timezone — via a restricted view.
 
+**Amendment (Decision 70) — Manager widened.** A Manager may now edit the studio profile, branding, location/coordinates, check-in code, opening hours, all Settings pages, and Store apps (so the "Edit studio profile, branding, PWA identity" row above is now ✅ for Manager). **Owner-only stays:** connecting or disconnecting a payment provider (Stripe/Xendit pages and secrets), changing roles, inviting/removing Managers or Owners, the audit log, and immediate cancel-with-refund. Enforced in RLS and RPC, not only in the UI — the payment-provider columns on `studios` keep an owner-only column guard even though the row's UPDATE policy is now owner-or-manager.
+
 ---
 
 ## 4. Staff & instructors

@@ -1,4 +1,5 @@
 import { staffScreen } from "@/lib/screen";
+import { isManagerUp } from "@/lib/auth";
 import { AppShell, Empty } from "@/components/ui";
 import type { PresetKey } from "@/lib/theme";
 import BrandingForm from "./form";
@@ -10,14 +11,14 @@ export default async function Branding() {
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
 
-  // Owner only. studios_owner_brand is the enforcement — this decides what to
-  // offer, and a manager who types the URL gets an explanation rather than a
-  // form that will refuse them after they have filled it in.
-  if (ctx.role !== "owner") {
+  // Decision 70(b): owner OR manager. The widened studios UPDATE policy is the
+  // enforcement; this decides what to offer, and a front desk / instructor who
+  // types the URL gets an explanation rather than a form that will refuse them.
+  if (!isManagerUp(ctx.role)) {
     return (
       <AppShell {...shell} title="Member app">
         <Empty>
-          How the member app looks is the owner&rsquo;s to set. You are signed in
+          How the member app looks is set by an owner or a manager. You are signed in
           as {ctx.role.replace("_", " ")}.
         </Empty>
       </AppShell>

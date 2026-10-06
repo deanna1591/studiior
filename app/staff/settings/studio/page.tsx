@@ -45,7 +45,13 @@ export default async function StudioSettings() {
         <StudioIdentityPanel
           name={studio?.name ?? ""} slug={slug} timezone={studio?.timezone ?? ""}
           currency={studio?.currency ?? ""} country={studio?.country ?? null}
-          canEditName={ctx.role === "owner"} memberDomain={memberDomain} />
+          canEditName={isManagerUp(ctx.role)} memberDomain={memberDomain} />
+      </SettingsSection>
+
+      <SettingsSection id="team" title="Team">
+        <SettingsSummaryRow title="Team access"
+          state="Who can sign in to run the studio — invite managers and front desk, change roles, remove access."
+          href="/settings/team" cta="Manage team" />
       </SettingsSection>
 
       <SettingsSection id="opening-hours" title="Opening hours">

@@ -45,7 +45,7 @@ export default async function IntegrationsSettings() {
       <SettingsSection id="store-apps" title="Store apps">
         <SettingsSummaryRow title="Android & iPhone app verification"
           state={storeState}
-          href="/settings/store-apps" cta="Manage" ownerLocked={!owner} />
+          href="/settings/store-apps" cta="Manage" />
       </SettingsSection>
     </AppShell>
   );
