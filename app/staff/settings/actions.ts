@@ -961,6 +961,10 @@ export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise
       cancellation_cutoff_minutes: cutoffMinutes(fd.get("cutoff_hours"), fd.get("cutoff_minutes")),
       require_waiver: fd.get("require_waiver") === "on",
       late_cancel_consumes_credit: fd.get("late_cancel_consumes_credit") === "on",
+      // Decision 68: the check-in window the four-state class button opens and
+      // closes against — minutes before the start it opens, minutes after it closes.
+      checkin_opens_minutes_before: clampInt(fd.get("checkin_opens_minutes_before"), 60),
+      checkin_closes_minutes_after: clampInt(fd.get("checkin_closes_minutes_after"), 30),
     })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };

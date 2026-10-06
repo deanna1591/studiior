@@ -238,9 +238,10 @@ const SELF_CHECKIN_REASONS: Record<string, string> = {
   class_not_scheduled: "That class isn't running.",
   month_not_published: "That class isn't open for check-in yet.",
   window_closed: "Check-in isn't open for this class right now.",
-  no_location: "You need to be at the studio to check in — or show your code at the desk.",
-  too_far: "You need to be at the studio to check in — or show your code at the desk.",
-  low_accuracy: "Your phone can't place you closely enough — try again outside, or show your code at the desk.",
+  // Decision 68 — the exact reason sentences under the button.
+  no_location: "Turn on location to check in, or ask at the desk.",
+  too_far: "You're too far from the studio to check in.",
+  low_accuracy: "Your phone can't place you closely enough — try again outside.",
   studio_has_no_location: "Self check-in isn't set up here — show your code at the desk.",
 };
 

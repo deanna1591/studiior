@@ -4,7 +4,8 @@ import { Icon } from "@/components/member/icons";
 import IconChip from "@/components/member/icon-chip";
 import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/components/member/ui";
 import Link from "next/link";
-import { bookClass, bookFirstFree, cancelBooking } from "@/app/member/actions";
+import { bookClass, bookFirstFree, cancelBooking, selfCheckIn } from "@/app/member/actions";
+import ClassButton from "@/components/member/class-button";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
@@ -46,6 +47,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
+  checkedIn = false, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -58,6 +60,12 @@ export default function ClassDetailBody({
   /** Decision 21 amendment: a flex class not yet decided — its confirmation
    *  deadline and how it is expressed. Null for core/always/decided classes. */
   pending?: Pending;
+  /** Decision 68: checked in by any door; whether self check-in can run; and
+   *  the studio's check-in window, so the page can offer "Check in now". */
+  checkedIn?: boolean;
+  selfCheckinAvailable?: boolean;
+  opensBeforeMin?: number;
+  closesAfterMin?: number;
 }) {
   const booked = booking?.status === "booked";
   const waiting = booking?.status === "waitlisted";
@@ -138,6 +146,29 @@ export default function ClassDetailBody({
 
         {past ? null : booked || waiting ? (
           <>
+            {/* Decision 68: the one button — but the page keeps its own status
+                line and Cancel, so here it adds only the new affordance:
+                Check in now (in the window) → Checked in. Nothing for the plain
+                reserved / waiting states the line above already expresses. */}
+            <div className="mb-3 flex justify-start empty:hidden">
+              <ClassButton
+                occurrenceId={occ.id}
+                bookingId={booking!.id}
+                classHref={`/class/${occ.id}`}
+                bookingStatus={booked ? "booked" : "waitlisted"}
+                flexPending={!!(pending && pending.until)}
+                checkedIn={checkedIn}
+                startsAt={occ.starts_at}
+                endsAt={occ.ends_at}
+                opensBeforeMin={opensBeforeMin}
+                closesAfterMin={closesAfterMin}
+                selfCheckinAvailable={selfCheckinAvailable}
+                checkinOnly
+                bookClass={bookClass}
+                bookFirstFree={bookFirstFree}
+                selfCheckIn={selfCheckIn}
+              />
+            </div>
             <ActionForm action={cancelBooking}>
               <input type="hidden" name="booking_id" value={booking!.id} />
               <CardActionOutline>{booked ? "Cancel booking" : "Leave the list"}</CardActionOutline>

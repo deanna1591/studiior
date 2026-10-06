@@ -3,8 +3,9 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ClassCard from "./class-card";
+import ClassButton from "./class-button";
 import { haptic } from "@/lib/haptics";
-import type { BookResult, ActionResult } from "@/app/member/actions";
+import type { BookResult, ActionResult, CheckInResult } from "@/app/member/actions";
 
 /**
  * The day's classes, booked and cancelled OPTIMISTICALLY.
@@ -29,6 +30,19 @@ import type { BookResult, ActionResult } from "@/app/member/actions";
 export type Row = {
   id: string;
   bookingId: string | null;
+  /** Raw booking status ('booked' | 'waitlisted' | 'attended' | …), for the
+   *  Decision 68 four-state button. */
+  bookingStatus: string | null;
+  /** Decision 68: checked in (here, at the door, or by a scan). */
+  checkedIn: boolean;
+  /** Decision 21: a booked flex class still awaiting its cutoff. */
+  flexPending: boolean;
+  /** Raw ISO instants — the button opens/closes the check-in window on a clock. */
+  startsAt: string;
+  endsAt: string | null;
+  /** Whether the geofenced self check-in can run (the location has coordinates
+   *  or does not require them); otherwise the button falls back to the desk code. */
+  selfCheckinAvailable: boolean;
   name: string;
   href: string;
   startLabel: string;
@@ -61,17 +75,21 @@ export default function DayClasses({
   bookClass,
   bookFirstFree,
   freeFirstEligible,
-  cancelBooking,
+  selfCheckIn,
   startCheckout,
   payAtDesk,
+  opensBeforeMin,
+  closesAfterMin,
 }: {
   rows: Row[];
   bookClass: (p: BookResult, f: FormData) => Promise<BookResult>;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
   freeFirstEligible: boolean;
-  cancelBooking: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  opensBeforeMin: number;
+  closesAfterMin: number;
 }) {
   const router = useRouter();
   // Per-row optimistic overlay and the last error the server returned for it.
@@ -114,25 +132,6 @@ export default function DayClasses({
         haptic("warning");
       } else {
         // Let the server become the source of truth again.
-        router.refresh();
-        setOverride((s) => ({ ...s, [r.id]: null }));
-      }
-    });
-  }
-
-  function cancel(r: Row) {
-    clearError(r.id);
-    setOverride((s) => ({ ...s, [r.id]: "cancelled" }));
-    haptic("tap");
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("booking_id", r.bookingId ?? "");
-      const res = await cancelBooking(null, fd);
-      if (res && res.ok === false) {
-        setOverride((s) => ({ ...s, [r.id]: null }));
-        setErrors((e) => ({ ...e, [r.id]: res.message }));
-        haptic("warning");
-      } else {
         router.refresh();
         setOverride((s) => ({ ...s, [r.id]: null }));
       }
@@ -203,22 +202,28 @@ export default function DayClasses({
             </span>
           );
         } else if (state === "booked" || state === "waiting") {
+          // Decision 68: one button carries where the member is —
+          // Reserved → Check in now → Checked in (or Waiting for a flex class,
+          // Waitlisted for a waitlist seat). Tapping Reserved / Waitlisted opens
+          // the class page, where Cancel lives.
           action = (
-            <span className="flex flex-col items-end gap-1">
-              <button
-                type="button"
-                onClick={() => cancel(r)}
-                style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
-                className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
-              >
-                {state === "booked" ? "Cancel" : "Leave list"}
-              </button>
-              {state === "booked" && r.peakCancelNote && (
-                <span className="m-micro max-w-[8.5rem] text-right leading-[14px] text-ink-2">
-                  {r.peakCancelNote}
-                </span>
-              )}
-            </span>
+            <ClassButton
+              occurrenceId={r.id}
+              bookingId={r.bookingId}
+              classHref={r.href}
+              bookingStatus={state === "booked" ? "booked" : "waitlisted"}
+              flexPending={r.flexPending}
+              checkedIn={r.checkedIn}
+              startsAt={r.startsAt}
+              endsAt={r.endsAt}
+              opensBeforeMin={opensBeforeMin}
+              closesAfterMin={closesAfterMin}
+              waitlistPosition={r.waitlistPosition}
+              selfCheckinAvailable={r.selfCheckinAvailable}
+              bookClass={bookClass}
+              bookFirstFree={bookFirstFree}
+              selfCheckIn={selfCheckIn}
+            />
           );
         } else if (state === "full") {
           action = r.waitlistEnabled ? (
@@ -233,11 +238,13 @@ export default function DayClasses({
           ) : null;
         } else {
           // Decision 30: for an eligible member, this book IS the free class.
+          // Decision 68: Book is the light accent tint (the solid accent is
+          // reserved for "Check in now", the one urgent action).
           action = (
             <button
               type="button"
               onClick={() => book(r, false)}
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+              style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
               className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
             >
               {freeFirstEligible ? "Book free" : "Book"}

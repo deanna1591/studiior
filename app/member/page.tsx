@@ -6,13 +6,13 @@ import { ActionForm, BookForm, QuietButton } from "@/components/member/ui";
 import IconChip from "@/components/member/icon-chip";
 import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
-import { bookClass, cancelBooking, respondToOffer } from "./actions";
+import { bookClass, bookFirstFree, respondToOffer, selfCheckIn } from "./actions";
 import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts, fmtDeadlineShort } from "@/lib/time";
 import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 import WaiverBanner from "@/components/member/waiver-banner";
 import Announcements, { type Announcement } from "@/components/member/announcements";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
-import SelfCheckIn from "@/components/member/self-check-in";
+import ClassButton from "@/components/member/class-button";
 import InstallCard from "@/components/member/install-card";
 
 export const dynamic = "force-dynamic";
@@ -39,13 +39,16 @@ export default async function MemberHome() {
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
-         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems }] =
+         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems },
+         { data: checkinRows }] =
     await Promise.all([
     supabase
       .from("bookings")
       .select("id, status, waitlist_position, occurrence_id, class_occurrences(id, name, starts_at, ends_at, capacity, booked_count, class_type_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url, image_focus_x, image_focus_y), rooms(name), locations(latitude, longitude, self_checkin_requires_location))")
       .eq("member_id", ctx.memberId)
-      .in("status", ["booked", "waitlisted"])
+      // Decision 68: 'attended' keeps a checked-in class in view so its button
+      // reads "Checked in", not "Book".
+      .in("status", ["booked", "waitlisted", "attended"])
       .order("booked_at"),
     supabase
       .from("waitlist_offers")
@@ -90,8 +93,16 @@ export default async function MemberHome() {
     // Decision 63: whether the studio sells merchandise (the Shop card appears
     // only when at least one active product exists — inert otherwise).
     supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
+    // Decision 68: the member's recent check-ins, so a booked class checked in
+    // by any door (self, scan or desk) reads "Checked in". A check-in is at
+    // class time; a 12h look-back catches today's. Same batch.
+    supabase.from("check_ins").select("occurrence_id")
+      .eq("member_id", ctx.memberId)
+      .gte("checked_in_at", new Date(now - 12 * 3600e3).toISOString()),
   ]);
   const hasShop = Array.isArray(shopItems) && (shopItems as unknown[]).length > 0;
+  const checkedInSet = new Set(((checkinRows ?? []) as { occurrence_id: string }[])
+    .map((r) => r.occurrence_id));
 
   // pending_until is null for a free provisional seat (Decision 30 amendment):
   // present in the map means "Waiting for confirmation", a value adds "· by {time}".
@@ -130,7 +141,9 @@ export default async function MemberHome() {
       new Date(a.class_occurrences!.starts_at).getTime() -
       new Date(b.class_occurrences!.starts_at).getTime());
 
-  const next = mine.find((b) => b.status === "booked");
+  // Decision 68: a checked-in ('attended') class is still the next class until
+  // it passes, so the hero keeps showing it as "Checked in".
+  const next = mine.find((b) => b.status === "booked" || b.status === "attended");
   const occ = next?.class_occurrences ?? null;
 
   // Decision 35: self check-in is available when the class's own location has
@@ -144,15 +157,9 @@ export default async function MemberHome() {
     ? (loc.self_checkin_requires_location === false || (loc.latitude != null && loc.longitude != null))
     : false;
 
-  // The window is the studio's, read through studio_member_settings() — not a
-  // 60 hard-coded here, because the setting exists so a studio can move it.
-  const opensAt = occ ? new Date(occ.starts_at).getTime() - settings.checkinOpensBefore * 60e3 : 0;
-  const closesAt = occ ? new Date(occ.ends_at ?? occ.starts_at).getTime() + settings.checkinClosesAfter * 60e3 : 0;
-  const inWindow = !!occ && now >= opensAt && now <= closesAt;
-
-  const canCancel =
-    !!occ && new Date(occ.starts_at).getTime() - now > settings.cancellationCutoff * 60e3;
-
+  // The check-in window (studio_member_settings) is passed to ClassButton, which
+  // owns the open/close decision on its own clock — so Home no longer computes
+  // inWindow or a cancel cutoff here; Cancel lives on the class page.
   const pastDue = membership.live?.status === "past_due";
   const credits = membership.live?.credits_remaining ?? null;
   // Decision 12 amendment: "unlimited" is recurring-only. A drop_in/trial is a
@@ -281,51 +288,42 @@ export default async function MemberHome() {
                   this is the phone check-in — geolocation on press, then
                   self_check_in(). Where it is not, it falls back to the rotating
                   code the desk scans. */}
-              {inWindow && (
-                selfCheckinAvailable
-                  ? <SelfCheckIn bookingId={next!.id} />
-                  : <Link href="/check-in"
-                        className="m-tap flex shrink-0 items-center rounded-full px-4 text-[13px] font-bold"
-                        style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-                      Check in
-                    </Link>
-              )}
+              {/* Decision 68: the one button, over the hero scrim — Reserved
+                  before the window, Check in now inside it, Checked in after
+                  (by any door). Tapping Reserved opens the class page, where
+                  Cancel lives. */}
+              <div className="shrink-0">
+                <ClassButton
+                  occurrenceId={occ.id}
+                  bookingId={next!.id}
+                  classHref={`/class/${occ.id}?t=${occ.class_type_id}`}
+                  bookingStatus={next!.status}
+                  flexPending={pendingUntil.has(next!.occurrence_id)}
+                  checkedIn={checkedInSet.has(next!.occurrence_id) || next!.status === "attended"}
+                  startsAt={occ.starts_at}
+                  endsAt={occ.ends_at}
+                  opensBeforeMin={settings.checkinOpensBefore}
+                  closesAfterMin={settings.checkinClosesAfter}
+                  selfCheckinAvailable={selfCheckinAvailable}
+                  tone="scrim"
+                  bookClass={bookClass}
+                  bookFirstFree={bookFirstFree}
+                  selfCheckIn={selfCheckIn}
+                />
+              </div>
             </div>
           </div>
         </section>
       ) : null}
 
-      {/* Decision 21 amendment: a booked flex class not yet decided — the same
-          "waiting for confirmation" line the class page shows. */}
-      {occ && next && pendingUntil.has(next.occurrence_id) && (
+      {/* Decision 21 amendment: a booked flex class not yet decided — the "by
+          {deadline}" detail under the hero. The hero's own button already reads
+          "Waiting for confirmation"; this adds only the deadline. */}
+      {occ && next && pendingUntil.has(next.occurrence_id) && pendingUntil.get(next.occurrence_id) && (
         <p className="mt-2 px-1 text-[12.5px] leading-[18px] text-ink-2">
-          Waiting for confirmation
-          {pendingUntil.get(next.occurrence_id) ? (
-            <>
-              {" · by "}
-              <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone, ctx.timeFormat)}</span>
-            </>
-          ) : null}
+          Confirmed by{" "}
+          <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone, ctx.timeFormat)}</span>
         </p>
-      )}
-
-      {occ && !inWindow && (
-        <div className="mt-2.5 px-1">
-          {canCancel ? (
-            <ActionForm action={cancelBooking}>
-              <input type="hidden" name="booking_id" value={next!.id} />
-              {/* A text link, not a button. Nothing needs doing on this screen
-                  and a filled Cancel would be the loudest thing on it. */}
-              <button className="m-tap text-[12.5px] text-ink-2 underline decoration-line-2 underline-offset-4">
-                Cancel this booking
-              </button>
-            </ActionForm>
-          ) : (
-            <p className="m-subtle text-ink-2">
-              Too late to cancel without using the class. Come anyway if you can.
-            </p>
-          )}
-        </div>
       )}
 
       {/* Nothing booked. The hero is still a hero — the next class ON THE
@@ -526,35 +524,47 @@ export default async function MemberHome() {
         );
       })()}
 
-      {mine.filter((b) => b.status === "booked" && b.id !== next?.id).length > 0 && (
+      {mine.filter((b) => (b.status === "booked" || b.status === "attended") && b.id !== next?.id).length > 0 && (
         <section className="mt-5">
           <h2 className="m-eyebrow mb-2.5 font-semibold text-ink">Also booked</h2>
           <ul className="m-card divide-y divide-line overflow-hidden">
-            {mine.filter((b) => b.status === "booked" && b.id !== next?.id).map((b) => (
-              <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
-                <span className="min-w-0">
-                  <span className="m-body block truncate text-ink">{b.class_occurrences!.name}</span>
-                  <span className="m-micro block text-ink-3">
-                    {day(b.class_occurrences!.starts_at)} ·{" "}
-                    <span className="num">{fmtTime(b.class_occurrences!.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
-                  </span>
-                  {pendingUntil.has(b.occurrence_id) && (
-                    <span className="m-micro mt-0.5 block text-ink-2">
-                      Waiting for confirmation
-                      {pendingUntil.get(b.occurrence_id) ? (
-                        <>
-                          {" · by "}
-                          <span className="num">{fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone, ctx.timeFormat)}</span>
-                        </>
-                      ) : null}
+            {mine.filter((b) => (b.status === "booked" || b.status === "attended") && b.id !== next?.id).map((b) => {
+              const bo = b.class_occurrences!;
+              const bloc = (bo as { locations?: { latitude: number | null; longitude: number | null;
+                self_checkin_requires_location: boolean } | null }).locations ?? null;
+              const bAvail = bloc
+                ? (bloc.self_checkin_requires_location === false || (bloc.latitude != null && bloc.longitude != null))
+                : false;
+              return (
+                <li key={b.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
+                  <span className="min-w-0">
+                    <span className="m-body block truncate text-ink">{bo.name}</span>
+                    <span className="m-micro block text-ink-3">
+                      {day(bo.starts_at)} ·{" "}
+                      <span className="num">{fmtTime(bo.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
                     </span>
-                  )}
-                </span>
-                <Link href="/book" className="m-micro shrink-0 text-lime-text underline underline-offset-4">
-                  Manage
-                </Link>
-              </li>
-            ))}
+                  </span>
+                  {/* Decision 68: the same one button here — Reserved / Check in
+                      now / Checked in / Waiting. */}
+                  <ClassButton
+                    occurrenceId={b.occurrence_id}
+                    bookingId={b.id}
+                    classHref={`/class/${b.occurrence_id}?t=${bo.class_type_id}`}
+                    bookingStatus={b.status}
+                    flexPending={pendingUntil.has(b.occurrence_id)}
+                    checkedIn={checkedInSet.has(b.occurrence_id) || b.status === "attended"}
+                    startsAt={bo.starts_at}
+                    endsAt={bo.ends_at}
+                    opensBeforeMin={settings.checkinOpensBefore}
+                    closesAfterMin={settings.checkinClosesAfter}
+                    selfCheckinAvailable={bAvail}
+                    bookClass={bookClass}
+                    bookFirstFree={bookFirstFree}
+                    selfCheckIn={selfCheckIn}
+                  />
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

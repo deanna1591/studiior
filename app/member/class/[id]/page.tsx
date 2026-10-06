@@ -29,7 +29,9 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
       </Link>
 
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending} />
+                       timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending}
+                       checkedIn={data.checkedIn} selfCheckinAvailable={data.selfCheckinAvailable}
+                       opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter} />
     </MemberShell>
   );
 }

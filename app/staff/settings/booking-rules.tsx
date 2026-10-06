@@ -19,11 +19,14 @@ function Save() {
  */
 export default function BookingRulesPanel({
   windowDays, cutoffMinutes, requireWaiver, lateCancelConsumesCredit,
+  checkinOpensBefore, checkinClosesAfter,
 }: {
   windowDays: number;
   cutoffMinutes: number;
   requireWaiver: boolean;
   lateCancelConsumesCredit: boolean;
+  checkinOpensBefore: number;
+  checkinClosesAfter: number;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveBookingRules, null);
   const parts = cutoffParts(cutoffMinutes);
@@ -69,6 +72,24 @@ export default function BookingRulesPanel({
                  className={num} aria-label="Cut-off minutes" />
           <span className="text-[13px] text-ink-2">m</span>
           <span className="ml-1 text-[12px] text-ink-3">= {label}</span>
+        </div>
+      </div>
+
+      {/* Check-in window — when the "Check in now" button opens and closes */}
+      <div className="rounded border border-line bg-surface px-3.5 py-3">
+        <p className="text-[13px] font-medium text-ink">Check-in window</p>
+        <p className="mt-0.5 text-[12px] leading-[18px] text-ink-3">
+          When a member&rsquo;s class shows the &ldquo;Check in now&rdquo; button — from this
+          many minutes before it starts until this many minutes after.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input name="checkin_opens_minutes_before" type="number" min={0} step={1}
+                 defaultValue={checkinOpensBefore} className={num} aria-label="Opens minutes before" />
+          <span className="text-[13px] text-ink-2">min before</span>
+          <span className="mx-1 text-ink-3">·</span>
+          <input name="checkin_closes_minutes_after" type="number" min={0} step={1}
+                 defaultValue={checkinClosesAfter} className={num} aria-label="Closes minutes after" />
+          <span className="text-[13px] text-ink-2">min after</span>
         </div>
       </div>
 

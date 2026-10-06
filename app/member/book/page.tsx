@@ -8,7 +8,7 @@ import DateStrip from "@/components/member/date-strip";
 import DayView from "@/components/member/day-view";
 import DayClasses, { type Row } from "@/components/member/day-classes";
 import FreeClassList from "@/components/member/free-class-list";
-import { bookClass, bookFirstFree, cancelBooking, startCheckout, payAtDesk } from "../actions";
+import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -90,11 +90,11 @@ export default async function Book({
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
          { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig },
-         { data: announceRaw }, { data: freeListRaw }] =
+         { data: announceRaw }, { data: freeListRaw }, { data: checkinRows }, { data: pendingRows }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
-        .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name)")
+        .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name), locations(latitude, longitude, self_checkin_requires_location)")
         // A flex class the cutoff turned off is GONE here — not shown cancelled,
         // not struck through, absent. occ_member_read already hides it from a
         // member who never booked it; this closes the own-read path for one who
@@ -115,7 +115,9 @@ export default async function Book({
       supabase.from("bookings")
         .select("id, status, occurrence_id, waitlist_position")
         .eq("member_id", ctx.memberId)
-        .in("status", ["booked", "waitlisted"]),
+        // Decision 68: 'attended' is still "mine" — a booking the member checked
+        // in to keeps its row so the button reads "Checked in", not "Book".
+        .in("status", ["booked", "waitlisted", "attended"]),
       // In the same batch: "we are closed" is a different fact from "nothing is
       // on", and a member has to be able to tell. `closures_member_read` makes
       // the row readable — there is nothing on it a member may not see.
@@ -158,6 +160,18 @@ export default async function Book({
       // Decision 30 amendment: the free booker's list — only eligible classes,
       // fullest first, with the capped ones marked. Same batch, no extra hop.
       supabase.rpc("free_first_class_list", { p_studio_id: ctx.studioId }),
+      // Decision 68: the member's own check-ins on this day (self RLS —
+      // `checkins_self_read`, no new reader), so a booked row that was checked
+      // in — at the door, by a scan, or here — reads "Checked in". A check-in is
+      // stamped at class time, so this day's window catches it. Same batch.
+      supabase.from("check_ins")
+        .select("occurrence_id")
+        .eq("member_id", ctx.memberId)
+        .gte("checked_in_at", from.toISOString())
+        .lt("checked_in_at", to.toISOString()),
+      // Decision 21: a booked flex class still awaiting its cutoff reads
+      // "Waiting for confirmation", not "Reserved". Same batch, no extra hop.
+      supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId }),
     ]);
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const freeList = ((freeListRaw ?? []) as unknown as {
@@ -202,6 +216,12 @@ export default async function Book({
     : null;
 
   const byOcc = new Map((mine ?? []).map((b) => [b.occurrence_id, b]));
+  // Decision 68: which of this day's classes the member has checked in to, and
+  // which booked flex classes are still awaiting confirmation (Decision 21).
+  const checkedInSet = new Set(((checkinRows ?? []) as { occurrence_id: string }[])
+    .map((r) => r.occurrence_id));
+  const pendingSet = new Set(((pendingRows ?? []) as { occurrence_id: string }[])
+    .map((r) => r.occurrence_id));
 
   const typeFilter = searchParams.type ?? "";
   const instFilter = searchParams.instructor ?? "";
@@ -319,9 +339,17 @@ export default async function Book({
   // never recomputes any of the peak/flex/publication logic.
   const rows: Row[] = shown.map((o) => {
     const booking = byOcc.get(o.id);
-    const booked = booking?.status === "booked";
+    // 'attended' is a booked seat that has been checked in (Decision 68).
+    const booked = booking?.status === "booked" || booking?.status === "attended";
     const waiting = booking?.status === "waitlisted";
     const holding = booking?.status === "pending_payment";
+    const checkedIn = checkedInSet.has(o.id) || booking?.status === "attended";
+    const flexPending = pendingSet.has(o.id);
+    const loc = (o as unknown as { locations?: { latitude: number | null;
+      longitude: number | null; self_checkin_requires_location: boolean } | null }).locations ?? null;
+    const selfCheckinAvailable = loc
+      ? (loc.self_checkin_requires_location === false || (loc.latitude != null && loc.longitude != null))
+      : false;
     const held = holdsOf.get(o.id) ?? 0;
     const spaces = Math.max(0, o.capacity - o.booked_count - held);
     const full = spaces <= 0;
@@ -362,6 +390,12 @@ export default async function Book({
     return {
       id: o.id,
       bookingId: booking?.id ?? null,
+      bookingStatus: booking?.status ?? null,
+      checkedIn,
+      flexPending,
+      startsAt: o.starts_at,
+      endsAt: o.ends_at ?? null,
+      selfCheckinAvailable,
       name: o.name,
       href: `/class/${o.id}?t=${o.class_type_id}`,
       startLabel: fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat),
@@ -563,9 +597,11 @@ export default async function Book({
           bookClass={bookClass}
           bookFirstFree={bookFirstFree}
           freeFirstEligible={freeFirstEligible}
-          cancelBooking={cancelBooking}
+          selfCheckIn={selfCheckIn}
           startCheckout={startCheckout}
           payAtDesk={payAtDesk}
+          opensBeforeMin={settings.checkinOpensBefore}
+          closesAfterMin={settings.checkinClosesAfter}
         />
       )}
       </DayView>

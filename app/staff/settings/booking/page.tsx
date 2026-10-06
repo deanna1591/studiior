@@ -20,7 +20,7 @@ export default async function BookingRulesSettings() {
   }
 
   const { data } = await supabase.from("studio_settings")
-    .select("booking_window_days, cancellation_cutoff_minutes, require_waiver, late_cancel_consumes_credit")
+    .select("booking_window_days, cancellation_cutoff_minutes, require_waiver, late_cancel_consumes_credit, checkin_opens_minutes_before, checkin_closes_minutes_after")
     .eq("studio_id", ctx.studioId).maybeSingle();
 
   return (
@@ -33,6 +33,8 @@ export default async function BookingRulesSettings() {
           cutoffMinutes={data?.cancellation_cutoff_minutes ?? 720}
           requireWaiver={data?.require_waiver ?? true}
           lateCancelConsumesCredit={data?.late_cancel_consumes_credit ?? true}
+          checkinOpensBefore={data?.checkin_opens_minutes_before ?? 60}
+          checkinClosesAfter={data?.checkin_closes_minutes_after ?? 30}
         />
       </div>
     </AppShell>
