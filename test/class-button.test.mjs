@@ -60,6 +60,21 @@ test("a cancelled class is Cancelled, whatever the booking", () => {
   assert.equal(classButtonState({ ...base, bookingStatus: "attended", cancelled: true, nowMs: at(5) }), "cancelled");
 });
 
+// Decision 68 amendment — the Book-list row maps as the page builds it: a
+// booked row before the window is Reserved; a checked-in row (status attended,
+// OR the day's check_ins set) is Checked in — the regression the Book-list SQL
+// suite proves the data for.
+test("Book-list row: booked before window -> Reserved", () => {
+  assert.equal(classButtonState({ ...base, bookingStatus: "booked", checkedIn: false, nowMs: at(-120) }), "reserved");
+});
+test("Book-list row: checked in (status attended) -> Checked in", () => {
+  assert.equal(classButtonState({ ...base, bookingStatus: "attended", checkedIn: true, nowMs: at(5) }), "checked_in");
+});
+test("Book-list row: booked + check-in seen by the set -> Checked in", () => {
+  // status stays 'booked' for a scan (method instructor); checkedIn flag drives it.
+  assert.equal(classButtonState({ ...base, bookingStatus: "booked", checkedIn: true, nowMs: at(5) }), "checked_in");
+});
+
 test("no end time falls back to the start for the close boundary", () => {
   // closes 30 after START; 31 min past start -> reserved.
   assert.equal(classButtonState({ startsMs: START, endsMs: null, opensBeforeMin: 10, closesAfterMin: 30,
