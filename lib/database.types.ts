@@ -3778,6 +3778,7 @@ export type Database = {
           created_at: string
           current_streak: number
           date_of_birth: string | null
+          deleted_at: string | null
           email: string
           emergency_contact: Json | null
           first_name: string
@@ -3811,6 +3812,7 @@ export type Database = {
           created_at?: string
           current_streak?: number
           date_of_birth?: string | null
+          deleted_at?: string | null
           email: string
           emergency_contact?: Json | null
           first_name: string
@@ -3844,6 +3846,7 @@ export type Database = {
           created_at?: string
           current_streak?: number
           date_of_birth?: string | null
+          deleted_at?: string | null
           email?: string
           emergency_contact?: Json | null
           first_name?: string
@@ -7902,6 +7905,7 @@ export type Database = {
         Returns: Json
       }
       delete_announcement: { Args: { p_id: string }; Returns: Json }
+      delete_my_account: { Args: never; Returns: undefined }
       deliver_notification: {
         Args: { p_notification_id: string }
         Returns: number
@@ -7954,6 +7958,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       extend_membership: {
         Args: {

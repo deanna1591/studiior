@@ -37,6 +37,8 @@ export async function searchStudio(q: string): Promise<SearchItem[]> {
       ? Promise.resolve({ data: [] as never[] })
       : supabase.from("members")
           .select("id, first_name, last_name, email, status")
+          // Decision 69: deleted members never appear in staff search.
+          .is("deleted_at", null)
           .or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`)
           .limit(8),
     supabase.from("instructors").select("id, display_name, status").ilike("display_name", like).limit(5),

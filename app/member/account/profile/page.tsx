@@ -44,6 +44,13 @@ export default async function Profile() {
         emergencyPhone={ec.phone ?? ""}
         marketingOptIn={me?.marketing_opt_in ?? false}
       />
+
+      {/* Decision 69: self-service account deletion, muted, at the very bottom. */}
+      <div className="mt-8 border-t border-line pt-4">
+        <Link href="/account/delete" className="m-sub m-press text-ink-3 underline underline-offset-4">
+          Delete my account
+        </Link>
+      </div>
     </MemberShell>
   );
 }
