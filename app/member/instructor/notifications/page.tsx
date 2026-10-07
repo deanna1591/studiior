@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { notifLabel, relTime, type NotifItem } from "@/lib/instructor-notify";
+import { notificationHref } from "@/lib/notification-href";
 import { MarkNotificationsRead } from "./mark-read";
 
 export const dynamic = "force-dynamic";
@@ -33,15 +35,27 @@ export default async function NotificationsPage() {
         <ul className="space-y-2">
           {items.map((n) => {
             const { title } = notifLabel(n.template_key);
-            return (
-              <li key={n.id} className="m-card flex items-start gap-3 px-3.5 py-3"
-                  style={!n.read ? { boxShadow: "inset 0 0 0 1.5px var(--accent-chip)" } : undefined}>
+            const href = notificationHref(n.template_key, n.payload);
+            const style = !n.read ? { boxShadow: "inset 0 0 0 1.5px var(--accent-chip)" } : undefined;
+            const cls = "m-card flex items-start gap-3 px-3.5 py-3";
+            const body = (
+              <>
                 <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                       style={{ background: n.read ? "var(--line-2)" : "var(--lime-text)" }} />
                 <span className="min-w-0 flex-1">
                   <span className={`block text-[14.5px] leading-5 ${n.read ? "text-ink-2" : "text-ink"}`}>{title}</span>
                   <span className="m-sub block text-ink-3">{relTime(n.created_at)}</span>
                 </span>
+                {href && <span className="self-center shrink-0 text-[18px] leading-none text-ink-3" aria-hidden>›</span>}
+              </>
+            );
+            return (
+              <li key={n.id}>
+                {href ? (
+                  <Link href={href} className={`${cls} m-press`} style={style}>{body}</Link>
+                ) : (
+                  <div className={cls} style={style}>{body}</div>
+                )}
               </li>
             );
           })}

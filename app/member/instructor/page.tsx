@@ -5,6 +5,7 @@ import AnnounceStrip from "@/components/member/announce-strip";
 import { AcceptCover } from "./actions-ui";
 import ClassTag from "@/components/instructor/class-tag";
 import { notifLabel, relTime, type NotifItem } from "@/lib/instructor-notify";
+import { notificationHref } from "@/lib/notification-href";
 
 export const dynamic = "force-dynamic";
 
@@ -276,18 +277,32 @@ export default async function InstructorHome() {
             </Link>
           </div>
           <ul className="space-y-2">
-            {notifs.map((n) => (
-              <li key={n.id} className="m-card flex items-start gap-3 px-3.5 py-3">
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: n.read ? "var(--line-2)" : "var(--lime-text)" }} />
-                <span className="min-w-0 flex-1">
-                  <span className={`block text-[14px] leading-5 ${n.read ? "text-ink-2" : "text-ink"}`}>
-                    {notifLabel(n.template_key).title}
+            {notifs.map((n) => {
+              const href = notificationHref(n.template_key, n.payload);
+              const cls = "m-card flex items-start gap-3 px-3.5 py-3";
+              const body = (
+                <>
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: n.read ? "var(--line-2)" : "var(--lime-text)" }} />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-[14px] leading-5 ${n.read ? "text-ink-2" : "text-ink"}`}>
+                      {notifLabel(n.template_key).title}
+                    </span>
+                    <span className="m-sub block text-ink-3">{relTime(n.created_at)}</span>
                   </span>
-                  <span className="m-sub block text-ink-3">{relTime(n.created_at)}</span>
-                </span>
-              </li>
-            ))}
+                  {href && <span className="self-center shrink-0 text-[18px] leading-none text-ink-3" aria-hidden>›</span>}
+                </>
+              );
+              return (
+                <li key={n.id}>
+                  {href ? (
+                    <Link href={href} className={`${cls} m-press`}>{body}</Link>
+                  ) : (
+                    <div className={cls}>{body}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
