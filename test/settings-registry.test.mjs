@@ -48,6 +48,15 @@ test("every group has at least one entry, and every entry's group exists", () =>
   }
 });
 
+test("every section has a non-empty summary", () => {
+  for (const g of GROUPS) {
+    for (const sec of g.sections) {
+      assert.ok(typeof sec.summary === "string" && sec.summary.trim().length > 0,
+        `group ${g.id} section ${sec.anchor} has no summary`);
+    }
+  }
+});
+
 test("every group section anchor is used by at least one entry", () => {
   for (const g of GROUPS) {
     for (const sec of g.sections) {

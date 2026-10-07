@@ -2,15 +2,16 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
-import { GROUPS } from "@/lib/settings-registry";
+import { GROUPS, SETTINGS } from "@/lib/settings-registry";
 import SettingsSearch from "@/components/staff/settings-search";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Decision 71 — Settings is a home page: one search box over the whole registry,
- * then six group cards, each listing its sections as links. The old flat
- * 14-link list is gone; each group is now ONE scrolling page.
+ * Decision 71 — Settings home: one search box, then the six groups as a single
+ * vertical list. Per group a heading + one-line description, then one row per
+ * section (label links to the page + section; a muted summary on the right).
+ * Owner-only sections are greyed with "Owner only" for a manager.
  */
 export default async function Settings() {
   const screen = await staffScreen("/settings");
@@ -20,30 +21,44 @@ export default async function Settings() {
     return <AppShell {...shell} title="Settings"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
   }
 
+  const owner = ctx.role === "owner";
+  // A section is owner-only when an entry under it is owner-only (Stripe, Xendit).
+  const ownerOnly = new Set(
+    SETTINGS.filter((s) => s.ownerOnly).map((s) => `${s.group}:${s.anchor}`),
+  );
+
   return (
     <AppShell {...shell} title="Settings">
-      <div className="mb-6">
+      <div className="mb-8 max-w-2xl">
         <SettingsSearch />
       </div>
 
-      <div className="grid max-w-4xl gap-3 sm:grid-cols-2">
+      <div className="max-w-2xl space-y-8">
         {GROUPS.map((g) => (
-          <div key={g.id} className="s-card overflow-hidden p-4">
-            <Link href={g.route} className="text-[15px] font-semibold text-ink hover:underline">
-              {g.label}
-            </Link>
+          <section key={g.id}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{g.label}</h2>
             <p className="mt-0.5 text-[12px] leading-[17px] text-ink-3">{g.description}</p>
-            <ul className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
-              {g.sections.map((s) => (
-                <li key={s.anchor}>
-                  <Link href={`${g.route}#${s.anchor}`}
-                        className="text-[12.5px] text-ink-2 underline decoration-line underline-offset-2 hover:text-ink">
-                    {s.title}
-                  </Link>
-                </li>
-              ))}
+            <ul className="s-card mt-2.5 divide-y divide-line overflow-hidden">
+              {g.sections.map((sec) => {
+                const locked = !owner && ownerOnly.has(`${g.id}:${sec.anchor}`);
+                return (
+                  <li key={sec.anchor} className="flex items-baseline justify-between gap-4 px-4 py-3.5">
+                    {locked ? (
+                      <span className="shrink-0 whitespace-nowrap text-[14px] font-medium text-ink-3">{sec.title}</span>
+                    ) : (
+                      <Link href={`${g.route}#${sec.anchor}`}
+                            className="shrink-0 whitespace-nowrap text-[14px] font-medium text-ink hover:underline">
+                        {sec.title}
+                      </Link>
+                    )}
+                    <span className="min-w-0 truncate text-right text-[12px] leading-[18px] text-ink-3">
+                      {locked ? "Owner only" : sec.summary}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
-          </div>
+          </section>
         ))}
       </div>
     </AppShell>

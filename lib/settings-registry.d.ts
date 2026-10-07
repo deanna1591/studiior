@@ -1,4 +1,4 @@
-export type SettingSection = { anchor: string; title: string };
+export type SettingSection = { anchor: string; title: string; summary: string };
 
 export type SettingGroup = {
   id: string;
