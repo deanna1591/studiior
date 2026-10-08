@@ -13,6 +13,8 @@ import CheckInButton from "./check-in-button";
 import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
 import ReleasePay from "./release-pay";
+import RunAnyway from "./run-anyway";
+import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
 
@@ -25,7 +27,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
 
   const { data: occ } = await supabase
     .from("class_occurrences")
-    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, instructors!instructor_id(display_name), rooms(name)")
+    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, instructors!instructor_id(display_name), rooms(name)")
     .eq("id", params.occurrenceId)
     .maybeSingle();
   if (!occ) notFound();
@@ -78,6 +80,58 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
     ? await supabase.from("instructor_pay_records").select("id")
         .eq("occurrence_id", params.occurrenceId).eq("type", "class").is("confirmed_at", null).maybeSingle()
     : { data: null };
+  // Decision 22 "Run anyway" — can this manager force a below-minimum flex (or
+  // high-minimum core) class to run? The pure helper decides the label from the
+  // occurrence + the studio's guarantee switches; the RPC is the real boundary.
+  const manager = isManagerUp(ctx.role);
+  const { data: gs } = manager
+    ? await supabase.from("studio_settings")
+        .select("guarantees_enabled, flex_enabled, core_min_bookings, flex_min_bookings")
+        .eq("studio_id", ctx.studioId).maybeSingle()
+    : { data: null };
+  const fcSettings = {
+    guaranteesEnabled: gs?.guarantees_enabled ?? false,
+    flexEnabled: gs?.flex_enabled ?? false,
+    coreMin: gs?.core_min_bookings ?? 1,
+    flexMin: gs?.flex_min_bookings ?? 1,
+    nowMs: Date.now(),
+  };
+  const fcOcc = {
+    flex: occ.flex ?? false,
+    guaranteeTier: occ.guarantee_tier ?? null,
+    minimumBookings: occ.minimum_bookings ?? null,
+    committedAt: occ.committed_at ?? null,
+    status: occ.status,
+    startsMs: new Date(occ.starts_at).getTime(),
+    bookedCount: occ.booked_count,
+  };
+  const showRunAnyway = manager && canForceCommit(fcOcc, fcSettings) === "run_anyway";
+  const runMinimum = showRunAnyway ? forceCommitMinimum(fcOcc, fcSettings) : 0;
+
+  // The committed-to-run after-state: who forced it and why. Read the newest
+  // force_committed audit row for this occurrence; the actor is identified by
+  // their studio_staff email (the app keys staff by email), or the viewer's own
+  // email when it was them. Shown only for a flex/core class that was forced,
+  // not for a class that committed naturally at the cutoff.
+  const forced = manager && occ.committed_at && (occ.flex || (gs?.guarantees_enabled && (occ.guarantee_tier ?? "core") === "core"));
+  const { data: fcAudit } = forced
+    ? await supabase.from("audit_logs")
+        .select("actor_user_id, after, created_at")
+        .eq("entity_id", occ.id).eq("action", "occurrence.force_committed")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle()
+    : { data: null };
+  let forcedBy: string | null = null;
+  if (fcAudit) {
+    const actorId = fcAudit.actor_user_id;
+    if (actorId && actorId === ctx.userId) forcedBy = ctx.email;
+    else if (actorId) {
+      const { data: actor } = await supabase.from("studio_staff")
+        .select("email").eq("studio_id", ctx.studioId).eq("user_id", actorId).maybeSingle();
+      forcedBy = actor?.email ?? "a manager";
+    } else forcedBy = "a manager";
+  }
+  const fcAfter = fcAudit?.after as { reason?: string; at?: string } | null | undefined;
+
   const nameOf = new Map((bookings ?? []).map((b) =>
     [b.member_id, `${b.members?.preferred_name || b.members?.first_name || ""} ${b.members?.last_name || ""}`.trim()]));
 
@@ -164,6 +218,17 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
         <CancelClass occurrenceId={occ.id}
           weekday={new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: ctx.timeZone }).format(new Date(occ.starts_at))}
           hasInstructor={!!occ.instructor_id} bookedCount={occ.booked_count} />
+      )}
+
+      {/* Decision 22: make a below-minimum flex (or high-minimum core) class run.
+          Once committed, the control is replaced by the confirmed-to-run line. */}
+      {showRunAnyway && <RunAnyway occurrenceId={occ.id} minimum={runMinimum} />}
+      {!showRunAnyway && forced && fcAfter && (
+        <p className="mb-5 text-[13px] leading-[19px]" style={{ color: "var(--lime-text)" }}>
+          Confirmed to run{fcAfter.reason ? ` · ${fcAfter.reason}` : ""}
+          {forcedBy ? ` · by ${forcedBy}` : ""}
+          {fcAfter.at ? ` at ${fmtTime(fcAfter.at, ctx.timeZone, ctx.timeFormat)}` : ""}
+        </p>
       )}
 
       {heldPay && <ReleasePay occurrenceId={occ.id} />}

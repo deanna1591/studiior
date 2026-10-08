@@ -186,6 +186,9 @@ export default async function Schedule({
     // class is an ordinary class and drawing it differently would be marking a
     // distinction that has stopped existing.
     flexPending: o.occ_flex && !o.occ_confirmed,
+    // Decision 22: a committed flex class that is still scheduled was pushed
+    // through (naturally at the cutoff, or via "Run anyway"). "Runs" badge.
+    flexCommitted: o.occ_flex && o.occ_confirmed && o.occ_status === "scheduled",
     // TWO FACTS, kept apart. `tier` is what the class IS — what the studio
     // configured, and what the series list beside this screen shows. `effective`
     // is what it will DO once the studio's switches are applied. They differ

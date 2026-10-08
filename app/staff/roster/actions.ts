@@ -253,3 +253,47 @@ export async function releasePay(_prev: ReleasePayState, fd: FormData): Promise<
   revalidatePath(`/roster/${occurrenceId}`);
   return { ok: true, message: "Released. The instructor's pay for this class is confirmed." };
 }
+
+export type ForceCommitState =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Decision 22 — "Run anyway": make a flex (or a high-minimum core) class run
+ * even though it is below its minimum. force_commit_occurrence sets the latch
+ * (committed_at), so the cutoff evaluator leaves it scheduled and the instructor
+ * is paid at the headcount rate. Owner/manager only (the RPC enforces PT403),
+ * reason required (PT422), already-committed refused (PT409).
+ *
+ * NO instructor notification is queued here. The core_committed template exists,
+ * but the only queueing primitive (queue_shift_notice) is service-role-only and
+ * a direct notifications INSERT is RLS-denied for an authenticated manager — so
+ * there is no no-migration path to queue it from this action. Queuing it belongs
+ * inside force_commit_occurrence (a migration), which this change does not touch.
+ */
+export async function forceCommit(_prev: ForceCommitState, fd: FormData): Promise<ForceCommitState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const reason = String(fd.get("reason") ?? "").trim();
+  if (!reason) return { ok: false, message: "Say why — this runs a class below its minimum, and it goes on the record." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("force_commit_occurrence", {
+    p_occurrence_id: occurrenceId, p_reason: reason,
+  });
+  if (error) {
+    const m = error.message || "";
+    if (/PT403/.test(m)) return { ok: false, message: "Owners and managers only." };
+    if (/PT409/.test(m)) return { ok: false, message: "This class is already confirmed to run." };
+    if (/PT422/.test(m)) return { ok: false, message: "Say why — this goes on the record." };
+    return { ok: false, message: m };
+  }
+  const r = data as unknown as { ok?: boolean } | null;
+  if (!r?.ok) return { ok: false, message: "That could not be done." };
+
+  revalidatePath(`/roster/${occurrenceId}`);
+  revalidatePath("/schedule");
+  return { ok: true, message: "Confirmed to run. It will go ahead even below its minimum." };
+}

@@ -980,5 +980,73 @@ select expect_num('...and trues up its pay',
   (select amount_cents from instructor_pay_records where occurrence_id='9a179a17-0000-0000-0000-00000000a307')::bigint, 95000);
 
 reset role;
+
+-- =============================================================================
+-- 22. "RUN ANYWAY" — the force-commit the staff page now exposes (Decision 22).
+--     A below-minimum flex class, PAST its cutoff (the sweep would cancel it for
+--     unmet minimum), is force-committed by the owner → it survives the sweep,
+--     scheduled, and is paid at the headcount tier. Guards: front desk PT403,
+--     empty reason PT422, committed-twice PT409.
+-- =============================================================================
+insert into auth.users (id) values ('9a179a17-0000-0000-0000-0000000000a7');
+insert into profiles (id, email, full_name) values
+  ('9a179a17-0000-0000-0000-0000000000a7','gp-desk-a@example.com','Fay Desk');
+insert into studio_staff (id, studio_id, user_id, email, role) values
+  ('9a179a17-0000-0000-0000-0000000055a7','9a179a17-0000-0000-0000-000000000001',
+   '9a179a17-0000-0000-0000-0000000000a7','gp-desk-a@example.com','front_desk');
+
+-- A flex class ~2h out (future) but PAST its 20:00-previous-day cutoff, with 2
+-- of a minimum of 3 booked and no room (no GiST clash). The sweep would turn it
+-- off for want of its minimum.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name,
+                               instructor_id, capacity, starts_at, ends_at,
+                               flex, minimum_bookings, guarantee_tier, booked_count)
+values ('9a179a17-0000-0000-0000-0000000000fc','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        'Run anyway flex','9a179a17-0000-0000-0000-00000000d101',6,
+        now() + interval '2 hours', now() + interval '2 hours 50 min',
+        true, 3, 'flex', 2);
+insert into bookings (id, studio_id, occurrence_id, member_id, status) values
+  ('9a179a17-0000-0000-0000-00000000fc01','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000000000fc','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-00000000fc02','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000000000fc','9a179a17-0000-0000-0000-0000000b1002','booked');
+
+-- Front desk cannot force a class to run.
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a7',false);
+set role authenticated;
+select expect_raises('front desk cannot force-commit',
+  $$select force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fc','numbers are fine')$$, 'PT403');
+reset role;
+
+-- The owner: empty reason refused, then it runs.
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+set role authenticated;
+select expect_raises('an empty reason is refused',
+  $$select force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fc','  ')$$, 'PT422');
+select expect_true('the owner forces the below-minimum flex class to run',
+  ((force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fc','a private group is coming')) ->> 'ok')::boolean);
+select expect_raises('committing it twice is refused',
+  $$select force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fc','again')$$, 'PT409');
+reset role;
+
+select expect_true('...it is committed',
+  (select committed_at is not null from class_occurrences where id='9a179a17-0000-0000-0000-0000000000fc'));
+
+-- The cutoff sweep now leaves it SCHEDULED (committed occurrences are skipped),
+-- where an uncommitted below-minimum flex class would have been cancelled.
+select sweep_commitments() is not null as swept_after_force;
+select expect_text('the cutoff evaluation leaves the committed class scheduled',
+  (select status::text from class_occurrences where id='9a179a17-0000-0000-0000-0000000000fc'), 'scheduled');
+
+-- The instructor is paid at the headcount tier (2 booked), not the flex-unmet
+-- rate — the record equals what compute_class_pay resolves, and is positive.
+select expect_num('the pay record uses the headcount tier (= compute_class_pay)',
+  (select amount_cents from instructor_pay_records
+    where occurrence_id='9a179a17-0000-0000-0000-0000000000fc' and type='class')::bigint,
+  (compute_class_pay('9a179a17-0000-0000-0000-0000000000fc') ->> 'amount_cents')::bigint);
+select expect_true('...and it is a real headcount payment, not the unmet-minimum 0',
+  (select amount_cents from instructor_pay_records
+    where occurrence_id='9a179a17-0000-0000-0000-0000000000fc' and type='class') > 0);
+
+reset role;
 select set_config('request.jwt.claim.sub', null, false);
 select 'guarantee and pay suite finished' as done;

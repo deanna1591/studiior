@@ -99,6 +99,9 @@ export type CalEvent = {
   pendingApplications: number;
   /** Decision 21: flex and not yet decided. False once confirmed. */
   flexPending: boolean;
+  /** Decision 22: a flex class that has been committed to run (e.g. via "Run
+   *  anyway"). Draws a small "Runs" badge so staff see which were pushed through. */
+  flexCommitted?: boolean;
   tier: string | null;
   effectiveTier?: string | null;
   minimum?: number | null;
@@ -628,6 +631,13 @@ export default function ScheduleCalendar({
               {event.flexPending && (
                 <span title="Runs only if it reaches its minimum">
                   Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}
+                </span>
+              )}
+              {/* Decision 22: a flex class committed to run (pushed through below
+                  its minimum). --lime-text on the card, the accent's TEXT step. */}
+              {event.flexCommitted && (
+                <span style={{ color: "var(--lime-text)" }} title="Committed to run, even below its minimum">
+                  Runs
                 </span>
               )}
               {/* Decision 38: assigned-class confirmation state, when asked.
