@@ -59,7 +59,11 @@ insert into profiles (id, email) values
 insert into studios (id, name, slug, timezone, currency) values
   ('ffffffff-0000-0000-0000-000000000001','Gate Studio','gate','Europe/Prague','CZK');
 
-insert into studio_settings (studio_id) values ('ffffffff-0000-0000-0000-000000000001');
+-- booking_cutoff_minutes defaults to 30 since migration 20260832400000; this
+-- suite's "imminent class takes its member" (30 min out) was authored against
+-- the old default of 0 (book right up to the start), so pin it explicitly.
+insert into studio_settings (studio_id, booking_cutoff_minutes)
+  values ('ffffffff-0000-0000-0000-000000000001', 0);
 -- Decision 34: require_waiver defaults on, so a version must exist for an
 -- unsigned member to be told "waiver_not_signed" (rather than "waiver_unavailable").
 insert into waiver_versions (studio_id, format, body, content_hash) values
@@ -624,3 +628,94 @@ select expect_text('the no-plan member is refused it too',
 select login(''); reset role;
 
 select 'ALL book_class BEHAVIOUR TESTS PASSED' as result;
+
+-- =============================================================================
+-- DECISION 71 SURFACING — booking_cutoff_minutes, max_future_bookings and
+-- waitlist_enabled now have a Booking-rules editor. These three columns were
+-- always enforced in book_class; this section proves the enforcement the editor
+-- now controls, on an isolated studio so earlier assertions are untouched.
+-- =============================================================================
+
+insert into studios (id, name, slug, timezone, currency) values
+  ('ffffffff-0000-0000-00bd-000000000001','Rule Studio','rule','Europe/Prague','CZK');
+-- require_waiver off so the booking gate is the rule under test, not the waiver.
+insert into studio_settings (studio_id, booking_cutoff_minutes, max_future_bookings,
+                             waitlist_enabled, require_waiver)
+  values ('ffffffff-0000-0000-00bd-000000000001', 60, null, true, false);
+insert into locations (id, studio_id, name) values
+  ('ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-000000000001','Main');
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('ffffffff-0000-0000-00bd-0000000000c1','ffffffff-0000-0000-00bd-000000000001','Reformer',50,5);
+
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at)
+values
+  ('ffffffff-0000-0000-00bd-0000000000e1','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-0000000000c1','Inside cutoff',5,now()+interval '45 minutes',now()+interval '95 minutes'),
+  ('ffffffff-0000-0000-00bd-0000000000e2','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-0000000000c1','Outside cutoff',5,now()+interval '2 days',now()+interval '2 days 50 min'),
+  ('ffffffff-0000-0000-00bd-0000000000e3','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-0000000000c1','Future A',5,now()+interval '2 days',now()+interval '2 days 50 min'),
+  ('ffffffff-0000-0000-00bd-0000000000e4','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-0000000000c1','Future B',5,now()+interval '3 days',now()+interval '3 days 50 min'),
+  ('ffffffff-0000-0000-00bd-0000000000e5','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-0000000000c1','One seat',1,now()+interval '2 days',now()+interval '2 days 50 min'),
+  ('ffffffff-0000-0000-00bd-0000000000e6','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-00000000000c','ffffffff-0000-0000-00bd-0000000000c1','Past',5,now()-interval '2 days',now()-interval '2 days'+interval '50 min');
+
+insert into members (id, studio_id, first_name, last_name, email, waiver_signed_at, status) values
+  ('ffffffff-0000-0000-00bd-0000000000d1','ffffffff-0000-0000-00bd-000000000001','M1','Cutoff','rule-m1@t',now(),'active'),
+  ('ffffffff-0000-0000-00bd-0000000000d2','ffffffff-0000-0000-00bd-000000000001','M2','Wait','rule-m2@t',now(),'active'),
+  ('ffffffff-0000-0000-00bd-0000000000d3','ffffffff-0000-0000-00bd-000000000001','M3','Wait','rule-m3@t',now(),'active'),
+  ('ffffffff-0000-0000-00bd-0000000000d4','ffffffff-0000-0000-00bd-000000000001','M4','Future','rule-m4@t',now(),'active'),
+  ('ffffffff-0000-0000-00bd-0000000000d5','ffffffff-0000-0000-00bd-000000000001','M5','Full','rule-m5@t',now(),'active');
+
+insert into membership_plans
+  (id, studio_id, name, type, price_cents, currency, billing_interval, credits, credits_per_period, restrictions)
+values
+  ('ffffffff-0000-0000-00bd-0000000000b1','ffffffff-0000-0000-00bd-000000000001','Unlimited','recurring',280000,'CZK','month',null,null,'{}');
+
+insert into memberships
+  (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, credits_remaining, expires_on)
+select ('ffffffff-0000-0000-00bd-00000010000'||n)::uuid, 'ffffffff-0000-0000-00bd-000000000001',
+       ('ffffffff-0000-0000-00bd-0000000000d'||n)::uuid, 'ffffffff-0000-0000-00bd-0000000000b1',
+       'active',280000,'CZK',current_date,null,null
+  from generate_series(1,5) n;
+
+-- ---- booking_cutoff_minutes: refused inside, allowed outside ----------------
+select expect_text('booking inside booking_cutoff_minutes (60m) is refused',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e1',
+              'ffffffff-0000-0000-00bd-0000000000d1','member')).failure_reason,
+  'past_booking_cutoff');
+select expect_text('booking well outside the cutoff is allowed',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e2',
+              'ffffffff-0000-0000-00bd-0000000000d1','member')).status::text,
+  'booked');
+
+-- ---- max_future_bookings: caps the N+1th future booking, ignores past -------
+-- M4 already attended a PAST class (direct insert): a past booking must not
+-- count toward the forward cap.
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source) values
+  ('ffffffff-0000-0000-00bd-00000000a406','ffffffff-0000-0000-00bd-000000000001','ffffffff-0000-0000-00bd-0000000000e6','ffffffff-0000-0000-00bd-0000000000d4','attended','member');
+update studio_settings set max_future_bookings = 1
+ where studio_id = 'ffffffff-0000-0000-00bd-000000000001';
+select expect_text('with cap 1 and a PAST booking, the first FUTURE booking still books',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e3',
+              'ffffffff-0000-0000-00bd-0000000000d4','member')).status::text,
+  'booked');
+select expect_text('the 2nd future booking is refused by the cap (past one ignored)',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e4',
+              'ffffffff-0000-0000-00bd-0000000000d4','member')).failure_reason,
+  'future_limit_reached');
+update studio_settings set max_future_bookings = null
+ where studio_id = 'ffffffff-0000-0000-00bd-000000000001';
+
+-- ---- waitlist_enabled: on → waitlisted; off → class_full --------------------
+select expect_text('full class takes its one seat',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e5',
+              'ffffffff-0000-0000-00bd-0000000000d2','member')).status::text,
+  'booked');
+select expect_text('waitlist on → the next member is waitlisted',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e5',
+              'ffffffff-0000-0000-00bd-0000000000d3','member')).status::text,
+  'waitlisted');
+update studio_settings set waitlist_enabled = false
+ where studio_id = 'ffffffff-0000-0000-00bd-000000000001';
+select expect_text('waitlist off → a full class is simply class_full',
+  (book_class('ffffffff-0000-0000-00bd-0000000000e5',
+              'ffffffff-0000-0000-00bd-0000000000d5','member')).failure_reason,
+  'class_full');

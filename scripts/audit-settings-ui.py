@@ -104,9 +104,9 @@ print()
 SKIP3 = {
     "onboarding_completed_at",  # system flag, set by the onboarding wizard
     "week_starts_on",           # studio locale (onboarding); read-only in Settings
-    "booking_cutoff_minutes",   # legacy/bootstrap-read, no settings editor
-    "waitlist_enabled",         # bootstrap-read flag, no settings editor
-    "max_future_bookings",      # unused cap, no editor
+    # booking_cutoff_minutes / waitlist_enabled / max_future_bookings now have a
+    # Booking-rules editor (Decision 71 surfacing, migration 20260832400000), so
+    # they are registered rather than skipped.
     "stripe_product_id",        # plan↔Stripe sync, never user-entered
     "stripe_price_id",          # plan↔Stripe sync, never user-entered
 }

@@ -947,6 +947,17 @@ export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise
       // closes against — minutes before the start it opens, minutes after it closes.
       checkin_opens_minutes_before: clampInt(fd.get("checkin_opens_minutes_before"), 60),
       checkin_closes_minutes_after: clampInt(fd.get("checkin_closes_minutes_after"), 30),
+      // Decision 71 surfacing: booking closes N minutes before (0..1440), a
+      // per-member forward cap (blank = null = no limit, else 1..100 — matching
+      // the CHECKs in migration 20260832400000), and the waitlist toggle.
+      booking_cutoff_minutes: Math.min(1440, clampInt(fd.get("booking_cutoff_minutes"), 30)),
+      max_future_bookings: (() => {
+        const raw = String(fd.get("max_future_bookings") ?? "").trim();
+        if (raw === "") return null;
+        const n = Math.floor(Number(raw));
+        return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : null;
+      })(),
+      waitlist_enabled: fd.get("waitlist_enabled") === "on",
     })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };

@@ -35,10 +35,13 @@ test("single-class notices → roster/{occurrence_id}", () => {
   }
 });
 
-test("class-reminder digests have no occurrence_id → null (fallback, not a guess)", () => {
-  assert.equal(notificationHref("instructor_week_ahead", { class_list: "…", schedule_link: "x" }), null);
-  assert.equal(notificationHref("instructor_tomorrow", { class_list: "…" }), null);
-  // and a single-class notice missing its id is also null
+test("whole-week digests and asks → /instructor/schedule (no dead bell row)", () => {
+  for (const k of ["instructor_week_ahead", "instructor_tomorrow", "week_confirm_ask",
+    "week_confirm_reminder", "assignment_confirmation_request", "instructor_unconfirmed",
+    "commitment_digest"]) {
+    assert.equal(notificationHref(k, { class_list: "…" }), "/instructor/schedule", k);
+  }
+  // a single-class notice missing its occurrence_id is still null — never guessed
   assert.equal(notificationHref("instructor_assigned", {}), null);
 });
 
@@ -56,7 +59,7 @@ test("pay / period closed → /instructor/pay", () => {
 
 test("unknown kind → null", () => {
   assert.equal(notificationHref("flex_going_ahead", { occurrence_id: OCC }), null);
-  assert.equal(notificationHref("week_confirm_ask", {}), null);
+  assert.equal(notificationHref("booking_confirmed", {}), null);
   assert.equal(notificationHref("something_new", { occurrence_id: OCC }), null);
   assert.equal(notificationHref("", null), null);
 });

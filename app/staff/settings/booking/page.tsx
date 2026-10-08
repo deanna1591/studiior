@@ -24,7 +24,7 @@ export default async function BookingSettings() {
 
   const [{ data: s }, horizon, peakWindowsRes, peakPlansRes, reportRes, { data: last }, { data: waiver }] = await Promise.all([
     supabase.from("studio_settings")
-      .select("booking_window_days, cancellation_cutoff_minutes, require_waiver, late_cancel_consumes_credit, checkin_opens_minutes_before, checkin_closes_minutes_after, publication_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, hide_unstaffed_from_members, occurrence_horizon_days")
+      .select("booking_window_days, cancellation_cutoff_minutes, require_waiver, late_cancel_consumes_credit, checkin_opens_minutes_before, checkin_closes_minutes_after, booking_cutoff_minutes, max_future_bookings, waitlist_enabled, publication_enabled, peak_allowance_enabled, suspension_enabled, suspension_window_days, suspension_warn_at, suspension_at, suspension_days, suspension_repeat_days, peak_cutoff_reminder_minutes, hide_unstaffed_from_members, occurrence_horizon_days")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.rpc("timetable_horizon", { p_studio_id: ctx.studioId }),
     supabase.rpc("studio_peak_windows", { p_studio_id: ctx.studioId }),
@@ -55,7 +55,10 @@ export default async function BookingSettings() {
           requireWaiver={s?.require_waiver ?? true}
           lateCancelConsumesCredit={s?.late_cancel_consumes_credit ?? true}
           checkinOpensBefore={s?.checkin_opens_minutes_before ?? 60}
-          checkinClosesAfter={s?.checkin_closes_minutes_after ?? 30} />
+          checkinClosesAfter={s?.checkin_closes_minutes_after ?? 30}
+          bookingCutoffMinutes={s?.booking_cutoff_minutes ?? 30}
+          maxFutureBookings={s?.max_future_bookings ?? null}
+          waitlistEnabled={s?.waitlist_enabled ?? true} />
       </SettingsSection>
 
       <SettingsSection id="publication" title="Publishing the month">
