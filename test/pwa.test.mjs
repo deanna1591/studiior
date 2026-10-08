@@ -48,6 +48,28 @@ test("manifestObject — member app: name, scope, colours, icons", () => {
   assert.equal(m.icons.find((i) => i.purpose === "maskable").src, "/icon/maskable?v=abc");
 });
 
+test("manifestObject — 52a follow-up: the five completeness keys, exact values", () => {
+  const m = manifestObject(
+    { slug: "reform", name: "Reform Collective", themeColor: "#B85C38",
+      backgroundColor: "#FAF6F2", iconV: "abc" }, "member");
+  // description derived from the studio name, contains it
+  assert.equal(m.description, "Reform Collective — book classes, check in, and manage your membership.");
+  assert.ok(m.description.includes("Reform Collective"));
+  // the exact values asked for
+  assert.equal(m.orientation, "portrait");
+  assert.equal(m.lang, "en");
+  assert.equal(m.dir, "ltr");
+  assert.deepEqual(m.categories, ["health", "fitness", "lifestyle"]);
+  assert.deepEqual(m.display_override, ["standalone"]);
+  // display unchanged; none of the things we were told NOT to add
+  assert.equal(m.display, "standalone");
+  for (const k of ["serviceworker", "screenshots", "shortcuts", "share_target",
+    "file_handlers", "protocol_handlers", "widgets", "edge_side_panel",
+    "iarc_rating_id", "related_applications", "scope_extensions"]) {
+    assert.ok(!(k in m), `manifest must not contain ${k}`);
+  }
+});
+
 test("manifestObject — instructor app: separate name, id and scope", () => {
   const m = manifestObject(
     { slug: "reform", name: "Reform Collective", themeColor: "#B85C38",
