@@ -266,11 +266,9 @@ export type ForceCommitState =
  * is paid at the headcount rate. Owner/manager only (the RPC enforces PT403),
  * reason required (PT422), already-committed refused (PT409).
  *
- * NO instructor notification is queued here. The core_committed template exists,
- * but the only queueing primitive (queue_shift_notice) is service-role-only and
- * a direct notifications INSERT is RLS-denied for an authenticated manager — so
- * there is no no-migration path to queue it from this action. Queuing it belongs
- * inside force_commit_occurrence (a migration), which this change does not touch.
+ * Decision 72(b): force_commit_occurrence itself queues the core_committed notice
+ * to the assigned instructor (if they have a login) after the commit, so the
+ * instructor is told the class is confirmed — no notification work is owed here.
  */
 export async function forceCommit(_prev: ForceCommitState, fd: FormData): Promise<ForceCommitState> {
   const ctx = await getStaffContext();

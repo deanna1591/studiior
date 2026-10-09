@@ -515,6 +515,16 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 72 — Force-commit tells the instructor; headcount pay basis ratified
+
+**Decision.** (a) The per-class pay tier is computed from `greatest(booked_at_cutoff, booked_at_start)` — the headcount at the cut-off or at class start, whichever is higher — which Decision 32 already made live for **every** studio: a member who books after the cut-off raises the instructor's tier, and a late cancel never lowers it. This is ratified as the pay basis for all studios; there is **no** per-studio headcount setting. (b) `force_commit_occurrence` (Decision 22's "Run anyway") queues the existing `core_committed` notice to the **assigned instructor — only if they have an app login** — after a successful commit, carrying `occurrence_id`, so an instructor whose class is forced to run is told it is confirmed. Built the way the other `queue_shift_notice` call sites build the payload; same signature, same ACL (`force_commit_occurrence` is SECURITY DEFINER owned by postgres, so it may call the service-role-only `queue_shift_notice` the way the sweeps do). No new template.
+
+**Non-goals.** No change to rates, tiers, holding pay, bonuses, pay periods, or the run/no-run decision (core minimum at its cut-off, flex minimum at its deadline). No new anon RPC — the anon surface stays EXACTLY THIRTEEN. No data update on hosted.
+
+**Touches.** Migration (re-issue `force_commit_occurrence`, re-assert ACL), the `forceCommit` server action (remove the "notify not possible" note), tests (`guarantee_pay` suite).
+
+---
+
 ## 52 — Native store apps: one thin shell per tenant (Android TWA + iOS Capacitor)
 
 **Decision.** Each tenant can have two native store listings that are thin shells over its live member web app (`https://{slug}.studiior.app`), so every web deploy is picked up with no store resubmission. First shell: "RPC Pilates Studio" (package/bundle `app.studiior.reformcollective`, SKU `reformcollective`), target live in both stores by 9 Nov 2026. The web app changes only to (1) serve the store-verification files per tenant and (2) let the owner enter the per-tenant store identifiers in Settings. No new anon RPC — the anon surface stays EXACTLY THIRTEEN. Push notifications are deferred: the iOS App ID declares the capability but nothing is wired until after launch. Reuses Decision 51 (manifest/icons), Decision 35 (QR check-in via the existing web camera path), the existing `.ics` routes (add to calendar), Decision 69 (in-app account deletion, required by both stores).

@@ -101,31 +101,31 @@ insert into instructor_class_types (studio_id, instructor_id, class_type_id) val
 -- X and Y submit approved availability for it; W submits it too BUT also carries a
 -- standing pattern whose window has ended, so instructor_valid_on is false for W.
 insert into availability_submissions (studio_id, instructor_id, period_start, status) values
-  ('c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-0000000d00d1', date_trunc('month',(current_date+21))::date, 'approved'),
-  ('c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-0000000d00d2', date_trunc('month',(current_date+21))::date, 'approved'),
-  ('c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-0000000d00d3', date_trunc('month',(current_date+21))::date, 'approved');
+  ('c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-0000000d00d1', date_trunc('month', current_date + interval '45 days')::date, 'approved'),
+  ('c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-0000000d00d2', date_trunc('month', current_date + interval '45 days')::date, 'approved'),
+  ('c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-0000000d00d3', date_trunc('month', current_date + interval '45 days')::date, 'approved');
 -- W's standing pattern ended in the past -> valid_on false for a future class.
 insert into instructor_availability (instructor_id, studio_id, day_of_week, starts_at_time, ends_at_time, effective_from, effective_to, approval_status)
 select 'c1a1c1a1-0000-0000-0000-0000000d00d3','c1a1c1a1-0000-0000-0000-000000000001', d, '06:00','22:00', current_date-60, current_date-30, 'approved'
   from generate_series(0,6) d;
 
--- Five CORE classes on ONE day (current_date+21) at different times (same studio
+-- Five CORE classes on ONE day (date_trunc('month', current_date + interval '45 days')::date + 3) at different times (same studio
 -- week trivially), plus two FLEX, plus one "Second Type" (X not qualified). All
 -- open (unassigned) and in a published month.
 insert into class_occurrences
   (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status, flex)
 values
-  ('c1a1c1a1-0000-0000-0000-000000c00001','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+21)+time '07:00') at time zone 'Europe/Prague',((current_date+21)+time '07:50') at time zone 'Europe/Prague','scheduled',false),
-  ('c1a1c1a1-0000-0000-0000-000000c00002','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+21)+time '09:00') at time zone 'Europe/Prague',((current_date+21)+time '09:50') at time zone 'Europe/Prague','scheduled',false),
-  ('c1a1c1a1-0000-0000-0000-000000c00003','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+21)+time '11:00') at time zone 'Europe/Prague',((current_date+21)+time '11:50') at time zone 'Europe/Prague','scheduled',false),
-  ('c1a1c1a1-0000-0000-0000-000000c00004','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+21)+time '13:00') at time zone 'Europe/Prague',((current_date+21)+time '13:50') at time zone 'Europe/Prague','scheduled',false),
-  ('c1a1c1a1-0000-0000-0000-000000c00005','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+21)+time '15:00') at time zone 'Europe/Prague',((current_date+21)+time '15:50') at time zone 'Europe/Prague','scheduled',false),
-  ('c1a1c1a1-0000-0000-0000-000000f00001','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+22)+time '07:00') at time zone 'Europe/Prague',((current_date+22)+time '07:50') at time zone 'Europe/Prague','scheduled',true),
-  ('c1a1c1a1-0000-0000-0000-000000f00002','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((current_date+22)+time '09:00') at time zone 'Europe/Prague',((current_date+22)+time '09:50') at time zone 'Europe/Prague','scheduled',true),
-  ('c1a1c1a1-0000-0000-0000-000000270001','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a2','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Second Type',10,0,((current_date+23)+time '07:00') at time zone 'Europe/Prague',((current_date+23)+time '07:50') at time zone 'Europe/Prague','scheduled',false);
+  ('c1a1c1a1-0000-0000-0000-000000c00001','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 3)+time '07:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 3)+time '07:50') at time zone 'Europe/Prague','scheduled',false),
+  ('c1a1c1a1-0000-0000-0000-000000c00002','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 3)+time '09:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 3)+time '09:50') at time zone 'Europe/Prague','scheduled',false),
+  ('c1a1c1a1-0000-0000-0000-000000c00003','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 3)+time '11:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 3)+time '11:50') at time zone 'Europe/Prague','scheduled',false),
+  ('c1a1c1a1-0000-0000-0000-000000c00004','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 3)+time '13:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 3)+time '13:50') at time zone 'Europe/Prague','scheduled',false),
+  ('c1a1c1a1-0000-0000-0000-000000c00005','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 3)+time '15:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 3)+time '15:50') at time zone 'Europe/Prague','scheduled',false),
+  ('c1a1c1a1-0000-0000-0000-000000f00001','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 4)+time '07:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 4)+time '07:50') at time zone 'Europe/Prague','scheduled',true),
+  ('c1a1c1a1-0000-0000-0000-000000f00002','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a1','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Core Reformer',10,0,((date_trunc('month', current_date + interval '45 days')::date + 4)+time '09:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 4)+time '09:50') at time zone 'Europe/Prague','scheduled',true),
+  ('c1a1c1a1-0000-0000-0000-000000270001','c1a1c1a1-0000-0000-0000-000000000001','c1a1c1a1-0000-0000-0000-00000000000a','c1a1c1a1-0000-0000-0000-0000000cc0a2','c1a1c1a1-0000-0000-0000-0000000ee0a1',null,'Second Type',10,0,((date_trunc('month', current_date + interval '45 days')::date + 5)+time '07:00') at time zone 'Europe/Prague',((date_trunc('month', current_date + interval '45 days')::date + 5)+time '07:50') at time zone 'Europe/Prague','scheduled',false);
 -- Publish studio A's class month.
 insert into schedule_publications (studio_id, month, published_at, auto) values
-  ('c1a1c1a1-0000-0000-0000-000000000001', date_trunc('month',(current_date+21))::date, now(), false);
+  ('c1a1c1a1-0000-0000-0000-000000000001', date_trunc('month', current_date + interval '45 days')::date, now(), false);
 
 -- =============================================================================
 -- 0. THE CLAIM LIST is filtered to what X can actually take (pristine open set,
@@ -133,7 +133,7 @@ insert into schedule_publications (studio_id, month, published_at, auto) values
 -- =============================================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub','c1a1c1a1-0000-0000-0000-0000000000d1',false);  -- X
-select set_config('t.cl', instructor_claimable('c1a1c1a1-0000-0000-0000-0000000d00d1', date_trunc('month',(current_date+21))::date)::text, false);
+select set_config('t.cl', instructor_claimable('c1a1c1a1-0000-0000-0000-0000000d00d1', date_trunc('month', current_date + interval '45 days')::date)::text, false);
 select expect_true('X can claim (has availability for the month)', (current_setting('t.cl')::jsonb ->> 'can_claim')::boolean);
 -- The Second Type class is in the list but marked not-qualified (labelled, not hidden).
 select expect_false('the Second Type class X is not qualified for is flagged qualified=false',
@@ -152,10 +152,10 @@ select expect_text('...each class carries its configured tier',
 select set_config('t.hz', instructor_claim_horizon('c1a1c1a1-0000-0000-0000-0000000d00d1')::text, false);
 select expect_true('horizon: the month X has availability for is claimable',
   (select (m ->> 'can_claim')::boolean from jsonb_array_elements(current_setting('t.hz')::jsonb -> 'months') m
-     where m ->> 'month' = to_char(date_trunc('month',(current_date+21)),'YYYY-MM')));
+     where m ->> 'month' = to_char(date_trunc('month', current_date + interval '45 days'),'YYYY-MM')));
 select expect_true('...and carries that month''s open classes',
   (select jsonb_array_length(m -> 'classes') > 0 from jsonb_array_elements(current_setting('t.hz')::jsonb -> 'months') m
-     where m ->> 'month' = to_char(date_trunc('month',(current_date+21)),'YYYY-MM')));
+     where m ->> 'month' = to_char(date_trunc('month', current_date + interval '45 days'),'YYYY-MM')));
 select expect_true('horizon: a month with no availability is flagged (actionable), not blank',
   exists(select 1 from jsonb_array_elements(current_setting('t.hz')::jsonb -> 'months') m
           where m ->> 'reason' = 'no_availability'));
@@ -239,7 +239,7 @@ delete from availability_submissions where instructor_id='c1a1c1a1-0000-0000-000
 delete from instructor_availability where instructor_id='c1a1c1a1-0000-0000-0000-0000000d00d3';
 set role authenticated;
 select set_config('request.jwt.claim.sub','c1a1c1a1-0000-0000-0000-0000000000d3',false);
-select set_config('t.wl', instructor_claimable('c1a1c1a1-0000-0000-0000-0000000d00d3', date_trunc('month',(current_date+21))::date)::text, false);
+select set_config('t.wl', instructor_claimable('c1a1c1a1-0000-0000-0000-0000000d00d3', date_trunc('month', current_date + interval '45 days')::date)::text, false);
 select expect_false('W with no availability for the month cannot claim', (current_setting('t.wl')::jsonb ->> 'can_claim')::boolean);
 select expect_text('...and is told why', current_setting('t.wl')::jsonb ->> 'reason', 'no_availability');
 reset role;

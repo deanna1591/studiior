@@ -1031,6 +1031,20 @@ reset role;
 select expect_true('...it is committed',
   (select committed_at is not null from class_occurrences where id='9a179a17-0000-0000-0000-0000000000fc'));
 
+-- Decision 72(b): the assigned instructor (d101 → login a3) is told the class is
+-- confirmed to run. Exactly one core_committed notice carrying the occurrence_id,
+-- addressed to that instructor's login. (tg_core_reached_minimum never puts
+-- occurrence_id in the payload, so counting by it isolates the force-commit path.)
+select expect_num('force-commit queues one core_committed for the login instructor',
+  (select count(*) from notifications
+    where template_key='core_committed'
+      and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fc')::bigint, 1);
+select expect_text('...addressed to the instructor''s login',
+  (select user_id::text from notifications
+    where template_key='core_committed'
+      and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fc'),
+  '9a179a17-0000-0000-0000-0000000000a3');
+
 -- The cutoff sweep now leaves it SCHEDULED (committed occurrences are skipped),
 -- where an uncommitted below-minimum flex class would have been cancelled.
 select sweep_commitments() is not null as swept_after_force;
@@ -1046,6 +1060,43 @@ select expect_num('the pay record uses the headcount tier (= compute_class_pay)'
 select expect_true('...and it is a real headcount payment, not the unmet-minimum 0',
   (select amount_cents from instructor_pay_records
     where occurrence_id='9a179a17-0000-0000-0000-0000000000fc' and type='class') > 0);
+
+-- Decision 72(b): a class whose assigned instructor has NO app login (d103,
+-- 'Later Coach', no studio_staff row) force-commits fine but queues NO notice —
+-- no row, no error.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name,
+                               instructor_id, capacity, starts_at, ends_at,
+                               flex, minimum_bookings, guarantee_tier, booked_count)
+values ('9a179a17-0000-0000-0000-0000000000fd','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        'Run anyway no-login','9a179a17-0000-0000-0000-00000000d103',6,
+        now() + interval '3 hours', now() + interval '3 hours 50 min',
+        true, 3, 'flex', 2);
+insert into bookings (id, studio_id, occurrence_id, member_id, status) values
+  ('9a179a17-0000-0000-0000-00000000fd01','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000000000fd','9a179a17-0000-0000-0000-0000000b1001','booked'),
+  ('9a179a17-0000-0000-0000-00000000fd02','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000000000fd','9a179a17-0000-0000-0000-0000000b1002','booked');
+
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+set role authenticated;
+select expect_true('a no-login instructor''s class still force-commits (no error)',
+  ((force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fd','numbers are fine')) ->> 'ok')::boolean);
+reset role;
+select expect_num('...and queues NO core_committed (no login to reach)',
+  (select count(*) from notifications
+    where template_key='core_committed'
+      and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fd')::bigint, 0);
+
+-- Anon: force_commit is not reachable, and the anon surface stays EXACTLY THIRTEEN.
+select expect_true('force_commit_occurrence is not anon-executable',
+  not has_function_privilege('anon', 'force_commit_occurrence(uuid, text)'::regprocedure, 'execute'));
+set role anon;
+select expect_raises('anon cannot call force_commit_occurrence',
+  $$select force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fd','x')$$, '42501');
+reset role;
+select expect_num('the anon surface is EXACTLY THIRTEEN',
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
+      and p.proname not like 'expect\_%')::bigint, 13);
 
 reset role;
 select set_config('request.jwt.claim.sub', null, false);
