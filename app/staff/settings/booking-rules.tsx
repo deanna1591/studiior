@@ -20,7 +20,7 @@ function Save() {
 export default function BookingRulesPanel({
   windowDays, cutoffMinutes, requireWaiver, lateCancelConsumesCredit,
   checkinOpensBefore, checkinClosesAfter,
-  bookingCutoffMinutes, maxFutureBookings, waitlistEnabled,
+  bookingCutoffMinutes, maxFutureBookings, maxUnpaidBookings, waitlistEnabled,
 }: {
   windowDays: number;
   cutoffMinutes: number;
@@ -30,6 +30,7 @@ export default function BookingRulesPanel({
   checkinClosesAfter: number;
   bookingCutoffMinutes: number;
   maxFutureBookings: number | null;
+  maxUnpaidBookings: number | null;
   waitlistEnabled: boolean;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveBookingRules, null);
@@ -89,6 +90,24 @@ export default function BookingRulesPanel({
                  min={1} max={100} step={1} defaultValue={maxFutureBookings ?? ""}
                  placeholder="No limit" className={num} />
           <span className="text-[13px] text-ink-2">bookings (blank = no limit)</span>
+        </div>
+      </div>
+
+      {/* Unpaid bookings allowed — max_unpaid_bookings (blank = no limit) */}
+      <div className="rounded border border-line bg-surface px-3.5 py-3">
+        <label className="block text-[13px] font-medium text-ink" htmlFor="max_unpaid_bookings">
+          Unpaid bookings allowed
+        </label>
+        <p className="mt-0.5 text-[12px] leading-[18px] text-ink-3">
+          When set, members can&rsquo;t hold more than this many unpaid bookings in the app — a new
+          one asks them to pay first (they can still pay at the desk). Staff bookings from the
+          roster are never capped. Leave blank for no limit; 0 means pay before every booking.
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <input id="max_unpaid_bookings" name="max_unpaid_bookings" type="number"
+                 min={0} max={100} step={1} defaultValue={maxUnpaidBookings ?? ""}
+                 placeholder="No limit" className={num} />
+          <span className="text-[13px] text-ink-2">unpaid bookings (blank = no limit)</span>
         </div>
       </div>
 

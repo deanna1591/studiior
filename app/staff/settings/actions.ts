@@ -957,6 +957,15 @@ export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise
         const n = Math.floor(Number(raw));
         return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : null;
       })(),
+      // Decision 73a: the unpaid-booking cap (blank = null = no limit, else
+      // 0..100 — matching the CHECK in migration 20260832420000; 0 = pay before
+      // every app booking).
+      max_unpaid_bookings: (() => {
+        const raw = String(fd.get("max_unpaid_bookings") ?? "").trim();
+        if (raw === "") return null;
+        const n = Math.floor(Number(raw));
+        return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
+      })(),
       waitlist_enabled: fd.get("waitlist_enabled") === "on",
     })
     .eq("studio_id", ctx.studioId).select("studio_id");

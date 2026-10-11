@@ -69,6 +69,10 @@ const REASONS: Record<string, string> = {
   // Decision 30 belt: an eligible member's first class is free — the UI routes
   // them to the free path, so this is only reached by a direct call.
   use_free_first: "Your first class here is free — book it as your free class.",
+  // Decision 73: the studio caps how many unpaid bookings a member may hold.
+  pay_first: "Pay for your booked class first, or pay at the desk when you come in.",
+  // Decision 73: a provisional free first class blocks other bookings until it's confirmed.
+  free_first_pending: "Your free first class is still waiting for confirmation. You can book more once it's confirmed.",
 };
 
 export type BookResult = { ok: true; message: string } | { ok: false; message: string } | null;

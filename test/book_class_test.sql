@@ -719,3 +719,135 @@ select expect_text('waitlist off → a full class is simply class_full',
   (book_class('ffffffff-0000-0000-00bd-0000000000e5',
               'ffffffff-0000-0000-00bd-0000000000d5','member')).failure_reason,
   'class_full');
+
+-- =============================================================================
+-- DECISION 73a — the unpaid-booking cap (max_unpaid_bookings) and the
+-- free-first-pending guard. Both are SELF-ONLY and exempt a studio-offered
+-- waitlist promotion, so book_class must be run as a REAL member session (jwt
+-- sub + role authenticated) — a trusted superuser call is the exempt path.
+-- =============================================================================
+
+-- book as a member (self): return the failure_reason, or the status on success.
+create or replace function t73_book(p_uid uuid, p_member uuid, p_occ uuid) returns text
+language plpgsql as $$
+declare r book_class_result;
+begin
+  perform set_config('request.jwt.claim.sub', p_uid::text, true);
+  set local role authenticated;
+  r := book_class(p_occ, p_member, 'member');
+  reset role;
+  return coalesce(r.failure_reason, r.status::text);
+end $$;
+
+-- ---- Cap studio 73a1: max_unpaid_bookings = 1 -------------------------------
+insert into auth.users (id) values
+  ('ffffffff-0000-0000-73a1-0000000000a1'),   -- CAP login
+  ('ffffffff-0000-0000-73a1-0000000000a2'),   -- desk login
+  ('ffffffff-0000-0000-73a1-0000000000a3');   -- CAP2 login
+insert into profiles (id, email) values
+  ('ffffffff-0000-0000-73a1-0000000000a1','73a1-cap@t'),
+  ('ffffffff-0000-0000-73a1-0000000000a2','73a1-desk@t'),
+  ('ffffffff-0000-0000-73a1-0000000000a3','73a1-cap2@t');
+insert into studios (id, name, slug, timezone, currency) values
+  ('ffffffff-0000-0000-73a1-000000000001','Cap Studio','cap73a1','Europe/Prague','CZK');
+insert into studio_settings (studio_id, max_unpaid_bookings, require_waiver, booking_cutoff_minutes)
+  values ('ffffffff-0000-0000-73a1-000000000001', 1, false, 0);
+insert into locations (id, studio_id, name) values
+  ('ffffffff-0000-0000-73a1-00000000000c','ffffffff-0000-0000-73a1-000000000001','Main');
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('ffffffff-0000-0000-73a1-0000000000c1','ffffffff-0000-0000-73a1-000000000001','Reformer',50,5);
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, guarantee_tier)
+select ('ffffffff-0000-0000-73a1-0000000000f'||n)::uuid, 'ffffffff-0000-0000-73a1-000000000001',
+       'ffffffff-0000-0000-73a1-00000000000c','ffffffff-0000-0000-73a1-0000000000c1',
+       'Future '||n, 5, now()+interval '2 days'+(n||' hours')::interval,
+       now()+interval '2 days'+(n||' hours 50 min')::interval, 'core'
+  from generate_series(1,6) n;
+-- CAP: an active member with NO plan, so a booking resolves to an unpaid drop-in.
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, waiver_signed_at) values
+  ('ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-000000000001','ffffffff-0000-0000-73a1-0000000000a1','Cap','Member','73a1-cap@t','active',now()),
+  ('ffffffff-0000-0000-73a1-0000000000b3','ffffffff-0000-0000-73a1-000000000001','ffffffff-0000-0000-73a1-0000000000a3','Cap','Two','73a1-cap2@t','active',now());
+-- DESK: front desk staff, so is_desk_up() is true for its session.
+insert into studio_staff (id, studio_id, user_id, email, role, status) values
+  ('ffffffff-0000-0000-73a1-0000000000e2','ffffffff-0000-0000-73a1-000000000001','ffffffff-0000-0000-73a1-0000000000a2','73a1-desk@t','front_desk','active');
+
+-- 1. First unpaid drop-in books (0 unpaid < cap 1).
+select expect_text('73a cap: 1st unpaid drop-in books',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a1','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000f1'), 'booked');
+-- 2. Second unpaid drop-in is refused — pay_first (1 unpaid >= cap 1).
+select expect_text('73a cap: 2nd unpaid drop-in is refused pay_first',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a1','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000f2'), 'pay_first');
+-- 3. Pay the first booking (a succeeded payments row against it) → it no longer
+--    counts, so f2 now books.
+insert into payments (studio_id, member_id, booking_id, amount_cents, currency, status)
+select 'ffffffff-0000-0000-73a1-000000000001','ffffffff-0000-0000-73a1-0000000000b1', b.id, 15000, 'CZK', 'succeeded'
+  from bookings b where b.occurrence_id='ffffffff-0000-0000-73a1-0000000000f1' and b.member_id='ffffffff-0000-0000-73a1-0000000000b1';
+select expect_text('73a cap: after the first is PAID, the next unpaid books',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a1','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000f2'), 'booked');
+-- CAP now holds 1 unpaid again (f2). A SELF booking of f3 would be pay_first...
+select expect_text('73a cap: a 3rd self booking is capped again',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a1','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000f3'), 'pay_first');
+-- 4. ...but a DESK (front-desk session) roster booking for the same member is NOT capped.
+select expect_text('73a cap: a desk roster booking for a capped member is allowed',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a2','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000f3'), 'booked');
+-- 5. A member with a CREDIT is not capped — the booking resolves to the pack, not
+--    an unpaid drop-in. Give CAP a pack with a credit; f4 books on it.
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits)
+  values ('ffffffff-0000-0000-73a1-0000000000d1','ffffffff-0000-0000-73a1-000000000001','Pack','class_pack',100000,'CZK',5);
+insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, credits_remaining, expires_on)
+  values ('ffffffff-0000-0000-73a1-0000000000d2','ffffffff-0000-0000-73a1-000000000001','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000d1','active',100000,'CZK',current_date,5,current_date+60);
+select expect_text('73a cap: a member WITH a credit still books (resolves to the pack, not drop-in)',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a1','ffffffff-0000-0000-73a1-0000000000b1','ffffffff-0000-0000-73a1-0000000000f4'), 'booked');
+-- 6. cap null → today's behaviour: a member holds as many unpaid drop-ins as they like.
+update studio_settings set max_unpaid_bookings = null where studio_id='ffffffff-0000-0000-73a1-000000000001';
+select expect_text('73a cap null: 1st unpaid books (CAP2)',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a3','ffffffff-0000-0000-73a1-0000000000b3','ffffffff-0000-0000-73a1-0000000000f5'), 'booked');
+select expect_text('73a cap null: 2nd unpaid also books (no cap)',
+  t73_book('ffffffff-0000-0000-73a1-0000000000a3','ffffffff-0000-0000-73a1-0000000000b3','ffffffff-0000-0000-73a1-0000000000f6'), 'booked');
+
+-- ---- Free-first-pending studio 73a2 ----------------------------------------
+insert into auth.users (id) values ('ffffffff-0000-0000-73a2-0000000000a1');
+insert into profiles (id, email) values ('ffffffff-0000-0000-73a2-0000000000a1','73a2-ff@t');
+insert into studios (id, name, slug, timezone, currency) values
+  ('ffffffff-0000-0000-73a2-000000000001','FF Studio','ff73a2','Europe/Prague','CZK');
+insert into studio_settings (studio_id, require_waiver, booking_cutoff_minutes,
+                             free_first_class_enabled, free_first_core_only, free_first_confirm_at)
+  values ('ffffffff-0000-0000-73a2-000000000001', false, 0, true, true, 3);
+insert into locations (id, studio_id, name) values
+  ('ffffffff-0000-0000-73a2-00000000000c','ffffffff-0000-0000-73a2-000000000001','Main');
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('ffffffff-0000-0000-73a2-0000000000c1','ffffffff-0000-0000-73a2-000000000001','Reformer',50,5);
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, guarantee_tier) values
+  ('ffffffff-0000-0000-73a2-0000000000f1','ffffffff-0000-0000-73a2-000000000001','ffffffff-0000-0000-73a2-00000000000c','ffffffff-0000-0000-73a2-0000000000c1','Free',5,now()+interval '2 days',now()+interval '2 days 50 min','core'),
+  ('ffffffff-0000-0000-73a2-0000000000f2','ffffffff-0000-0000-73a2-000000000001','ffffffff-0000-0000-73a2-00000000000c','ffffffff-0000-0000-73a2-0000000000c1','Other',5,now()+interval '3 days',now()+interval '3 days 50 min','core'),
+  ('ffffffff-0000-0000-73a2-0000000000f3','ffffffff-0000-0000-73a2-000000000001','ffffffff-0000-0000-73a2-00000000000c','ffffffff-0000-0000-73a2-0000000000c1','Full',1,now()+interval '3 days',now()+interval '3 days 50 min','core');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, waiver_signed_at) values
+  ('ffffffff-0000-0000-73a2-0000000000b1','ffffffff-0000-0000-73a2-000000000001','ffffffff-0000-0000-73a2-0000000000a1','Free','First','73a2-ff@t','lead',now()),
+  ('ffffffff-0000-0000-73a2-0000000000b2','ffffffff-0000-0000-73a2-000000000001',null,'Other','Member','73a2-other@t','active',now());
+-- FF holds a PROVISIONAL free-first seat on f1 (direct insert mirroring
+-- book_first_free exactly — a comp, provisional booking + a host-null guest pass).
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, provisional)
+  values ('ffffffff-0000-0000-73a2-00000000ab01','ffffffff-0000-0000-73a2-000000000001','ffffffff-0000-0000-73a2-0000000000f1','ffffffff-0000-0000-73a2-0000000000b1','booked','member','comp',true);
+insert into guest_passes (studio_id, host_member_id, guest_member_id, guest_email, occurrence_id, guest_booking_id, status)
+  values ('ffffffff-0000-0000-73a2-000000000001',null,'ffffffff-0000-0000-73a2-0000000000b1','73a2-ff@t','ffffffff-0000-0000-73a2-0000000000f1','ffffffff-0000-0000-73a2-00000000ab01','invited');
+-- fill f3 (cap 1) so a non-guarded booking would waitlist.
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source)
+  values ('ffffffff-0000-0000-73a2-00000000ab02','ffffffff-0000-0000-73a2-000000000001','ffffffff-0000-0000-73a2-0000000000f3','ffffffff-0000-0000-73a2-0000000000b2','booked','member','drop_in');
+update class_occurrences set booked_count = 1 where id = 'ffffffff-0000-0000-73a2-0000000000f3';
+
+-- While FF's free-first is provisional: another booking is refused free_first_pending.
+select expect_text('73a free-first pending: another booking is refused free_first_pending',
+  t73_book('ffffffff-0000-0000-73a2-0000000000a1','ffffffff-0000-0000-73a2-0000000000b1','ffffffff-0000-0000-73a2-0000000000f2'), 'free_first_pending');
+-- A waitlist JOIN (full class) is refused free_first_pending too — the guard is
+-- before capacity, so it never reaches class_full/waitlisted.
+select expect_text('73a free-first pending: a waitlist join is refused free_first_pending',
+  t73_book('ffffffff-0000-0000-73a2-0000000000a1','ffffffff-0000-0000-73a2-0000000000b1','ffffffff-0000-0000-73a2-0000000000f3'), 'free_first_pending');
+-- Once the free-first is CONFIRMED (no longer provisional), booking is allowed.
+update bookings set provisional = false, confirmed_at = now() where id = 'ffffffff-0000-0000-73a2-00000000ab01';
+select expect_text('73a free-first confirmed: the member can book again',
+  t73_book('ffffffff-0000-0000-73a2-0000000000a1','ffffffff-0000-0000-73a2-0000000000b1','ffffffff-0000-0000-73a2-0000000000f2'), 'booked');
+
+-- anon surface unchanged — EXACTLY THIRTEEN (73a adds no anon function).
+select expect_num('anon surface is EXACTLY THIRTEEN', (
+  select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
+   where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
+     and p.proname not like 'expect\_%' and p.proname not like 't73%' and p.proname <> 'login'), 13);

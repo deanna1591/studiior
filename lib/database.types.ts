@@ -6388,6 +6388,7 @@ export type Database = {
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
           max_future_bookings: number | null
+          max_unpaid_bookings: number | null
           morning_brief_send_at: string
           no_show_consumes_credit: boolean
           no_show_fee_cents: number
@@ -6488,6 +6489,7 @@ export type Database = {
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
           max_future_bookings?: number | null
+          max_unpaid_bookings?: number | null
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
@@ -6588,6 +6590,7 @@ export type Database = {
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
           max_future_bookings?: number | null
+          max_unpaid_bookings?: number | null
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
