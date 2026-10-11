@@ -4,7 +4,7 @@
 //   node --test test/member_urls.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buyPath, buyUrl } from "../lib/member-urls.mjs";
+import { buyPath, buyUrl, payNowHref } from "../lib/member-urls.mjs";
 import { safeNext } from "../lib/auth-redirect.mjs";
 
 test("buyPath is /buy/{plan}", () => {
@@ -24,4 +24,13 @@ test("the buy ?next is a relative path and is open-redirect guarded", () => {
   assert.equal(safeNext("https://evil.com/buy/x"), "/");           // absolute rejected
   assert.equal(safeNext(undefined), "/");                          // missing -> "/"
   assert.equal(safeNext(""), "/");                                 // empty -> "/"
+});
+
+test("payNowHref carries a relative ?return and refuses an open redirect (Decision 73b)", () => {
+  assert.equal(payNowHref("p1", "/class/abc"), "/buy/p1?return=%2Fclass%2Fabc");  // the real case
+  assert.equal(payNowHref("p1", null), "/buy/p1");                                 // no return
+  assert.equal(payNowHref("p1", undefined), "/buy/p1");
+  assert.equal(payNowHref("p1", "//evil.com"), "/buy/p1");                         // protocol-relative dropped
+  assert.equal(payNowHref("p1", "https://evil.com"), "/buy/p1");                   // absolute dropped
+  assert.equal(payNowHref("p1", "/\\evil"), "/buy/p1");                            // backslash trick dropped
 });

@@ -15,8 +15,8 @@ const TERMINAL = ["succeeded", "failed", "expired", "cancelled"];
  * to once per 5s per purchase, so a ~6s cadence never over-asks — which recovers
  * a payment whose webhook was late or never delivered.
  */
-export default function PurchasePoll({ id, initialStatus, kind = "plan" }:
-  { id: string; initialStatus: string | null; kind?: "plan" | "product" }) {
+export default function PurchasePoll({ id, initialStatus, kind = "plan", returnTo = null }:
+  { id: string; initialStatus: string | null; kind?: "plan" | "product"; returnTo?: string | null }) {
   const isProduct = kind === "product";
   const backHref = isProduct ? "/shop" : "/account/plan";
   const backLabel = isProduct ? "Back to the shop" : "Back to plans";
@@ -54,11 +54,14 @@ export default function PurchasePoll({ id, initialStatus, kind = "plan" }:
         <p className="m-sub mt-1 text-ink-2">
           {isProduct
             ? "Your payment went through. Pick it up at the front desk whenever suits you."
+            : returnTo
+            ? "Your payment went through — your booking is paid."
             : "Your payment went through and your plan is ready."}
         </p>
-        <Link href={isProduct ? "/account/orders" : "/account/plan"}
+        {/* Decision 73b: a "Pay now" that came from a class returns there. */}
+        <Link href={isProduct ? "/account/orders" : returnTo ?? "/account/plan"}
               className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
-          {isProduct ? "See your orders" : "See your plan"}
+          {isProduct ? "See your orders" : returnTo ? "Back to your class" : "See your plan"}
         </Link>
       </div>
     );

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { currentMemberOrigin } from "@/lib/tenant";
 import { decryptSecret } from "@/lib/integrations-crypto";
 import { createSession, getCustomerByReferenceId } from "@/lib/xendit";
+import { safeNext } from "@/lib/auth-redirect";
 
 export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 
@@ -20,6 +21,11 @@ export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> {
   const planId = String(fd.get("plan_id") ?? "").trim();
   if (!planId) return { ok: false, message: "No plan chosen." };
+
+  // Decision 73b: where to land after a successful purchase (the class the
+  // member was paying for). safeNext keeps it a relative path — no open redirect.
+  const rawReturn = fd.get("return");
+  const returnTo = rawReturn ? safeNext(String(rawReturn)) : "/";
 
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
@@ -77,7 +83,9 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
     description: `${ctx.studioName} — ${plan?.name ?? "plan"}`,
     // purchase_id is the primary way the callback resolves back to this purchase.
     metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
-    successUrl: `${origin}/purchase/${purchase.purchase_id}`,
+    // Carry ?return through the poll screen so it can offer "Back to your class"
+    // on success (omitted when it is the default "/").
+    successUrl: `${origin}/purchase/${purchase.purchase_id}${returnTo && returnTo !== "/" ? `?return=${encodeURIComponent(returnTo)}` : ""}`,
     cancelUrl: `${origin}/account/plan`,
   };
   const withCustomerId = (customerId: string) => createSession(secret, { ...common, customerId });

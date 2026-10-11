@@ -10,6 +10,7 @@ import { classSheetView } from "@/lib/class-sheet";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
+import { payNowHref } from "@/lib/member-urls";
 
 /**
  * One class, in full — the body shared by the full page (`/class/[id]`) and the
@@ -49,6 +50,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
+  unpaid = false, dropinPlanId = null,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -69,6 +71,12 @@ export default function ClassDetailBody({
   selfCheckinAvailable?: boolean;
   opensBeforeMin?: number;
   closesAfterMin?: number;
+  /** Decision 73b: this booking is an unpaid drop-in (a booked seat with no
+   *  payment). When set, the page offers two ways to pay. */
+  unpaid?: boolean;
+  /** The studio's public active drop_in plan, for the "Pay now" link. Null when
+   *  the studio has none — then only the "pay at the desk" line shows. */
+  dropinPlanId?: string | null;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -234,6 +242,31 @@ export default function ClassDetailBody({
           </BookForm>
         )}
       </div>
+
+      {/* Decision 73b: an unpaid drop-in booking — two ways to pay. "Pay now"
+          opens the studio's public drop_in plan through the Xendit rail and
+          returns here after; "pay at the desk" is informational. When the
+          studio has no public drop_in plan, only the desk line shows. */}
+      {unpaid && !past && (
+        <div className="m-card mt-3 p-4">
+          <p className="text-[15px] font-medium leading-5 text-ink">This booking isn&rsquo;t paid yet</p>
+          <p className="m-sub mt-1 text-ink-2">
+            Pay now to settle it, or pay at the desk when you come in.
+          </p>
+          {dropinPlanId ? (
+            <>
+              <Link href={payNowHref(dropinPlanId, `/class/${occ.id}`)}
+                    style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                    className="m-action m-press mt-3 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
+                Pay now
+              </Link>
+              <p className="m-sub mt-2 text-ink-3">Or pay at the desk when you come in.</p>
+            </>
+          ) : (
+            <p className="m-sub mt-3 text-ink-3">Pay at the desk when you come in.</p>
+          )}
+        </div>
+      )}
 
       {/* Decision 30's conversion moment: they've booked their free class, so
           tell them what comes next rather than leaving the space empty. */}

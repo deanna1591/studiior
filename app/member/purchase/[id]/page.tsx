@@ -2,13 +2,17 @@ import Link from "next/link";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
+import { safeNext } from "@/lib/auth-redirect";
 import PurchasePoll from "./poll";
 
 export const dynamic = "force-dynamic";
 
 /** Decision 40: the member returns here from Xendit's hosted checkout. The
- *  callback grants the plan; this screen waits for the purchase to flip. */
-export default async function Purchase({ params }: { params: { id: string } }) {
+ *  callback grants the plan; this screen waits for the purchase to flip.
+ *  Decision 73b: ?return (a relative class path, safeNext-guarded) lets the
+ *  success card offer "Back to your class". */
+export default async function Purchase({ params, searchParams }: { params: { id: string }; searchParams?: { return?: string } }) {
+  const returnTo = searchParams?.return ? safeNext(searchParams.return) : "/";
   const { supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
@@ -25,7 +29,8 @@ export default async function Purchase({ params }: { params: { id: string } }) {
       </Link>
       <h1 className="m-title mb-4 text-ink">Your payment</h1>
       {purchase ? (
-        <PurchasePoll id={params.id} initialStatus={purchase.status} kind={kind} />
+        <PurchasePoll id={params.id} initialStatus={purchase.status} kind={kind}
+                      returnTo={returnTo !== "/" ? returnTo : null} />
       ) : (
         <div className="m-card p-5 text-center">
           <p className="text-[16px] font-semibold text-ink">We couldn’t find that payment</p>

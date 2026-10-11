@@ -33,7 +33,8 @@ export async function loadClassDetail(
   classTypeId?: string | null,
 ): Promise<{ occ: DetailOccurrence; type: DetailType; booking: DetailBooking;
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
-  checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean } | null> {
+  checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean;
+  unpaid: boolean; dropinPlanId: string | null } | null> {
 
   const occQuery = supabase
     .from("class_occurrences")
@@ -42,7 +43,8 @@ export async function loadClassDetail(
   const typeQuery = (ctid: string) => supabase.from("class_types")
     .select("name, description, image_url, image_focus_x, image_focus_y").eq("id", ctid).maybeSingle();
   const bookingQuery = supabase.from("bookings")
-    .select("id, status, waitlist_position, provisional")
+    // Decision 73b: payment_source tells an unpaid drop-in from a pack seat.
+    .select("id, status, waitlist_position, provisional, payment_source")
     .eq("member_id", memberId).eq("occurrence_id", id)
     // Decision 68: 'attended' keeps the row so the page reads "Checked in".
     .in("status", ["booked", "waitlisted", "attended"]).maybeSingle();
@@ -66,14 +68,31 @@ export async function loadClassDetail(
   // deadline? Returns (null, 'none') for core/always/decided — the presence of a
   // deadline is the only thing exposed; never the minimum, count or reason.
   const pendingQuery = supabase.rpc("flex_deadline_for", { p_occurrence_id: id });
+  // Decision 73b: the studio's public active drop_in plan (for the "Pay now"
+  // link), and whether this member already has a succeeded/partially-refunded
+  // payment on a booking for THIS class — both in the parallel wave, so neither
+  // adds a serial hop. "unpaid" = a booked drop_in seat with no such payment.
+  const dropinPlanQuery = supabase.from("membership_plans").select("id")
+    .eq("studio_id", studioId).eq("type", "drop_in")
+    .eq("visibility", "public").eq("status", "active")
+    .order("sort_order").limit(1).maybeSingle();
+  const paidQuery = supabase.from("payments")
+    .select("id, bookings!inner(occurrence_id)", { count: "exact", head: true })
+    .eq("member_id", memberId).eq("bookings.occurrence_id", id)
+    .in("status", ["succeeded", "partially_refunded"]);
 
   const finish = (occ: Record<string, unknown> | null, type: unknown, booking: unknown,
                   activeGuests: number | null, elig: unknown, freeCount: number | null,
-                  pend: unknown, checkinRow: { checked_in_at: string } | null) => {
+                  pend: unknown, checkinRow: { checked_in_at: string } | null,
+                  dropinPlan: { id: string } | null, paidCount: number | null) => {
     if (!occ) return null;
     const e = elig as { ok?: boolean } | null;
     const p = (pend as { deadline_at: string | null; mode: string }[] | null)?.[0];
     const bk = (booking ?? null) as DetailBooking;
+    const bps = (booking as { payment_source?: string | null } | null)?.payment_source ?? null;
+    // Decision 73b: a booked (not waitlisted/attended, not pending_payment) drop_in
+    // seat with no succeeded payment is unpaid — the Pay-now surface.
+    const unpaid = bk?.status === "booked" && bps === "drop_in" && (paidCount ?? 0) === 0;
     const loc = (occ as { locations?: { latitude: number | null; longitude: number | null;
       self_checkin_requires_location: boolean } | null }).locations ?? null;
     return {
@@ -95,21 +114,23 @@ export async function loadClassDetail(
       pending: p?.deadline_at
         ? { until: p.deadline_at, mode: p.mode }
         : ((bk as { provisional?: boolean } | null)?.provisional ? { until: null, mode: "free" } : null),
+      unpaid,
+      dropinPlanId: dropinPlan?.id ?? null,
     };
   };
 
   if (classTypeId) {
     // One wave: nothing waits on the occurrence.
-    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }] =
-      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery]);
-    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow);
+    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { data: dropinPlan }, { count: paidCount }] =
+      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, dropinPlanQuery, paidQuery]);
+    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, dropinPlan, paidCount);
   }
 
   // No hint (deep link / refresh): occurrence, booking and guest in parallel;
   // then type, the one read that needs the occurrence's class_type_id.
-  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }] =
-    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery]);
+  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { data: dropinPlan }, { count: paidCount }] =
+    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, dropinPlanQuery, paidQuery]);
   if (!occ) return null;
   const { data: type } = occ.class_type_id ? await typeQuery(occ.class_type_id) : { data: null };
-  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow);
+  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, dropinPlan, paidCount);
 }

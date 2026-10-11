@@ -9,6 +9,7 @@ import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { buyPath } from "@/lib/member-urls";
+import { safeNext } from "@/lib/auth-redirect";
 import BuyPlan from "../../account/plan/buy";
 
 export const dynamic = "force-dynamic";
@@ -71,8 +72,12 @@ export async function generateMetadata({ params }: { params: { plan: string } })
   return { title };
 }
 
-export default async function Buy({ params }: { params: { plan: string } }) {
+export default async function Buy({ params, searchParams }: { params: { plan: string }; searchParams?: { return?: string } }) {
   const next = buyPath(params.plan);
+  // Decision 73b: a relative path to land on after a successful purchase (the
+  // class a "Pay now" came from). safeNext guards against an open redirect.
+  const rawReturn = searchParams?.return;
+  const returnTo = rawReturn ? safeNext(rawReturn) : null;
   const ctx = await getMemberContext();
 
   // --- Signed out (or a session with no member row for this studio) ----------
@@ -209,7 +214,7 @@ export default async function Buy({ params }: { params: { plan: string } }) {
           </p>
         ) : (
           <div className="mt-5 flex justify-end">
-            <BuyPlan planId={plan.id} />
+            <BuyPlan planId={plan.id} returnTo={returnTo && returnTo !== "/" ? returnTo : undefined} />
           </div>
         )}
       </section>
