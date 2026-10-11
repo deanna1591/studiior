@@ -26,7 +26,7 @@ type Tone = "tint" | "scrim";
 
 export default function ClassButton({
   occurrenceId, bookingId, classHref,
-  bookingStatus, flexPending, checkedIn, cancelled = false,
+  bookingStatus, flexPending, pendingLabel = null, checkedIn, cancelled = false,
   startsAt, endsAt, opensBeforeMin, closesAfterMin,
   waitlistPosition = null,
   full = false, waitlistEnabled = false, freeFirstEligible = false, confirmLast = false,
@@ -39,6 +39,10 @@ export default function ClassButton({
   classHref: string;
   bookingStatus: string | null;
   flexPending: boolean;
+  /** Decision 21 vs Decision 30: a flex-pending booking carries its cutoff ("by
+   *  20:00 Sat"), a free-first PROVISIONAL seat does not (null) — so the two
+   *  "Waiting for confirmation" states read differently. Formatted server-side. */
+  pendingLabel?: string | null;
   checkedIn: boolean;
   cancelled?: boolean;
   startsAt: string;
@@ -191,7 +195,20 @@ export default function ClassButton({
     );
   }
   if (state === "waiting_confirmation") {
-    return wrap(<span className={`${chip} text-center leading-[15px]`} style={tint}>Waiting for confirmation</span>);
+    // A flex-pending booking shows its cutoff ("· by 20:00 Sat"); a free-first
+    // PROVISIONAL seat (pendingLabel null) stays bare, since it confirms the
+    // moment the class is on, not at a fixed deadline. The two states then read
+    // differently rather than both saying only "Waiting for confirmation".
+    return wrap(
+      <span className="flex flex-col items-end gap-0.5">
+        <span className={`${chip} text-center leading-[15px]`} style={tint}>Waiting for confirmation</span>
+        {pendingLabel && (
+          <span className="m-micro leading-[15px] text-ink-2">
+            by <span className="num">{pendingLabel}</span>
+          </span>
+        )}
+      </span>,
+    );
   }
   if (state === "checked_in") {
     return wrap(<span className={chip} style={grey}>Checked in</span>);

@@ -37,6 +37,10 @@ export type Row = {
   checkedIn: boolean;
   /** Decision 21: a booked flex class still awaiting its cutoff. */
   flexPending: boolean;
+  /** The flex cutoff as a short label ("20:00 Sat"), or null for a free-first
+   *  PROVISIONAL seat (which has no fixed deadline) — so the two "Waiting for
+   *  confirmation" states read differently. */
+  pendingLabel: string | null;
   /** Raw ISO instants — the button opens/closes the check-in window on a clock. */
   startsAt: string;
   endsAt: string | null;
@@ -213,6 +217,7 @@ export default function DayClasses({
               classHref={r.href}
               bookingStatus={state === "booked" ? "booked" : "waitlisted"}
               flexPending={r.flexPending}
+              pendingLabel={r.pendingLabel}
               checkedIn={r.checkedIn}
               startsAt={r.startsAt}
               endsAt={r.endsAt}

@@ -9,7 +9,7 @@ import DayView from "@/components/member/day-view";
 import DayClasses, { type Row } from "@/components/member/day-classes";
 import FreeClassList from "@/components/member/free-class-list";
 import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
-import { addDays, dayStart, fmtTime, zonedDateKey } from "@/lib/time";
+import { addDays, dayStart, fmtTime, fmtDeadlineShort, zonedDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -220,8 +220,15 @@ export default async function Book({
   // which booked flex classes are still awaiting confirmation (Decision 21).
   const checkedInSet = new Set(((checkinRows ?? []) as { occurrence_id: string }[])
     .map((r) => r.occurrence_id));
-  const pendingSet = new Set(((pendingRows ?? []) as { occurrence_id: string }[])
-    .map((r) => r.occurrence_id));
+  // Decision 21 / Decision 30: "Waiting for confirmation" covers two states. A
+  // flex-pending booking carries its cutoff (pending_until set) and shows "· by
+  // {deadline}"; a free-first PROVISIONAL seat carries none (null) and stays
+  // bare — it confirms the moment the class is on, so a deadline would mislead.
+  // Keep the value, not just presence, so the Book list can tell them apart the
+  // way Home and the class page already do.
+  const pendingMap = new Map(((pendingRows ?? []) as
+    { occurrence_id: string; pending_until: string | null }[])
+    .map((r) => [r.occurrence_id, r.pending_until]));
 
   const typeFilter = searchParams.type ?? "";
   const instFilter = searchParams.instructor ?? "";
@@ -344,7 +351,11 @@ export default async function Book({
     const waiting = booking?.status === "waitlisted";
     const holding = booking?.status === "pending_payment";
     const checkedIn = checkedInSet.has(o.id) || booking?.status === "attended";
-    const flexPending = pendingSet.has(o.id);
+    const flexPending = pendingMap.has(o.id);
+    const pendingUntil = pendingMap.get(o.id) ?? null;
+    const pendingLabel = pendingUntil
+      ? fmtDeadlineShort(pendingUntil, ctx.timeZone, ctx.timeFormat)
+      : null;
     const loc = (o as unknown as { locations?: { latitude: number | null;
       longitude: number | null; self_checkin_requires_location: boolean } | null }).locations ?? null;
     const selfCheckinAvailable = loc
@@ -393,6 +404,7 @@ export default async function Book({
       bookingStatus: booking?.status ?? null,
       checkedIn,
       flexPending,
+      pendingLabel,
       startsAt: o.starts_at,
       endsAt: o.ends_at ?? null,
       selfCheckinAvailable,

@@ -208,6 +208,33 @@ select expect_num('both free seats are provisional so far',
 select expect_num('no free_booking_confirmed queued yet',
   (select count(*) from notifications where template_key='free_booking_confirmed'
      and (payload->>'occurrence_id')='17a10000-0000-0000-0000-00000000c001'), 0);
+
+-- The member app renders TWO states as "Waiting for confirmation": a Decision-21
+-- flex-pending booking (member_pending_bookings.pending_until = its cutoff) and a
+-- Decision-30 free-first PROVISIONAL seat (pending_until NULL — it confirms the
+-- moment the class is on, so a deadline would mislead). The Book list now shows
+-- "· by {deadline}" only when pending_until is set, so the two read differently.
+-- The flex half (non-null cutoff) is asserted in flex_member_confirmation_test;
+-- this is the free-first half the bare chip relies on. L5 holds a provisional
+-- free seat on c001 (core, not flex) right now.
+create or replace function t_free_pending(p_lead int, p_occ uuid) returns text
+language plpgsql as $$
+declare v_uid uuid := ('17a10000-0000-0000-0000-00000000aa0' || p_lead)::uuid;
+        v_until timestamptz; v_found boolean;
+begin
+  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  set local role authenticated;
+  select pending_until into v_until
+    from member_pending_bookings('17a10000-0000-0000-0000-000000000001')
+   where occurrence_id = p_occ limit 1;
+  v_found := found;
+  reset role;
+  if not v_found then return 'absent'; end if;
+  return case when v_until is null then 'null' else 'set' end;
+end $$;
+select expect_text('a provisional free-first seat is pending with NO deadline (pending_until null)',
+  t_free_pending(5, '17a10000-0000-0000-0000-00000000c001'), 'null');
+
 -- the 3rd booking is PAID (book_class) → reaches 3 → confirms the two provisional
 do $$
 begin
