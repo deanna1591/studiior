@@ -3,6 +3,7 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, Rows, SectionLabel } from "@/components/ui";
 import { PLAN_TYPE_LABEL, formatMoney, type PlanType } from "@/lib/plans";
+import PlansReorder, { type ReorderPlan } from "@/components/staff/plans-reorder";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function PlansList() {
   const [{ data: plans }, { data: memberships }, { data: seats }] = await Promise.all([
     supabase
       .from("membership_plans")
-      .select("id, name, type, price_cents, currency, status, visibility, credits, credits_per_period, validity_days, billing_interval, sort_order")
+      .select("id, name, type, price_cents, currency, status, visibility, credits, credits_per_period, validity_days, billing_interval, sort_order, featured, badge")
       .order("status").order("sort_order").order("name"),
     supabase.from("memberships").select("plan_id, status"),
     // Decision 24. Empty for a studio with the switch off, which is what makes
@@ -46,15 +47,37 @@ export default async function PlansList() {
   const active = (plans ?? []).filter((p) => p.status === "active");
   const archived = (plans ?? []).filter((p) => p.status !== "active");
 
+  const buysOf = (p: NonNullable<typeof plans>[number]) =>
+    p.type === "recurring"
+      ? p.credits_per_period === null
+        ? "Unlimited classes"
+        : `${p.credits_per_period} classes per ${p.billing_interval ?? "period"}`
+      : `${p.credits ?? "—"} class${p.credits === 1 ? "" : "es"}${p.validity_days ? `, valid ${p.validity_days} days` : ""}`;
+
+  // Decision 74: the staff list is reorderable. Active plans are handed to the
+  // client reorder component (drag + Up/Down + Featured + badge); archived plans
+  // stay below as plain rows and are not reorderable.
+  const reorderActive: ReorderPlan[] = active.map((p) => {
+    const n = live.get(p.id) ?? 0;
+    const seat = seatOf.get(p.id);
+    const right = seat
+      ? `${seat.taken} of ${seat.cap} places${seat.is_over ? " · over" : seat.is_full ? " · full" : ""}`
+      : n === 0 ? "Nobody on it" : `${n} member${n === 1 ? "" : "s"}`;
+    return {
+      id: p.id,
+      name: p.name,
+      meta: `${PLAN_TYPE_LABEL[p.type as PlanType]} · ${buysOf(p)}${p.visibility !== "public" ? ` · ${p.visibility.replace("_", " ")}` : ""}`,
+      price: formatMoney(p.price_cents, p.currency),
+      right,
+      featured: !!p.featured,
+      badge: p.badge ?? null,
+    };
+  });
+
   const row = (p: NonNullable<typeof plans>[number]) => {
     const n = live.get(p.id) ?? 0;
     const seat = seatOf.get(p.id);
-    const buys =
-      p.type === "recurring"
-        ? p.credits_per_period === null
-          ? "Unlimited classes"
-          : `${p.credits_per_period} classes per ${p.billing_interval ?? "period"}`
-        : `${p.credits ?? "—"} class${p.credits === 1 ? "" : "es"}${p.validity_days ? `, valid ${p.validity_days} days` : ""}`;
+    const buys = buysOf(p);
     return (
       <Link
         key={p.id}
@@ -129,7 +152,7 @@ export default async function PlansList() {
           and members can buy it.
         </Empty>
       ) : (
-        <Rows>{active.map(row)}</Rows>
+        <PlansReorder plans={reorderActive} />
       )}
 
       {archived.length > 0 && (

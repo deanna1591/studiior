@@ -3967,6 +3967,7 @@ export type Database = {
       }
       membership_plans: {
         Row: {
+          badge: string | null
           billing_interval:
             | Database["public"]["Enums"]["billing_interval"]
             | null
@@ -3980,6 +3981,7 @@ export type Database = {
           credits_per_period: number | null
           currency: string
           description: string | null
+          featured: boolean
           freeze_allowed: boolean
           id: string
           is_demo: boolean
@@ -4005,6 +4007,7 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          badge?: string | null
           billing_interval?:
             | Database["public"]["Enums"]["billing_interval"]
             | null
@@ -4018,6 +4021,7 @@ export type Database = {
           credits_per_period?: number | null
           currency: string
           description?: string | null
+          featured?: boolean
           freeze_allowed?: boolean
           id?: string
           is_demo?: boolean
@@ -4043,6 +4047,7 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          badge?: string | null
           billing_interval?:
             | Database["public"]["Enums"]["billing_interval"]
             | null
@@ -4056,6 +4061,7 @@ export type Database = {
           credits_per_period?: number | null
           currency?: string
           description?: string | null
+          featured?: boolean
           freeze_allowed?: boolean
           id?: string
           is_demo?: boolean
@@ -7436,6 +7442,14 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_plan_to_unpaid: {
+        Args: {
+          p_member_id: string
+          p_membership_id: string
+          p_studio_id: string
+        }
+        Returns: string
+      }
       approve_availability_submission: {
         Args: { p_submission_id: string }
         Returns: Json
@@ -9029,6 +9043,10 @@ export type Database = {
         }[]
       }
       reopen_studio: { Args: { p_closure_id: string }; Returns: Json }
+      reorder_plans: {
+        Args: { p_plan_ids: string[]; p_studio_id: string }
+        Returns: undefined
+      }
       republish_open_shift: { Args: { p_occurrence_id: string }; Returns: Json }
       request_availability_changes: {
         Args: { p_note: string; p_submission_id: string }

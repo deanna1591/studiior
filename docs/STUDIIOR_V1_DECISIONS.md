@@ -537,6 +537,16 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 74 — Plan display order and featured plans
+
+**Decision.** `membership_plans` gains `sort_order int` (unique per studio among live plans; new plans append to the end), `featured boolean not null default false`, and `badge text null` (max 24 chars, e.g. "Most popular", "Best value"). The staff Plans list is reorderable by drag and drop (with Up/Down buttons as the keyboard/mobile fallback) and each plan has a Featured toggle and badge field. Everywhere plans are shown to members — the member plans page (`/account/plan`), the class-sheet Buy path, and the public website embed — plans are listed by `sort_order` with featured plans first and visually highlighted (accent border + badge chip). Public visibility rules, prices and buy links are unchanged. Reorder and feature writes go through the existing staff plan write path (owner/manager RLS). No new anon RPC — the anon surface stays EXACTLY THIRTEEN; if the website embed reads plans through one of the thirteen, that function's output gains the three fields.
+
+**Non-goals.** No per-plan images; no scheduling of featured periods; no change to which plans are public.
+
+**Touches.** Migration (three columns + backfill `sort_order` by `created_at` per studio), staff Plans page (drag reorder, Featured, badge), member plans page + embed ordering/highlight, settings registry if any plan-level audit applies, tests.
+
+---
+
 ## 52 — Native store apps: one thin shell per tenant (Android TWA + iOS Capacitor)
 
 **Decision.** Each tenant can have two native store listings that are thin shells over its live member web app (`https://{slug}.studiior.app`), so every web deploy is picked up with no store resubmission. First shell: "RPC Pilates Studio" (package/bundle `app.studiior.reformcollective`, SKU `reformcollective`), target live in both stores by 9 Nov 2026. The web app changes only to (1) serve the store-verification files per tenant and (2) let the owner enter the per-tenant store identifiers in Settings. No new anon RPC — the anon surface stays EXACTLY THIRTEEN. Push notifications are deferred: the iOS App ID declares the capability but nothing is wired until after launch. Reuses Decision 51 (manifest/icons), Decision 35 (QR check-in via the existing web camera path), the existing `.ics` routes (add to calendar), Decision 69 (in-app account deletion, required by both stores).

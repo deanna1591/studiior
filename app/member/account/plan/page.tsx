@@ -3,6 +3,7 @@ import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
+import { sortPlans } from "@/lib/plan-order";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
 import { safeNext } from "@/lib/auth-redirect";
 import BuyPlan from "./buy";
@@ -54,8 +55,8 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       // (plans_member_read) already limits this to this studio's visibility=
       // 'public' plans — Permissions §9. Purchase is at the desk (Decision 16).
       supabase.from("membership_plans")
-        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count")
-        .eq("visibility", "public").eq("status", "active").order("sort_order"),
+        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count, featured, badge")
+        .eq("visibility", "public").eq("status", "active").order("featured", { ascending: false }).order("sort_order"),
       // Decision 24: which public plans are full. A row only for a capped plan
       // at a seat-caps studio; absent means uncapped or the switch is off.
       supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
@@ -191,7 +192,9 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
         <section className="mt-8">
           <h2 className="section-label text-ink-2">{live ? "Other plans" : "Plans"}</h2>
           <ul className="mt-3 space-y-3">
-            {(catalogue ?? []).map((p) => {
+            {/* Decision 74: featured first, then sort_order — the same pure rule
+                the staff list and the node test use. */}
+            {sortPlans(catalogue ?? []).map((p) => {
               // Decision 24: a full capped plan either hides from members
               // ('hide') or shows as full, sellable at the desk only
               // ('staff_only'). The renewal of a plan you already hold is a
@@ -212,7 +215,14 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                 : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
                    `one ${p.billing_interval ?? "period"} — renew by hand`];
               return (
-                <li key={p.id} className="m-card p-4">
+                // Decision 74: a featured plan is highlighted with an accent
+                // border and its badge chip.
+                <li key={p.id} className="m-card p-4"
+                    style={p.featured ? { border: "1.5px solid var(--accent-solid)" } : undefined}>
+                  {p.featured && p.badge && (
+                    <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4 text-ink"
+                          style={{ background: "var(--accent-chip)" }}>{p.badge}</span>
+                  )}
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="text-[16px] font-semibold leading-5 text-ink">{p.name}</h3>
                     <span className="num shrink-0 text-[16px] font-semibold text-ink">

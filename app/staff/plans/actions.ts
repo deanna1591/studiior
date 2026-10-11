@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { FIELDS, toCents, type PlanType } from "@/lib/plans";
+import { clampBadge } from "@/lib/plan-order";
 import type { Database } from "@/lib/database.types";
 
 /** The generated row type, minus the tenant key the action supplies itself. */
@@ -244,6 +245,56 @@ export async function setPlanStatus(_prev: PlanFormState, fd: FormData): Promise
 
   revalidatePath("/plans");
   revalidatePath(`/plans/${id}`);
+  return null;
+}
+
+/**
+ * Decision 74: set the display order of a studio's LIVE plans in one atomic
+ * write. The staff list passes every live plan id in the new order; reorder_plans
+ * sets sort_order 1..n (owner/manager guard inside, cross-studio refusal). The
+ * RPC is the boundary, so no role check here.
+ */
+export async function reorderPlans(planIds: string[]): Promise<{ error: string } | null> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "Not signed in." };
+  const supabase = createClient();
+  const { error } = await supabase.rpc("reorder_plans", {
+    p_studio_id: ctx.studioId,
+    p_plan_ids: planIds,
+  });
+  if (error) {
+    if (error.code === "PT403") return { error: "Your role cannot change plan order. Owners and managers only." };
+    if (error.code === "PT400") return { error: "That list of plans is out of date — reload the page and try again." };
+    return { error: error.message };
+  }
+  revalidatePath("/plans");
+  revalidatePath("/account/plan");
+  return null;
+}
+
+/**
+ * Decision 74: a plan's Featured flag and badge, written through the existing
+ * plans_manager_write RLS (owner/manager). badge is trimmed and clamped to the
+ * 24-char ceiling so a write can never be refused by the CHECK.
+ */
+export async function setPlanFeature(
+  planId: string, featured: boolean, badge: string | null,
+): Promise<{ error: string } | null> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "Not signed in." };
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("membership_plans")
+    .update({ featured, badge: clampBadge(badge) })
+    .eq("id", planId)
+    .select("id");
+  if (error) return { error: explain(error) };
+  // RLS refuses by making the row invisible, not by raising.
+  if (!data || data.length === 0) {
+    return { error: "Your role cannot change plans. Owners and managers only." };
+  }
+  revalidatePath("/plans");
+  revalidatePath("/account/plan");
   return null;
 }
 
