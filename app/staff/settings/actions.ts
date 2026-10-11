@@ -967,6 +967,10 @@ export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise
         return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
       })(),
       waitlist_enabled: fd.get("waitlist_enabled") === "on",
+      // Decision 75a: mark any still-booked booking as a no-show at midnight
+      // finalise_days_after (0..7) the class, independent of suspension.
+      finalise_attendance: fd.get("finalise_attendance") === "on",
+      finalise_days_after: Math.min(7, Math.max(0, clampInt(fd.get("finalise_days_after"), 1))),
     })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };

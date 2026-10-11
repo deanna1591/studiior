@@ -21,6 +21,7 @@ export default function BookingRulesPanel({
   windowDays, cutoffMinutes, requireWaiver, lateCancelConsumesCredit,
   checkinOpensBefore, checkinClosesAfter,
   bookingCutoffMinutes, maxFutureBookings, maxUnpaidBookings, waitlistEnabled,
+  finaliseAttendance, finaliseDaysAfter,
 }: {
   windowDays: number;
   cutoffMinutes: number;
@@ -32,6 +33,8 @@ export default function BookingRulesPanel({
   maxFutureBookings: number | null;
   maxUnpaidBookings: number | null;
   waitlistEnabled: boolean;
+  finaliseAttendance: boolean;
+  finaliseDaysAfter: number;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveBookingRules, null);
   const parts = cutoffParts(cutoffMinutes);
@@ -186,6 +189,26 @@ export default function BookingRulesPanel({
           A no-show uses up the credit. Someone booked in who never arrives is
           charged the class — there is nothing to turn off.
         </p>
+      </div>
+
+      {/* Decision 75a: finalise attendance — mark unmarked bookings no-show. */}
+      <div className="rounded border border-line bg-surface px-3.5 py-3">
+        <label className="flex items-start gap-2.5">
+          <input type="checkbox" name="finalise_attendance" defaultChecked={finaliseAttendance} className="mt-1" />
+          <span className="text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Mark unmarked bookings as no-show</span> — a
+            member booked in who was never checked in is recorded as a no-show once
+            the class is finalised. The instructor and the desk can still mark
+            attendance until then.
+          </span>
+        </label>
+        <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+          <label className="text-[13px] leading-[19px] text-ink" htmlFor="finalise_days_after">Finalise</label>
+          <input id="finalise_days_after" name="finalise_days_after" type="number" min={0} max={7}
+                 defaultValue={finaliseDaysAfter}
+                 className="num w-16 rounded border border-line bg-paper px-2 py-1 text-[13px] text-ink" />
+          <span className="text-[13px] leading-[19px] text-ink-3">day(s) after the class, at midnight (0 = the same night).</span>
+        </div>
       </div>
 
       <div><Save /></div>

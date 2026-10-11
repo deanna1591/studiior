@@ -1,45 +1,23 @@
-import Link from "next/link";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
-import { dayMonthParts, fmtTime } from "@/lib/time";
+import Statement from "@/components/member/statement";
+import type { StatementRow } from "@/lib/statement";
 
 export const dynamic = "force-dynamic";
 
 /**
- * What they have actually done.
- *
- * This screen is the reason migration 025 exists: occ_member_read is
- * `status = 'scheduled'`, so once a class runs it leaves the member's view and
- * every one of these rows read "Visit" with no name, no time and no teacher.
- * The narrow policy — readable if you have a booking or a check-in for it —
- * is what puts the class names back.
+ * Decision 75a — the member's itemised activity statement: every booking,
+ * cancellation, check-in, no-show, purchase, refund, free class and reschedule,
+ * in time order with the credit movement and a running balance (member_activity,
+ * which computes the balance from credit_ledger). Replaces the old check-ins
+ * list. The two KPI cards stay as context.
  */
 export default async function History() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers, memberName, avatarUrl} = await memberScreen();
+  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } = await memberScreen();
 
-  const [{ data: visits }, { data: achievements }] = await Promise.all([
-    supabase
-      .from("check_ins")
-      .select("id, checked_in_at, occurrence_id, import_id, class_occurrences(name, starts_at, instructors!instructor_id(display_name))")
-      .eq("member_id", ctx.memberId)
-      .order("checked_in_at", { ascending: false })
-      .limit(200),
-    supabase
-      .from("member_achievements")
-      .select("id, earned_at, achievement_definitions(name, description, icon)")
-      .eq("member_id", ctx.memberId)
-      .order("earned_at", { ascending: false }),
-  ]);
-
-  const groups: { label: string; items: NonNullable<typeof visits> }[] = [];
-  for (const v of visits ?? []) {
-    const label = new Intl.DateTimeFormat("en-GB", {
-      timeZone: ctx.timeZone, month: "long", year: "numeric",
-    }).format(new Date(v.checked_in_at));
-    const last = groups[groups.length - 1];
-    if (last && last.label === label) last.items.push(v);
-    else groups.push({ label, items: [v] });
-  }
+  const { data: activity } = await supabase.rpc("member_activity", {
+    p_member_id: ctx.memberId, p_from: "2000-01-01", p_to: "2100-01-01",
+  });
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Your history">
@@ -57,72 +35,7 @@ export default async function History() {
         </div>
       </div>
 
-      {(achievements ?? []).length > 0 && (
-        <section className="mb-6">
-          <h2 className="m-sub mb-2 font-medium text-ink">Earned</h2>
-          <ul className="flex flex-wrap gap-2">
-            {(achievements ?? []).map((a) => {
-              const { day, month } = dayMonthParts(a.earned_at, ctx.timeZone);
-              return (
-                <li key={a.id}
-                    className="rounded-full border border-lime-text bg-lime-tint px-3 py-1.5">
-                  <span className="m-sub text-ink">
-                    {a.achievement_definitions?.name ?? "Achievement"}
-                  </span>
-                  <span className="m-micro ml-1.5 text-ink-2">
-                    <span className="num">{day}</span> {month}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {(visits ?? []).length === 0 ? (
-        <div className="m-card p-5 text-center">
-          <p className="m-body text-ink">No classes yet.</p>
-          <p className="m-sub mt-1 text-ink-2">
-            Your first one will show up here.{" "}
-            <Link href="/book" className="text-lime-text underline underline-offset-4">
-              Find one to book
-            </Link>
-            .
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {groups.map((g) => (
-            <section key={g.label}>
-              <h2 className="m-micro mb-1.5 uppercase tracking-[0.06em] text-ink-3">{g.label}</h2>
-              <ul className="m-card divide-y divide-line overflow-hidden">
-                {g.items.map((v) => {
-                  const { day, month } = dayMonthParts(v.checked_in_at, ctx.timeZone);
-                  return (
-                    <li key={v.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                      <span className="min-w-0">
-                        <span className="m-body block truncate text-ink">
-                          {v.class_occurrences?.name ?? "Class"}
-                        </span>
-                        <span className="m-micro block text-ink-3">
-                          {v.class_occurrences?.instructors?.display_name ??
-                            (v.import_id ? "From before you joined the app" : "—")}
-                        </span>
-                      </span>
-                      <span className="m-micro shrink-0 text-right text-ink-3">
-                        <span className="num">{day}</span> {month}
-                        {v.occurrence_id && (
-                          <span className="num block">{fmtTime(v.checked_in_at, ctx.timeZone, ctx.timeFormat)}</span>
-                        )}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
+      <Statement rows={(activity ?? []) as StatementRow[]} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
     </MemberShell>
   );
 }

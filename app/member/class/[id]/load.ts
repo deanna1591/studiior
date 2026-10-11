@@ -47,7 +47,8 @@ export async function loadClassDetail(
     .select("id, status, waitlist_position, provisional, payment_source")
     .eq("member_id", memberId).eq("occurrence_id", id)
     // Decision 68: 'attended' keeps the row so the page reads "Checked in".
-    .in("status", ["booked", "waitlisted", "attended"]).maybeSingle();
+    // Decision 75a: 'no_show' keeps it so the page can read "Did not attend".
+    .in("status", ["booked", "waitlisted", "attended", "no_show"]).maybeSingle();
   // Decision 68: the member's own check-in for this class (self RLS), so the
   // class page shows "Checked in" after any door — self, scan or desk — with the
   // time it happened (FIX A).

@@ -24,9 +24,24 @@ type Ev = {
 const DOT: Record<string, string> = {
   joined: "var(--lime-text)",
   attended: "var(--line-2)",
+  booked: "var(--line-2)",
+  waitlisted: "var(--line-2)",
+  free_first: "var(--lime-text)",
   cancelled: "var(--coral)",
+  late_cancelled: "var(--coral)",
+  studio_cancelled: "var(--coral)",
+  no_show: "var(--coral)",
+  rescheduled: "var(--amber-deep)",
+  instructor_changed: "var(--amber-deep)",
   payment: "var(--ink-3)",
+  purchase: "var(--ink-3)",
+  refund: "var(--ink-3)",
+  payment_failed: "var(--coral)",
+  credits_added: "var(--lime-text)",
+  credit_used: "var(--line-2)",
+  credit_adjustment: "var(--ink-3)",
   membership_changed: "var(--lime-text)",
+  message_sent: "var(--ink-3)",
 };
 
 export function TimelineList({ events, timeZone, timeFormat = "24h" }: { events: Ev[]; timeZone: string; timeFormat?: TimeFormat }) {

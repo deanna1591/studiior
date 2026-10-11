@@ -476,6 +476,8 @@ export type Database = {
           is_late_cancel: boolean
           member_id: string
           membership_id: string | null
+          no_show_at: string | null
+          no_show_by: string | null
           occurrence_id: string
           overridden_rules: string[] | null
           override_reason: string | null
@@ -504,6 +506,8 @@ export type Database = {
           is_late_cancel?: boolean
           member_id: string
           membership_id?: string | null
+          no_show_at?: string | null
+          no_show_by?: string | null
           occurrence_id: string
           overridden_rules?: string[] | null
           override_reason?: string | null
@@ -532,6 +536,8 @@ export type Database = {
           is_late_cancel?: boolean
           member_id?: string
           membership_id?: string | null
+          no_show_at?: string | null
+          no_show_by?: string | null
           occurrence_id?: string
           overridden_rules?: string[] | null
           override_reason?: string | null
@@ -1261,6 +1267,7 @@ export type Database = {
           assignment_confirmed_at: string | null
           assignment_confirmed_by: string | null
           assignment_requested_at: string | null
+          attendance_finalised_at: string | null
           booked_at_cutoff: number | null
           booked_at_start: number | null
           booked_count: number
@@ -1310,6 +1317,7 @@ export type Database = {
           assignment_confirmed_at?: string | null
           assignment_confirmed_by?: string | null
           assignment_requested_at?: string | null
+          attendance_finalised_at?: string | null
           booked_at_cutoff?: number | null
           booked_at_start?: number | null
           booked_count?: number
@@ -1359,6 +1367,7 @@ export type Database = {
           assignment_confirmed_at?: string | null
           assignment_confirmed_by?: string | null
           assignment_requested_at?: string | null
+          attendance_finalised_at?: string | null
           booked_at_cutoff?: number | null
           booked_at_start?: number | null
           booked_count?: number
@@ -4648,6 +4657,61 @@ export type Database = {
           },
         ]
       }
+      occurrence_events: {
+        Row: {
+          actor_user_id: string | null
+          after: Json | null
+          at: string
+          before: Json | null
+          id: string
+          kind: string
+          occurrence_id: string
+          studio_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          after?: Json | null
+          at?: string
+          before?: Json | null
+          id?: string
+          kind: string
+          occurrence_id: string
+          studio_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          after?: Json | null
+          at?: string
+          before?: Json | null
+          id?: string
+          kind?: string
+          occurrence_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "occurrence_events_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "occurrence_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "occurrence_events_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pay_periods: {
         Row: {
           closed_at: string | null
@@ -6372,6 +6436,8 @@ export type Database = {
           cover_escalation_hours: number
           created_at: string
           dropin_payment_window_minutes: number
+          finalise_attendance: boolean
+          finalise_days_after: number
           flex_deadline_hours: number
           flex_deadline_mode: string
           flex_deadline_time: string
@@ -6473,6 +6539,8 @@ export type Database = {
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
+          finalise_attendance?: boolean
+          finalise_days_after?: number
           flex_deadline_hours?: number
           flex_deadline_mode?: string
           flex_deadline_time?: string
@@ -6574,6 +6642,8 @@ export type Database = {
           cover_escalation_hours?: number
           created_at?: string
           dropin_payment_window_minutes?: number
+          finalise_attendance?: boolean
+          finalise_days_after?: number
           flex_deadline_hours?: number
           flex_deadline_mode?: string
           flex_deadline_time?: string
@@ -7991,6 +8061,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
       extend_membership: {
         Args: {
           p_membership_id: string
@@ -8003,6 +8081,7 @@ export type Database = {
         Args: { p_days: number; p_studio_id: string }
         Returns: string
       }
+      finalise_attendance_sweep: { Args: never; Returns: Json }
       flex_deadline_for: {
         Args: { p_occurrence_id: string }
         Returns: {
@@ -8409,6 +8488,22 @@ export type Database = {
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      member_activity: {
+        Args: { p_from: string; p_member_id: string; p_to: string }
+        Returns: {
+          amount_cents: number
+          at: string
+          balance_after: number
+          booking_id: string
+          credit_delta: number
+          currency: string
+          detail: string
+          kind: string
+          membership_id: string
+          occurrence_id: string
+          title: string
+        }[]
+      }
       member_announcements: { Args: { p_studio_id: string }; Returns: Json }
       member_app_domain: { Args: never; Returns: string }
       member_booking_window_days: {

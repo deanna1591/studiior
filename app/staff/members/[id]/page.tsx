@@ -63,7 +63,7 @@ export default async function MemberDetail({
 
   const [
     { data: memberships }, { data: ledger }, { data: visits },
-    { data: timeline }, { data: notes }, { data: goals }, { data: tags },
+    { data: activity }, { data: notes }, { data: goals }, { data: tags },
     { data: docs }, { data: standing }, { data: infractions },
   ] = await Promise.all([
     supabase.from("memberships")
@@ -75,9 +75,11 @@ export default async function MemberDetail({
     supabase.from("check_ins")
       .select("id, checked_in_at")
       .eq("member_id", params.id).order("checked_in_at", { ascending: false }).limit(600),
-    supabase.from("timeline_events")
-      .select("id, type, occurred_at, title, description, metadata")
-      .eq("member_id", params.id).order("occurred_at", { ascending: false }).limit(200),
+    // Decision 75a: the journey reads the member_activity statement (bookings,
+    // check-ins, credit movements, payments, occurrence events, joined and
+    // message_sent for staff). timeline_events and its triggers stay in place
+    // until parity is proven in a follow-up.
+    supabase.rpc("member_activity", { p_member_id: params.id, p_from: "2000-01-01", p_to: "2100-01-01" }),
     supabase.from("member_notes")
       .select("id, category, body, pinned, managers_only, active, created_at")
       .eq("member_id", params.id).order("pinned", { ascending: false }).order("created_at", { ascending: false }),
@@ -117,7 +119,27 @@ export default async function MemberDetail({
         .eq("member_id", params.id).order("created_at", { ascending: false }).limit(20)
     : { data: null };
 
-  const journey = (timeline ?? []).filter((e) => manager || e.type !== "payment");
+  // Decision 75a: map the statement rows to the TimelineList shape. Non-managers
+  // keep the existing display choice — the pure money rows are withheld (the
+  // class rows that merely carry a credit delta stay).
+  const MONEY_KINDS = new Set(["purchase", "refund", "payment_failed", "credits_added", "credit_adjustment"]);
+  type Act = { at: string; kind: string; title: string; detail: string | null;
+    credit_delta: number | null; amount_cents: number | null; currency: string | null;
+    occurrence_id: string | null; booking_id: string | null; membership_id: string | null };
+  const journey = ((activity ?? []) as Act[])
+    .filter((e) => manager || !MONEY_KINDS.has(e.kind))
+    .map((e, i) => {
+      const cd = e.credit_delta ?? 0;
+      const creditNote = cd !== 0 ? `${cd > 0 ? "+" : ""}${cd} credit${Math.abs(cd) === 1 ? "" : "s"}` : null;
+      return {
+        id: `${e.kind}:${e.occurrence_id ?? e.booking_id ?? e.membership_id ?? "x"}:${e.at}:${i}`,
+        type: e.kind,
+        occurred_at: e.at,
+        title: e.title,
+        description: [e.detail, creditNote].filter(Boolean).join(" · ") || null,
+        metadata: { amount_cents: e.amount_cents, currency: e.currency },
+      };
+    });
 
   // Goal progress is computed, never read off member_goals.current_value —
   // that column has never been written and every goal read "0 of 12".

@@ -78,6 +78,8 @@ export default function ClassDetailBody({
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
   const past = new Date(occ.starts_at).getTime() < Date.now();
+  // Decision 75a: a no-show booking reads "Did not attend" — no capacity, no action.
+  const noShow = booking?.status === "no_show";
 
   // FIX A: the member's OWN relationship to the class wins over capacity — the
   // same resolver the schedule uses. attended → checked_in (grey, no actions);
@@ -159,7 +161,8 @@ export default function ClassDetailBody({
             greyed, non-clickable line with the check-in time; the capacity line
             is hidden for anyone with their own booking. */}
         <p className="m-sub mb-3 text-ink-2">
-          {past && !view.hideCapacity ? "This class has already started."
+          {noShow ? "Did not attend"
+            : past && !view.hideCapacity ? "This class has already started."
             : isCheckedIn ? <>You&rsquo;re checked in{checkedInAt && <> · <span className="num">{fmtTime(checkedInAt, timeZone, timeFormat)}</span></>}</>
             : isWaitlisted ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the waitlist.</>
             : hasBooking ? (waitingLabel ?? "You're booked in.")
