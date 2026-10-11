@@ -1,5 +1,5 @@
 export function buyPath(planId: string): string;
-export function payNowHref(planId: string, returnPath: string | null | undefined): string;
+export function payNowHref(returnPath: string | null | undefined): string;
 export function buyUrl(memberOrigin: string, planId: string): string;
 export function resolveMemberBase(
   dbValue: string | null | undefined,

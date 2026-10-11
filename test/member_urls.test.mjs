@@ -26,11 +26,11 @@ test("the buy ?next is a relative path and is open-redirect guarded", () => {
   assert.equal(safeNext(""), "/");                                 // empty -> "/"
 });
 
-test("payNowHref carries a relative ?return and refuses an open redirect (Decision 73b)", () => {
-  assert.equal(payNowHref("p1", "/class/abc"), "/buy/p1?return=%2Fclass%2Fabc");  // the real case
-  assert.equal(payNowHref("p1", null), "/buy/p1");                                 // no return
-  assert.equal(payNowHref("p1", undefined), "/buy/p1");
-  assert.equal(payNowHref("p1", "//evil.com"), "/buy/p1");                         // protocol-relative dropped
-  assert.equal(payNowHref("p1", "https://evil.com"), "/buy/p1");                   // absolute dropped
-  assert.equal(payNowHref("p1", "/\\evil"), "/buy/p1");                            // backslash trick dropped
+test("payNowHref targets the plans page with a relative ?return, open-redirect guarded (Decision 73b)", () => {
+  assert.equal(payNowHref("/class/abc"), "/account/plan?return=%2Fclass%2Fabc");  // the real case
+  assert.equal(payNowHref(null), "/account/plan");                                 // no return
+  assert.equal(payNowHref(undefined), "/account/plan");
+  assert.equal(payNowHref("//evil.com"), "/account/plan");                         // protocol-relative dropped
+  assert.equal(payNowHref("https://evil.com"), "/account/plan");                   // absolute dropped
+  assert.equal(payNowHref("/\\evil"), "/account/plan");                            // backslash trick dropped
 });

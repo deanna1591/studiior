@@ -4,11 +4,19 @@ import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
+import { safeNext } from "@/lib/auth-redirect";
 import BuyPlan from "./buy";
 
 export const dynamic = "force-dynamic";
 
-export default async function Plan() {
+export default async function Plan({ searchParams }: { searchParams: { return?: string } }) {
+  // Decision 73b: a "Pay now" from an unpaid booking lands here with ?return set
+  // to the class. Buying ANY plan settles that held booking on activation, so
+  // the return is threaded to every buy link and named in a banner. safeNext
+  // keeps it a relative path — no open redirect; "/" is treated as no return.
+  const rawReturn = searchParams?.return;
+  const settleReturn = rawReturn && safeNext(String(rawReturn)) !== "/"
+    ? safeNext(String(rawReturn)) : null;
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
   const { live, all } = await membershipState(supabase, ctx.memberId);
@@ -76,6 +84,17 @@ export default async function Plan() {
       </Link>
       <h1 className="m-title mb-4 text-ink">Your plan</h1>
 
+      {/* Decision 73b: when sent here from an unpaid booking, say what any
+          purchase does for it. */}
+      {settleReturn && (
+        <div className="m-card mb-3 p-4" style={{ background: "var(--accent-chip)" }}>
+          <p className="text-[15px] font-medium leading-5 text-ink">Buying any plan pays for your held class</p>
+          <p className="m-sub mt-1 text-ink-2">
+            Pick a plan below — the class you booked is settled as soon as the payment goes through.
+          </p>
+        </div>
+      )}
+
       {freeFirstEligible && (
         <div className="m-card mb-3 p-4">
           <p className="text-[15px] font-semibold leading-5 text-ink">Your first class is on us</p>
@@ -130,7 +149,7 @@ export default async function Plan() {
                 <p className="m-sub text-ink">
                   Your {live.membership_plans?.name} ends {live.renews_on && d(live.renews_on)} — renew for another {live.membership_plans?.billing_interval ?? "period"}.
                 </p>
-                <BuyPlan planId={live.plan_id} />
+                <BuyPlan planId={live.plan_id} returnTo={settleReturn} />
               </div>
             )}
           </div>
@@ -216,7 +235,7 @@ export default async function Plan() {
                         This plan is full — ask the studio.
                       </p>
                     ) : (
-                      <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} /></div>
+                      <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} returnTo={settleReturn} /></div>
                     )
                   )}
                 </li>
