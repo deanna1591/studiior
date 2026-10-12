@@ -25,3 +25,14 @@ export function monthCoveredState(
 
 /** The review-page note beside a not-sent instructor who has a standing pattern. */
 export function standingNote(standing: StandingCoverage): string;
+
+export type AvailabilityState =
+  | "locked" | "submitted" | "open" | "overdue" | "pattern";
+
+/** The one-line status at the top of the instructor availability page (Decision 46). */
+export function availabilityStatusLine(input: {
+  today: string;
+  shownMonth: string;
+  dueDay: number;
+  state: AvailabilityState;
+}): string;

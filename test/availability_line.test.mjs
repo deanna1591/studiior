@@ -4,7 +4,7 @@
 //   node --test test/availability_line.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { availabilityLine, standingNote, monthCoveredState } from "../lib/availability-line.mjs";
+import { availabilityLine, standingNote, monthCoveredState, availabilityStatusLine } from "../lib/availability-line.mjs";
 
 const base = { monthLabel: "November 2026", standing: null, instructorId: "abc" };
 
@@ -84,4 +84,48 @@ test("monthCoveredState: no submission, a covering pattern → 'pattern'", () =>
 test("monthCoveredState: nothing on file → 'none'", () => {
   assert.equal(monthCoveredState(null, false), "none");
   assert.equal(monthCoveredState("draft", false), "none");
+});
+
+// availabilityStatusLine — the one-liner at the top of the instructor
+// availability page (Decision 46). shownMonth is the collected month; due is
+// always dueDay of the month before it; a done/pattern cycle points at the
+// NEXT month. One case per state, plus the year roll.
+test("open → the collected month is open, due dueDay of the month before", () => {
+  assert.equal(
+    availabilityStatusLine({ today: "2026-10-12", shownMonth: "2026-11-01", dueDay: 20, state: "open" }),
+    "November availability is open · submit by 20 October.");
+});
+
+test("overdue → was due, submit now (and open upgrades to overdue past the due day)", () => {
+  assert.equal(
+    availabilityStatusLine({ today: "2026-10-25", shownMonth: "2026-11-01", dueDay: 20, state: "overdue" }),
+    "November availability was due 20 October — submit now; the studio may already be building the timetable.");
+  // A stale 'open' page past the due day still warns, derived from today.
+  assert.equal(
+    availabilityStatusLine({ today: "2026-10-25", shownMonth: "2026-11-01", dueDay: 20, state: "open" }),
+    "November availability was due 20 October — submit now; the studio may already be building the timetable.");
+});
+
+test("locked → next month opens 1st of this one, due dueDay of this one", () => {
+  assert.equal(
+    availabilityStatusLine({ today: "2026-10-12", shownMonth: "2026-11-01", dueDay: 20, state: "locked" }),
+    "December availability opens on 1 November · submit by 20 November.");
+});
+
+test("submitted → same next-cycle line as locked", () => {
+  assert.equal(
+    availabilityStatusLine({ today: "2026-10-12", shownMonth: "2026-11-01", dueDay: 20, state: "submitted" }),
+    "December availability opens on 1 November · submit by 20 November.");
+});
+
+test("pattern → the if-your-hours-change clause for the next month", () => {
+  assert.equal(
+    availabilityStatusLine({ today: "2026-10-12", shownMonth: "2026-11-01", dueDay: 20, state: "pattern" }),
+    "If your hours change for December, tell the studio by 20 November.");
+});
+
+test("year roll: December shown, locked → January opens 1 December, due 20 December", () => {
+  assert.equal(
+    availabilityStatusLine({ today: "2026-11-12", shownMonth: "2026-12-01", dueDay: 20, state: "locked" }),
+    "January availability opens on 1 December · submit by 20 December.");
 });
