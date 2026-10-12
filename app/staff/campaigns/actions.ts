@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { renderBody } from "@/lib/email-body";
 import type { Json } from "@/lib/database.types";
 
 /**
@@ -99,7 +100,11 @@ export async function sendTest(
   id: string, subject: string, body: string, filter: AudienceFilter,
 ): Promise<CampaignResult> {
   const supabase = await persist(id, subject, body, filter);
-  const { data, error } = await supabase.rpc("send_campaign_test", { p_campaign_id: id });
+  // Decision 77: the body markup is parsed in ONE place (Next), and the sender
+  // receives the rendered html/text — the SQL no longer builds HTML.
+  const r = renderBody(body);
+  const { data, error } = await supabase.rpc("send_campaign_test",
+    { p_campaign_id: id, p_html: r.html, p_text: r.text });
   if (error) return { error: say(error.message) };
   revalidate(id);
   return { ok: true, sentence: (data as { sentence?: string })?.sentence ?? "Test sent." };
@@ -109,7 +114,9 @@ export async function sendNow(
   id: string, subject: string, body: string, filter: AudienceFilter,
 ): Promise<CampaignResult> {
   const supabase = await persist(id, subject, body, filter);
-  const { data, error } = await supabase.rpc("send_campaign", { p_campaign_id: id });
+  const r = renderBody(body);
+  const { data, error } = await supabase.rpc("send_campaign",
+    { p_campaign_id: id, p_html: r.html, p_text: r.text });
   if (error) return { error: say(error.message) };
   revalidate(id);
   return { ok: true, sentence: (data as { sentence?: string })?.sentence ?? "Sending." };
@@ -119,7 +126,9 @@ export async function scheduleCampaign(
   id: string, subject: string, body: string, filter: AudienceFilter, whenIso: string,
 ): Promise<CampaignResult> {
   const supabase = await persist(id, subject, body, filter);
-  const { data, error } = await supabase.rpc("send_campaign", { p_campaign_id: id, p_when: whenIso });
+  const r = renderBody(body);
+  const { data, error } = await supabase.rpc("send_campaign",
+    { p_campaign_id: id, p_when: whenIso, p_html: r.html, p_text: r.text });
   if (error) return { error: say(error.message) };
   revalidate(id);
   return { ok: true, sentence: (data as { sentence?: string })?.sentence ?? "Scheduled." };

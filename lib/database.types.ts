@@ -9458,10 +9458,18 @@ export type Database = {
         Returns: Json
       }
       send_campaign: {
-        Args: { p_campaign_id: string; p_when?: string }
+        Args: {
+          p_campaign_id: string
+          p_html?: string
+          p_text?: string
+          p_when?: string
+        }
         Returns: Json
       }
-      send_campaign_test: { Args: { p_campaign_id: string }; Returns: Json }
+      send_campaign_test: {
+        Args: { p_campaign_id: string; p_html?: string; p_text?: string }
+        Returns: Json
+      }
       send_due_notifications: { Args: never; Returns: Json }
       send_message: {
         Args: { p_message_id: string }

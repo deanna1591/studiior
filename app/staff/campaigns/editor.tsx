@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { fromStudioWall } from "@/lib/tz";
+import EmailComposer from "@/components/staff/email-composer";
 import {
   saveCampaign, sendTest, sendNow, scheduleCampaign,
   audienceCount, type AudienceFilter,
@@ -78,27 +79,40 @@ export default function Editor({
       else setMsg(r.sentence ?? "Done.");
     });
 
-  const paras = body.split(/\n\n+/).filter((p) => p.trim().length > 0);
-
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* Compose */}
-      <div>
-        <label className="block text-[12px] font-medium text-ink-2">Subject</label>
-        <input
-          value={subject} onChange={(e) => setSubject(e.target.value)}
-          className="mt-1 w-full rounded border border-line-2 bg-surface px-3 py-2 text-[14px] text-ink"
-          placeholder="What members will see first"
-        />
-
-        <label className="mt-4 block text-[12px] font-medium text-ink-2">Message</label>
-        <textarea
-          value={body} onChange={(e) => setBody(e.target.value)}
-          rows={10}
-          className="mt-1 w-full rounded border border-line-2 bg-surface px-3 py-2 text-[14px] leading-[21px] text-ink"
-          placeholder={"Plain text. Leave a blank line between paragraphs."}
-        />
-
+    <>
+      <EmailComposer
+        subject={subject} onSubject={setSubject}
+        body={body} onBody={setBody}
+        studioName={studioName}
+        onSendTest={async () => {
+          const r = await sendTest(id, subject, body, filter());
+          return "error" in r ? { error: r.error } : { sentence: r.sentence };
+        }}
+        previewFooter={
+          <p className="mt-6 border-t border-line pt-3 text-[12px] leading-4 text-ink-3">
+            You&rsquo;re receiving this because you said yes to news from {studioName}.{" "}
+            <span className="underline">Unsubscribe</span>
+          </p>
+        }
+        actions={
+          <>
+            <button type="button" disabled={pending}
+              onClick={() => run(() => saveCampaign(id, subject, body, filter()))}
+              className="rounded border border-line-2 bg-surface px-3 py-2 text-[13px] font-medium text-ink hover:bg-paper disabled:opacity-50">
+              Save draft
+            </button>
+            <button type="button" disabled={pending}
+              onClick={() => {
+                if (confirm(`Send this to ${count ?? "the"} member${count === 1 ? "" : "s"} now?`))
+                  run(() => sendNow(id, subject, body, filter()));
+              }}
+              className="rounded bg-ink px-3 py-2 text-[13px] font-medium text-paper hover:bg-ink-2 disabled:opacity-50">
+              Send now
+            </button>
+          </>
+        }
+      >
         <fieldset className="mt-5 rounded border border-line p-3">
           <legend className="px-1 text-[12px] font-medium text-ink-2">Who it goes to</legend>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -131,30 +145,9 @@ export default function Editor({
           </p>
         </fieldset>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <button type="button" disabled={pending}
-            onClick={() => run(() => saveCampaign(id, subject, body, filter()))}
-            className="rounded border border-line-2 bg-surface px-3 py-2 text-[13px] font-medium text-ink hover:bg-paper disabled:opacity-50">
-            Save draft
-          </button>
-          <button type="button" disabled={pending}
-            onClick={() => run(() => sendTest(id, subject, body, filter()))}
-            className="rounded border border-line-2 bg-surface px-3 py-2 text-[13px] font-medium text-ink hover:bg-paper disabled:opacity-50">
-            Send a test to me
-          </button>
-          <button type="button" disabled={pending}
-            onClick={() => {
-              if (confirm(`Send this to ${count ?? "the"} member${count === 1 ? "" : "s"} now?`))
-                run(() => sendNow(id, subject, body, filter()));
-            }}
-            className="rounded bg-ink px-3 py-2 text-[13px] font-medium text-paper hover:bg-ink-2 disabled:opacity-50">
-            Send now
-          </button>
-        </div>
-
         <div className="mt-3 flex flex-wrap items-end gap-2 rounded border border-line p-3">
           <label className="block">
-            <span className="block text-[11px] text-ink-3">Date</span>
+            <span className="block text-[11px] text-ink-3">Schedule for a date</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
               className="mt-1 rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink" />
           </label>
@@ -178,25 +171,7 @@ export default function Editor({
 
         {msg && <p className="mt-3 text-[13px] text-ink">{msg}</p>}
         {err && <p className="mt-3 text-[13px] text-coral">{err}</p>}
-      </div>
-
-      {/* Preview — the email frame with the footer a recipient sees. */}
-      <div>
-        <span className="block text-[12px] font-medium text-ink-2">Preview</span>
-        <div className="mt-1 rounded-lg border border-line bg-surface p-5">
-          <div className="mb-3 text-[17px] font-semibold text-ink">{studioName}</div>
-          <div className="mb-4 h-[3px] w-11 rounded bg-accent-solid" />
-          <p className="text-[15px] font-semibold text-ink">{subject || "Subject"}</p>
-          <div className="mt-3 space-y-3 text-[14px] leading-[21px] text-ink">
-            {paras.length ? paras.map((p, i) => <p key={i}>{p}</p>)
-              : <p className="text-ink-3">Your message appears here.</p>}
-          </div>
-          <p className="mt-6 border-t border-line pt-3 text-[12px] leading-4 text-ink-3">
-            You’re receiving this because you said yes to news from {studioName}.{" "}
-            <span className="underline">Unsubscribe</span>
-          </p>
-        </div>
-      </div>
-    </div>
+      </EmailComposer>
+    </>
   );
 }
