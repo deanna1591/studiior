@@ -27,10 +27,16 @@ export default async function Closures() {
   }
 
   const today = studioToday(ctx.timeZone);
-  const { data: closures } = await supabase
-    .from("studio_closures")
-    .select("id, starts_on, ends_on, starts_at_time, ends_at_time, reason")
-    .order("starts_on", { ascending: false });
+  const [{ data: closures }, { data: settings }] = await Promise.all([
+    supabase
+      .from("studio_closures")
+      .select("id, starts_on, ends_on, starts_at_time, ends_at_time, reason")
+      .order("starts_on", { ascending: false }),
+    // Decision 77: the horizon warning compares the resume date to today + this.
+    supabase.from("studio_settings").select("occurrence_horizon_days")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
+  ]);
+  const horizonDays = settings?.occurrence_horizon_days ?? 60;
 
   const rows = closures ?? [];
   const upcoming = rows.filter((c) => c.ends_on >= today);
@@ -55,7 +61,7 @@ export default async function Closures() {
 
       <section className="mb-10">
         <SectionLabel>Close a date</SectionLabel>
-        <div className="mt-3"><CloseForm today={today} /></div>
+        <div className="mt-3"><CloseForm today={today} studioName={ctx.studioName} horizonDays={horizonDays} /></div>
       </section>
 
       {upcoming.length > 0 && (

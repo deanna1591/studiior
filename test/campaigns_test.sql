@@ -86,12 +86,17 @@ insert into memberships (id, studio_id, member_id, plan_id, status, price_cents,
   ('ca50ca50-0000-0000-0000-00000000ad03','ca50ca50-0000-0000-0000-0000000000a1','ca50ca50-0000-0000-0000-0000000e0003','ca50ca50-0000-0000-0000-00000000a1a1','active',300000,'CZK',current_date);
 
 -- Campaign fixtures (inserted as the test superuser; RLS bypassed for setup).
-insert into campaigns (id, studio_id, subject, body, audience, status) values
-  ('ca50ca50-0000-0000-0000-0000000c0001','ca50ca50-0000-0000-0000-0000000000a1','Hello there','Line one.\n\nLine two.','{}','draft'),
-  ('ca50ca50-0000-0000-0000-0000000c0002','ca50ca50-0000-0000-0000-0000000000a1','See you soon','Scheduled body.','{}','draft'),
-  ('ca50ca50-0000-0000-0000-0000000c0003','ca50ca50-0000-0000-0000-0000000000a1','Nobody home','x','{"health":"at_risk"}','draft'),
-  ('ca50ca50-0000-0000-0000-0000000c0004','ca50ca50-0000-0000-0000-0000000000a1','Blank','','{}','draft'),
-  ('ca50ca50-0000-0000-0000-0000000c0005','ca50ca50-0000-0000-0000-0000000000a1','Test me','Test body.','{}','draft');
+-- Decision 77: the rendered body lives on the row (body_html/body_text), set by
+-- Next on save; the senders read those columns. These fixtures set them directly.
+insert into campaigns (id, studio_id, subject, body, body_html, body_text, audience, status) values
+  ('ca50ca50-0000-0000-0000-0000000c0001','ca50ca50-0000-0000-0000-0000000000a1','Hello there',E'Line one.\n\nLine two.','<p>Line one.</p><p>Line two.</p>',E'Line one.\n\nLine two.','{}','draft'),
+  ('ca50ca50-0000-0000-0000-0000000c0002','ca50ca50-0000-0000-0000-0000000000a1','See you soon','Scheduled body.','<p>Scheduled body.</p>','Scheduled body.','{}','draft'),
+  ('ca50ca50-0000-0000-0000-0000000c0003','ca50ca50-0000-0000-0000-0000000000a1','Nobody home','x','<p>x</p>','x','{"health":"at_risk"}','draft'),
+  ('ca50ca50-0000-0000-0000-0000000c0004','ca50ca50-0000-0000-0000-0000000000a1','Blank','',null,null,'{}','draft'),
+  ('ca50ca50-0000-0000-0000-0000000c0005','ca50ca50-0000-0000-0000-0000000000a1','Test me','Test body.','<p>Test body.</p>','Test body.','{}','draft'),
+  -- Decision 77 (STEP 0): a scheduled campaign carrying the Next-rendered html.
+  ('ca50ca50-0000-0000-0000-0000000c0006','ca50ca50-0000-0000-0000-0000000000a1','Rich',E'a **bold** word\n\n![x](https://cdn.example.com/a.jpg)',
+   '<p>a <strong>bold</strong> word</p><img src="https://cdn.example.com/a.jpg" alt="x">',E'a bold word\n\n[x]','{}','draft');
 
 -- =============================================================================
 -- A. RLS — manager-up on both tables; front desk and instructor see nothing.
@@ -99,7 +104,7 @@ insert into campaigns (id, studio_id, subject, body, audience, status) values
 set role authenticated;
 select set_config('request.jwt.claim.sub','ca50ca50-0000-0000-0000-0000000000f1',false);
 select expect_true('owner sees the studio campaigns',
-  (select count(*) = 5 from campaigns where studio_id='ca50ca50-0000-0000-0000-0000000000a1'));
+  (select count(*) = 6 from campaigns where studio_id='ca50ca50-0000-0000-0000-0000000000a1'));
 reset role;
 
 set role authenticated;
@@ -191,6 +196,17 @@ select expect_txt('scheduled: campaign is scheduled',
   (select status from campaigns where id='ca50ca50-0000-0000-0000-0000000c0002'), 'scheduled');
 select expect_true('scheduled: scheduled_for is in the future',
   (select scheduled_for > now() from campaigns where id='ca50ca50-0000-0000-0000-0000000c0002'));
+
+-- Decision 77 (STEP 0): a SCHEDULED campaign bakes the Next-rendered html into
+-- each queued notification — <strong> and <img> reach the queue, not raw markup.
+select send_campaign('ca50ca50-0000-0000-0000-0000000c0006', now() + interval '2 days');
+select expect_true('scheduled campaign queued with <strong> and <img>',
+  exists (select 1 from notifications n
+           join campaign_recipients cr on cr.notification_id = n.id
+          where cr.campaign_id = 'ca50ca50-0000-0000-0000-0000000c0006'
+            and n.payload->>'body_html' like '%<strong>%'
+            and n.payload->>'body_html' like '%<img %'
+            and n.payload->>'body' = E'a bold word\n\n[x]'));
 
 -- Zero audience -> PT409.
 select expect_raises('zero audience PT409',

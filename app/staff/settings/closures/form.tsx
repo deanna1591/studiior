@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, buttonQuietClass, inputClass } from "@/components/ui";
-import { previewClosure, applyClosure, reopen, type ClosureState, type PlainState } from "./actions";
+import EmailComposer from "@/components/staff/email-composer";
+import { resumeDefault, beyondHorizon, previewSystemBlock } from "@/lib/closure-notice";
+import { previewClosure, applyClosure, reopen, closureTestSend, type ClosureState, type PlainState } from "./actions";
 
 function Go({ label, busy, quiet }: { label: string; busy: string; quiet?: boolean }) {
   const { pending } = useFormStatus();
@@ -15,13 +17,24 @@ function Go({ label, busy, quiet }: { label: string; busy: string; quiet?: boole
 }
 
 /** Preview then apply, because closing CANCELS classes people are booked on. */
-export default function CloseForm({ today }: { today: string }) {
+export default function CloseForm({ today, studioName, horizonDays }:
+  { today: string; studioName: string; horizonDays: number }) {
   const [starts, setStarts] = useState(today);
   const [ends, setEnds] = useState(today);
   const [reason, setReason] = useState("");
   const [partial, setPartial] = useState(false);
   const [from, setFrom] = useState("14:00");
   const [to, setTo] = useState("18:00");
+  // Decision 77: the all-member notice, multi-day only.
+  const [notice, setNotice] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [resumesOn, setResumesOn] = useState("");
+
+  const multiDay = ends > starts;
+  const noticeOn = multiDay && notice;
+  const resumes = resumesOn || resumeDefault(ends);
+  const horizonWarn = noticeOn && resumes && beyondHorizon(resumes, today, horizonDays);
 
   const [prev, doPreview] = useFormState<ClosureState, FormData>(previewClosure, null);
   const [done, doApply] = useFormState<ClosureState, FormData>(applyClosure, null);
@@ -35,11 +48,15 @@ export default function CloseForm({ today }: { today: string }) {
       {partial && <input type="hidden" name="partial" value="on" />}
       {partial && <input type="hidden" name="starts_at_time" value={from} />}
       {partial && <input type="hidden" name="ends_at_time" value={to} />}
+      {noticeOn && <input type="hidden" name="notice" value="on" />}
+      {noticeOn && <input type="hidden" name="subject" value={subject} />}
+      {noticeOn && <input type="hidden" name="message" value={message} />}
+      {noticeOn && <input type="hidden" name="resumes_on" value={resumes} />}
     </>
   );
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-3xl">
       {shown && "error" in shown && <Notice kind="error">{shown.error}</Notice>}
 
       <form action={doPreview} className="space-y-4">
@@ -84,11 +101,54 @@ export default function CloseForm({ today }: { today: string }) {
           </div>
         )}
 
+        {/* Decision 77: a multi-day closure can send ONE notice to every member
+            instead of per-class emails. Off by default; single-day unchanged. */}
+        {multiDay && (
+          <label className="flex items-start gap-2.5">
+            <input type="checkbox" checked={notice} className="mt-0.5 h-4 w-4"
+                   onChange={(e) => setNotice(e.target.checked)} />
+            <span className="text-[13px] leading-[19px] text-ink-2">
+              Send one notice to every member instead of per-class emails — for a
+              launch delay or a long break, so everyone hears why and when classes resume.
+            </span>
+          </label>
+        )}
+
         <Go label="See what closing does" busy="Working it out…" />
       </form>
 
+      {/* The composer sits outside the preview/apply forms; its values are
+          mirrored into both via the hidden fields above. */}
+      {noticeOn && (
+        <div className="mt-5 rounded border border-line p-4">
+          <EmailComposer
+            subject={subject} onSubject={setSubject}
+            body={message} onBody={setMessage}
+            studioName={studioName}
+            subjectPlaceholder="We open on 16 November"
+            onSendTest={async () => closureTestSend(subject, message, resumes)}
+            previewFooter={
+              <div className="mt-4 border-t border-line pt-3"
+                   dangerouslySetInnerHTML={{ __html: previewSystemBlock({ resumesOn: resumes, sampleCancelled: ["Reformer Flow · Mon 09 Nov 07:00"] }).html }} />
+            }
+          >
+            <div className="mt-4">
+              <Field label="Classes resume on">
+                <input type="date" value={resumes} className={inputClass}
+                       onChange={(e) => setResumesOn(e.target.value)} />
+              </Field>
+              {horizonWarn && (
+                <p className="mt-2 rounded border-l-2 border-amber bg-amber-tint px-3 py-2 text-[12.5px] leading-[18px] text-ink">
+                  Members following the link will see no classes yet — extend the horizon in Settings first.
+                </p>
+              )}
+            </div>
+          </EmailComposer>
+        </div>
+      )}
+
       {shown && "result" in shown && (
-        <Outcome result={shown.result} applied={done !== null}>
+        <Outcome result={shown.result} applied={done !== null} noticeOn={noticeOn}>
           <form action={doApply}>{hidden}<Go label="Close the studio" busy="Closing…" /></form>
         </Outcome>
       )}
@@ -97,23 +157,27 @@ export default function CloseForm({ today }: { today: string }) {
 }
 
 function Outcome({
-  result, applied, children,
+  result, applied, noticeOn, children,
 }: {
   result: Extract<ClosureState, { result: unknown }>["result"];
-  applied: boolean; children: React.ReactNode;
+  applied: boolean; noticeOn: boolean; children: React.ReactNode;
 }) {
   if (result.ok) {
     return (
       <section className="mt-6 rounded border border-line bg-surface px-3.5 py-3">
         <p className="section-label text-ink-2">What happened</p>
         <p className="mt-1.5 text-[13px] leading-[19px] text-ink">
-          {result.classes_cancelled === 0
+          {result.classes_cancelled === 0 && !result.notice
             ? "Closed. There was nothing on the calendar to cancel."
             : <>Closed. <span className="num">{result.classes_cancelled}</span>{" "}
-                {result.classes_cancelled === 1 ? "class" : "classes"} cancelled and{" "}
-                <span className="num">{result.members_notified}</span>{" "}
-                {result.members_notified === 1 ? "member" : "members"} emailed. Their
-                credits have gone back, whatever the usual notice period is.</>}
+                {result.classes_cancelled === 1 ? "class" : "classes"} cancelled.{" "}
+                {result.notice
+                  ? <>Credits have gone back and one notice went to{" "}
+                      <span className="num">{result.notice_sent ?? 0}</span>{" "}
+                      {result.notice_sent === 1 ? "member" : "members"}.</>
+                  : <><span className="num">{result.members_notified}</span>{" "}
+                      {result.members_notified === 1 ? "member" : "members"} emailed. Their
+                      credits have gone back, whatever the usual notice period is.</>}</>}
         </p>
       </section>
     );
@@ -139,6 +203,14 @@ function Outcome({
               will be emailed. Credits go back regardless of timing and no late fees
               are charged — the studio cancelled, not them.</>}
       </p>
+      {/* Decision 77: with the notice on, the confirm names who it reaches. */}
+      {noticeOn && (
+        <p className="mt-2 text-[13px] leading-[19px] text-ink">
+          Instead of per-class emails, one notice goes to{" "}
+          <span className="num">{result.members_total}</span>{" "}
+          {result.members_total === 1 ? "member" : "members"} — booked or not.
+        </p>
+      )}
       {result.detail.length > 0 && (
         <ul className="mt-2 space-y-1">
           {result.detail.slice(0, 12).map((d) => (

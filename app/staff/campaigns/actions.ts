@@ -58,14 +58,17 @@ export async function createCampaign(): Promise<void> {
   redirect(`/campaigns/${data.id}`);
 }
 
-/** Save subject/body/audience onto a draft. */
+/** Save subject/body/audience onto a draft. Decision 77: the rendered body is
+ *  stored on the row (body_html/body_text) so the sender never parses markup. */
 export async function saveCampaign(
   id: string, subject: string, body: string, filter: AudienceFilter,
 ): Promise<CampaignResult> {
   const supabase = createClient();
+  const r = renderBody(body);
   const { error } = await supabase
     .from("campaigns")
-    .update({ subject, body, audience: cleanFilter(filter), updated_at: new Date().toISOString() })
+    .update({ subject, body, body_html: r.html, body_text: r.text,
+              audience: cleanFilter(filter), updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("status", "draft");
   if (error) return { error: say(error.message) };
@@ -86,11 +89,15 @@ export async function audienceCount(id: string, filter: AudienceFilter): Promise
   return { count: (data ?? []).length };
 }
 
+// Decision 77: every persist stores the rendered body on the row, so the sender
+// reads body_html/body_text and the markup is parsed in ONE place (Next).
 async function persist(id: string, subject: string, body: string, filter: AudienceFilter) {
   const supabase = createClient();
+  const r = renderBody(body);
   await supabase
     .from("campaigns")
-    .update({ subject, body, audience: cleanFilter(filter), updated_at: new Date().toISOString() })
+    .update({ subject, body, body_html: r.html, body_text: r.text,
+              audience: cleanFilter(filter), updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("status", "draft");
   return supabase;
@@ -100,11 +107,7 @@ export async function sendTest(
   id: string, subject: string, body: string, filter: AudienceFilter,
 ): Promise<CampaignResult> {
   const supabase = await persist(id, subject, body, filter);
-  // Decision 77: the body markup is parsed in ONE place (Next), and the sender
-  // receives the rendered html/text — the SQL no longer builds HTML.
-  const r = renderBody(body);
-  const { data, error } = await supabase.rpc("send_campaign_test",
-    { p_campaign_id: id, p_html: r.html, p_text: r.text });
+  const { data, error } = await supabase.rpc("send_campaign_test", { p_campaign_id: id });
   if (error) return { error: say(error.message) };
   revalidate(id);
   return { ok: true, sentence: (data as { sentence?: string })?.sentence ?? "Test sent." };
@@ -114,9 +117,7 @@ export async function sendNow(
   id: string, subject: string, body: string, filter: AudienceFilter,
 ): Promise<CampaignResult> {
   const supabase = await persist(id, subject, body, filter);
-  const r = renderBody(body);
-  const { data, error } = await supabase.rpc("send_campaign",
-    { p_campaign_id: id, p_html: r.html, p_text: r.text });
+  const { data, error } = await supabase.rpc("send_campaign", { p_campaign_id: id });
   if (error) return { error: say(error.message) };
   revalidate(id);
   return { ok: true, sentence: (data as { sentence?: string })?.sentence ?? "Sending." };
@@ -126,9 +127,7 @@ export async function scheduleCampaign(
   id: string, subject: string, body: string, filter: AudienceFilter, whenIso: string,
 ): Promise<CampaignResult> {
   const supabase = await persist(id, subject, body, filter);
-  const r = renderBody(body);
-  const { data, error } = await supabase.rpc("send_campaign",
-    { p_campaign_id: id, p_when: whenIso, p_html: r.html, p_text: r.text });
+  const { data, error } = await supabase.rpc("send_campaign", { p_campaign_id: id, p_when: whenIso });
   if (error) return { error: say(error.message) };
   revalidate(id);
   return { ok: true, sentence: (data as { sentence?: string })?.sentence ?? "Scheduled." };

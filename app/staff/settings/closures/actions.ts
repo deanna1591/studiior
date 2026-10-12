@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { renderBody } from "@/lib/email-body";
 
 export type ClosureResult =
   | { ok: false; requires_confirmation: true; starts_on: string; ends_on: string;
-      partial: boolean; classes: number; members_booked: number;
+      partial: boolean; classes: number; members_booked: number; members_total: number;
       detail: { occurrence_id: string; name: string; local: string; booked: number }[] }
-  | { ok: true; classes_cancelled: number; members_notified: number };
+  | { ok: true; classes_cancelled: number; members_notified: number; notice_sent?: number; notice?: boolean };
 
 export type ClosureState = { error: string } | { result: ClosureResult } | null;
 export type PlainState = { ok: boolean; message: string } | null;
@@ -36,6 +37,17 @@ async function run(fd: FormData, confirm: boolean): Promise<ClosureState> {
     return { error: "A part-day closure needs both a start and an end time." };
   }
 
+  // Decision 77: the all-member notice (multi-day only). Next renders the
+  // composed message so the markup is parsed in ONE place.
+  const notice = t(fd, "notice") === "on" && ends_on > starts_on;
+  const subject = t(fd, "subject");
+  const message = t(fd, "message");
+  const resumes_on = t(fd, "resumes_on");
+  if (notice && (!subject || !message)) {
+    return { error: "The notice to members needs a subject and a message." };
+  }
+  const rendered = notice ? renderBody(message) : null;
+
   const supabase = createClient();
   const { data, error } = await supabase.rpc("close_studio", {
     p_studio_id: ctx.studioId,
@@ -43,6 +55,12 @@ async function run(fd: FormData, confirm: boolean): Promise<ClosureState> {
     p_starts_at_time: from || undefined,
     p_ends_at_time: to || undefined,
     p_confirm: confirm,
+    p_notice: notice,
+    p_subject: notice ? subject : undefined,
+    p_message: notice ? message : undefined,
+    p_message_html: rendered?.html,
+    p_message_text: rendered?.text,
+    p_resumes_on: notice && resumes_on ? resumes_on : undefined,
   });
   if (error) return { error: say(error.message) };
   if (confirm) {
@@ -65,6 +83,27 @@ export async function previewClosure(_prev: ClosureState, fd: FormData) {
  */
 export async function applyClosure(_prev: ClosureState, fd: FormData) {
   return run(fd, true);
+}
+
+/**
+ * Decision 77: send the composed closure notice to the staff member's own email
+ * (a sample system block — the resume line only; the real email builds each
+ * member's cancelled-class list). Hand-addressed, so consent never applies.
+ */
+export async function closureTestSend(
+  subject: string, message: string, resumesOn: string,
+): Promise<{ sentence?: string; error?: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "You are not signed in." };
+  if (!subject.trim() || !message.trim()) return { error: "Add a subject and a message first." };
+  const r = renderBody(message);
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("closure_notice_test", {
+    p_studio_id: ctx.studioId, p_subject: subject, p_body_html: r.html, p_body_text: r.text,
+    p_resumes_on: resumesOn || undefined,
+  });
+  if (error) return { error: say(error.message) };
+  return { sentence: (data as { sentence?: string })?.sentence ?? "Test sent." };
 }
 
 /**

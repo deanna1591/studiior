@@ -745,6 +745,8 @@ export type Database = {
         Row: {
           audience: Json
           body: string
+          body_html: string | null
+          body_text: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -759,6 +761,8 @@ export type Database = {
         Insert: {
           audience?: Json
           body?: string
+          body_html?: string | null
+          body_text?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -773,6 +777,8 @@ export type Database = {
         Update: {
           audience?: Json
           body?: string
+          body_html?: string | null
+          body_text?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -6389,11 +6395,15 @@ export type Database = {
           ends_at_time: string | null
           ends_on: string
           id: string
+          message: string | null
+          notice_sent_at: string | null
           pays_instructors: boolean
           reason: string
+          resumes_on: string | null
           starts_at_time: string | null
           starts_on: string
           studio_id: string
+          subject: string | null
           updated_at: string
         }
         Insert: {
@@ -6402,11 +6412,15 @@ export type Database = {
           ends_at_time?: string | null
           ends_on: string
           id?: string
+          message?: string | null
+          notice_sent_at?: string | null
           pays_instructors?: boolean
           reason: string
+          resumes_on?: string | null
           starts_at_time?: string | null
           starts_on: string
           studio_id: string
+          subject?: string | null
           updated_at?: string
         }
         Update: {
@@ -6415,11 +6429,15 @@ export type Database = {
           ends_at_time?: string | null
           ends_on?: string
           id?: string
+          message?: string | null
+          notice_sent_at?: string | null
           pays_instructors?: boolean
           reason?: string
+          resumes_on?: string | null
           starts_at_time?: string | null
           starts_on?: string
           studio_id?: string
+          subject?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -7965,11 +7983,17 @@ export type Database = {
           p_confirm?: boolean
           p_ends_at_time?: string
           p_ends_on: string
+          p_message?: string
+          p_message_html?: string
+          p_message_text?: string
+          p_notice?: boolean
           p_pays_instructors?: boolean
           p_reason: string
+          p_resumes_on?: string
           p_starts_at_time?: string
           p_starts_on: string
           p_studio_id: string
+          p_subject?: string
         }
         Returns: Json
       }
@@ -7980,6 +8004,16 @@ export type Database = {
           p_starts_at_time?: string
           p_starts_on: string
           p_studio_id: string
+        }
+        Returns: Json
+      }
+      closure_notice_test: {
+        Args: {
+          p_body_html: string
+          p_body_text: string
+          p_resumes_on?: string
+          p_studio_id: string
+          p_subject: string
         }
         Returns: Json
       }
@@ -9458,18 +9492,10 @@ export type Database = {
         Returns: Json
       }
       send_campaign: {
-        Args: {
-          p_campaign_id: string
-          p_html?: string
-          p_text?: string
-          p_when?: string
-        }
+        Args: { p_campaign_id: string; p_when?: string }
         Returns: Json
       }
-      send_campaign_test: {
-        Args: { p_campaign_id: string; p_html?: string; p_text?: string }
-        Returns: Json
-      }
+      send_campaign_test: { Args: { p_campaign_id: string }; Returns: Json }
       send_due_notifications: { Args: never; Returns: Json }
       send_message: {
         Args: { p_message_id: string }
