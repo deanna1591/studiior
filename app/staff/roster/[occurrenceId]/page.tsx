@@ -74,6 +74,28 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
     .in("status", ["invited", "confirmed", "attended"]);
   const guestOf = new Map((guestRows ?? []).map((g) => [g.guest_member_id, g.host_member_id]));
 
+  // Decision 76: who on this roster is on a GROUP (Barkada) booking — the plan
+  // name, the host, and whether this seat IS the host. Only when a group booked
+  // this class will there be rows.
+  const { data: groupRows } = await supabase
+    .from("group_bookings")
+    .select("member_id, is_host, group_purchases!inner(occurrence_id, membership_plans(name), members(first_name, last_name))")
+    .eq("group_purchases.occurrence_id", params.occurrenceId);
+  const groupOf = new Map(
+    (groupRows ?? []).map((g) => {
+      const gpu = g.group_purchases as unknown as {
+        membership_plans: { name: string } | null;
+        members: { first_name: string | null; last_name: string | null } | null;
+      } | null;
+      const host = gpu?.members;
+      return [g.member_id as string, {
+        isHost: g.is_host as boolean,
+        plan: gpu?.membership_plans?.name ?? "Group",
+        host: `${host?.first_name ?? ""} ${host?.last_name ?? ""}`.trim() || "a member",
+      }];
+    }),
+  );
+
   // Decision 28: is this class's pay held (instructor not checked in)? Managers
   // can release it. Only a class that ran has a held record.
   const { data: heldPay } = isManagerUp(ctx.role)
@@ -276,6 +298,15 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                       {guestOf.get(b.member_id) ? "Guest · first time" : "First class (free)"}
                     </span>
                   )}
+                  {groupOf.has(b.member_id) && (
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+                      {/* Decision 76: a group (Barkada) seat. */}
+                      {groupOf.get(b.member_id)!.isHost
+                        ? `${groupOf.get(b.member_id)!.plan} · host`
+                        : groupOf.get(b.member_id)!.plan}
+                    </span>
+                  )}
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
                     {b.payment_source?.replace("_", " ") ?? "—"}
                     {b.override_reason ? ` · override: ${b.override_reason}` : ""}
@@ -296,6 +327,11 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                 {guestOf.get(b.member_id) && (
                   <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
                     Brought by {nameOf.get(guestOf.get(b.member_id) ?? "") || "a member"}
+                  </p>
+                )}
+                {groupOf.has(b.member_id) && !groupOf.get(b.member_id)!.isHost && (
+                  <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
+                    Booked by {groupOf.get(b.member_id)!.host}
                   </p>
                 )}
                 {guestOf.has(b.member_id) && !b.members?.waiver_signed_at && (

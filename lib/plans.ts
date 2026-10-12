@@ -25,6 +25,10 @@ export const FIELDS: Record<PlanType, FieldSet> = {
   class_pack: { billing: false, credits: true,  creditsPerPeriod: false, validity: true,  commitment: false, freeze: false },
   drop_in:    { billing: false, credits: true,  creditsPerPeriod: false, validity: true,  commitment: false, freeze: false },
   trial:      { billing: false, credits: true,  creditsPerPeriod: false, validity: true,  commitment: false, freeze: false },
+  // Decision 76: a group (Barkada) plan — no credits, no period, no freeze. Its
+  // own fields (group_size, group_book_within_days) are edited by the Plans
+  // form in 76b; none of the credit/billing fields apply.
+  group:      { billing: false, credits: false, creditsPerPeriod: false, validity: false, commitment: false, freeze: false },
 };
 
 export const PLAN_TYPE_LABEL: Record<PlanType, string> = {
@@ -32,6 +36,7 @@ export const PLAN_TYPE_LABEL: Record<PlanType, string> = {
   class_pack: "Class pack",
   drop_in: "Drop-in",
   trial: "Intro offer / trial",
+  group: "Group package (Barkada)",
 };
 
 export const PLAN_TYPE_HINT: Record<PlanType, string> = {
@@ -42,6 +47,8 @@ export const PLAN_TYPE_HINT: Record<PlanType, string> = {
   drop_in: "One class, bought and used.",
   trial:
     "A plan in its own right, not a flag on someone — it converts to a paid plan or it expires. Usually a few classes over a short window.",
+  group:
+    "One price for a group of N who come to one class together. The buyer books the whole group into a scheduled class and invites the others by email.",
 };
 
 // Decision 57/62: the one-time-plan predicate and the intro-once sentence live

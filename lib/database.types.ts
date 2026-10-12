@@ -2137,6 +2137,164 @@ export type Database = {
           },
         ]
       }
+      group_bookings: {
+        Row: {
+          booking_id: string
+          created_at: string
+          group_purchase_id: string
+          id: string
+          is_host: boolean
+          member_id: string
+          studio_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          group_purchase_id: string
+          id?: string
+          is_host?: boolean
+          member_id: string
+          studio_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          group_purchase_id?: string
+          id?: string
+          is_host?: boolean
+          member_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_bookings_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_bookings_group_purchase_id_fkey"
+            columns: ["group_purchase_id"]
+            isOneToOne: false
+            referencedRelation: "group_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_bookings_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_bookings_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_bookings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_bookings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_purchases: {
+        Row: {
+          booked_at: string | null
+          created_at: string
+          expires_on: string
+          group_size: number
+          host_member_id: string
+          id: string
+          occurrence_id: string | null
+          plan_id: string
+          status: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          booked_at?: string | null
+          created_at?: string
+          expires_on: string
+          group_size: number
+          host_member_id: string
+          id?: string
+          occurrence_id?: string | null
+          plan_id: string
+          status?: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          booked_at?: string | null
+          created_at?: string
+          expires_on?: string
+          group_size?: number
+          host_member_id?: string
+          id?: string
+          occurrence_id?: string | null
+          plan_id?: string
+          status?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_purchases_host_member_id_fkey"
+            columns: ["host_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_purchases_host_member_id_fkey"
+            columns: ["host_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_purchases_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_purchases_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_purchases_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_purchases_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guest_passes: {
         Row: {
           created_at: string
@@ -3992,6 +4150,8 @@ export type Database = {
           description: string | null
           featured: boolean
           freeze_allowed: boolean
+          group_book_within_days: number
+          group_size: number | null
           id: string
           is_demo: boolean
           max_active_members: number | null
@@ -4032,6 +4192,8 @@ export type Database = {
           description?: string | null
           featured?: boolean
           freeze_allowed?: boolean
+          group_book_within_days?: number
+          group_size?: number | null
           id?: string
           is_demo?: boolean
           max_active_members?: number | null
@@ -4072,6 +4234,8 @@ export type Database = {
           description?: string | null
           featured?: boolean
           freeze_allowed?: boolean
+          group_book_within_days?: number
+          group_size?: number | null
           id?: string
           is_demo?: boolean
           max_active_members?: number | null
@@ -4776,6 +4940,7 @@ export type Database = {
           failure_code: string | null
           failure_message: string | null
           gift_card_id: string | null
+          group_purchase_id: string | null
           id: string
           is_demo: boolean
           member_id: string | null
@@ -4811,6 +4976,7 @@ export type Database = {
           failure_code?: string | null
           failure_message?: string | null
           gift_card_id?: string | null
+          group_purchase_id?: string | null
           id?: string
           is_demo?: boolean
           member_id?: string | null
@@ -4846,6 +5012,7 @@ export type Database = {
           failure_code?: string | null
           failure_message?: string | null
           gift_card_id?: string | null
+          group_purchase_id?: string | null
           id?: string
           is_demo?: boolean
           member_id?: string | null
@@ -4882,6 +5049,13 @@ export type Database = {
             columns: ["gift_card_id"]
             isOneToOne: false
             referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_group_purchase_id_fkey"
+            columns: ["group_purchase_id"]
+            isOneToOne: false
+            referencedRelation: "group_purchases"
             referencedColumns: ["id"]
           },
           {
@@ -7632,6 +7806,14 @@ export type Database = {
         Returns: boolean
       }
       book_first_free: { Args: { p_occurrence_id: string }; Returns: Json }
+      book_group: {
+        Args: {
+          p_emails: string[]
+          p_group_purchase_id: string
+          p_occurrence_id: string
+        }
+        Returns: Json
+      }
       book_guest: {
         Args: {
           p_guest_email: string
@@ -7679,6 +7861,7 @@ export type Database = {
         }
       }
       cancel_campaign: { Args: { p_campaign_id: string }; Returns: Json }
+      cancel_group: { Args: { p_group_purchase_id: string }; Returns: Json }
       cancel_occurrence: {
         Args: {
           p_cause?: Database["public"]["Enums"]["cancellation_cause"]
@@ -8061,14 +8244,7 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
+      expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
           p_membership_id: string
@@ -9701,6 +9877,14 @@ export type Database = {
         }
         Returns: Json
       }
+      swap_group_guest: {
+        Args: {
+          p_group_purchase_id: string
+          p_new_email: string
+          p_old_email: string
+        }
+        Returns: Json
+      }
       swap_instructors: {
         Args: { p_occurrence_a: string; p_occurrence_b: string }
         Returns: Json
@@ -9976,13 +10160,14 @@ export type Database = {
         | "drop_in"
         | "comp"
         | "gift_card"
+        | "group"
       payment_status:
         | "pending"
         | "succeeded"
         | "failed"
         | "refunded"
         | "partially_refunded"
-      plan_type: "recurring" | "class_pack" | "drop_in" | "trial"
+      plan_type: "recurring" | "class_pack" | "drop_in" | "trial" | "group"
       platform_status:
         | "trialing"
         | "active"
@@ -10241,6 +10426,7 @@ export const Constants = {
         "drop_in",
         "comp",
         "gift_card",
+        "group",
       ],
       payment_status: [
         "pending",
@@ -10249,7 +10435,7 @@ export const Constants = {
         "refunded",
         "partially_refunded",
       ],
-      plan_type: ["recurring", "class_pack", "drop_in", "trial"],
+      plan_type: ["recurring", "class_pack", "drop_in", "trial", "group"],
       platform_status: [
         "trialing",
         "active",
