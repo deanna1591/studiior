@@ -39,7 +39,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   // three reads that actually need a query: the ledger, the active-guest count
   // (only when guest passes are on), and the peak slots.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }] =
+  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }] =
     await Promise.all([
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
@@ -55,12 +55,20 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       // (plans_member_read) already limits this to this studio's visibility=
       // 'public' plans — Permissions §9. Purchase is at the desk (Decision 16).
       supabase.from("membership_plans")
-        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count, featured, badge")
+        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count, group_size, featured, badge")
         .eq("visibility", "public").eq("status", "active").order("featured", { ascending: false }).order("sort_order"),
       // Decision 24: which public plans are full. A row only for a capped plan
       // at a seat-caps studio; absent means uncapped or the switch is off.
       supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
+      // Decision 76: a group this member has bought but not yet booked into a
+      // class. If any, the catalogue hides group plans and points them at it.
+      supabase.from("group_purchases")
+        .select("id, membership_plans(name), group_size")
+        .eq("host_member_id", ctx.memberId).eq("status", "unbooked")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+  const unbookedGroup = (unbookedGroupRes as unknown as {
+    id: string; group_size: number; membership_plans: { name: string } | null } | null);
   const seatOf = new Map((seats ?? []).map((s) => [s.plan_id, s]));
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
@@ -94,6 +102,20 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
             Pick a plan below — the class you booked is settled as soon as the payment goes through.
           </p>
         </div>
+      )}
+
+      {/* Decision 76: an unbooked group to pick a class for. */}
+      {unbookedGroup && (
+        <Link href={`/group/${unbookedGroup.id}`} className="m-card m-press mb-3 flex items-center justify-between gap-3 p-4"
+              style={{ background: "var(--accent-chip)" }}>
+          <span>
+            <span className="block text-[15px] font-semibold leading-5 text-ink">You have a group to book</span>
+            <span className="m-sub text-ink-2">
+              {unbookedGroup.membership_plans?.name ?? "Your group"} · pick a class for all <span className="num">{unbookedGroup.group_size}</span> of you.
+            </span>
+          </span>
+          <Icon name="chevron-right" size={18} />
+        </Link>
       )}
 
       {freeFirstEligible && (
@@ -195,6 +217,10 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
             {/* Decision 74: featured first, then sort_order — the same pure rule
                 the staff list and the node test use. */}
             {sortPlans(catalogue ?? []).map((p) => {
+              // Decision 76: while this member holds an unbooked group, hide
+              // group plans from the catalogue — the banner above sends them to
+              // book the one they already have rather than buy another.
+              if (p.type === "group" && unbookedGroup) return null;
               // Decision 24: a full capped plan either hides from members
               // ('hide') or shows as full, sellable at the desk only
               // ('staff_only'). The renewal of a plan you already hold is a
@@ -202,7 +228,9 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
               const seat = seatOf.get(p.id);
               const full = !!seat?.is_full;
               if (full && seat?.on_limit_reached === "hide") return null;
-              const includes = p.type === "class_pack"
+              const includes = p.type === "group"
+                ? [`${p.group_size ?? 2} people`, "one class together"]
+                : p.type === "class_pack"
                 ? [p.credits != null ? `${p.credits} classes` : null,
                    p.validity_days ? `use within ${p.validity_days} days` : null]
                 : p.type === "drop_in"

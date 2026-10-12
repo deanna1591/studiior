@@ -70,7 +70,7 @@ export default async function Sales({
   const planId = merchOnly ? null : (searchParams.plan || null);
   const status = searchParams.status || null;
 
-  const [{ data: plans }, salesRes, totalsRes] = await Promise.all([
+  const [{ data: plans }, salesRes, totalsRes, groupsRes] = await Promise.all([
     supabase.from("membership_plans").select("id, name").order("name"),
     supabase.rpc("sales_history", {
       p_studio_id: ctx.studioId, p_from: from, p_to: to,
@@ -80,7 +80,25 @@ export default async function Sales({
       p_studio_id: ctx.studioId, p_from: from, p_to: to,
       p_plan_id: planId ?? undefined, p_status: status ?? undefined,
     }),
+    // Decision 76: group (Barkada) purchases bought this month — status and, when
+    // booked, the class. Read straight from group_purchases (desk-up RLS), not
+    // sales_history (a group payment is tagged group_purchase_id, membership_id
+    // null, so it is not a membership sale row).
+    supabase.from("group_purchases")
+      .select("id, status, group_size, created_at, membership_plans(name), members(first_name, last_name), class_occurrences(name, starts_at)")
+      .eq("studio_id", ctx.studioId)
+      .gte("created_at", from).lte("created_at", to + "T23:59:59.999Z")
+      .order("created_at", { ascending: false }),
   ]);
+  const groups = (groupsRes.data ?? []) as unknown as {
+    id: string; status: string; group_size: number; created_at: string;
+    membership_plans: { name: string } | null;
+    members: { first_name: string | null; last_name: string | null } | null;
+    class_occurrences: { name: string | null; starts_at: string } | null;
+  }[];
+  const GROUP_STATE: Record<string, string> = {
+    unbooked: "Unbooked", booked: "Booked", expired: "Expired", cancelled: "Cancelled",
+  };
 
   let sales = (salesRes.data ?? []) as Sale[];
   let totals = (totalsRes.data ?? null) as Totals | null;
@@ -229,6 +247,46 @@ export default async function Sales({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Decision 76: group (Barkada) purchases this month — the package, who
+          bought it, its status, and the class it was booked into. */}
+      {groups.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-[13px] font-medium leading-5 text-ink">Group packages</h2>
+          <div className="overflow-x-auto rounded border border-line">
+            <table className="w-full min-w-[640px] border-collapse">
+              <thead>
+                <tr className="border-b border-line text-left text-[12px] leading-4 text-ink-3">
+                  <th className="px-3 py-2 font-medium">Bought</th>
+                  <th className="px-3 py-2 font-medium">Package</th>
+                  <th className="px-3 py-2 font-medium">Buyer</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Class</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g) => (
+                  <tr key={g.id} className="border-b border-line text-[13px] text-ink last:border-0">
+                    <td className="px-3 py-2">{d(g.created_at.slice(0, 10))}</td>
+                    <td className="px-3 py-2">
+                      {g.membership_plans?.name ?? "Group"} · <span className="num">{g.group_size}</span> people
+                    </td>
+                    <td className="px-3 py-2">
+                      {`${g.members?.first_name ?? ""} ${g.members?.last_name ?? ""}`.trim() || "—"}
+                    </td>
+                    <td className="px-3 py-2"><StateChip state={GROUP_STATE[g.status] ?? g.status} /></td>
+                    <td className="px-3 py-2 text-ink-2">
+                      {g.class_occurrences
+                        ? <>{g.class_occurrences.name ?? "a class"} · {d(g.class_occurrences.starts_at.slice(0, 10))}</>
+                        : <span className="text-ink-3">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
     </AppShell>
   );

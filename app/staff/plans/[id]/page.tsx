@@ -35,7 +35,7 @@ export default async function EditPlan({
     .maybeSingle();
   if (!plan) notFound();
 
-  const [{ data: classTypes }, { count: liveCount }, { data: settings }, { data: seats }, { data: usesSeatCaps }, { data: studioRow }, { count: totalCount }] =
+  const [{ data: classTypes }, { count: liveCount }, { data: settings }, { data: seats }, { data: usesSeatCaps }, { data: studioRow }, { count: totalCount }, { data: roomRow }] =
     await Promise.all([
       supabase.from("class_types").select("id, name").eq("status", "active").order("name"),
       supabase
@@ -58,6 +58,9 @@ export default async function EditPlan({
       // Decision 57 follow-up: deletion is blocked by the FK on ANY membership
       // (any status), so the delete gate counts ALL, not just the live ones.
       supabase.from("memberships").select("id", { count: "exact", head: true }).eq("plan_id", params.id),
+      // Decision 76: the largest room, the ceiling the group-size field offers.
+      supabase.from("rooms").select("capacity").eq("studio_id", ctx.studioId)
+        .order("capacity", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
   const active = liveCount ?? 0;
@@ -88,6 +91,8 @@ export default async function EditPlan({
     max_bookings_per_day: plan.max_bookings_per_day,
     restrictions: (plan.restrictions as PlanDraft["restrictions"]) ?? null,
     counts_for_conversion: plan.counts_for_conversion ?? false,
+    group_size: plan.group_size,
+    group_book_within_days: plan.group_book_within_days,
     peak_allowance: plan.peak_allowance,
     peak_allowance_period: plan.peak_allowance_period,
     max_active_members: plan.max_active_members,
@@ -113,7 +118,8 @@ export default async function EditPlan({
       )}
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
                 activeMemberships={active} mode="edit"
-                seatCaps={seatCaps} taken={taken} peakHours={peakHours} conversionOn={conversionOn} />
+                seatCaps={seatCaps} taken={taken} peakHours={peakHours} conversionOn={conversionOn}
+                maxRoomCapacity={roomRow?.capacity ?? 0} />
       <PlanLifecycle id={plan.id} status={plan.status} totalMemberships={totalCount ?? 0} />
     </AppShell>
   );

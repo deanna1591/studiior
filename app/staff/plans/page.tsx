@@ -23,7 +23,7 @@ export default async function PlansList() {
   const [{ data: plans }, { data: memberships }, { data: seats }] = await Promise.all([
     supabase
       .from("membership_plans")
-      .select("id, name, type, price_cents, currency, status, visibility, credits, credits_per_period, validity_days, billing_interval, sort_order, featured, badge")
+      .select("id, name, type, price_cents, currency, status, visibility, credits, credits_per_period, validity_days, billing_interval, group_size, sort_order, featured, badge")
       .order("status").order("sort_order").order("name"),
     supabase.from("memberships").select("plan_id, status"),
     // Decision 24. Empty for a studio with the switch off, which is what makes
@@ -48,7 +48,9 @@ export default async function PlansList() {
   const archived = (plans ?? []).filter((p) => p.status !== "active");
 
   const buysOf = (p: NonNullable<typeof plans>[number]) =>
-    p.type === "recurring"
+    p.type === "group"
+      ? `${p.group_size ?? "—"} people`
+      : p.type === "recurring"
       ? p.credits_per_period === null
         ? "Unlimited classes"
         : `${p.credits_per_period} classes per ${p.billing_interval ?? "period"}`

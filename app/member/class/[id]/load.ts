@@ -34,7 +34,8 @@ export async function loadClassDetail(
 ): Promise<{ occ: DetailOccurrence; type: DetailType; booking: DetailBooking;
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
   checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean;
-  unpaid: boolean } | null> {
+  unpaid: boolean;
+  group: { isHost: boolean; host: string; plan: string; groupId: string } | null } | null> {
 
   const occQuery = supabase
     .from("class_occurrences")
@@ -77,12 +78,25 @@ export async function loadClassDetail(
     .select("id, bookings!inner(occurrence_id)", { count: "exact", head: true })
     .eq("member_id", memberId).eq("bookings.occurrence_id", id)
     .in("status", ["succeeded", "partially_refunded"]);
+  // Decision 76: is the member's seat on this class part of a group (Barkada)?
+  // The group for THIS occurrence that this member is on — host or guest, plus
+  // the host's name and the plan, for the class-sheet group panel.
+  const groupQuery = supabase.from("group_bookings")
+    .select("is_host, group_purchases!inner(id, occurrence_id, members(first_name), membership_plans(name))")
+    .eq("member_id", memberId).eq("group_purchases.occurrence_id", id).maybeSingle();
 
   const finish = (occ: Record<string, unknown> | null, type: unknown, booking: unknown,
                   activeGuests: number | null, elig: unknown, freeCount: number | null,
                   pend: unknown, checkinRow: { checked_in_at: string } | null,
-                  paidCount: number | null) => {
+                  paidCount: number | null, groupRow: unknown) => {
     if (!occ) return null;
+    const gr = groupRow as { is_host: boolean; group_purchases: {
+      id: string; members: { first_name: string | null } | null;
+      membership_plans: { name: string } | null } | null } | null;
+    const group = gr?.group_purchases
+      ? { isHost: gr.is_host, host: gr.group_purchases.members?.first_name ?? "the host",
+          plan: gr.group_purchases.membership_plans?.name ?? "Group", groupId: gr.group_purchases.id }
+      : null;
     const e = elig as { ok?: boolean } | null;
     const p = (pend as { deadline_at: string | null; mode: string }[] | null)?.[0];
     const bk = (booking ?? null) as DetailBooking;
@@ -112,21 +126,23 @@ export async function loadClassDetail(
         ? { until: p.deadline_at, mode: p.mode }
         : ((bk as { provisional?: boolean } | null)?.provisional ? { until: null, mode: "free" } : null),
       unpaid,
+      // Decision 76: the group (Barkada) this seat belongs to, if any.
+      group,
     };
   };
 
   if (classTypeId) {
     // One wave: nothing waits on the occurrence.
-    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }] =
-      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery]);
-    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount);
+    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }] =
+      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery]);
+    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow);
   }
 
   // No hint (deep link / refresh): occurrence, booking and guest in parallel;
   // then type, the one read that needs the occurrence's class_type_id.
-  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }] =
-    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery]);
+  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }] =
+    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery]);
   if (!occ) return null;
   const { data: type } = occ.class_type_id ? await typeQuery(occ.class_type_id) : { data: null };
-  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount);
+  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow);
 }

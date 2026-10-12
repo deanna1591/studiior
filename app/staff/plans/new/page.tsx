@@ -18,6 +18,7 @@ const BLANK: PlanDraft = {
   commitment_months: 0, cancellation_notice_days: 0,
   freeze_allowed: true, max_freeze_days: null,
   booking_window_days: null, max_bookings_per_day: null, restrictions: null, counts_for_conversion: false,
+  group_size: null, group_book_within_days: 30,
 };
 
 export default async function NewPlan({
@@ -36,7 +37,7 @@ export default async function NewPlan({
     );
   }
 
-  const [{ data: templates }, { data: classTypes }, { data: settings }, { data: usesSeatCaps }] = await Promise.all([
+  const [{ data: templates }, { data: classTypes }, { data: settings }, { data: usesSeatCaps }, { data: roomRow }] = await Promise.all([
     supabase
       .from("plan_templates")
       .select("id, name, description, type, billing_interval, billing_interval_count, credits, credits_per_period, validity_days, signup_fee_cents, commitment_months, cancellation_notice_days, freeze_allowed, max_freeze_days, booking_window_days, max_bookings_per_day, restrictions, visibility")
@@ -46,7 +47,11 @@ export default async function NewPlan({
       .eq("studio_id", ctx.studioId).maybeSingle(),
     // 142: whether seat caps are on at all is one predicate, not a per-plan null.
     supabase.rpc("studio_uses_seat_caps", { p_studio_id: ctx.studioId }),
+    // Decision 76: the largest room, the ceiling the group-size field offers.
+    supabase.from("rooms").select("capacity").eq("studio_id", ctx.studioId)
+      .order("capacity", { ascending: false }).limit(1).maybeSingle(),
   ]);
+  const maxRoom = roomRow?.capacity ?? 0;
 
   // Decision 24. A system template says nothing about places — the six of them
   // are shapes of plan, not a studio's capacity — so a plan started from one
@@ -63,7 +68,7 @@ export default async function NewPlan({
                 actions={<NavLink href="/plans/new">Start from a template instead</NavLink>}>
         <PlanForm draft={BLANK} classTypes={classTypes ?? []} currency={ctx.currency}
                   activeMemberships={0} mode="create"
-                seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} />
+                seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} maxRoomCapacity={maxRoom} />
       </AppShell>
     );
   }
@@ -132,7 +137,7 @@ export default async function NewPlan({
       </p>
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={ctx.currency}
                 activeMemberships={0} mode="create"
-                seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} />
+                seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} maxRoomCapacity={maxRoom} />
     </AppShell>
   );
 }

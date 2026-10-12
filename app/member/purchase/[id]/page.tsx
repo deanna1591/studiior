@@ -17,8 +17,20 @@ export default async function Purchase({ params, searchParams }: { params: { id:
     await memberScreen();
 
   const { data: purchase } = await supabase
-    .from("xendit_purchases").select("status, product_order_id").eq("id", params.id).maybeSingle();
-  const kind = purchase?.product_order_id ? "product" : "plan";
+    .from("xendit_purchases")
+    .select("status, product_order_id, membership_plans(type)")
+    .eq("id", params.id).maybeSingle();
+  const planType = (purchase?.membership_plans as unknown as { type?: string } | null)?.type;
+  // Decision 76: a group plan's success lands on "Pick your class" rather than
+  // "see your plan". Resolve the member's newest unbooked group to link to.
+  let groupHref: string | null = null;
+  if (!purchase?.product_order_id && planType === "group") {
+    const { data: g } = await supabase.from("group_purchases")
+      .select("id").eq("status", "unbooked")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (g) groupHref = `/group/${g.id}`;
+  }
+  const kind = purchase?.product_order_id ? "product" : groupHref ? "group" : "plan";
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
@@ -30,6 +42,7 @@ export default async function Purchase({ params, searchParams }: { params: { id:
       <h1 className="m-title mb-4 text-ink">Your payment</h1>
       {purchase ? (
         <PurchasePoll id={params.id} initialStatus={purchase.status} kind={kind}
+                      groupHref={groupHref}
                       returnTo={returnTo !== "/" ? returnTo : null} />
       ) : (
         <div className="m-card p-5 text-center">

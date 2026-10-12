@@ -46,6 +46,15 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
   const price = toCents(String(fd.get("price") ?? ""));
   if (price === null) return { ok: false, error: "Price must be an amount like 2800 or 2800.00." };
 
+  // Decision 76: a group plan needs a size of 2 or more (the CHECK enforces it;
+  // this gives a sentence rather than a constraint name).
+  if (type === "group") {
+    const gs = Number(String(fd.get("group_size") ?? "").trim());
+    if (!Number.isFinite(gs) || gs < 2) {
+      return { ok: false, error: "A group plan needs a group size of 2 or more." };
+    }
+  }
+
   const signup = toCents(String(fd.get("signup_fee") ?? "0")) ?? 0;
 
   const num = (key: string): number | null => {
@@ -124,6 +133,12 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
               String(fd.get("on_limit_reached") ?? "hide") === "staff_only"
                 ? "staff_only" : "hide",
           }
+        : {}),
+
+      // Decision 76: group plan size + booking window. For any other type the
+      // columns stay null/default (the CHECK requires group_size iff group).
+      ...(type === "group"
+        ? { group_size: num("group_size"), group_book_within_days: num("group_book_within_days") ?? 30 }
         : {}),
 
       // {class_type_ids: []} is "covers everything" to book_class(), so an

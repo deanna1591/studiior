@@ -26,7 +26,8 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
                        timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending}
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
-                       opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter} />
+                       opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
+                       unpaid={data.unpaid} group={data.group} />
     </Sheet>
   );
 }

@@ -50,7 +50,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
-  unpaid = false,
+  unpaid = false, group = null,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -74,6 +74,9 @@ export default function ClassDetailBody({
   /** Decision 73b: this booking is an unpaid drop-in (a booked seat with no
    *  payment). When set, the page offers two ways to pay. */
   unpaid?: boolean;
+  /** Decision 76: this seat is part of a group (Barkada). A guest sees "Booked
+   *  by {host}" and no cancel; the host gets a link to manage the group. */
+  group?: { isHost: boolean; host: string; plan: string; groupId: string } | null;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -201,15 +204,38 @@ export default function ClassDetailBody({
                 selfCheckIn={selfCheckIn}
               />
             </div>
-            <ActionForm action={cancelBooking}>
-              <input type="hidden" name="booking_id" value={booking!.id} />
-              <CardActionOutline>{isWaitlisted ? "Leave the list" : "Cancel booking"}</CardActionOutline>
-            </ActionForm>
-            {!isWaitlisted && (
-              <a href={`/class/${occ.id}/ics`}
-                 className="m-press mt-2 block text-center text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
-                Add to calendar
-              </a>
+            {/* Decision 76: a GROUP seat is never individually cancelled. A
+                guest sees who booked them and is told to ask the host; the host
+                gets a link to manage the whole group (names, swap, cancel). */}
+            {group ? (
+              group.isHost ? (
+                <div className="m-card p-3" style={{ background: "var(--accent-chip)" }}>
+                  <p className="text-[14px] font-medium leading-5 text-ink">You booked this for your group</p>
+                  <p className="m-sub mt-0.5 text-ink-2">{group.plan}</p>
+                  <Link href={`/group/${group.groupId}`}
+                        className="m-press mt-2 inline-block text-[13px] text-ink underline underline-offset-4">
+                    Manage this group
+                  </Link>
+                </div>
+              ) : (
+                <div className="m-card p-3">
+                  <p className="text-[14px] leading-5 text-ink">Booked by {group.host} · {group.plan}</p>
+                  <p className="m-sub mt-0.5 text-ink-3">Ask {group.host} if you can&rsquo;t make it.</p>
+                </div>
+              )
+            ) : (
+              <>
+                <ActionForm action={cancelBooking}>
+                  <input type="hidden" name="booking_id" value={booking!.id} />
+                  <CardActionOutline>{isWaitlisted ? "Leave the list" : "Cancel booking"}</CardActionOutline>
+                </ActionForm>
+                {!isWaitlisted && (
+                  <a href={`/class/${occ.id}/ics`}
+                     className="m-press mt-2 block text-center text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
+                    Add to calendar
+                  </a>
+                )}
+              </>
             )}
           </>
         ) : freeFirst?.eligible ? (

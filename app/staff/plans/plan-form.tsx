@@ -32,6 +32,8 @@ export type PlanDraft = {
   max_bookings_per_day: number | null;
   restrictions: { class_type_ids?: string[] } | null;
   counts_for_conversion: boolean;
+  group_size: number | null;
+  group_book_within_days: number;
   max_active_members: number | null;
   show_remaining_below: number | null;
   on_limit_reached: string;
@@ -62,13 +64,16 @@ function Submit({ label }: { label: string }) {
 const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
 export default function PlanForm({
-  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken, peakHours, conversionOn,
+  draft, classTypes, currency, activeMemberships, mode, seatCaps, taken, peakHours, conversionOn, maxRoomCapacity,
 }: {
   draft: PlanDraft;
   classTypes: { id: string; name: string }[];
   currency: string;
   activeMemberships: number;
   mode: "create" | "edit";
+  /** Decision 76: the studio's largest room capacity — the ceiling the group
+   *  size field offers (a group fills one class, so it cannot exceed a room). */
+  maxRoomCapacity: number;
   /** Decision 24's switch. Off, and this form must show NO TRACE of places. */
   seatCaps: boolean;
   /** How many hold this plan right now — from plan_seats_taken(), never recounted here. */
@@ -177,6 +182,30 @@ export default function PlanForm({
           </p>
         )}
       </Section>
+
+      {/* Decision 76: a group (Barkada) package — N people, one class together,
+          booked within a window. Shown only for the group type. */}
+      {type === "group" && (
+        <Section title="Group" note="One price for a group who come to one class together.">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Group size (people)">
+              <input name="group_size" type="number" min={2} max={maxRoomCapacity || undefined}
+                     defaultValue={num(draft.group_size) || "2"} className={inputClass} placeholder="6" />
+              <p className="mt-1 text-xs text-ink-3">
+                2 or more. The buyer picks any class with at least this many free seats.
+                {maxRoomCapacity > 0 && <> Your largest room holds {maxRoomCapacity}.</>}
+              </p>
+            </Field>
+            <Field label="Book within (days)">
+              <input name="group_book_within_days" type="number" min={1} max={365}
+                     defaultValue={draft.group_book_within_days || 30} className={inputClass} placeholder="30" />
+              <p className="mt-1 text-xs text-ink-3">
+                How long after buying they have to pick a class. An unbooked group expires then.
+              </p>
+            </Field>
+          </div>
+        </Section>
+      )}
 
       <Section title="What it buys">
         {f.creditsPerPeriod && (
