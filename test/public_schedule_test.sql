@@ -325,4 +325,73 @@ select expect_num('a smaller p_days is honoured (a studio may show fewer days)',
   (public_schedule('ec40-alpha', 3)::jsonb ->> 'window_days')::int, 3);
 reset role;
 
+-- =============================================================================
+-- 10. THE IN-WINDOW LIST IS UNCAPPED; the 40-cap bites only on 'upcoming'
+-- =============================================================================
+-- Migration 20260832510000. The single `limit v_limit` truncated a busy
+-- in-window week at 40. Echo: 50 scheduled, published, assigned classes all
+-- INSIDE a 30-day window -> in_window returns all 50. Foxtrot: 45 classes 30+
+-- days out with a 7-day window -> the primary window is empty, the 'upcoming'
+-- fallback (no upper date bound) still caps at 40.
+reset role;
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('ec40ec40-0000-0000-0000-0000000000e1','Echo Studio','ec40-echo','Europe/Prague','CZK','active'),
+  ('ec40ec40-0000-0000-0000-0000000000f1','Foxtrot Studio','ec40-foxtrot','Europe/Prague','CZK','active');
+insert into studio_settings (studio_id, booking_window_days) values
+  ('ec40ec40-0000-0000-0000-0000000000e1', 30),   -- wide window, so 50 classes fit in-window
+  ('ec40ec40-0000-0000-0000-0000000000f1', 7);    -- narrow window, so 30-days-out is 'upcoming'
+insert into locations (id, studio_id, name, is_primary) values
+  ('ec40ec40-0000-0000-0000-0000000000ee','ec40ec40-0000-0000-0000-0000000000e1','Main',true),
+  ('ec40ec40-0000-0000-0000-0000000000ff','ec40ec40-0000-0000-0000-0000000000f1','Main',true);
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('ec40ec40-0000-0000-0000-000000ee00e1','ec40ec40-0000-0000-0000-0000000000e1','ec40ec40-0000-0000-0000-0000000000ee','Echo Room',10),
+  ('ec40ec40-0000-0000-0000-000000ff00f1','ec40ec40-0000-0000-0000-0000000000f1','ec40ec40-0000-0000-0000-0000000000ff','Foxtrot Room',10);
+insert into class_types (id, studio_id, name, description, color, duration_minutes, default_capacity) values
+  ('ec40ec40-0000-0000-0000-0000cccc00e1','ec40ec40-0000-0000-0000-0000000000e1','Echo Flow','E.','#2F4F4F',50,10),
+  ('ec40ec40-0000-0000-0000-0000cccc00f1','ec40ec40-0000-0000-0000-0000000000f1','Foxtrot Flow','F.','#2F4F4F',50,10);
+-- Echo: 50 assigned classes, 70 min apart from local tomorrow (no room overlap,
+-- all within the 30-day window).
+insert into instructors (id, studio_id, display_name) values
+  ('ec40ec40-0000-0000-0000-0000dddd00e1','ec40ec40-0000-0000-0000-0000000000e1','Echo Coach');
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
+select
+  ('ec40ec40-0000-0000-0000-0000' || lpad(n::text,6,'0') || 'e1')::uuid,
+  'ec40ec40-0000-0000-0000-0000000000e1','ec40ec40-0000-0000-0000-0000000000ee',
+  'ec40ec40-0000-0000-0000-0000cccc00e1','ec40ec40-0000-0000-0000-000000ee00e1','ec40ec40-0000-0000-0000-0000dddd00e1',
+  'Echo Flow',10,0,
+  ((date_trunc('day', now() at time zone 'Europe/Prague') + interval '1 day') at time zone 'Europe/Prague') + make_interval(mins => (n-1)*70),
+  ((date_trunc('day', now() at time zone 'Europe/Prague') + interval '1 day') at time zone 'Europe/Prague') + make_interval(mins => (n-1)*70 + 50),
+  'scheduled'
+from generate_series(1,50) n;
+-- Foxtrot: 45 assigned classes, all 30+ days out (beyond the 7-day window).
+insert into instructors (id, studio_id, display_name) values
+  ('ec40ec40-0000-0000-0000-0000dddd00f1','ec40ec40-0000-0000-0000-0000000000f1','Foxtrot Coach');
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
+select
+  ('ec40ec40-0000-0000-0000-0000' || lpad(n::text,6,'0') || 'f1')::uuid,
+  'ec40ec40-0000-0000-0000-0000000000f1','ec40ec40-0000-0000-0000-0000000000ff',
+  'ec40ec40-0000-0000-0000-0000cccc00f1','ec40ec40-0000-0000-0000-000000ff00f1','ec40ec40-0000-0000-0000-0000dddd00f1',
+  'Foxtrot Flow',10,0,
+  ((date_trunc('day', now() at time zone 'Europe/Prague') + interval '30 days') at time zone 'Europe/Prague') + make_interval(mins => (n-1)*70),
+  ((date_trunc('day', now() at time zone 'Europe/Prague') + interval '30 days') at time zone 'Europe/Prague') + make_interval(mins => (n-1)*70 + 50),
+  'scheduled'
+from generate_series(1,45) n;
+
+set role anon;
+select set_config('t.echo', public_schedule('ec40-echo', 30)::text, false);
+select set_config('t.fox',  public_schedule('ec40-foxtrot', 7)::text, false);
+reset role;
+select expect_text('Echo (50 classes inside a 30-day window) -> in_window',
+  current_setting('t.echo')::jsonb ->> 'state', 'in_window');
+select expect_num('...and ALL 50 are returned (in-window is uncapped)',
+  jsonb_array_length(current_setting('t.echo')::jsonb -> 'classes'), 50);
+select expect_text('Foxtrot (45 classes 30 days out, 7-day window) -> upcoming',
+  current_setting('t.fox')::jsonb ->> 'state', 'upcoming');
+select expect_true('...and the upcoming fallback is capped at <= 40',
+  jsonb_array_length(current_setting('t.fox')::jsonb -> 'classes') <= 40);
+select expect_num('...exactly 40 of the 45 (the cap still bites)',
+  jsonb_array_length(current_setting('t.fox')::jsonb -> 'classes'), 40);
+
 select 'public_schedule_test: all assertions passed' as done;
