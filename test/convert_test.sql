@@ -245,6 +245,9 @@ select expect_num('a no-show gets NO after/day3 ladder mail',
   (select count(*) from notifications where member_id='c0780000-0000-0000-0000-00000000ad11' and template_key in ('convert_after_class','convert_day3','convert_day7')), 0);
 select expect_num('MB email carries the member first name',
   (select 1 from notifications where member_id='c0780000-0000-0000-0000-00000000ad05' and template_key='convert_before_class' and payload->>'first_name'='Before'), 1);
+-- 78a item 0: the "sell" mail links to /buy/{intro_offer_plan_id} when an offer is set.
+select expect_true('convert mail buy_url points at /buy/{intro_offer_plan_id}',
+  (select payload->>'buy_url' like '%/buy/c0780000-0000-0000-0000-0000000f0001' from notifications where member_id='c0780000-0000-0000-0000-00000000ad06' and template_key='convert_after_class'));
 
 -- stop on purchase: MP (day3 aged, has a membership) gets nothing.
 select expect_num('a converted member gets no convert mail',

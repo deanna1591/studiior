@@ -27,7 +27,7 @@ export default async function MembershipSettings() {
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }] = await Promise.all([
     supabase.from("studio_settings")
-      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, guest_passes_enabled, challenges_enabled, convert_sequence_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to")
+      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, guest_passes_enabled, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("studios").select("currency").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("pay_periods").select("starts_on, ends_on, status").lte("starts_on", today).gte("ends_on", today).maybeSingle(),
@@ -83,7 +83,7 @@ export default async function MembershipSettings() {
       </SettingsSection>
 
       <SettingsSection id="convert-keep" title="Convert and keep">
-        <ConvertKeepPanel enabled={s?.convert_sequence_enabled ?? false}
+        <ConvertKeepPanel enabled={s?.convert_sequence_enabled ?? false} keepEnabled={s?.keep_sequence_enabled ?? false}
           planId={s?.intro_offer_plan_id ?? null} days={s?.intro_offer_days ?? 14}
           exclusive={s?.intro_offer_exclusive ?? false} tasksTo={s?.retention_tasks_to ?? "owner_manager"}
           plans={(activePlans ?? []).map((p) => ({ id: p.id as string, name: p.name as string }))} />

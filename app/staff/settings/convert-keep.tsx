@@ -18,9 +18,9 @@ function Save() {
  * transactional and honours the member's own notification settings.
  */
 export default function ConvertKeepPanel({
-  enabled, planId, days, exclusive, tasksTo, plans,
+  enabled, keepEnabled, planId, days, exclusive, tasksTo, plans,
 }: {
-  enabled: boolean; planId: string | null; days: number;
+  enabled: boolean; keepEnabled: boolean; planId: string | null; days: number;
   exclusive: boolean; tasksTo: string;
   plans: { id: string; name: string }[];
 }) {
@@ -77,6 +77,18 @@ export default function ConvertKeepPanel({
             <span className="block text-[12px] leading-[18px] text-ink-3">
               Hide the intro plan from everyone except a member inside their window, so it is a genuine
               first-timer price. (Needs an intro offer chosen above.)
+            </span>
+          </span>
+        </label>
+
+        <label className="mt-3 flex items-start gap-2.5 border-t border-line pt-3">
+          <input type="checkbox" name="keep_sequence_enabled" defaultChecked={keepEnabled} className="mt-1" />
+          <span className="text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Run the keep sequence</span> — remind members before a plan
+            ends, when pack classes are about to expire, and win lapsed members back.
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Replaces the standard expiry and credit-expiry emails while on. Auto-renewing memberships
+              are left alone — they renew themselves.
             </span>
           </span>
         </label>

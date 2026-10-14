@@ -6736,6 +6736,7 @@ export type Database = {
           intro_offer_days: number
           intro_offer_exclusive: boolean
           intro_offer_plan_id: string | null
+          keep_sequence_enabled: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -6844,6 +6845,7 @@ export type Database = {
           intro_offer_days?: number
           intro_offer_exclusive?: boolean
           intro_offer_plan_id?: string | null
+          keep_sequence_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6952,6 +6954,7 @@ export type Database = {
           intro_offer_days?: number
           intro_offer_exclusive?: boolean
           intro_offer_plan_id?: string | null
+          keep_sequence_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -8390,6 +8393,18 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9518,11 +9533,14 @@ export type Database = {
         Returns: {
           class_at: string
           days_since: number
+          expires_on: string
           instructor_name: string
           member_id: string
           member_name: string
           offer_ends: string
           phone: string
+          plan_name: string
+          section: string
           suggested_message: string
           task_id: string
           task_status: string

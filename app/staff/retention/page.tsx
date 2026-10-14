@@ -32,7 +32,12 @@ export default async function RetentionScreen() {
     const { day, month } = dayMonthParts(iso, ctx.timeZone);
     return `${day} ${month}`;
   };
+  // expires_on is a plain date (no tz); format in UTC so it reads as the day it is.
+  const fmtDate = (d: string | null) =>
+    d ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
+          .format(new Date(`${d}T00:00:00Z`)) : null;
   const rows: RetentionRow[] = (data ?? []).map((r: any) => ({
+    section: r.section,
     member_id: r.member_id,
     member_name: r.member_name,
     phone: r.phone,
@@ -40,6 +45,8 @@ export default async function RetentionScreen() {
     days_since: r.days_since,
     instructor_name: r.instructor_name || null,
     offer_label: fmt(r.offer_ends),
+    plan_name: r.plan_name ?? null,
+    date_label: fmtDate(r.expires_on),
     task_id: r.task_id,
     task_status: r.task_status,
     suggested_message: r.suggested_message,

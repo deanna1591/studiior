@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   windowEndMs, windowActive, quietShift, daysSince,
   dateRuleDue, afterClassDue, viberText, CONVERT_TEMPLATES,
+  keepRuleDue, KEEP_TEMPLATES,
 } from "../lib/convert.mjs";
 
 const DAY = 86_400_000;
@@ -67,4 +68,18 @@ test("the convert template set is the six", () => {
   assert.equal(CONVERT_TEMPLATES.length, 6);
   assert.ok(CONVERT_TEMPLATES.includes("convert_before_class"));
   assert.ok(CONVERT_TEMPLATES.includes("convert_missed_you"));
+});
+
+test("keep rules fire on their own day relative to the membership end", () => {
+  assert.equal(keepRuleDue("renew_7", -7), true);
+  assert.equal(keepRuleDue("renew_7", -6), false);
+  assert.equal(keepRuleDue("renew_1", -1), true);
+  assert.equal(keepRuleDue("renew_0", 0), true);
+  assert.equal(keepRuleDue("lapsed_3", 3), true);
+  assert.equal(keepRuleDue("credits_7", -7), true);
+  assert.equal(keepRuleDue("credits_2", -2), true);
+  assert.equal(keepRuleDue("winback_30", 30), true);
+  assert.equal(keepRuleDue("winback_60", 60), true);
+  assert.equal(keepRuleDue("renew_0", 1), false);
+  assert.equal(KEEP_TEMPLATES.length, 8);
 });

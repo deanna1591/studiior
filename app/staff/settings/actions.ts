@@ -1063,6 +1063,7 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
   if (!ctx) return { ok: false, message: "You are not signed in." };
 
   const on = String(fd.get("convert_sequence_enabled") ?? "") === "on";
+  const keepOn = String(fd.get("keep_sequence_enabled") ?? "") === "on";
   const exclusive = String(fd.get("intro_offer_exclusive") ?? "") === "on";
   const planRaw = String(fd.get("intro_offer_plan_id") ?? "").trim();
   const plan = planRaw === "" ? null : planRaw;
@@ -1078,9 +1079,9 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
 
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
-    .update({ convert_sequence_enabled: on, intro_offer_plan_id: plan,
-              intro_offer_days: days, intro_offer_exclusive: exclusive,
-              retention_tasks_to: to })
+    .update({ convert_sequence_enabled: on, keep_sequence_enabled: keepOn,
+              intro_offer_plan_id: plan, intro_offer_days: days,
+              intro_offer_exclusive: exclusive, retention_tasks_to: to })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };

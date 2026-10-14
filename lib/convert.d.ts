@@ -10,3 +10,5 @@ export function dateRuleDue(
 export function afterClassDue(endMs: number, nowMs: number): boolean;
 export function viberText(firstName: string | null | undefined, studioName: string, offerName: string | null | undefined): string;
 export const CONVERT_TEMPLATES: string[];
+export function keepRuleDue(rule: string, delta: number): boolean;
+export const KEEP_TEMPLATES: string[];
