@@ -265,6 +265,19 @@ export default async function Dashboard({
             </Link>
           )}
 
+          {/* Decision 78c: at-risk / drifting members, when retention tasks are on. */}
+          {data.retention.tasksEnabled && (data.retention.atRisk > 0 || data.retention.drifting > 0) && (
+            <Link href="/retention"
+              className="flex items-center justify-between rounded border border-line-2 bg-amber-tint px-3.5 py-2.5 text-[13px] text-ink hover:border-line">
+              <span>
+                <span className="font-medium num">{data.retention.atRisk}</span>{" "}
+                member{data.retention.atRisk === 1 ? "" : "s"} at risk,{" "}
+                <span className="font-medium num">{data.retention.drifting}</span> drifting
+              </span>
+              <span className="text-ink-2">Open retention →</span>
+            </Link>
+          )}
+
           {/* 4.11 and 4.10 */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Tasks t={data.tasks} error={data.tasksError} />

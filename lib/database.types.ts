@@ -3946,6 +3946,7 @@ export type Database = {
       member_tasks: {
         Row: {
           assigned_role: string
+          close_note: string | null
           closed_at: string | null
           contacted_at: string | null
           contacted_by: string | null
@@ -3960,6 +3961,7 @@ export type Database = {
         }
         Insert: {
           assigned_role?: string
+          close_note?: string | null
           closed_at?: string | null
           contacted_at?: string | null
           contacted_by?: string | null
@@ -3974,6 +3976,7 @@ export type Database = {
         }
         Update: {
           assigned_role?: string
+          close_note?: string | null
           closed_at?: string | null
           contacted_at?: string | null
           contacted_by?: string | null
@@ -4805,6 +4808,58 @@ export type Database = {
           text_body?: string
         }
         Relationships: []
+      }
+      notification_templates_overrides: {
+        Row: {
+          body: string
+          body_html: string
+          key: string
+          studio_id: string
+          subject: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          body: string
+          body_html: string
+          key: string
+          studio_id: string
+          subject: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          body?: string
+          body_html?: string
+          key?: string
+          studio_id?: string
+          subject?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_templates_overrides_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_templates_overrides_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_templates_overrides_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -6761,6 +6816,7 @@ export type Database = {
           publication_enabled: boolean
           reminder_hours_before: number
           require_waiver: boolean
+          retention_tasks_enabled: boolean
           retention_tasks_to: string
           roster_confirm_days: number
           seat_caps_enabled: boolean
@@ -6870,6 +6926,7 @@ export type Database = {
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
+          retention_tasks_enabled?: boolean
           retention_tasks_to?: string
           roster_confirm_days?: number
           seat_caps_enabled?: boolean
@@ -6979,6 +7036,7 @@ export type Database = {
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
+          retention_tasks_enabled?: boolean
           retention_tasks_to?: string
           roster_confirm_days?: number
           seat_caps_enabled?: boolean
@@ -8393,18 +8451,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -8747,6 +8793,17 @@ export type Database = {
         }[]
       }
       instructor_roster: { Args: { p_occurrence_id: string }; Returns: Json }
+      instructor_roster_notes: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          drifting: boolean
+          first_timer: boolean
+          intro_window_ends: string
+          member_id: string
+          member_name: string
+          usual_class: string
+        }[]
+      }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       instructor_valid_on: {
         Args: { p_instructor_id: string; p_on: string }
@@ -9532,6 +9589,7 @@ export type Database = {
         Args: { p_studio_id: string }
         Returns: {
           class_at: string
+          contacted_at: string
           days_since: number
           expires_on: string
           instructor_name: string
@@ -9540,6 +9598,7 @@ export type Database = {
           offer_ends: string
           phone: string
           plan_name: string
+          reason: string
           section: string
           suggested_message: string
           task_id: string
@@ -9547,6 +9606,7 @@ export type Database = {
           window_active: boolean
         }[]
       }
+      retention_counts: { Args: { p_studio_id: string }; Returns: Json }
       retention_unconverted_count: {
         Args: { p_studio_id: string }
         Returns: number
@@ -9679,6 +9739,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      send_template_test: {
+        Args: { p_key: string; p_studio_id: string }
+        Returns: Json
       }
       send_via_resend: {
         Args: {

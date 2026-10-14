@@ -34,8 +34,11 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data, error }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }] = await Promise.all([
+  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }] = await Promise.all([
     supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
+    // Decision 78c: a drifting member's heads-up + their usual class (null when
+    // retention tasks are off; the reader is guarded to this class's instructor).
+    supabase.rpc("instructor_roster_notes", { p_occurrence_id: params.id }),
     // Decision 58: who an "ask for cover" can be directed to.
     supabase.rpc("instructor_colleagues", { p_instructor_id: ctx.instructor_id }),
     // Decision 58 amendment: whether a directed confirm is final at once.
@@ -55,6 +58,11 @@ export default async function RosterPage({ params }: { params: { id: string } })
   const colleagues = ((colleaguesData ?? []) as { instructor_id: string; display_name: string; has_login: boolean }[])
     .map((c) => ({ id: c.instructor_id, name: c.display_name, hasLogin: c.has_login }));
   const autoAccept = settings?.cover_auto_accept_enabled ?? false;
+  // Decision 78c: member_id → { drifting, usual_class } for the roster chip.
+  const notes = new Map<string, { drifting: boolean; usual_class: string | null }>(
+    ((notesData ?? []) as { member_id: string; drifting: boolean; usual_class: string | null }[])
+      .map((n) => [n.member_id, { drifting: n.drifting, usual_class: n.usual_class }]),
+  );
 
   if (error || !r) {
     return (
@@ -129,7 +137,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
                 )}
               </div>
 
-              {(m.first_timer || m.birthday) && (
+              {(m.first_timer || m.birthday || notes.get(m.member_id)?.drifting) && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {/* A MEMBER'S FIRST EVER CLASS is the one thing an instructor
                       most needs to know, and the fact that decides how the next
@@ -139,6 +147,17 @@ export default async function RosterPage({ params }: { params: { id: string } })
                           title="Their first class is on us — they're in their intro window. A warm welcome goes a long way."
                           style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
                       First ever class
+                    </span>
+                  )}
+                  {/* Decision 78c: a regular whose rhythm has slipped. A warm
+                      "good to see you back" is the whole point. */}
+                  {!m.first_timer && notes.get(m.member_id)?.drifting && (
+                    <span className="rounded-full px-2.5 py-1 text-[12px] leading-4"
+                          title={notes.get(m.member_id)?.usual_class
+                            ? `Usually comes to ${notes.get(m.member_id)!.usual_class}. A "good to see you back" goes a long way.`
+                            : `Hasn't been in a while. A "good to see you back" goes a long way.`}
+                          style={{ background: "var(--amber-tint)", color: "var(--ink)" }}>
+                      Hasn&rsquo;t been in a while
                     </span>
                   )}
                   {m.birthday && (

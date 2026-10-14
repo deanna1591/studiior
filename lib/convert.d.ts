@@ -12,3 +12,5 @@ export function viberText(firstName: string | null | undefined, studioName: stri
 export const CONVERT_TEMPLATES: string[];
 export function keepRuleDue(rule: string, delta: number): boolean;
 export const KEEP_TEMPLATES: string[];
+export function taskKindForBand(band: string): "at_risk" | "drifting_fyi" | null;
+export function taskRecovered(band: string, checkedInSinceTask: boolean): boolean;

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   windowEndMs, windowActive, quietShift, daysSince,
   dateRuleDue, afterClassDue, viberText, CONVERT_TEMPLATES,
-  keepRuleDue, KEEP_TEMPLATES,
+  keepRuleDue, KEEP_TEMPLATES, taskKindForBand, taskRecovered,
 } from "../lib/convert.mjs";
 
 const DAY = 86_400_000;
@@ -82,4 +82,19 @@ test("keep rules fire on their own day relative to the membership end", () => {
   assert.equal(keepRuleDue("winback_60", 60), true);
   assert.equal(keepRuleDue("renew_0", 1), false);
   assert.equal(KEEP_TEMPLATES.length, 8);
+});
+
+test("task kind follows the health band", () => {
+  assert.equal(taskKindForBand("at_risk"), "at_risk");
+  assert.equal(taskKindForBand("drifting"), "drifting_fyi");
+  assert.equal(taskKindForBand("healthy"), null);
+  assert.equal(taskKindForBand("new"), null);
+});
+
+test("a task recovers on a healthy/new band or a check-in", () => {
+  assert.equal(taskRecovered("healthy", false), true);
+  assert.equal(taskRecovered("new", false), true);
+  assert.equal(taskRecovered("at_risk", true), true);   // checked in since
+  assert.equal(taskRecovered("at_risk", false), false);
+  assert.equal(taskRecovered("drifting", false), false);
 });

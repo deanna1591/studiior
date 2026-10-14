@@ -47,6 +47,8 @@ export default async function RetentionScreen() {
     offer_label: fmt(r.offer_ends),
     plan_name: r.plan_name ?? null,
     date_label: fmtDate(r.expires_on),
+    reason: r.reason ?? null,
+    contacted_label: fmt(r.contacted_at),
     task_id: r.task_id,
     task_status: r.task_status,
     suggested_message: r.suggested_message,

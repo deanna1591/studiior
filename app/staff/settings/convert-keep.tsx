@@ -18,9 +18,10 @@ function Save() {
  * transactional and honours the member's own notification settings.
  */
 export default function ConvertKeepPanel({
-  enabled, keepEnabled, planId, days, exclusive, tasksTo, plans,
+  enabled, keepEnabled, tasksEnabled, planId, days, exclusive, tasksTo, plans,
 }: {
-  enabled: boolean; keepEnabled: boolean; planId: string | null; days: number;
+  enabled: boolean; keepEnabled: boolean; tasksEnabled: boolean;
+  planId: string | null; days: number;
   exclusive: boolean; tasksTo: string;
   plans: { id: string; name: string }[];
 }) {
@@ -93,6 +94,19 @@ export default function ConvertKeepPanel({
           </span>
         </label>
 
+        <label className="mt-3 flex items-start gap-2.5 border-t border-line pt-3">
+          <input type="checkbox" name="retention_tasks_enabled" defaultChecked={tasksEnabled} className="mt-1" />
+          <span className="text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Raise retention tasks</span> — a task when a member&rsquo;s
+            rhythm slips to &ldquo;at risk&rdquo;, a soft note when they start drifting, and a heads-up
+            to their instructor.
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Needs the daily health check the system runs for you. Tasks and drifting members appear
+              on the <a href="/retention" className="text-lime-text underline underline-offset-2">Retention</a> screen.
+            </span>
+          </span>
+        </label>
+
         <div className="mt-3 border-t border-line pt-3">
           <label className="block text-[13px] leading-[19px] text-ink">
             <span className="font-medium">Retention tasks go to</span>
@@ -106,6 +120,17 @@ export default function ConvertKeepPanel({
 
         <div className="mt-3"><Save /></div>
       </div>
+
+      <a href="/settings/templates"
+         className="mt-3 flex items-center justify-between rounded border border-line bg-surface px-3.5 py-3 hover:bg-paper">
+        <span className="text-[13px] leading-[19px] text-ink">
+          <span className="font-medium">Email templates</span>
+          <span className="block text-[12px] leading-[18px] text-ink-3">
+            Edit the convert, keep, retention and closure wording in your own voice.
+          </span>
+        </span>
+        <span className="text-[13px] text-ink-2">Edit →</span>
+      </a>
     </form>
   );
 }

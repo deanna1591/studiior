@@ -1064,6 +1064,7 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
 
   const on = String(fd.get("convert_sequence_enabled") ?? "") === "on";
   const keepOn = String(fd.get("keep_sequence_enabled") ?? "") === "on";
+  const tasksOn = String(fd.get("retention_tasks_enabled") ?? "") === "on";
   const exclusive = String(fd.get("intro_offer_exclusive") ?? "") === "on";
   const planRaw = String(fd.get("intro_offer_plan_id") ?? "").trim();
   const plan = planRaw === "" ? null : planRaw;
@@ -1079,7 +1080,7 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
 
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
-    .update({ convert_sequence_enabled: on, keep_sequence_enabled: keepOn,
+    .update({ convert_sequence_enabled: on, keep_sequence_enabled: keepOn, retention_tasks_enabled: tasksOn,
               intro_offer_plan_id: plan, intro_offer_days: days,
               intro_offer_exclusive: exclusive, retention_tasks_to: to })
     .eq("studio_id", ctx.studioId).select("studio_id");
