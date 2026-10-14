@@ -1055,3 +1055,41 @@ export async function saveStudioName(_prev: PlainState, fd: FormData): Promise<P
   revalidatePath("/settings/studio"); revalidatePath("/");
   return { ok: true, message: "Saved." };
 }
+
+// Decision 78a — the Convert-and-keep section: the convert-sequence switch, the
+// intro offer (plan + window + exclusivity) and who retention tasks go to.
+export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const on = String(fd.get("convert_sequence_enabled") ?? "") === "on";
+  const exclusive = String(fd.get("intro_offer_exclusive") ?? "") === "on";
+  const planRaw = String(fd.get("intro_offer_plan_id") ?? "").trim();
+  const plan = planRaw === "" ? null : planRaw;
+  const daysRaw = String(fd.get("intro_offer_days") ?? "").trim();
+  const days = daysRaw === "" ? 14 : Math.trunc(Number(daysRaw));
+  if (!Number.isFinite(days) || days < 1 || days > 90)
+    return { ok: false, message: "The intro window must be between 1 and 90 days." };
+  const to = String(fd.get("retention_tasks_to") ?? "owner_manager");
+  if (to !== "owner_manager" && to !== "front_desk")
+    return { ok: false, message: "Tasks go to owners and managers, or to front desk." };
+  if (exclusive && plan === null)
+    return { ok: false, message: "Pick the intro offer plan before making it exclusive." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ convert_sequence_enabled: on, intro_offer_plan_id: plan,
+              intro_offer_days: days, intro_offer_exclusive: exclusive,
+              retention_tasks_to: to })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings"); revalidatePath("/staff/retention"); revalidatePath("/");
+  return {
+    ok: true,
+    message: on
+      ? "Saved. New members who take a free class will get the convert sequence."
+      : "Saved. The convert sequence is off — no sequence mail will go out.",
+  };
+}

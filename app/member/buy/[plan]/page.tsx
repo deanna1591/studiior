@@ -174,12 +174,19 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
   // never a new place and is never gated — begin treats a recurring plan the
   // member already holds (active/past_due) as a renewal and skips the cap, so
   // this screen must too, or it would hide the Buy a renewal needs.
-  const [{ data: held }, { data: seats }] = await Promise.all([
+  const [{ data: held }, { data: seats }, { data: introCfg }, { data: introWin }] = await Promise.all([
     supabase.from("memberships")
       .select("status").eq("member_id", ctx.memberId).eq("plan_id", plan.id)
       .not("status", "in", "(cancelled,expired)"),
     supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
+    // Decision 78: an exclusive intro offer is only buyable inside the window.
+    supabase.from("studio_settings").select("intro_offer_plan_id, intro_offer_exclusive")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
   ]);
+  const introActive = ((introWin as { active?: boolean } | null)?.active) === true;
+  const exclusiveLocked = !!introCfg?.intro_offer_exclusive
+    && introCfg?.intro_offer_plan_id === plan.id && !introActive;
   const heldRows = held ?? [];
   const alreadyHas = heldRows.length > 0;
   const isRenewal = plan.type === "recurring" &&
@@ -207,6 +214,10 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
         {introUsed ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
             {INTRO_USED_SENTENCE}
+          </p>
+        ) : exclusiveLocked ? (
+          <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+            This offer is just for your intro — take a free class first, and it opens up.
           </p>
         ) : full ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">

@@ -3943,6 +3943,87 @@ export type Database = {
           },
         ]
       }
+      member_tasks: {
+        Row: {
+          assigned_role: string
+          closed_at: string | null
+          contacted_at: string | null
+          contacted_by: string | null
+          created_at: string
+          id: string
+          kind: string
+          member_id: string
+          reason: string | null
+          status: string
+          studio_id: string
+          suggested_message: string | null
+        }
+        Insert: {
+          assigned_role?: string
+          closed_at?: string | null
+          contacted_at?: string | null
+          contacted_by?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          member_id: string
+          reason?: string | null
+          status?: string
+          studio_id: string
+          suggested_message?: string | null
+        }
+        Update: {
+          assigned_role?: string
+          closed_at?: string | null
+          contacted_at?: string | null
+          contacted_by?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          member_id?: string
+          reason?: string | null
+          status?: string
+          studio_id?: string
+          suggested_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_tasks_contacted_by_fkey"
+            columns: ["contacted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tasks_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tasks_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tasks_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_tasks_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           address: Json | null
@@ -4626,6 +4707,7 @@ export type Database = {
           milestone_push: boolean
           reminder_email: boolean
           reminder_push: boolean
+          sequence_email: boolean
           studio_id: string
           updated_at: string
           waitlist_email: boolean
@@ -4644,6 +4726,7 @@ export type Database = {
           milestone_push?: boolean
           reminder_email?: boolean
           reminder_push?: boolean
+          sequence_email?: boolean
           studio_id: string
           updated_at?: string
           waitlist_email?: boolean
@@ -4662,6 +4745,7 @@ export type Database = {
           milestone_push?: boolean
           reminder_email?: boolean
           reminder_push?: boolean
+          sequence_email?: boolean
           studio_id?: string
           updated_at?: string
           waitlist_email?: boolean
@@ -6619,6 +6703,7 @@ export type Database = {
           conversion_bonus_cents: number
           conversion_bonus_enabled: boolean
           conversion_window_days: number
+          convert_sequence_enabled: boolean
           core_claim_default_cap: number
           core_cutoff_hours: number
           core_min_bookings: number
@@ -6648,6 +6733,9 @@ export type Database = {
           how_to_buy: string | null
           instructor_booking_alerts: boolean
           instructor_class_reminders: boolean
+          intro_offer_days: number
+          intro_offer_exclusive: boolean
+          intro_offer_plan_id: string | null
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
           max_bookings_per_day: number | null
@@ -6672,6 +6760,7 @@ export type Database = {
           publication_enabled: boolean
           reminder_hours_before: number
           require_waiver: boolean
+          retention_tasks_to: string
           roster_confirm_days: number
           seat_caps_enabled: boolean
           setup_optional_items: string[]
@@ -6722,6 +6811,7 @@ export type Database = {
           conversion_bonus_cents?: number
           conversion_bonus_enabled?: boolean
           conversion_window_days?: number
+          convert_sequence_enabled?: boolean
           core_claim_default_cap?: number
           core_cutoff_hours?: number
           core_min_bookings?: number
@@ -6751,6 +6841,9 @@ export type Database = {
           how_to_buy?: string | null
           instructor_booking_alerts?: boolean
           instructor_class_reminders?: boolean
+          intro_offer_days?: number
+          intro_offer_exclusive?: boolean
+          intro_offer_plan_id?: string | null
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6775,6 +6868,7 @@ export type Database = {
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
+          retention_tasks_to?: string
           roster_confirm_days?: number
           seat_caps_enabled?: boolean
           setup_optional_items?: string[]
@@ -6825,6 +6919,7 @@ export type Database = {
           conversion_bonus_cents?: number
           conversion_bonus_enabled?: boolean
           conversion_window_days?: number
+          convert_sequence_enabled?: boolean
           core_claim_default_cap?: number
           core_cutoff_hours?: number
           core_min_bookings?: number
@@ -6854,6 +6949,9 @@ export type Database = {
           how_to_buy?: string | null
           instructor_booking_alerts?: boolean
           instructor_class_reminders?: boolean
+          intro_offer_days?: number
+          intro_offer_exclusive?: boolean
+          intro_offer_plan_id?: string | null
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
           max_bookings_per_day?: number | null
@@ -6878,6 +6976,7 @@ export type Database = {
           publication_enabled?: boolean
           reminder_hours_before?: number
           require_waiver?: boolean
+          retention_tasks_to?: string
           roster_confirm_days?: number
           seat_caps_enabled?: boolean
           setup_optional_items?: string[]
@@ -6906,6 +7005,13 @@ export type Database = {
           week_starts_on?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "studio_settings_intro_offer_plan_id_fkey"
+            columns: ["intro_offer_plan_id"]
+            isOneToOne: false
+            referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "studio_settings_studio_id_fkey"
             columns: ["studio_id"]
@@ -8089,6 +8195,11 @@ export type Database = {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
       }
+      convert_keep_sweep: {
+        Args: { p_now?: string; p_studio_id: string }
+        Returns: Json
+      }
+      convert_keep_sweep_all: { Args: { p_now?: string }; Returns: Json }
       cover_available_to: { Args: { p_instructor_id: string }; Returns: Json }
       create_announcement: {
         Args: {
@@ -8236,6 +8347,7 @@ export type Database = {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
         Returns: boolean
       }
+      dismiss_task: { Args: { p_task_id: string }; Returns: Json }
       earth_distance_m: {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
@@ -8645,6 +8757,10 @@ export type Database = {
           week_start: string
         }[]
       }
+      intro_window: {
+        Args: { p_member_id: string; p_now?: string }
+        Returns: Json
+      }
       invite_instructor: {
         Args: { p_days?: number; p_email: string; p_instructor_id: string }
         Returns: Json
@@ -8698,6 +8814,7 @@ export type Database = {
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
       mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
+      mark_task_contacted: { Args: { p_task_id: string }; Returns: Json }
       member_activity: {
         Args: { p_from: string; p_member_id: string; p_to: string }
         Returns: {
@@ -9224,6 +9341,10 @@ export type Database = {
       }
       queue_waitlist_missed: { Args: { p_booking_id: string }; Returns: number }
       queue_waitlist_offer: { Args: { p_offer_id: string }; Returns: number }
+      quiet_hours_shift: {
+        Args: { p_ts: string; p_tz: string }
+        Returns: string
+      }
       rank_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
       reassign_occurrence: {
         Args: { p_instructor_id: string; p_occurrence_id: string }
@@ -9392,6 +9513,26 @@ export type Database = {
       }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
       restore_series: { Args: { p_series_id: string }; Returns: Json }
+      retention_board: {
+        Args: { p_studio_id: string }
+        Returns: {
+          class_at: string
+          days_since: number
+          instructor_name: string
+          member_id: string
+          member_name: string
+          offer_ends: string
+          phone: string
+          suggested_message: string
+          task_id: string
+          task_status: string
+          window_active: boolean
+        }[]
+      }
+      retention_unconverted_count: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
       revoke_calendar_feed: {
         Args: { p_kind: string; p_studio_id: string }
         Returns: Json

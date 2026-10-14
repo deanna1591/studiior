@@ -123,7 +123,7 @@ export async function dashboardData(
 
   const [
     kpis, revenue, heatmap, health, activity, tasks, month, absent,
-    nRevenue, nAttendance, nLead, challengeKpi, guestKpi, recent, tiers,
+    nRevenue, nAttendance, nLead, challengeKpi, guestKpi, recent, tiers, retention,
   ] = await Promise.all([
     supabase.rpc("dashboard_kpis", { p_studio_id: studioId }),
     supabase.rpc("dashboard_revenue", { p_studio_id: studioId, p_from: from, p_to: today }),
@@ -146,6 +146,10 @@ export async function dashboardData(
     // client) and the tier suggestions — zero rows when neither tier is on.
     supabase.rpc("dashboard_recent_bookings", { p_studio_id: studioId, p_limit: 30 }),
     supabase.rpc("tier_suggestions", { p_studio_id: studioId }),
+    // Decision 78: how many free-class members have not converted — the count is
+    // read through retention_board, so it can never disagree with that list. 0
+    // (and so nothing to show) for a studio not running the convert sequence.
+    supabase.rpc("retention_unconverted_count", { p_studio_id: studioId }),
   ]);
 
   // A FAILED QUERY MUST NOT LOOK LIKE AN EMPTY STUDIO. schedule_range() raised
@@ -190,6 +194,7 @@ export async function dashboardData(
     recentError: err(recent),
     tiers: (tiers.data ?? []) as TierSuggestion[],
     tiersError: err(tiers),
+    unconverted: (retention.data as number | null) ?? 0,
   };
 }
 

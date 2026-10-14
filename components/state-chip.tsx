@@ -23,6 +23,9 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   refunded: { label: "Refunded" },
   unpaid: { label: "Unpaid" },
   frozen: { label: "Paused" },
+  // retention task status (Decision 78)
+  open: { label: "To contact", warn: true },
+  contacted: { label: "Contacted" },
   // campaign status (Decision 50)
   draft: { label: "Draft" },
   scheduled: { label: "Scheduled", warn: true },

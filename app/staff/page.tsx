@@ -252,6 +252,19 @@ export default async function Dashboard({
             </div>
           )}
 
+          {/* Decision 78: free-class members not yet converted. Present only
+              when the convert sequence is on and someone is waiting. */}
+          {data.unconverted > 0 && (
+            <Link href="/retention"
+              className="flex items-center justify-between rounded border border-line-2 bg-amber-tint px-3.5 py-2.5 text-[13px] text-ink hover:border-line">
+              <span>
+                <span className="font-medium num">{data.unconverted}</span>{" "}
+                free-class member{data.unconverted === 1 ? "" : "s"} not yet converted
+              </span>
+              <span className="text-ink-2">Reach out →</span>
+            </Link>
+          )}
+
           {/* 4.11 and 4.10 */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Tasks t={data.tasks} error={data.tasksError} />

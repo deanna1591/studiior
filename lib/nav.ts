@@ -67,6 +67,10 @@ export function railGroups(
         ...(desk ? [{ href: "/due", label: "Payments due" }] : []),
         ...(manager
           ? [
+              // Decision 78: free-class members not yet converted, drifting, at
+              // risk. Manager-up here; a routed front desk reaches it from the
+              // dashboard tile (the page and RPC enforce the real gate).
+              { href: "/retention", label: "Retention" },
               { href: "/imports", label: "Import" },
               // Decision 27. A basic studio tool, always available to managers.
               { href: "/announcements", label: "What’s on" },

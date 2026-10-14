@@ -39,7 +39,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   // three reads that actually need a query: the ledger, the active-guest count
   // (only when guest passes are on), and the peak slots.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }] =
+  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }] =
     await Promise.all([
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
@@ -66,7 +66,17 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
         .select("id, membership_plans(name), group_size")
         .eq("host_member_id", ctx.memberId).eq("status", "unbooked")
         .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      // Decision 78: an exclusive intro offer is only shown inside the window.
+      supabase.from("studio_settings").select("intro_offer_plan_id, intro_offer_exclusive")
+        .eq("studio_id", ctx.studioId).maybeSingle(),
+      supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
     ]);
+  // Hide the exclusive intro plan from anyone not inside their intro window; the
+  // DB (xendit_begin_purchase) refuses it too, so this is presentation only.
+  const introActive = ((introWin as { active?: boolean } | null)?.active) === true;
+  const hideExclusivePlan = !!introCfg?.intro_offer_exclusive && !!introCfg?.intro_offer_plan_id && !introActive;
+  const shownCatalogue = (catalogue ?? []).filter(
+    (p) => !(hideExclusivePlan && p.id === introCfg!.intro_offer_plan_id));
   const unbookedGroup = (unbookedGroupRes as unknown as {
     id: string; group_size: number; membership_plans: { name: string } | null } | null);
   const seatOf = new Map((seats ?? []).map((s) => [s.plan_id, s]));
@@ -210,13 +220,13 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       {/* The catalogue. Decision 16: no online checkout — the studio sells at the
           desk — but "the plans are here" has to actually show the plans and their
           prices, or the free-class conversion has nowhere to land. */}
-      {(catalogue ?? []).length > 0 && (
+      {shownCatalogue.length > 0 && (
         <section className="mt-8">
           <h2 className="section-label text-ink-2">{live ? "Other plans" : "Plans"}</h2>
           <ul className="mt-3 space-y-3">
             {/* Decision 74: featured first, then sort_order — the same pure rule
                 the staff list and the node test use. */}
-            {sortPlans(catalogue ?? []).map((p) => {
+            {sortPlans(shownCatalogue).map((p) => {
               // Decision 76: while this member holds an unbooked group, hide
               // group plans from the catalogue — the banner above sends them to
               // book the one they already have rather than buy another.

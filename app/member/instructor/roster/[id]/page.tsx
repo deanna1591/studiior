@@ -136,6 +136,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
                       hour goes. */}
                   {m.first_timer && (
                     <span className="rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4"
+                          title="Their first class is on us — they're in their intro window. A warm welcome goes a long way."
                           style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
                       First ever class
                     </span>
