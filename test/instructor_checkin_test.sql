@@ -45,9 +45,14 @@ insert into profiles (id, email) select id, id::text||'@example.com' from auth.u
 insert into studios (id, name, slug, timezone, currency, status) values
   ('9a4d9a4d-0000-0000-0000-000000000001','Pay A','9a4d-a','UTC','USD','active'),
   ('9a4d9a4d-0000-0000-0000-000000000002','Pay B','9a4d-b','UTC','USD','active');
-insert into studio_settings (studio_id, guarantees_enabled) values
-  ('9a4d9a4d-0000-0000-0000-000000000001', true),
-  ('9a4d9a4d-0000-0000-0000-000000000002', true);
+-- Pin the fortnightly anchor to 2 days ago so the "ran now" (now) and "ran old"
+-- (now - 3h) occurrences always share ONE pay period: with the default anchor
+-- (month start), a run in the first 3h of a fortnight-boundary day (e.g. the
+-- 15th) put now-3h in the PREVIOUS fortnight, so closing one period left the
+-- other open and the settlement raised PT409. Test-only date robustness.
+insert into studio_settings (studio_id, guarantees_enabled, pay_period_anchor) values
+  ('9a4d9a4d-0000-0000-0000-000000000001', true, (now() - interval '2 days')::date),
+  ('9a4d9a4d-0000-0000-0000-000000000002', true, (now() - interval '2 days')::date);
 insert into locations (id, studio_id, name, is_primary) values
   ('9a4d9a4d-0000-0000-0000-00000000000a','9a4d9a4d-0000-0000-0000-000000000001','Main',true),
   ('9a4d9a4d-0000-0000-0000-00000000000b','9a4d9a4d-0000-0000-0000-000000000002','Main',true);

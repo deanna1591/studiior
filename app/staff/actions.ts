@@ -122,17 +122,16 @@ export async function checkIn(_prev: string | null, formData: FormData) {
   const occurrenceId = String(formData.get("occurrence_id") ?? "");
   const memberId = String(formData.get("member_id") ?? "");
 
-  const { error } = await supabase.from("check_ins").insert({
-    studio_id: ctx.studioId,
-    booking_id: bookingId,
-    member_id: memberId,
-    occurrence_id: occurrenceId,
-    method: "staff",
-    checked_in_by: ctx.userId,
+  // Decision 75(f): the ONE check-in path — record_check_in inserts the check_in
+  // AND flips the booking to 'attended' in one transaction, so finalisation
+  // never no-shows a member who was checked in at the desk.
+  const { error } = await supabase.rpc("record_check_in", {
+    p_booking_id: bookingId,
+    p_method: "staff",
   });
+  void memberId; // record_check_in derives the member from the booking
 
   if (error) {
-    if (error.code === "23505") return "Already checked in.";
     // PT422 is raised by the §8 check-in window trigger (migration 007). The
     // rule lives in SQL; this only puts its message on screen.
     if (error.code === "PT422") return error.message;
@@ -191,25 +190,18 @@ export async function checkInByCode(_prev: CodeState, fd: FormData): Promise<Cod
     };
   }
 
-  const { error: ciError } = await supabase.from("check_ins").insert({
-    studio_id: ctx.studioId,
-    booking_id: booking.id,
-    member_id: row.member_id,
-    occurrence_id: occurrenceId,
-    method: "qr",
-    checked_in_by: ctx.userId,
+  // Decision 75(f): the ONE check-in path — insert + flip booking to attended.
+  const { data: ciData, error: ciError } = await supabase.rpc("record_check_in", {
+    p_booking_id: booking.id, p_method: "qr",
   });
   if (ciError) {
-    if (ciError.code === "23505") {
-      return { ok: true, message: `${row.first_name} is already checked in.` };
-    }
     // PT422 is the §8 window trigger. The rule lives in SQL; this shows it.
     if (ciError.code === "PT422") return { ok: false, message: ciError.message };
     return { ok: false, message: ciError.message };
   }
-
-  await supabase.from("bookings").update({ status: "attended" }).eq("id", booking.id);
+  const ci = ciData as { ok: boolean; already?: boolean } | null;
   revalidatePath(`/roster/${occurrenceId}`);
+  if (ci?.already) return { ok: true, message: `${row.first_name} is already checked in.` };
   return { ok: true, message: `${row.first_name} ${row.last_name} checked in.` };
 }
 

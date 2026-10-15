@@ -293,18 +293,21 @@ export async function checkInMember(
   const supabase = createClient();
   const occurrenceId = String(form.get("occurrence_id"));
   // Decision 35 §4/§5: an instructor checking a member in is 'instructor', not
-  // 'staff' (a human at the desk). The roster reads this as "Scanned".
-  const { error } = await supabase.from("check_ins").insert({
-    studio_id: String(form.get("studio_id")),
-    booking_id: String(form.get("booking_id")),
-    member_id: String(form.get("member_id")),
-    occurrence_id: occurrenceId,
-    method: "instructor",
+  // 'staff' (a human at the desk). The roster reads this as "Scanned". Decision
+  // 75(f): the ONE check-in path — record_check_in inserts the check_in AND
+  // flips the booking to 'attended', so finalisation never no-shows them.
+  const { data, error } = await supabase.rpc("record_check_in", {
+    p_booking_id: String(form.get("booking_id")),
+    p_method: "instructor",
   });
   if (error) {
-    if (error.code === "23505") return { ok: "In." };               // already checked in
     if (error.code === "PT422") return { error: "They need to sign the studio waiver first." };
     return { error: error.message };
+  }
+  const res = data as { ok: boolean; reason?: string } | null;
+  if (res && !res.ok) {
+    if (res.reason === "not_booked") return { error: "They aren't booked into this class." };
+    return { error: "That could not be recorded." };
   }
   revalidatePath(`/instructor/roster/${occurrenceId}`);
   return { ok: "In." };
@@ -341,16 +344,17 @@ export async function scanCheckIn(
     .in("status", ["booked", "attended"]).maybeSingle();
   if (!booking) return { error: `${m.first_name} isn't booked into this class.` };
 
-  const { error: insErr } = await supabase.from("check_ins").insert({
-    studio_id: studioId, booking_id: booking.id, member_id: m.member_id,
-    occurrence_id: occurrenceId, method: "instructor",
+  // Decision 75(f): the ONE check-in path — insert + flip booking to attended.
+  const { data: res, error: insErr } = await supabase.rpc("record_check_in", {
+    p_booking_id: booking.id, p_method: "instructor",
   });
   if (insErr) {
-    if (insErr.code === "23505") return { ok: `${m.first_name} is already in.` };
     if (insErr.code === "PT422") return { error: `${m.first_name} needs to sign the studio waiver first.` };
     return { error: insErr.message };
   }
+  const r = res as { ok: boolean; already?: boolean } | null;
   revalidatePath(`/instructor/roster/${occurrenceId}`);
+  if (r?.already) return { ok: `${m.first_name} is already in.` };
   return { ok: `${m.first_name} ${m.last_name} — in.` };
 }
 
