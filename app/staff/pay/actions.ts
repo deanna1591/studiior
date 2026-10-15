@@ -46,3 +46,30 @@ export async function markPaid(_prev: PayState, fd: FormData): Promise<PayState>
   revalidatePath(`/pay/${periodId}`);
   return { ok: true, message: "Recorded. The instructor sees their statement marked paid." };
 }
+
+export type CloseState = { ok: boolean; message?: string; held?: { name: string; when: string; instructor: string }[] } | null;
+
+/**
+ * Decision 75b-2 (h): close a pay period. close_pay_period refuses while any
+ * class record is held (an instructor has not checked in, or a manager has not
+ * released it) and returns the holdouts as a REASON — we show the list, not an
+ * error toast. Manager-up; the DB is the boundary.
+ */
+export async function closePeriod(_prev: CloseState, fd: FormData): Promise<CloseState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const periodId = String(fd.get("period_id") ?? "");
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("close_pay_period", { p_period_id: periodId });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "Only owners and managers close a period." };
+    if (error.code === "PT409") return { ok: false, message: error.message };
+    return { ok: false, message: error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string; classes?: { name: string; when: string; instructor: string }[] } | null;
+  if (r && !r.ok && r.reason === "held_records") {
+    return { ok: false, message: "This period still has classes waiting on a check-in.", held: r.classes ?? [] };
+  }
+  revalidatePath(`/pay/${periodId}`);
+  return { ok: true, message: "Period closed. Corrections from here are adjustments in the next period." };
+}

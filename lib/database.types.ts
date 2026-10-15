@@ -7970,7 +7970,6 @@ export type Database = {
       }
       backfill_all_timelines: { Args: never; Returns: Json }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
-      bf: { Args: never; Returns: number }
       book_class: {
         Args: {
           p_member_id: string
@@ -8452,10 +8451,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_eq: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -8733,6 +8728,10 @@ export type Database = {
         Returns: Json
       }
       instructor_open_classes: {
+        Args: { p_instructor_id: string }
+        Returns: Json
+      }
+      instructor_pay_periods: {
         Args: { p_instructor_id: string }
         Returns: Json
       }
@@ -9424,10 +9423,6 @@ export type Database = {
         Returns: string
       }
       rank_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
-      rci: {
-        Args: { p_booking: string; p_method: string; p_uid: string }
-        Returns: string
-      }
       reassign_occurrence: {
         Args: { p_instructor_id: string; p_occurrence_id: string }
         Returns: Json
@@ -9441,9 +9436,6 @@ export type Database = {
         Returns: number
       }
       rebuild_timeline_rows: { Args: { p_member_id: string }; Returns: number }
-      rec_amt: { Args: { p_occ: string }; Returns: number }
-      rec_checked: { Args: { p_occ: string }; Returns: string }
-      rec_instr: { Args: { p_occ: string }; Returns: string }
       recompute_member_stats: {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number

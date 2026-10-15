@@ -129,12 +129,13 @@ select expect_true('the record is now confirmed (method self, payable)',
   (select confirmed_at is not null and confirm_method='self' from instructor_pay_records where occurrence_id='9a4d9a4d-0000-0000-0000-00000000c001'));
 
 -- =============================================================================
--- 5. Closing a period with a held record is refused, naming the count.
+-- 5. Closing a period with a held record is refused — Decision 75b-2 (h) now
+--    RETURNS the holdouts as a reason (house style), not a PT409 raise.
 --    (Ran Old on studio A is still held.)
 -- =============================================================================
-select expect_true('closing a period with a held record is refused',
-  as_state('9a4d9a4d-0000-0000-0000-0000000000a1',
-    $$ select close_pay_period((select period_id from instructor_pay_records where occurrence_id='9a4d9a4d-0000-0000-0000-00000000c002'))::text $$) = 'ERR:PT409');
+select expect_true('closing a period with a held record returns a held_records reason',
+  ((as_state('9a4d9a4d-0000-0000-0000-0000000000a1',
+    $$ select close_pay_period((select period_id from instructor_pay_records where occurrence_id='9a4d9a4d-0000-0000-0000-00000000c002'))::text $$)::jsonb ->> 'reason') = 'held_records'));
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 -- =============================================================================
