@@ -10,6 +10,7 @@ import DayClasses, { type Row } from "@/components/member/day-classes";
 import FreeClassList from "@/components/member/free-class-list";
 import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, fmtDeadlineShort, zonedDateKey } from "@/lib/time";
+import { freeEligibleSet, whichView, nearestEligibleDay } from "@/lib/free-first-view";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 export default async function Book({
   searchParams,
 }: {
-  searchParams: { d?: string; type?: string; instructor?: string; v?: string };
+  searchParams: { d?: string; type?: string; instructor?: string; v?: string; all?: string };
 }) {
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings , openOffers, memberName, avatarUrl} = await memberScreen();
 
@@ -178,6 +179,17 @@ export default async function Book({
     occurrence_id: string; name: string; starts_at: string; room_name: string | null;
     instructor_first: string | null; headcount: number; capacity: number; free_bookable: boolean;
   }[]);
+  // Decision 55 follow-up: the Book tab is the free-class picker while the member
+  // is eligible and has eligible classes (unless they asked for the full
+  // timetable via ?all=1). On the timetable, "Book free" shows only on the rows
+  // where it actually works (free-bookable); everything else is the paid Book.
+  const showAll = searchParams.all === "1";
+  const freeEligibleIds = freeEligibleSet(freeList);
+  const freeView = whichView({ freeFirstEligible, eligibleCount: freeList.length, showAll });
+  const freeDeepLinkDay = nearestEligibleDay(
+    freeList.map((c) => zonedDateKey(c.starts_at, ctx.timeZone)),
+    /^\d{4}-\d{2}-\d{2}$/.test((searchParams.d ?? "").trim()) ? (searchParams.d ?? "").trim() : null,
+  );
   // BANNER announcements only reach the Book strip; What's-on posts stay Home-only.
   const bannerAnnouncements = ((announceRaw ?? []) as unknown as
     { id: string; kind: string; title: string; link_url: string | null; link_label: string | null }[])
@@ -240,7 +252,8 @@ export default async function Book({
   const qs = (over: Record<string, string | number | undefined>) => {
     const p = new URLSearchParams();
     const merged = { d: offset, v: monthView ? "month" : undefined,
-                     type: typeFilter || undefined, instructor: instFilter || undefined, ...over };
+                     type: typeFilter || undefined, instructor: instFilter || undefined,
+                     all: showAll ? "1" : undefined, ...over };
     for (const [k, v] of Object.entries(merged)) {
       if (v !== undefined && v !== "" && !(k === "d" && v === 0)) p.set(k, String(v));
     }
@@ -451,10 +464,24 @@ export default async function Book({
           built-in banner (Decision 27 amendment); the "Book — first class free"
           row buttons still carry it while this member is eligible. */}
       <AnnounceStrip items={bannerAnnouncements} />
-      {/* Decision 30 amendment: an eligible member picks their free class from a
-          grouped list, fullest first, with capped classes marked. */}
-      {freeFirstEligible && (
-        <FreeClassList classes={freeList} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} bookFirstFree={bookFirstFree} />
+      {/* Decision 55 follow-up: while eligible and unpicked, the Book tab IS the
+          free-class picker (the primary view); ?all=1 shows the full timetable,
+          where "Book free" appears only on the rows it works on. */}
+      {freeView === "picker" ? (
+        <FreeClassList
+          classes={freeList} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat}
+          bookFirstFree={bookFirstFree}
+          heading="Choose your free class — open to first-timers"
+          fullTimetableHref={qs({ all: "1" })}
+          initialDayKey={freeDeepLinkDay}
+        />
+      ) : (
+      <>
+      {freeFirstEligible && freeList.length > 0 && (
+        <Link href={qs({ all: undefined })}
+              className="mb-3 inline-block text-[13px] text-lime-text underline underline-offset-4">
+          ← Back to your free class
+        </Link>
       )}
       <section aria-label="Choose a day" className="mb-4">
         <div className="mb-2.5 flex items-center gap-2">
@@ -609,6 +636,7 @@ export default async function Book({
           bookClass={bookClass}
           bookFirstFree={bookFirstFree}
           freeFirstEligible={freeFirstEligible}
+          freeEligibleIds={freeEligibleIds}
           selfCheckIn={selfCheckIn}
           startCheckout={startCheckout}
           payAtDesk={payAtDesk}
@@ -617,6 +645,8 @@ export default async function Book({
         />
       )}
       </DayView>
+      </>
+      )}
     </MemberShell>
   );
 }

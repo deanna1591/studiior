@@ -79,6 +79,7 @@ export default function DayClasses({
   bookClass,
   bookFirstFree,
   freeFirstEligible,
+  freeEligibleIds,
   selfCheckIn,
   startCheckout,
   payAtDesk,
@@ -89,6 +90,10 @@ export default function DayClasses({
   bookClass: (p: BookResult, f: FormData) => Promise<BookResult>;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
   freeFirstEligible: boolean;
+  /** Decision 55 follow-up: the occurrences a free booking actually works on
+   *  (free_first_class_list, free-bookable). "Book free" shows only on these;
+   *  every other row shows the paid Book button + a muted note. */
+  freeEligibleIds?: Set<string>;
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
@@ -123,12 +128,12 @@ export default function DayClasses({
     startTransition(async () => {
       const fd = new FormData();
       fd.set("occurrence_id", r.id);
-      // Decision 30: an eligible member's booking IS the free class — the same
-      // button, the free path. Never the paid drop-in that book_class would
-      // resolve for a lead. (Waitlisting a full class is never the free path.)
-      const res = await (freeFirstEligible && !asWaitlist
-        ? bookFirstFree(null, fd)
-        : bookClass(null, fd));
+      // Decision 30 + 55 follow-up: an eligible member's booking IS the free
+      // class ONLY on a row where a free booking works (free_first_class_list,
+      // free-bookable). Elsewhere it is the paid Book, so the button and the
+      // rule never contradict. (Waitlisting a full class is never the free path.)
+      const rowIsFree = freeFirstEligible && !asWaitlist && !!freeEligibleIds?.has(r.id);
+      const res = await (rowIsFree ? bookFirstFree(null, fd) : bookClass(null, fd));
       if (res && res.ok === false) {
         // Snap back and say why.
         setOverride((s) => ({ ...s, [r.id]: null }));
@@ -168,6 +173,9 @@ export default function DayClasses({
           : "quiet";
 
         let action: React.ReactNode = null;
+        // Decision 55 follow-up: set in the Book-button branch when this row is
+        // not free-bookable for an eligible member (→ a muted note below).
+        let freeNote = false;
         if (state === "past") action = null;
         else if (state === "future") {
           // Too far ahead to book yet — say when it opens, rather than a Book
@@ -242,9 +250,12 @@ export default function DayClasses({
             </button>
           ) : null;
         } else {
-          // Decision 30: for an eligible member, this book IS the free class.
-          // Decision 68: Book is the light accent tint (the solid accent is
-          // reserved for "Check in now", the one urgent action).
+          // Decision 30 + 55 follow-up: "Book free" only where a free booking
+          // works; a non-eligible row for an eligible member is the paid Book
+          // plus a muted note (rendered below the card), so the button and the
+          // rule never contradict. Decision 68: Book is the light accent tint.
+          const rowIsFree = freeFirstEligible && !!freeEligibleIds?.has(r.id);
+          freeNote = freeFirstEligible && !rowIsFree;
           action = (
             <button
               type="button"
@@ -252,7 +263,7 @@ export default function DayClasses({
               style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
               className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
             >
-              {freeFirstEligible ? "Book free" : "Book"}
+              {rowIsFree ? "Book free" : "Book"}
             </button>
           );
         }
@@ -284,6 +295,11 @@ export default function DayClasses({
               booked={state === "booked"}
               dimmed={state === "past" || state === "peakBlocked"}
             />
+            {freeNote && (
+              <li className="m-micro list-none px-3 pb-1 pt-0.5 text-ink-3" aria-hidden>
+                Free class not available for this one
+              </li>
+            )}
           </Fragment>
         );
       })}

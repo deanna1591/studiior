@@ -22,9 +22,14 @@ type FreeClass = {
  */
 export default function FreeClassList({
   classes, timeZone, timeFormat = "24h", bookFirstFree,
+  heading, fullTimetableHref, initialDayKey,
 }: {
   classes: FreeClass[]; timeZone: string; timeFormat?: TimeFormat;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
+  // Decision 55 follow-up: the Book tab uses this as its primary view with a
+  // first-timer heading, a link to the full timetable, chips to narrow by class,
+  // and a ?d= deep-link day.
+  heading?: string; fullTimetableHref?: string; initialDayKey?: string | null;
 }) {
   const [pending, start] = useTransition();
   const [booked, setBooked] = useState<string | null>(null);
@@ -55,10 +60,19 @@ export default function FreeClassList({
     return { days, byDay, firstKey: withClasses[0] ?? null };
   }, [classes, timeZone]);
 
-  const [selected, setSelected] = useState<string | null>(firstKey);
+  const [selected, setSelected] = useState<string | null>(initialDayKey ?? firstKey);
+  // Class-type chips, from the distinct class names in the eligible list. Only
+  // shown when there is more than one to choose between.
+  const typeNames = useMemo(
+    () => [...new Set(classes.map((c) => c.name))].sort(),
+    [classes],
+  );
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
   if (classes.length === 0 || !firstKey) return null;
   const key = selected ?? firstKey;
-  const rows = (byDay.get(key) ?? []).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const rows = (byDay.get(key) ?? [])
+    .filter((c) => !typeFilter || c.name === typeFilter)
+    .slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
   const book = (id: string) => start(async () => {
     const f = new FormData();
@@ -69,10 +83,35 @@ export default function FreeClassList({
 
   return (
     <section aria-label="Your free class" className="mb-5">
-      <h2 className="m-head mb-1 text-[16px] leading-5 text-ink">Your free class — pick one.</h2>
+      <h2 className="m-head mb-1 text-[16px] leading-5 text-ink">{heading ?? "Your free class — pick one."}</h2>
       <p className="m-sub mb-3 text-[12.5px] leading-[18px] text-ink-2">
         Days with people already in are a good bet.
+        {fullTimetableHref && (
+          <> · <Link href={fullTimetableHref} className="text-lime-text underline underline-offset-4">See the full timetable</Link></>
+        )}
       </p>
+
+      {/* Class-type chips — narrow the eligible classes. Only when there's a choice. */}
+      {typeNames.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => setTypeFilter(null)}
+                  className="m-press rounded-full px-3 py-1 text-[12px] font-semibold"
+                  style={typeFilter === null
+                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                    : { background: "var(--surface)", color: "var(--ink-2)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+            All
+          </button>
+          {typeNames.map((n) => (
+            <button key={n} type="button" onClick={() => setTypeFilter(n)}
+                    className="m-press rounded-full px-3 py-1 text-[12px] font-semibold"
+                    style={typeFilter === n
+                      ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                      : { background: "var(--surface)", color: "var(--ink-2)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Day strip: a dot marks a day with at least one eligible class. */}
       <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Pick a day">

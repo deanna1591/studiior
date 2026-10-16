@@ -821,6 +821,8 @@ Check-in, no-show finalisation, instructor headcount and pay, and statements tre
 
 **Where:** migration (time_format + `fmt_clock` + the re-issued senders + the exposers); `lib/time.ts` `fmtClock`; `app/member/book` free picker. **Status:** settled. **Reuses:** Decision 30 amendment (the free-class eligibility + provisional machinery), Decision 51 (the Branding "how members see it" group). **Off by default** (`'24h'` = today), asserted inert by the `all_off` canary.
 
+**Follow-up, 16 Oct 2026 (Reform member report).** An eligible member saw 'Book free' on flex classes, tapped, and was refused with the core-classes sentence — the button and the rule contradicted each other. (a) On the timetable, 'Book free' appears only on rows present in free_first_class_list; every other row shows the normal paid button plus a muted note 'Free class not available for this one'. (b) While a member is eligible and has no free booking, the Book tab opens with the picker expanded under the heading 'Choose your free class — open to first-timers', with the day strip and class-type chips filtered to eligible classes and a 'See the full timetable' link; after booking, or when the member is not eligible, nothing changes. (c) The refusal sentences stay for the direct-link case. No setting, no migration.
+
 ---
 
 ## 54 — Instructor portal polish (owner's first walkthrough), install-page tightening, and two Decision 55 follow-ups
