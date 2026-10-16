@@ -1293,6 +1293,7 @@ export type Database = {
           ends_at: string
           flex: boolean
           flex_reached_minimum_at: string | null
+          free_first_override: string | null
           guarantee_tier: Database["public"]["Enums"]["guarantee_tier"] | null
           id: string
           instructor_checked_in_at: string | null
@@ -1343,6 +1344,7 @@ export type Database = {
           ends_at: string
           flex?: boolean
           flex_reached_minimum_at?: string | null
+          free_first_override?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
           instructor_checked_in_at?: string | null
@@ -1393,6 +1395,7 @@ export type Database = {
           ends_at?: string
           flex?: boolean
           flex_reached_minimum_at?: string | null
+          free_first_override?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
           id?: string
           instructor_checked_in_at?: string | null
@@ -8413,6 +8416,7 @@ export type Database = {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
       }
+      effective_free_first: { Args: { p_occurrence_id: string }; Returns: Json }
       end_membership: {
         Args: {
           p_keep_credits?: boolean
@@ -9806,6 +9810,10 @@ export type Database = {
       set_class_type_instructors: {
         Args: { p_class_type_id: string; p_instructor_ids: string[] }
         Returns: number
+      }
+      set_free_first_override: {
+        Args: { p_occurrence_id: string; p_value?: string }
+        Returns: Json
       }
       set_insight_status: {
         Args: {

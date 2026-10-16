@@ -14,6 +14,7 @@ import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
 import ReleasePay from "./release-pay";
 import RunAnyway from "./run-anyway";
+import FreeFirstCard from "./free-first";
 import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
@@ -52,6 +53,16 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
     candidates = cands;
     pendingApplications = count ?? 0;
   }
+
+  // Decision 30 amendment (b): the per-class free-first state for the card
+  // (only shown when the studio runs free first classes).
+  const [{ data: ffSettings }, { data: ffStateRaw }] = await Promise.all([
+    supabase.from("studio_settings").select("free_first_class_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.rpc("effective_free_first", { p_occurrence_id: params.occurrenceId }),
+  ]);
+  const ffEnabled = ffSettings?.free_first_class_enabled ?? false;
+  const ffState = ffStateRaw as unknown as
+    { override: "open" | "closed" | null; effective_open: boolean; rules_open: boolean; reason: string | null } | null;
 
   const [{ data: bookings }, { data: checkIns }] =
     await Promise.all([
@@ -258,6 +269,22 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
       {/* The desk end of the member's rotating code. Without it the QR on
           their phone is a picture nothing can read. */}
       <CodeCheckIn occurrenceId={occ.id} />
+
+      {/* Decision 30 amendment (b): open or close THIS class to free first
+          classes. Only when the studio runs free first classes. */}
+      {ffEnabled && ffState && (
+        <div className="mt-4">
+          <FreeFirstCard
+            occurrenceId={occ.id}
+            initial={{
+              override: (ffState.override ?? null) as "open" | "closed" | null,
+              effectiveOpen: !!ffState.effective_open,
+              rulesOpen: !!ffState.rules_open,
+              reason: (ffState.reason ?? null) as string | null,
+            }}
+          />
+        </div>
+      )}
 
       <SectionLabel>Roster</SectionLabel>
       {booked.length === 0 ? (

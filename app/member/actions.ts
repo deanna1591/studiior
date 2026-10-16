@@ -144,6 +144,7 @@ const FREE_FIRST_REASONS: Record<string, string> = {
   peak_not_allowed: "Free classes aren't offered at peak times. You can still book this one paying.",
   flex_not_allowed: "Your free class is for our core classes — pick one of those.",
   not_trial_class: "This class isn't open for free first classes. Pick another one.",
+  free_first_closed_here: "This class isn't open to free first classes. Pick another one.",
   free_seats_full: "This class is full for free classes. Pick another one.",
   not_staffed_yet: "This class isn't open for booking yet.",
   class_full: "That class is full.",

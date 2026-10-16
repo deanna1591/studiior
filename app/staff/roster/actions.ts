@@ -295,3 +295,43 @@ export async function forceCommit(_prev: ForceCommitState, fd: FormData): Promis
   revalidatePath("/schedule");
   return { ok: true, message: "Confirmed to run. It will go ahead even below its minimum." };
 }
+
+export type FreeFirstState =
+  | { ok: true; effectiveOpen: boolean; override: "open" | "closed" | null; why: string; reason: string | null }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Decision 30 amendment (b): open or close THIS class to free first classes,
+ * overriding the studio-wide core-only rule and the per-series switch. value is
+ * 'open' | 'closed' | '' (clear → follow studio rules). set_free_first_override
+ * is the boundary (front desk and up); refusals come back as reasons.
+ */
+export async function setFreeFirstOverride(_prev: FreeFirstState, fd: FormData): Promise<FreeFirstState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const raw = String(fd.get("value") ?? "");
+  const value = raw === "open" || raw === "closed" ? raw : null;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_free_first_override", {
+    p_occurrence_id: occurrenceId, p_value: value ?? undefined,
+  });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "Only owners, managers and front desk set this." };
+    return { ok: false, message: error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string; effective_open?: boolean; override?: "open" | "closed" | null; why?: string } | null;
+  if (!r?.ok) {
+    const msg = r?.reason === "past_class" ? "This class has already started."
+      : r?.reason === "cancelled" ? "This class is cancelled."
+      : "That could not be set.";
+    return { ok: false, message: msg };
+  }
+  revalidatePath(`/roster/${occurrenceId}`);
+  return {
+    ok: true, effectiveOpen: !!r.effective_open, override: r.override ?? null,
+    why: r.why ?? "rules", reason: null,
+  };
+}
