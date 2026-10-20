@@ -9,6 +9,8 @@ import { enGB } from "date-fns/locale";
 import { moveClass } from "./actions";
 import CreateOnSlot, { type SlotDraft } from "./create-slot";
 import BlockPanel, { type BlockFacts } from "@/components/schedule/block-panel";
+import type { FreeFirstCardState } from "@/components/schedule/free-first";
+import { showsTrialsMarker } from "@/lib/free-first-view";
 import { TierMark } from "@/components/tier-mark";
 import StaffAvatar from "@/components/staff-avatar";
 
@@ -116,6 +118,9 @@ export type CalEvent = {
   /** Decision 38: the assigned instructor confirmed / was asked and has not. */
   assignmentConfirmed?: boolean;
   assignmentAwaiting?: boolean;
+  /** Decision 30 amendment (b) follow-up: the per-class free-first state, for the
+   *  popup card and the "Trials" marker. Null when the studio does not use it. */
+  freeFirst?: FreeFirstCardState | null;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -124,7 +129,7 @@ type WallEvent = CalEvent & { start: Date; end: Date };
 export default function ScheduleCalendar({
   events: initial, resources, classTypes, rooms, timeZone, deadlineHours,
   quietPct, quietWindowDays, fullPct, showTier, coreEnabled, flexEnabled,
-  assignmentConfirmations,
+  assignmentConfirmations, freeFirstEnabled = false,
   anchor, today, view, minHour, maxHour, weekStartsOn,
   instructorNames, instructorAvatars, canManage, instructorParam, timeFormat = "24h",
 }: {
@@ -152,6 +157,9 @@ export default function ScheduleCalendar({
   flexEnabled: boolean;
   /** Decision 38 amendment: show the "already confirmed" bypass tick on create. */
   assignmentConfirmations: boolean;
+  /** Decision 30 amendment (b) follow-up: the studio uses free first classes, so
+   *  the popup shows the "Open to first-timers" card and blocks can show "Trials". */
+  freeFirstEnabled?: boolean;
   timeZone: string;
   deadlineHours: number;
   /**
@@ -649,6 +657,13 @@ export default function ScheduleCalendar({
               {assignmentConfirmations && event.assignmentAwaiting && (
                 <span className="text-ink-3" title="Awaiting the instructor's confirmation">awaiting</span>
               )}
+              {/* Decision 30 amendment (b) follow-up: this class is open to
+                  first-timers BY OVERRIDE. Only shown for an override — a
+                  rules-open core class would mark every block. --ink-2 carries
+                  it (the safe floor on a tinted block, like "On its own"). */}
+              {showsTrialsMarker(event.freeFirst) && (
+                <span className="text-ink-2" title="Open to first-timers (set for this class)">Trials</span>
+              )}
             </span>
           </div>
         </div>
@@ -789,9 +804,11 @@ export default function ScheduleCalendar({
         <BlockPanel
           canManage={canManage}
           confirmationsOn={assignmentConfirmations}
+          freeFirstEnabled={freeFirstEnabled}
           rosterHref={`/roster/${selected.id}`}
           facts={{
             id: selected.id,
+            freeFirst: selected.freeFirst ?? null,
             title: selected.title,
             when: new Intl.DateTimeFormat("en-GB", {
               weekday: "long", day: "numeric", month: "long", timeZone,
@@ -830,6 +847,13 @@ export default function ScheduleCalendar({
                 ? { ...e, resourceId: UNASSIGNED, staffing: "open" }
                 : e));
             setSelected(null);
+            startTransition(() => router.refresh());
+          }}
+          onFreeFirstChange={(s) => {
+            // The popup stays open; the block behind it gets the "Trials" marker
+            // at once, and the server's fresh events land right after.
+            setEvents((prev) => prev.map((e) => e.id === selected.id ? { ...e, freeFirst: s } : e));
+            setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, freeFirst: s } : prev));
             startTransition(() => router.refresh());
           }}
         />

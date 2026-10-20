@@ -550,6 +550,19 @@ values
    (date '2026-11-18' + time '07:00') at time zone 'Europe/Prague',
    (date '2026-11-18' + time '07:50') at time zone 'Europe/Prague','scheduled','assigned');
 
+-- Pin this two-timezone window to exactly the fixtures above. The suite's own
+-- generating series materialises a Wednesday class for this Manila studio, and
+-- on a run date where 18 Nov is inside the occurrence horizon it lands on the
+-- 18th — so schedule_range(18th,18th) then sees 3 where this section means 2.
+-- Date-fragile, test-only: remove any non-fixture occurrence for this studio in
+-- the 17–18 Nov window. The series and every other occurrence are untouched.
+delete from class_occurrences
+ where studio_id = '0ccc0ccc-0000-0000-0000-000000000002'
+   and id not in ('0ccc0ccc-0000-0000-0000-00000000ff01',
+                  '0ccc0ccc-0000-0000-0000-00000000ff02',
+                  '0ccc0ccc-0000-0000-0000-00000000ff03')
+   and (starts_at at time zone 'Asia/Manila')::date in (date '2026-11-17', date '2026-11-18');
+
 select expect_text('a 07:00 Manila class is stored the previous day in UTC',
   (select to_char(starts_at at time zone 'UTC','YYYY-MM-DD HH24:MI')
      from class_occurrences where id = '0ccc0ccc-0000-0000-0000-00000000ff01'),

@@ -329,6 +329,9 @@ export async function setFreeFirstOverride(_prev: FreeFirstState, fd: FormData):
       : "That could not be set.";
     return { ok: false, message: msg };
   }
+  // The control lives in the Schedule popup now (Decision 30 (b) follow-up), so
+  // the week's "Trials" marker must refresh; the roster path stays harmless.
+  revalidatePath("/schedule");
   revalidatePath(`/roster/${occurrenceId}`);
   return {
     ok: true, effectiveOpen: !!r.effective_open, override: r.override ?? null,

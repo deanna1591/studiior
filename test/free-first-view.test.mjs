@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { freeEligibleSet, whichView, nearestEligibleDay } from "../lib/free-first-view.mjs";
+import { freeEligibleSet, whichView, nearestEligibleDay, showsTrialsMarker } from "../lib/free-first-view.mjs";
 
 test("freeEligibleSet keeps only free_bookable rows", () => {
   const s = freeEligibleSet([
@@ -28,4 +28,18 @@ test("nearestEligibleDay: that day, else nearest, first when no want", () => {
   assert.equal(nearestEligibleDay(keys, null), "2026-10-20");           // no want -> first
   assert.equal(nearestEligibleDay(keys, "garbage"), "2026-10-20");      // bad -> first
   assert.equal(nearestEligibleDay([], "2026-10-22"), null);             // none
+});
+
+// Decision 30 amendment (b) follow-up — the "Trials" calendar-block marker.
+test("showsTrialsMarker: only an effectively-open OVERRIDE shows it", () => {
+  assert.equal(showsTrialsMarker({ override: "open", effectiveOpen: true }), true);
+  // A rules-open class (no override) gets no marker — it would be on every core class.
+  assert.equal(showsTrialsMarker({ override: null, effectiveOpen: true }), false);
+  // Closed, either way, never.
+  assert.equal(showsTrialsMarker({ override: "closed", effectiveOpen: false }), false);
+  // override 'open' but not effectively open (studio switch off) — no marker.
+  assert.equal(showsTrialsMarker({ override: "open", effectiveOpen: false }), false);
+  // Null / missing state (studio doesn't use free first classes).
+  assert.equal(showsTrialsMarker(null), false);
+  assert.equal(showsTrialsMarker(undefined), false);
 });

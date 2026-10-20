@@ -5,6 +5,7 @@ import { republishShift, openShift } from "@/app/staff/roster/actions";
 import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
 import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
+import FreeFirstCard, { type FreeFirstCardState } from "@/components/schedule/free-first";
 
 export type BlockFacts = {
   id: string;
@@ -23,6 +24,10 @@ export type BlockFacts = {
   cancelled?: boolean;
   cancellationCause?: string | null;
   cancellationReason?: string | null;
+  /** Decision 30 amendment (b) follow-up: the per-class free-first state (from
+   *  schedule_range's effective_free_first), for the "Open to first-timers"
+   *  card. Null when the studio does not use free first classes. */
+  freeFirst?: FreeFirstCardState | null;
 };
 
 /**
@@ -39,7 +44,8 @@ export type BlockFacts = {
  * closes on click or Escape.
  */
 export default function BlockPanel({
-  facts, canManage, rosterHref, confirmationsOn = false, onAssigned, onUnassigned, onClose,
+  facts, canManage, rosterHref, confirmationsOn = false, freeFirstEnabled = false,
+  onAssigned, onUnassigned, onFreeFirstChange, onClose,
 }: {
   facts: BlockFacts;
   canManage: boolean;
@@ -47,8 +53,12 @@ export default function BlockPanel({
   // Decision 58: the studio's assignment_confirmations. When off there is no ask
   // to suppress, so the "already confirmed" bypass tick is not shown.
   confirmationsOn?: boolean;
+  // Decision 30 amendment (b) follow-up: the studio's free_first_class_enabled.
+  // The "Open to first-timers" card is shown only when on.
+  freeFirstEnabled?: boolean;
   onAssigned: (instructorId: string, instructorName: string) => void;
   onUnassigned: () => void;
+  onFreeFirstChange?: (s: FreeFirstCardState) => void;
   onClose: () => void;
 }) {
   const [candidates, setCandidates] = useState<AssignCandidate[] | null>(null);
@@ -290,6 +300,14 @@ export default function BlockPanel({
               </>
             )}
           </div>
+        )}
+
+        {/* Decision 30 amendment (b) follow-up: "Open to first-timers" for this
+            class, between "Or open it as a shift" and "Open the full roster".
+            Front desk and up; hidden when the studio does not use free first
+            classes. The popup stays open across a change. */}
+        {canManage && freeFirstEnabled && !facts.cancelled && facts.freeFirst && (
+          <FreeFirstCard occurrenceId={facts.id} initial={facts.freeFirst} onChange={onFreeFirstChange} />
         )}
 
         <div className="mt-3 border-t border-line pt-3">

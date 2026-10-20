@@ -117,7 +117,7 @@ export default async function Schedule({
       supabase.from("shift_applications")
         .select("occurrence_id").eq("status", "pending"),
       supabase.from("studio_settings")
-        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled, assignment_confirmations, open_time, close_time")
+        .select("unstaffed_deadline_hours, week_starts_on, guarantees_enabled, flex_enabled, assignment_confirmations, free_first_class_enabled, open_time, close_time")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_pct" }),
       supabase.rpc("insight_threshold", { p_studio_id: ctx.studioId, p_key: "underfilled_window_days" }),
@@ -161,6 +161,10 @@ export default async function Schedule({
     occ_series_tier: string | null; occ_minimum: number | null;
     occ_status: string; occ_cancellation_cause: string | null;
     occ_assignment_requested: boolean; occ_assignment_confirmed: boolean;
+    occ_free_first: {
+      override: "open" | "closed" | null; effective_open: boolean;
+      rules_open: boolean; reason: string | null;
+    } | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -212,6 +216,12 @@ export default async function Schedule({
     // Decision 38: the assigned-class confirmation state (only when asked).
     assignmentConfirmed: o.occ_assignment_confirmed,
     assignmentAwaiting: o.occ_assignment_requested && !o.occ_assignment_confirmed,
+    // Decision 30 amendment (b) follow-up: the per-class free-first state for the
+    // popup card and the "Trials" marker. Null when the studio doesn't use it.
+    freeFirst: o.occ_free_first
+      ? { override: o.occ_free_first.override, effectiveOpen: o.occ_free_first.effective_open,
+          rulesOpen: o.occ_free_first.rules_open, reason: o.occ_free_first.reason }
+      : null,
   }));
 
   // The instructor filter narrows what the calendar DRAWS — a specific
@@ -596,6 +606,7 @@ export default async function Schedule({
           coreEnabled={settings?.guarantees_enabled ?? false}
           flexEnabled={settings?.flex_enabled ?? false}
           assignmentConfirmations={settings?.assignment_confirmations ?? false}
+          freeFirstEnabled={settings?.free_first_class_enabled ?? false}
           anchor={anchor} today={today} view={view} weekStartsOn={weekStartsOn}
           minHour={minHour} maxHour={maxHour}
           // id -> name and id -> avatar for EVERY active instructor, so the week
