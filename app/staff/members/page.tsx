@@ -6,6 +6,7 @@ import { AppShell, Empty, NavLink, Pill, PillRow, Rows, Segmented } from "@/comp
 import { HealthBand, HealthChip, bandOf, isLoud, type Band } from "@/components/health-band";
 import { StateChip } from "@/components/state-chip";
 import { MessageLink } from "@/components/message-link";
+import { defaultSortMode } from "@/lib/members-list";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +33,17 @@ const FILTERS: { key: string; label: string; bands?: Band[] }[] = [
 ];
 
 // Combinable with the health filter, on its own `plan` param. "On a plan"
-// gathers the two usable states; the rest map to one plan_state each.
-const PLAN_FILTERS: { key: string; label: string; match: (s: string) => boolean }[] = [
-  { key: "on_plan", label: "On a plan", match: (s) => s === "on_plan" || s === "expiring" },
-  { key: "expiring", label: "Expiring (14 days)", match: (s) => s === "expiring" },
-  { key: "expired", label: "Expired", match: (s) => s === "expired" },
-  { key: "free_only", label: "Free class only", match: (s) => s === "free_only" },
-  { key: "none", label: "No plan yet", match: (s) => s === "none" },
+// gathers the two usable states; the free cohort (plan_state 'free_only') is
+// split by free_stage (Members list polish, 20 Oct 2026); the rest map to one
+// plan_state each. Matches the whole row (free_stage + plan_state).
+const PLAN_FILTERS: { key: string; label: string; match: (m: Row) => boolean }[] = [
+  { key: "on_plan", label: "On a plan", match: (m) => m.plan_state === "on_plan" || m.plan_state === "expiring" },
+  { key: "expiring", label: "Expiring (14 days)", match: (m) => m.plan_state === "expiring" },
+  { key: "expired", label: "Expired", match: (m) => m.plan_state === "expired" },
+  { key: "free_booked", label: "Free class booked", match: (m) => m.plan_state === "free_only" && m.free_stage === "booked" },
+  { key: "free_taken", label: "Free class taken", match: (m) => m.plan_state === "free_only" && m.free_stage === "taken" },
+  { key: "free_missed", label: "Free class missed", match: (m) => m.plan_state === "free_only" && m.free_stage === "missed" },
+  { key: "none", label: "Signed up, nothing booked", match: (m) => m.plan_state === "none" },
 ];
 
 type Row = {
@@ -47,7 +52,7 @@ type Row = {
   health_band: string; health_reason: string; user_id: string | null;
   current_plan_name: string | null; plan_type: string | null;
   expires_on: string | null; credits_remaining: number | null;
-  plan_state: string; complimentary: boolean;
+  plan_state: string; complimentary: boolean; free_stage: string | null;
 };
 
 export default async function Members({
@@ -91,14 +96,17 @@ export default async function Members({
   }
 
   // The plan filter is an AND on top of the health filter.
-  if (planSpec) shown = shown.filter((m) => planSpec.match(m.plan_state));
+  if (planSpec) shown = shown.filter((m) => planSpec.match(m));
+  // Backward compatible: ?plan=free_only still works, mapping to the three free
+  // chips combined (the whole free cohort).
+  else if (planFilter === "free_only") shown = shown.filter((m) => m.plan_state === "free_only");
   // Decision 61: "Complimentary" is a flag, not a plan_state.
   else if (planFilter === "complimentary") shown = shown.filter((m) => m.complimentary);
 
   const count = (bands: Band[]) =>
     all.filter((m) => bands.includes(bandOf(m.health_band))).length;
   const planCount = (p: (typeof PLAN_FILTERS)[number]) =>
-    all.filter((m) => p.match(m.plan_state)).length;
+    all.filter((m) => p.match(m)).length;
 
   const href = (patch: { filter?: string | null; plan?: string | null; sort?: string | null }) => {
     const f = patch.filter === undefined ? filter : patch.filter;
@@ -119,13 +127,29 @@ export default async function Members({
   const SEVERITY: Record<Band, number> = {
     at_risk: 0, drifting: 1, new: 2, insufficient_history: 3, healthy: 4,
   };
+  // Members list polish (20 Oct 2026): a studio where nobody has visited yet has
+  // no attention to sort by — newest sign-up is the sensible default there. The
+  // user's explicit "By expiry" always wins; otherwise the mode decides.
+  const sortMode = sort === "expiry" ? "expiry" : defaultSortMode(all);
+  let joinedMap: Map<string, string | null> | null = null;
+  if (sortMode === "newest") {
+    const { data: jr } = await supabase
+      .from("members").select("id, joined_on").eq("studio_id", ctx.studioId);
+    joinedMap = new Map((jr ?? []).map((r) => [r.id, r.joined_on]));
+  }
+  const joinedTs = (m: Row) => {
+    const j = joinedMap?.get(m.id);
+    return j ? Date.parse(j) : 0;
+  };
   const ordered =
-    sort === "expiry"
+    sortMode === "expiry"
       ? [...shown].sort((a, b) => {
           const ax = a.expires_on ? Date.parse(a.expires_on) : Infinity;
           const bx = b.expires_on ? Date.parse(b.expires_on) : Infinity;
           return ax - bx;
         })
+      : sortMode === "newest"
+      ? [...shown].sort((a, b) => joinedTs(b) - joinedTs(a))
       : [...shown].sort(
           (a, b) => SEVERITY[bandOf(a.health_band)] - SEVERITY[bandOf(b.health_band)],
         );
@@ -163,15 +187,13 @@ export default async function Members({
               return (
                 <Pill key={f.key} href={href({ filter: f.key })} active={filter === f.key}>
                   {f.label}
-                  {n > 0 && <span className="num ml-1.5 opacity-60">{n}</span>}
+                  <span className="num ml-1.5 opacity-60">{n}</span>
                 </Pill>
               );
             })}
             <Pill href={href({ filter: "no_app" })} active={filter === "no_app"}>
               No app
-              {all.filter((m) => !m.user_id).length > 0 && (
-                <span className="num ml-1.5 opacity-60">{all.filter((m) => !m.user_id).length}</span>
-              )}
+              <span className="num ml-1.5 opacity-60">{all.filter((m) => !m.user_id).length}</span>
             </Pill>
             {membershipFilterLabel && (filter === "past_due" || filter === "payment") && (
               <Pill href={href({ filter })} active>{membershipFilterLabel}</Pill>
@@ -184,7 +206,7 @@ export default async function Members({
               return (
                 <Pill key={p.key} href={href({ plan: p.key })} active={planFilter === p.key}>
                   {p.label}
-                  {n > 0 && <span className="num ml-1.5 opacity-60">{n}</span>}
+                  <span className="num ml-1.5 opacity-60">{n}</span>
                 </Pill>
               );
             })}
@@ -193,7 +215,7 @@ export default async function Members({
               return (
                 <Pill href={href({ plan: "complimentary" })} active={planFilter === "complimentary"}>
                   Complimentary
-                  {n > 0 && <span className="num ml-1.5 opacity-60">{n}</span>}
+                  <span className="num ml-1.5 opacity-60">{n}</span>
                 </Pill>
               );
             })()}
@@ -250,7 +272,10 @@ export default async function Members({
                     >
                       {m.first_name} {m.last_name}
                     </Link>
-                    {!loud && <HealthChip band={band} />}
+                    {/* Members list polish (20 Oct 2026): no health chip for a
+                        member with zero visits — the band can't say anything yet.
+                        "New" (a recent sign-up) stays. */}
+                    {!loud && ((m.lifetime_visits ?? 0) > 0 || band === "new") && <HealthChip band={band} />}
                     {/* Quiet, and only on the ones without. A tick on every
                         row that has an account is a column of ticks; the
                         useful signal is the absence. */}
@@ -297,7 +322,17 @@ export default async function Members({
  *  chip; free-only and no-plan carry the chip alone. */
 function PlanLine({ m, timeZone }: { m: Row; timeZone: string }) {
   const ps = m.plan_state;
-  if (ps === "free_only" || ps === "none") return <StateChip state={ps} />;
+  // Members list polish (20 Oct 2026): the free cohort shows its stage in place
+  // of "Free class only"; "none" is renamed via the chip. A free_only member
+  // with no resolvable stage (comp cancelled) falls back to "Free class only".
+  if (ps === "free_only") {
+    const stage = m.free_stage === "booked" ? "free_booked"
+      : m.free_stage === "taken" ? "free_taken"
+      : m.free_stage === "missed" ? "free_missed"
+      : "free_only";
+    return <StateChip state={stage} />;
+  }
+  if (ps === "none") return <StateChip state="none" />;
 
   const detail: React.ReactNode[] = [];
   if (m.plan_type === "recurring" && !m.expires_on) {

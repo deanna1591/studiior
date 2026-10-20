@@ -88,6 +88,11 @@ insert into members (id, studio_id, email, first_name, last_name, status) values
   ('5a1e5a1e-0000-0000-0000-0000000e0006','5a1e5a1e-0000-0000-0000-0000000000a1','none@example.com','No','Plan','lead'),
   ('5a1e5a1e-0000-0000-0000-0000000e0007','5a1e5a1e-0000-0000-0000-0000000000a1','frz@example.com','Fro','Zen','active'),
   ('5a1e5a1e-0000-0000-0000-0000000e0008','5a1e5a1e-0000-0000-0000-0000000000a1','unp@example.com','Un','Paid','active'),
+  -- Members list polish: the free cohort split by comp-booking stage.
+  ('5a1e5a1e-0000-0000-0000-0000000e0009','5a1e5a1e-0000-0000-0000-0000000000a1','fb@example.com','Free','Booked','lead'),
+  ('5a1e5a1e-0000-0000-0000-0000000e000a','5a1e5a1e-0000-0000-0000-0000000000a1','ft@example.com','Free','Taken','lead'),
+  ('5a1e5a1e-0000-0000-0000-0000000e000b','5a1e5a1e-0000-0000-0000-0000000000a1','fm@example.com','Free','Missed','lead'),
+  ('5a1e5a1e-0000-0000-0000-0000000e000c','5a1e5a1e-0000-0000-0000-0000000000a1','fx@example.com','Free','Cancelled','lead'),
   ('5a1e5a1e-0000-0000-0000-0000000e00b1','5a1e5a1e-0000-0000-0000-0000000000b1','sb@example.com','Es','Bee','active');
 
 -- A class occurrence in SA, a few days out, staffed (for the frozen-booking test).
@@ -150,6 +155,19 @@ begin
   insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, expires_on, credits_remaining, created_at)
   values ('5a1e5a1e-0000-0000-0000-00000000ad08', sa,'5a1e5a1e-0000-0000-0000-0000000e0008','5a1e5a1e-0000-0000-0000-00000000a1a2','active',150000,'CZK',m0, td+60, 10, buy);
 
+  -- Members list polish: a comp booking drives free_stage; a guest_pass makes
+  -- each free_only. A cancelled comp booking does not count.
+  insert into bookings (studio_id, member_id, occurrence_id, status, payment_source) values
+    (sa,'5a1e5a1e-0000-0000-0000-0000000e0009','5a1e5a1e-0000-0000-0000-00000000cc01','booked','comp'),
+    (sa,'5a1e5a1e-0000-0000-0000-0000000e000a','5a1e5a1e-0000-0000-0000-00000000cc01','attended','comp'),
+    (sa,'5a1e5a1e-0000-0000-0000-0000000e000b','5a1e5a1e-0000-0000-0000-00000000cc01','no_show','comp'),
+    (sa,'5a1e5a1e-0000-0000-0000-0000000e000c','5a1e5a1e-0000-0000-0000-00000000cc01','cancelled','comp');
+  insert into guest_passes (studio_id, host_member_id, guest_member_id, guest_email, occurrence_id, status) values
+    (sa, null,'5a1e5a1e-0000-0000-0000-0000000e0009','fb@example.com','5a1e5a1e-0000-0000-0000-00000000cc01','confirmed'),
+    (sa, null,'5a1e5a1e-0000-0000-0000-0000000e000a','ft@example.com','5a1e5a1e-0000-0000-0000-00000000cc01','attended'),
+    (sa, null,'5a1e5a1e-0000-0000-0000-0000000e000b','fm@example.com','5a1e5a1e-0000-0000-0000-00000000cc01','confirmed'),
+    (sa, null,'5a1e5a1e-0000-0000-0000-0000000e000c','fx@example.com','5a1e5a1e-0000-0000-0000-00000000cc01','cancelled');
+
   -- SB: a membership + payment, same month, to prove isolation.
   insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, created_at)
   values ('5a1e5a1e-0000-0000-0000-00000000adb1','5a1e5a1e-0000-0000-0000-0000000000b1','5a1e5a1e-0000-0000-0000-0000000e00b1','5a1e5a1e-0000-0000-0000-00000000a1b1','active',200000,'CZK',m0, buy);
@@ -184,6 +202,23 @@ select expect_num('overview: no SB member appears',
 -- front desk may read the overview; it carries NO amounts (no amount column).
 select expect_true('front desk can read member_plan_overview',
   (select count(*) > 0 from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1')));
+
+-- Members list polish: free_stage, additive. plan_state is UNCHANGED for the
+-- same fixtures (the four below are still free_only).
+select expect_txt('free_stage: a still-booked comp booking -> booked',
+  (select free_stage from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e0009'), 'booked');
+select expect_txt('free_stage: an attended comp booking -> taken',
+  (select free_stage from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000a'), 'taken');
+select expect_txt('free_stage: only a no_show comp booking, no later booking -> missed',
+  (select free_stage from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000b'), 'missed');
+select expect_true('free_stage: a cancelled comp booking does not count -> null',
+  (select free_stage is null from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000c'));
+select expect_true('free_stage: a member with nothing -> null',
+  (select free_stage is null from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e0006'));
+select expect_true('plan_state UNCHANGED: the four free-stage members are still free_only',
+  (select bool_and(plan_state = 'free_only') from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1')
+     where id in ('5a1e5a1e-0000-0000-0000-0000000e0009','5a1e5a1e-0000-0000-0000-0000000e000a',
+                  '5a1e5a1e-0000-0000-0000-0000000e000b','5a1e5a1e-0000-0000-0000-0000000e000c')));
 
 -- front desk is refused Sales.
 select expect_raises('front desk PT403 on sales_history',

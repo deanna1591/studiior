@@ -17,7 +17,12 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   expiring: { label: "Expiring", warn: true },
   expired: { label: "Expired" },
   free_only: { label: "Free class only" },
-  none: { label: "No plan" },
+  // Members list polish (20 Oct 2026): the free cohort split by stage, and the
+  // "no plan" rename.
+  free_booked: { label: "Free class booked" },
+  free_taken: { label: "Free class taken" },
+  free_missed: { label: "Free class missed" },
+  none: { label: "Signed up, nothing booked" },
   // sale_status (sales_history)
   active: { label: "Active" },
   refunded: { label: "Refunded" },

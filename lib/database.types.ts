@@ -8455,6 +8455,26 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; sql: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9039,6 +9059,7 @@ export type Database = {
           email: string
           expires_on: string
           first_name: string
+          free_stage: string
           had_free_class: boolean
           has_ever_paid: boolean
           health_band: string
@@ -9699,6 +9720,7 @@ export type Database = {
           occ_capacity: number
           occ_confirmed: boolean
           occ_flex: boolean
+          occ_free_first: Json
           occ_id: string
           occ_instructor_id: string
           occ_minimum: number
