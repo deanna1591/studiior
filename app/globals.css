@@ -484,20 +484,24 @@ body {
 .rbc-day-slot .rbc-time-slot { border-top-color: color-mix(in srgb, var(--line) 55%, transparent); }
 .rbc-calendar .rbc-current-time-indicator { background-color: var(--coral); height: 2px; }
 
-/* WEEK BLOCK: the instructor avatar is legible at 20px where a truncated name
-   ("Christi…") is not, so below a width the name drops and the face carries the
-   block; below a narrower one the fill drops too and the avatar alone answers
-   "who". The block is its own query container — its width is the column width
-   less the event's padding. */
+/* THE BLOCK IS TWO LINES, AND A 50-MINUTE CLASS MUST FIT BOTH.
+   The block renders its own time (line 1) and class name (line 2), so
+   react-big-calendar's own time label is dropped in BOTH day and week views —
+   the content then fills the full block height. At the library's default
+   40px/hour a 50-min block is ~33px, which cannot hold two padded lines; the
+   hour is lifted so 50 min clears the two-line height (two ~15px lines + the
+   Trials pill + padding ≈ 36px) with a little to spare. */
+.rbc-calendar .rbc-timeslot-group { min-height: 46px; }
+.rbc-time-view .rbc-event-label { display: none; }
+.rbc-time-view .rbc-event-content { height: 100%; }
+/* WEEK BLOCK: the block is its own query container, so a column too narrow for
+   the "Trials" pill swaps it for a 6px dot in the same accent. */
 .rbc-calendar .wk-block { container-type: inline-size; width: 100%; }
-@container (max-width: 92px) { .wk-block .wk-name { display: none; } }
-@container (max-width: 52px) { .wk-block .wk-fill { display: none; } }
-/* Drop react-big-calendar's own time label in WEEK view — the gutter already
-   says the time and it is the least useful line at this size, stealing the row
-   the instructor needs. Day view keeps it (wider blocks, the label helps). The
-   content fills the height the label vacated. */
-.sched-week .rbc-event-label { display: none; }
-.sched-week .rbc-event-content { height: 100%; display: flex; align-items: center; }
+.wk-block .wk-trials-dot { display: none; }
+@container (max-width: 104px) {
+  .wk-block .wk-trials { display: none; }
+  .wk-block .wk-trials-dot { display: inline-block; }
+}
 
 /* MONTH VIEW: rounded like the time view, the studio's own surface, and the
    library's off-range/"+ more"/date chrome brought into the palette. Density is

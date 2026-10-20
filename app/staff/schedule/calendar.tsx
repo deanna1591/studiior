@@ -12,15 +12,8 @@ import BlockPanel, { type BlockFacts } from "@/components/schedule/block-panel";
 import type { FreeFirstCardState } from "@/components/schedule/free-first";
 import { showsTrialsMarker } from "@/lib/free-first-view";
 import { TierMark } from "@/components/tier-mark";
-import StaffAvatar from "@/components/staff-avatar";
 
-/** "Bo Fictitious" -> "Bo F." — who is teaching, at a glance, in a week column. */
-function shortName(full: string): string {
-  const parts = full.trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 1) return full;
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-}
-/** Up to two initials, for the month chip where even "Bo F." will not fit. */
+/** Up to two initials, for the month chip where a full name will not fit. */
 function initialsOf(full: string): string {
   return full.trim().split(/\s+/).filter(Boolean).slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
@@ -490,105 +483,80 @@ export default function ScheduleCalendar({
 
   const components = useMemo(() => ({
     event: ({ event }: { event: WallEvent }) => {
-      const f = fullness(event);
-      const unstaffed = event.staffing !== "assigned";
-      if (event.cancelled) {
-        const why = event.cancellationCause === "no_instructor" ? "no instructor"
-          : event.cancellationCause === "force_majeure" ? "beyond anyone's control"
-          : "studio's reason";
+      const isWeek = view === "week";
+      // The block renders its own time (the rbc event label is dropped in CSS),
+      // so a 50-minute block is exactly two lines and never clips. Studio clock
+      // per Decision 55: event.start/end are wall Dates (local fields ARE the
+      // studio clock), so date-fns format reads the studio's hour directly.
+      const clockFmt = timeFormat === "12h" ? "h:mm a" : "HH:mm";
+      const timeRange = `${format(event.start, clockFmt)}–${format(event.end, clockFmt)}`;
+      const headcount = `${event.bookedCount}/${event.capacity}`;
+      // Shared frame: two stacked lines filling the block height.
+      const root = `sched-block ${isWeek ? "wk-block" : ""} flex h-full flex-col justify-center gap-px text-[12px] leading-[15px]`;
+
+      // A struck, muted two-line block for the two decided-off states. Staffing
+      // colour and the line-through carry the state; line 1 keeps time+headcount
+      // so the slot still reads at a glance.
+      if (event.cancelled || event.notRunning) {
+        const reason = event.cancelled
+          ? (event.cancellationCause === "no_instructor" ? "cancelled, no instructor"
+             : event.cancellationCause === "force_majeure" ? "cancelled, beyond anyone's control"
+             : "cancelled, studio's reason")
+          : (event.bookedCount === 0 ? "not running, nobody booked"
+             : (event.minimum ?? 0) > 0 ? `not running, ${event.bookedCount} booked, needed ${event.minimum}`
+             : `not running, ${event.bookedCount} booked`);
         return (
-          <div className="text-[12px] leading-4">
-            <div className="flex items-baseline justify-between gap-1.5">
-              <span className="min-w-0 truncate font-medium text-ink line-through">{event.title}</span>
-              {event.bookedCount > 0 && (
-                <span className="num shrink-0 text-[13px] font-semibold tabular-nums">
-                  {event.bookedCount}/{event.capacity}
-                </span>
+          <div className={root}>
+            <div className="flex items-baseline gap-1.5">
+              <span className="num min-w-0 flex-1 truncate tabular-nums text-ink-2">{timeRange}</span>
+              {(event.cancelled ? event.bookedCount > 0 : true) && (
+                <span className="num shrink-0 font-semibold tabular-nums text-ink-2">{headcount}</span>
               )}
             </div>
-            <div className="text-ink-2">Cancelled — {why}</div>
-          </div>
-        );
-      }
-      if (event.notRunning) {
-        return (
-          <div className="text-[12px] leading-4">
-            <div className="flex items-baseline justify-between gap-1.5">
-              <span className="min-w-0 truncate font-medium text-ink line-through">{event.title}</span>
-              <span className="num shrink-0 text-[13px] font-semibold tabular-nums">
-                {event.bookedCount}/{event.capacity}
-              </span>
-            </div>
-            <div className="text-ink-2">
-              Not running — {event.bookedCount === 0 ? "nobody booked"
-                : (event.minimum ?? 0) > 0
-                  ? `${event.bookedCount} booked, needed ${event.minimum}`
-                  : `${event.bookedCount} booked`}
+            <div className="min-w-0 truncate text-ink-2">
+              <span className="font-medium text-ink line-through">{event.title}</span>
+              {" — "}{reason}
             </div>
           </div>
         );
       }
-      // WEEK VIEW: WHO is teaching, then staffed-or-not, then how full — one
-      // legible line. A 50-minute block is too narrow for the day layout's two
-      // rows, so "REFORME…" with no instructor is all a week ever showed. The
-      // time is dropped (the gutter says it), and the class NAME gives way to
-      // the instructor, because most classes in a week are the same few formats
-      // and who is teaching is the question. Colour treatment is unchanged
-      // (staffing: amber for unstaffed); an unassigned class shows a gap marker.
-      if (view === "week") {
-        const name = event.resourceId === UNASSIGNED
-          ? null : (instructorNames[event.resourceId] ?? null);
-        return (
-          <div className="wk-block flex items-center gap-1.5 text-[12px] leading-4">
-            {showTier && event.tier && (
-              <TierMark tier={event.tier as "core" | "flex" | "always"}
-                        effective={event.effectiveTier as "core" | "flex" | "always" | null}
-                        minimum={event.minimum ?? null} />
-            )}
-            {unstaffed ? (
-              // A gap marker rather than an avatar — a dashed empty ring, the
-              // amber already carried by the block's own fill and border.
-              <span aria-hidden title="Nobody is teaching this"
-                    style={{ width: 20, height: 20, borderColor: "var(--ink-3)" }}
-                    className="flex shrink-0 items-center justify-center rounded-full border border-dashed text-[11px] text-ink-2">
-                ⚠
-              </span>
-            ) : (
-              // The avatar is legible at 20px where a truncated name is not, so
-              // at the narrowest widths the name drops (container query) and the
-              // face carries it.
-              <StaffAvatar name={name ?? "?"} url={instructorAvatars[event.resourceId] ?? null} size={20} />
-            )}
-            <span className="wk-name min-w-0 flex-1 truncate font-medium text-ink">
-              {unstaffed ? "Nobody assigned" : shortName(name ?? event.title)}
-            </span>
-            {/* Decision 30 amendment (b) follow-up: the first-line "Trials" chip
-                in week view too — only for an override (effective-open). */}
-            {showsTrialsMarker(event.freeFirst) && (
-              <span className="shrink-0 rounded px-1 text-[10px] font-medium leading-[14px]"
-                    style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
-                    title="Open to first-timers (set for this class)">Trials</span>
-            )}
-            <span className="wk-fill num shrink-0 text-[12.5px] font-semibold tabular-nums text-ink">
-              {event.bookedCount}/{event.capacity}
-            </span>
-          </div>
-        );
-      }
+
+      // THE "TRIALS" MARKER (Decision 30 amendment b): open to first-timers BY
+      // OVERRIDE only — a rules-open core class would mark every block. A small
+      // pill, --ink on --accent-chip with a 1px border, radius full, sitting on
+      // the RIGHT of line 2 directly under the headcount above it (never centred,
+      // never free-floating). In WEEK view a column too narrow for the pill
+      // swaps it for a 6px dot (container query on .wk-block).
+      const trialsPill = (
+        <span className="shrink-0 rounded-full border px-1 text-[10.5px] font-medium leading-[14px]"
+              style={{ background: "var(--accent-chip)", color: "var(--ink)", borderColor: "var(--line-2)" }}
+              title="Open to first-timers (set for this class)">Trials</span>
+      );
+      const trials = !showsTrialsMarker(event.freeFirst) ? null : isWeek ? (
+        <span className="shrink-0 leading-none">
+          <span className="wk-trials">{trialsPill}</span>
+          <span aria-hidden className="wk-trials-dot rounded-full align-middle"
+                style={{ width: 6, height: 6, background: "var(--accent-chip)", border: "1px solid var(--line-2)" }}
+                title="Open to first-timers" />
+        </span>
+      ) : trialsPill;
+
+      // THE NORMAL BLOCK: exactly two lines.
+      //   line 1: time range (left) · headcount (right) — the number a planner
+      //           scans for, mono + tabular so a column of them lines up.
+      //   line 2: tier dot + class name (left, truncate) · Trials marker (right).
+      // Staffing (colour), fullness (the ring) and flex-pending (the dashed edge)
+      // are carried by the block's own styling, not by a third text line — which
+      // is what let a 50-minute block clip. Room, waitlist, applications and the
+      // confirmation marks live in the tooltip and the click-through panel.
       return (
-        <div className="text-[12px] leading-4">
-          <div className="flex items-baseline justify-between gap-1.5">
-            <span className="min-w-0 truncate font-medium">
-              {unstaffed && (
-                <span aria-hidden title="Nobody is teaching this">⚠ </span>
-              )}
-              {/* THE TIER, AND ONLY THE TIER. Colour on this calendar already
-                  carries staffing and the dashed edge already means "flex,
-                  still waiting on its deadline" — a temporary state that clears
-                  when the class commits. Neither can also mean the tier, which
-                  is permanent: conflating them is why a committed flex class
-                  has until now looked exactly like a core one. A shape is the
-                  one channel nothing else is using. */}
+        <div className={root}>
+          <div className="flex items-baseline gap-1.5">
+            <span className="num min-w-0 flex-1 truncate tabular-nums text-ink">{timeRange}</span>
+            <span className="num shrink-0 text-[13px] font-semibold tabular-nums text-ink">{headcount}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="flex min-w-0 flex-1 items-center gap-1 font-medium text-ink">
               {showTier && event.tier && (
                 <>
                   <TierMark tier={event.tier as "core" | "flex" | "always"}
@@ -597,84 +565,12 @@ export default function ScheduleCalendar({
                   <span className="sr-only">
                     {event.tier === "flex" ? "Flex class. "
                      : event.tier === "always" ? "Always runs. " : "Core class. "}
-                  </span>{" "}
+                  </span>
                 </>
               )}
-              {event.title}
+              <span className="min-w-0 truncate">{event.title}</span>
             </span>
-            {/* Decision 30 amendment (b) follow-up: open to first-timers BY
-                OVERRIDE. On the FIRST line (a short 50-min block clips the
-                second), only for an override — a rules-open core class would
-                mark every block. A chip (ink on accent-chip, 11:1) so the block
-                tint underneath never decides its contrast. */}
-            {showsTrialsMarker(event.freeFirst) && (
-              <span className="shrink-0 rounded px-1 text-[10px] font-medium leading-[14px]"
-                    style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
-                    title="Open to first-timers (set for this class)">Trials</span>
-            )}
-            {/* The number a planner is actually scanning for, so it is the
-                biggest thing on the block and set in mono — tabular figures
-                line up down a column, which is the whole reason to read one. */}
-            <span className="num shrink-0 text-[13px] font-semibold tabular-nums">
-              {event.bookedCount}/{event.capacity}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between gap-1.5 text-ink-2">
-            <span className="min-w-0 truncate">
-              {unstaffed ? "Nobody assigned" : (event.room ?? "No room")}
-              {event.pendingApplications > 0 && (
-                <> · <span className="num">{event.pendingApplications}</span> applied</>
-              )}
-            </span>
-            <span className="shrink-0">
-              {event.waitlistCount > 0 && (
-                <span className="num" title={`${event.waitlistCount} on the waitlist`}>
-                  +{event.waitlistCount} wait
-                </span>
-              )}
-              {event.waitlistCount === 0 && f === "full" && <span>Full</span>}
-              {event.waitlistCount === 0 && f === "quiet" && !event.flexPending && <span>Quiet</span>}
-              {/* A flex slot with nothing else of this instructor's near it.
-                  Worth seeing while you are still deciding where to put it:
-                  it is a trip for one class that may not run.
-
-                  It used to be set in `--amber-deep`, which measured 3.58 here
-                  against a 4.5 floor — amber setting a sentence, which this
-                  palette does not allow: it is derived to be a DOT colour at
-                  3:1, not body text. It never showed up locally before because
-                  no seeded studio had a flex series to be standalone. Ink
-                  carries the words; the amber is already on the left border. */}
-              {event.standalone && (
-                <span className="text-ink-2" title="Nothing else of this instructor's within 90 minutes">
-                  On its own
-                </span>
-              )}
-              {/* The number that decides whether it runs, beside the word that
-                  says it might not. The word is the TEMPORARY half — it clears
-                  when the class commits — and the ○ beside the name is the
-                  permanent one. */}
-              {event.flexPending && (
-                <span title="Runs only if it reaches its minimum">
-                  Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}
-                </span>
-              )}
-              {/* Decision 22: a flex class committed to run (pushed through below
-                  its minimum). --lime-text on the card, the accent's TEXT step. */}
-              {event.flexCommitted && (
-                <span style={{ color: "var(--lime-text)" }} title="Committed to run, even below its minimum">
-                  Runs
-                </span>
-              )}
-              {/* Decision 38: assigned-class confirmation state, when asked.
-                  Decision 58: hidden entirely when the studio has confirmations
-                  off (no "unconfirmed" marks). */}
-              {assignmentConfirmations && event.assignmentConfirmed && (
-                <span title="The instructor confirmed" style={{ color: "var(--lime-text)" }}>✓</span>
-              )}
-              {assignmentConfirmations && event.assignmentAwaiting && (
-                <span className="text-ink-3" title="Awaiting the instructor's confirmation">awaiting</span>
-              )}
-            </span>
+            {trials}
           </div>
         </div>
       );
@@ -727,7 +623,7 @@ export default function ScheduleCalendar({
         );
       },
     },
-  }), [fullness, loadByResource, view, showTier, instructorNames, instructorAvatars]);
+  }), [fullness, loadByResource, view, showTier, instructorNames, instructorAvatars, timeFormat]);
 
   // CLICKING AN EMPTY SLOT CREATES A CLASS THERE.
   //
