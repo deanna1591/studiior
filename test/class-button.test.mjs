@@ -1,6 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classButtonState } from "../lib/class-button.mjs";
+import { classButtonState, flexWaitingLabel } from "../lib/class-button.mjs";
+
+// Decision 21 amendment (20 Oct 2026): the plain-words waiting status.
+test("flexWaitingLabel with a deadline reads 'Booked · we'll confirm by {Day time}'", () => {
+  assert.equal(flexWaitingLabel("Sun 8:00 PM"), "Booked · we'll confirm by Sun 8:00 PM");
+  assert.equal(flexWaitingLabel("Mon 20:00"), "Booked · we'll confirm by Mon 20:00");
+});
+
+test("flexWaitingLabel with no deadline (free provisional) reads 'once the class is on'", () => {
+  assert.equal(flexWaitingLabel(null), "Booked · we'll confirm once the class is on");
+  assert.equal(flexWaitingLabel(), "Booked · we'll confirm once the class is on");
+});
+
+test("flexWaitingLabel never says 'waiting for confirmation'", () => {
+  assert.ok(!/waiting for confirmation/i.test(flexWaitingLabel("Sun 8:00 PM")));
+  assert.ok(!/waiting for confirmation/i.test(flexWaitingLabel(null)));
+});
 
 // A class at a fixed instant; opens 10 before, closes 30 after (Reform's values).
 const START = Date.UTC(2026, 9, 10, 7, 0, 0);

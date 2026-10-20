@@ -13,3 +13,4 @@ export type ClassButtonState =
   | "book" | "reserved" | "waiting_confirmation"
   | "checkin" | "checked_in" | "waitlisted" | "cancelled";
 export function classButtonState(input: ClassButtonInput): ClassButtonState;
+export function flexWaitingLabel(deadlineLabel?: string | null): string;

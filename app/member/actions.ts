@@ -7,6 +7,7 @@ import { getMemberContext } from "@/lib/auth";
 import { stripeFor } from "@/lib/stripe";
 import { memberOrigin, currentMemberOrigin } from "@/lib/tenant";
 import { buildAuthCallback } from "@/lib/auth-redirect";
+import { fmtDeadlineShort } from "@/lib/time";
 
 export type SignInResult = { error: string } | { ok: true } | null;
 
@@ -72,7 +73,7 @@ const REASONS: Record<string, string> = {
   // Decision 73: the studio caps how many unpaid bookings a member may hold.
   pay_first: "Pay for your booked class first, or pay at the desk when you come in.",
   // Decision 73: a provisional free first class blocks other bookings until it's confirmed.
-  free_first_pending: "Your free first class is still waiting for confirmation. You can book more once it's confirmed.",
+  free_first_pending: "Your free first class isn't confirmed yet — you can book more once it is.",
 };
 
 export type BookResult = { ok: true; message: string } | { ok: false; message: string } | null;
@@ -122,6 +123,25 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
     return {
       ok: true,
       message: "We're holding your spot. Finish paying to confirm it.",
+    };
+  }
+
+  // Decision 21 amendment (20 Oct 2026): a booking on a flex class not yet
+  // decided lands "pending" — say so in plain words with the deadline, never a
+  // generic "Booked" that hides that a confirmation is still coming. The
+  // authoritative pending signal is member_pending_bookings (flex, uncommitted,
+  // scheduled); a flex seat carries a deadline, so pending_until is set here.
+  const occId = String(formData.get("occurrence_id") ?? "");
+  const { data: pend } = await supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId });
+  const pendingRow = (pend as { occurrence_id: string; pending_until: string | null }[] | null)
+    ?.find((p) => p.occurrence_id === occId);
+  if (pendingRow) {
+    const by = pendingRow.pending_until
+      ? ` by ${fmtDeadlineShort(pendingRow.pending_until, ctx.timeZone, ctx.timeFormat)}`
+      : "";
+    return {
+      ok: true,
+      message: `You're booked. We'll email you${by} to confirm this class is going ahead. Nothing else to do.`,
     };
   }
 

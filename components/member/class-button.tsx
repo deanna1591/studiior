@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { haptic } from "@/lib/haptics";
-import { classButtonState } from "@/lib/class-button";
+import { classButtonState, flexWaitingLabel } from "@/lib/class-button";
 import type { BookResult, CheckInResult } from "@/app/member/actions";
 
 /**
@@ -39,9 +39,10 @@ export default function ClassButton({
   classHref: string;
   bookingStatus: string | null;
   flexPending: boolean;
-  /** Decision 21 vs Decision 30: a flex-pending booking carries its cutoff ("by
-   *  20:00 Sat"), a free-first PROVISIONAL seat does not (null) — so the two
-   *  "Waiting for confirmation" states read differently. Formatted server-side. */
+  /** Decision 21 vs Decision 30: a flex-pending booking carries its cutoff
+   *  ("Sat 8:00 PM"), a free-first PROVISIONAL seat does not (null) — so the
+   *  plain-words status reads "…by {Day} {time}" vs "…once the class is on".
+   *  Formatted server-side (fmtDeadlineShort). */
   pendingLabel?: string | null;
   checkedIn: boolean;
   cancelled?: boolean;
@@ -195,18 +196,13 @@ export default function ClassButton({
     );
   }
   if (state === "waiting_confirmation") {
-    // A flex-pending booking shows its cutoff ("· by 20:00 Sat"); a free-first
-    // PROVISIONAL seat (pendingLabel null) stays bare, since it confirms the
-    // moment the class is on, not at a fixed deadline. The two states then read
-    // differently rather than both saying only "Waiting for confirmation".
+    // Decision 21 amendment (20 Oct 2026): plain words, never "waiting for
+    // confirmation". A flex-pending booking reads "Booked · we'll confirm by
+    // {Day} {time}"; a free-first PROVISIONAL seat (pendingLabel null) reads
+    // "Booked · we'll confirm once the class is on" — no fixed deadline.
     return wrap(
-      <span className="flex flex-col items-end gap-0.5">
-        <span className={`${chip} text-center leading-[15px]`} style={tint}>Waiting for confirmation</span>
-        {pendingLabel && (
-          <span className="m-micro leading-[15px] text-ink-2">
-            by <span className="num">{pendingLabel}</span>
-          </span>
-        )}
+      <span className={`${chip} text-center leading-[15px]`} style={tint}>
+        {flexWaitingLabel(pendingLabel)}
       </span>,
     );
   }

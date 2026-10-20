@@ -176,7 +176,10 @@ export default function FreeClassList({
                   </div>
                 </div>
                 {isBooked ? (
-                  <span className="relative z-10 shrink-0 text-[12.5px] font-medium text-ink-2">Waiting for confirmation</span>
+                  // Decision 21 amendment (20 Oct 2026): plain words. A free seat
+                  // is provisional with no fixed deadline — it confirms once the
+                  // class is on.
+                  <span className="relative z-10 shrink-0 text-[12.5px] font-medium text-ink-2">Booked · we&rsquo;ll confirm once the class is on</span>
                 ) : c.free_bookable ? (
                   <button onClick={() => book(c.occurrence_id)} disabled={pending}
                           className="m-press relative z-10 shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold disabled:opacity-60"

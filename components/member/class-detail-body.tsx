@@ -7,6 +7,7 @@ import Link from "next/link";
 import { bookClass, bookFirstFree, cancelBooking, selfCheckIn } from "@/app/member/actions";
 import ClassButton from "@/components/member/class-button";
 import { classSheetView } from "@/lib/class-sheet";
+import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
@@ -103,23 +104,18 @@ export default function ClassDetailBody({
   // waiting_confirmation / waitlisted.
   const hasBooking = view.hideCapacity && !isCheckedIn;
 
-  // Decision 21 amendment: the member-facing confirmation copy — always about
-  // THEIR booking, never a minimum or a headcount. The "confirmed by" line
-  // (hours-before vs the evening before) and the "waiting" status once booked.
-  // Decision 30 amendment: a free provisional booking is pending with no time
-  // (mode 'free', until null) — it confirms the moment the class is on. The flex
-  // "confirmed by {deadline}" line is only for a flex class (until set).
+  // Decision 21 amendment (20 Oct 2026): the member-facing confirmation copy —
+  // always about THEIR booking, in plain words, never a minimum or a headcount.
+  // The class page gets ONE grey line (why a small class may wait, reassuringly,
+  // no numbers); and the plain-words status once booked. Decision 30: a free
+  // PROVISIONAL booking is pending with no time (mode 'free', until null) — it
+  // confirms the moment the class is on, so the grey line (which speaks of a
+  // deadline) shows only for a flex class with a cutoff.
   const confirmLine = pending && !past && pending.until
-    ? (pending.mode === "hours_before"
-        ? `Bookings for this class are confirmed ${Math.round(
-            (new Date(occ.starts_at).getTime() - new Date(pending.until).getTime()) / 3_600_000,
-          )} hours before it starts.`
-        : `Bookings for this class are confirmed by ${fmtTime(pending.until, timeZone, timeFormat)} the evening before.`)
+    ? "Small classes go ahead once a few people have booked. Most are confirmed well before the deadline."
     : null;
   const waitingLabel = pending && !past
-    ? (pending.until
-        ? `Waiting for confirmation · by ${fmtDeadlineShort(pending.until, timeZone, timeFormat)}`
-        : "Waiting for confirmation")
+    ? flexWaitingLabel(pending.until ? fmtDeadlineShort(pending.until, timeZone, timeFormat) : null)
     : null;
   const mins = occ.ends_at
     ? Math.round((new Date(occ.ends_at).getTime() - new Date(occ.starts_at).getTime()) / 60000)

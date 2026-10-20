@@ -299,6 +299,9 @@ export default async function MemberHome() {
                   classHref={`/class/${occ.id}?t=${occ.class_type_id}`}
                   bookingStatus={next!.status}
                   flexPending={pendingUntil.has(next!.occurrence_id)}
+                  pendingLabel={pendingUntil.get(next!.occurrence_id)
+                    ? fmtDeadlineShort(pendingUntil.get(next!.occurrence_id)!, ctx.timeZone, ctx.timeFormat)
+                    : null}
                   checkedIn={checkedInSet.has(next!.occurrence_id) || next!.status === "attended"}
                   startsAt={occ.starts_at}
                   endsAt={occ.ends_at}
@@ -316,15 +319,10 @@ export default async function MemberHome() {
         </section>
       ) : null}
 
-      {/* Decision 21 amendment: a booked flex class not yet decided — the "by
-          {deadline}" detail under the hero. The hero's own button already reads
-          "Waiting for confirmation"; this adds only the deadline. */}
-      {occ && next && pendingUntil.has(next.occurrence_id) && pendingUntil.get(next.occurrence_id) && (
-        <p className="mt-2 px-1 text-[12.5px] leading-[18px] text-ink-2">
-          Confirmed by{" "}
-          <span className="num">{fmtDeadlineShort(pendingUntil.get(next.occurrence_id)!, ctx.timeZone, ctx.timeFormat)}</span>
-        </p>
-      )}
+      {/* Decision 21 amendment (20 Oct 2026): the hero's own button now carries
+          the whole plain-words status — "Booked · we'll confirm by {Day} {time}"
+          — so the separate "Confirmed by" line below it is gone (it would say the
+          deadline twice). */}
 
       {/* Nothing booked. The hero is still a hero — the next class ON THE
           SCHEDULE, with the button that books it. An empty state that only
@@ -552,6 +550,9 @@ export default async function MemberHome() {
                     classHref={`/class/${b.occurrence_id}?t=${bo.class_type_id}`}
                     bookingStatus={b.status}
                     flexPending={pendingUntil.has(b.occurrence_id)}
+                    pendingLabel={pendingUntil.get(b.occurrence_id)
+                      ? fmtDeadlineShort(pendingUntil.get(b.occurrence_id)!, ctx.timeZone, ctx.timeFormat)
+                      : null}
                     checkedIn={checkedInSet.has(b.occurrence_id) || b.status === "attended"}
                     startsAt={bo.starts_at}
                     endsAt={bo.ends_at}

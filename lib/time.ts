@@ -47,13 +47,15 @@ export function fmtTime(iso: string, timeZone: string, format: TimeFormat = "24h
 }
 
 /**
- * Decision 21 amendment — the flex confirmation deadline, short: "20:00 Mon"
- * (or "8:00 PM Mon" under 12h, Decision 55).
+ * Decision 21 amendment — the flex confirmation deadline, short, Day THEN time:
+ * "Mon 20:00" (or "Sun 8:00 PM" under 12h, Decision 55). The 20 Oct 2026
+ * wording amendment reads it as "{Day} {time}" in "we'll confirm by {Day} {time}",
+ * so the day leads; every caller is that same plain-words flex-confirmation line.
  */
 export function fmtDeadlineShort(iso: string, timeZone: string, format: TimeFormat = "24h"): string {
   const time = fmtTime(iso, timeZone, format);
   const day = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short" }).format(new Date(iso));
-  return `${time} ${day}`;
+  return `${day} ${time}`;
 }
 
 export function fmtDayLabel(iso: string, timeZone: string): string {
