@@ -562,6 +562,13 @@ export default function ScheduleCalendar({
             <span className="wk-name min-w-0 flex-1 truncate font-medium text-ink">
               {unstaffed ? "Nobody assigned" : shortName(name ?? event.title)}
             </span>
+            {/* Decision 30 amendment (b) follow-up: the first-line "Trials" chip
+                in week view too — only for an override (effective-open). */}
+            {showsTrialsMarker(event.freeFirst) && (
+              <span className="shrink-0 rounded px-1 text-[10px] font-medium leading-[14px]"
+                    style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+                    title="Open to first-timers (set for this class)">Trials</span>
+            )}
             <span className="wk-fill num shrink-0 text-[12.5px] font-semibold tabular-nums text-ink">
               {event.bookedCount}/{event.capacity}
             </span>
@@ -595,6 +602,16 @@ export default function ScheduleCalendar({
               )}
               {event.title}
             </span>
+            {/* Decision 30 amendment (b) follow-up: open to first-timers BY
+                OVERRIDE. On the FIRST line (a short 50-min block clips the
+                second), only for an override — a rules-open core class would
+                mark every block. A chip (ink on accent-chip, 11:1) so the block
+                tint underneath never decides its contrast. */}
+            {showsTrialsMarker(event.freeFirst) && (
+              <span className="shrink-0 rounded px-1 text-[10px] font-medium leading-[14px]"
+                    style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+                    title="Open to first-timers (set for this class)">Trials</span>
+            )}
             {/* The number a planner is actually scanning for, so it is the
                 biggest thing on the block and set in mono — tabular figures
                 line up down a column, which is the whole reason to read one. */}
@@ -656,13 +673,6 @@ export default function ScheduleCalendar({
               )}
               {assignmentConfirmations && event.assignmentAwaiting && (
                 <span className="text-ink-3" title="Awaiting the instructor's confirmation">awaiting</span>
-              )}
-              {/* Decision 30 amendment (b) follow-up: this class is open to
-                  first-timers BY OVERRIDE. Only shown for an override — a
-                  rules-open core class would mark every block. --ink-2 carries
-                  it (the safe floor on a tinted block, like "On its own"). */}
-              {showsTrialsMarker(event.freeFirst) && (
-                <span className="text-ink-2" title="Open to first-timers (set for this class)">Trials</span>
               )}
             </span>
           </div>
