@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import EmailComposer from "@/components/staff/email-composer";
 import { stateLine, SNOOZE_DAYS, snoozeLabel } from "@/lib/retention";
 import {
-  fetchSnapshot, prefillEmail, sendEmail, sendTest, logContact, snooze, dismiss,
+  fetchSnapshot, prefillEmail, sendEmail, sendTest, logContact, snooze, dismiss, draftRetentionEmail,
 } from "@/app/staff/retention/actions";
 
 type Snapshot = Record<string, any>;
@@ -35,13 +35,15 @@ function d(iso: string | null | undefined) {
 }
 
 export default function RetentionPanel({
-  studioId, studioName, row, onClose,
-}: { studioId: string; studioName: string; row: PanelRow; onClose: () => void }) {
+  studioId, studioName, aiDrafts, row, onClose,
+}: { studioId: string; studioName: string; aiDrafts: boolean; row: PanelRow; onClose: () => void }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [mode, setMode] = useState<"view" | "email">("view");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const [prev, setPrev] = useState<{ subject: string; body: string } | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const [pending, start] = useTransition();
 
   useEffect(() => {
@@ -81,21 +83,50 @@ export default function RetentionPanel({
                 return r.ok ? { sentence: `Sent a test to ${r.to}.` } : { error: r.error ?? "Could not send the test." };
               }}
               actions={
-                <button
-                  disabled={pending}
-                  onClick={() => start(async () => {
-                    const r = await sendEmail(row.member_id, row.situation, subject, body);
-                    if (r.ok) { setNote("Sent."); setMode("view"); fetchSnapshot(row.member_id).then(setSnap); }
-                    else setNote(r.reason === "muted" ? "They have turned off sequence emails."
-                                 : r.reason === "duplicate" ? "Already emailed today."
-                                 : r.reason === "no_email" ? "No email on file." : "Could not send.");
-                  })}
-                  className="rounded-md px-3 py-1.5 text-[13px] font-medium"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-                  {pending ? "Sending…" : "Send"}
-                </button>
+                <>
+                  <button
+                    disabled={pending}
+                    onClick={() => start(async () => {
+                      const r = await sendEmail(row.member_id, row.situation, subject, body);
+                      if (r.ok) { setNote("Sent."); setMode("view"); fetchSnapshot(row.member_id).then(setSnap); }
+                      else setNote(r.reason === "muted" ? "They have turned off sequence emails."
+                                   : r.reason === "duplicate" ? "Already emailed today."
+                                   : r.reason === "no_email" ? "No email on file." : "Could not send.");
+                    })}
+                    className="rounded-md px-3 py-1.5 text-[13px] font-medium"
+                    style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                    {pending ? "Sending…" : "Send"}
+                  </button>
+                  {aiDrafts && (
+                    <button type="button" disabled={drafting}
+                      onClick={async () => {
+                        setDrafting(true); setNote(null);
+                        const r = await draftRetentionEmail(studioId, row.member_id, row.situation, subject, body);
+                        setDrafting(false);
+                        if (r.ok && r.subject != null && r.body != null) {
+                          setPrev({ subject, body }); setSubject(r.subject); setBody(r.body);
+                        } else {
+                          setNote(r.reason === "not_configured" ? "AI drafts aren't configured on this platform yet."
+                                 : r.reason === "cap" ? "This month's AI draft limit is reached."
+                                 : r.reason === "off" ? "AI drafts are off for this studio."
+                                 : r.reason === "unreadable" ? "The AI reply couldn't be read — try again."
+                                 : "The AI draft couldn't be written — try again.");
+                        }
+                      }}
+                      className="rounded-md border border-line-2 px-3 py-1.5 text-[13px] text-ink-2 hover:text-ink">
+                      {drafting ? "Drafting…" : "Draft with AI"}
+                    </button>
+                  )}
+                </>
               }
             />
+            {aiDrafts && (
+              <p className="mt-1.5 text-[12px] text-ink-3">
+                {prev
+                  ? <>Written by AI from this member&rsquo;s history — read it before you send. <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={() => { if (prev) { setSubject(prev.subject); setBody(prev.body); setPrev(null); } }}>Undo</button></>
+                  : "Written by AI from this member’s history — read it before you send."}
+              </p>
+            )}
             {note && <p className="mt-2 text-[12.5px] text-ink-2">{note}</p>}
           </div>
         ) : (

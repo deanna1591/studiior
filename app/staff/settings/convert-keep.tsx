@@ -19,11 +19,13 @@ function Save() {
  */
 export default function ConvertKeepPanel({
   enabled, keepEnabled, tasksEnabled, planId, days, exclusive, tasksTo, plans,
+  aiDrafts, studioVoice,
 }: {
   enabled: boolean; keepEnabled: boolean; tasksEnabled: boolean;
   planId: string | null; days: number;
   exclusive: boolean; tasksTo: string;
   plans: { id: string; name: string }[];
+  aiDrafts: boolean; studioVoice: string | null;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveConvertKeep, null);
   return (
@@ -115,6 +117,30 @@ export default function ConvertKeepPanel({
               <option value="owner_manager">Owners and managers</option>
               <option value="front_desk">Front desk</option>
             </select>
+          </label>
+        </div>
+
+        <label className="mt-3 flex items-start gap-2.5 border-t border-line pt-3">
+          <input type="checkbox" name="ai_drafts_enabled" defaultChecked={aiDrafts} className="mt-1" />
+          <span className="text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">AI drafts</span> — Draft with AI in the retention composer.
+            Sends the member&rsquo;s first name, class history and plan details to an AI model to write a
+            draft. Off by default.
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              You always read and edit the draft before it sends; nothing is sent automatically.
+            </span>
+          </span>
+        </label>
+
+        <div className="mt-3 border-t border-line pt-3">
+          <label className="block text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">How your studio speaks</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              A few lines on your tone, so AI drafts sound like you.
+            </span>
+            <textarea name="studio_voice" defaultValue={studioVoice ?? ""} rows={4}
+              placeholder="Warm and encouraging, never pushy. We use first names, keep it short, and sign off from the team."
+              className="mt-1.5 w-full max-w-lg rounded border border-line-2 bg-paper px-2 py-1.5 text-[13px] leading-[19px] text-ink" />
           </label>
         </div>
 

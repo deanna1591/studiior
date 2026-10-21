@@ -21,9 +21,10 @@ export default async function Account() {
 
   // Decision 63: the Shop entry appears only when the studio has products, and
   // My orders only when this member has ordered something.
-  const [{ data: shop }, { data: orders }] = await Promise.all([
+  const [{ data: shop }, { data: orders }, { data: aiDrafts }] = await Promise.all([
     supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
     supabase.rpc("member_orders"),
+    supabase.rpc("member_sees_ai_drafts"),
   ]);
   const hasProducts = Array.isArray(shop) && shop.length > 0;
   const hasOrders = Array.isArray(orders) && orders.length > 0;
@@ -77,6 +78,13 @@ export default async function Account() {
           </li>
         ))}
       </ul>
+
+      {aiDrafts === true && (
+        <p className="m-micro mt-4 px-1 text-ink-3">
+          To write you a personal note, {studioName} may use an AI assistant that sees your first
+          name, class history and plan — a person always reads and sends it.
+        </p>
+      )}
 
       <SignOut to="/login"
                className="m-tap m-card mt-6 w-full text-[14px] font-semibold text-ink-2">

@@ -26,9 +26,16 @@ begin
 end $$;
 create or replace function login(uid text) returns void language plpgsql as $$
 begin
-  -- Session-level (false), so the claim persists across psql statements.
-  perform set_config('request.jwt.claim.sub', uid, false);
-  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role','authenticated')::text, false);
+  -- Session-level (false), so the claim persists across psql statements. An empty
+  -- uid clears the claim to NULL (not ''), so auth.uid() returns null rather than
+  -- failing to cast '' to uuid.
+  if coalesce(uid, '') = '' then
+    perform set_config('request.jwt.claim.sub', null, false);
+    perform set_config('request.jwt.claims', null, false);
+  else
+    perform set_config('request.jwt.claim.sub', uid, false);
+    perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role','authenticated')::text, false);
+  end if;
 end $$;
 
 -- --- Fixtures ----------------------------------------------------------------
@@ -112,6 +119,8 @@ update members set health_band='at_risk', health_reason='Was coming about every 
  where id='7e9a0000-0000-0000-0000-00000000e002';
 update members set health_band='drifting', health_reason='Not been in for a while.'
  where id='7e9a0000-0000-0000-0000-00000000e003';
+-- Link Ava to a member login, for the member_sees_ai_drafts (79b) privacy check.
+update members set user_id='7e9a0000-0000-0000-0000-0000000000f1' where id='7e9a0000-0000-0000-0000-00000000e002';
 
 -- =============================================================================
 -- Readers
@@ -234,6 +243,51 @@ do $$ begin
 end $$;
 reset role;
 select login('');
+
+-- =============================================================================
+-- Decision 79b — AI drafts (opt-in, default OFF)
+-- =============================================================================
+select expect_true('ai_drafts default OFF',
+  (select ai_drafts_enabled = false from studio_settings where studio_id='7e9a0000-0000-0000-0000-000000000001'));
+select expect_true('ai_draft_gate: enabled false when off',
+  (ai_draft_gate('7e9a0000-0000-0000-0000-000000000001'::uuid)->>'enabled')::boolean = false);
+update studio_settings set ai_drafts_enabled=true, studio_voice='Warm and brief.' where studio_id='7e9a0000-0000-0000-0000-000000000001';
+select set_config('t.gate', ai_draft_gate('7e9a0000-0000-0000-0000-000000000001'::uuid)::text, false);
+select expect_true('ai_draft_gate: enabled true when on', ((current_setting('t.gate')::jsonb)->>'enabled')::boolean);
+select expect_text('ai_draft_gate: model', (current_setting('t.gate')::jsonb)->>'model', 'claude-sonnet-5-5');
+select expect_num('ai_draft_gate: default cap 200', (((current_setting('t.gate')::jsonb)->>'cap'))::bigint, 200);
+select expect_num('ai_draft_gate: used 0 to start', (((current_setting('t.gate')::jsonb)->>'used'))::bigint, 0);
+-- record_ai_draft writes a usage row; ai_draft_count counts it.
+select set_config('t.rec', record_ai_draft('7e9a0000-0000-0000-0000-000000000001'::uuid,'7e9a0000-0000-0000-0000-00000000e002','at_risk','claude-sonnet-5-5',120,48)::text, false);
+select expect_num('record_ai_draft: one usage row', (select count(*) from ai_draft_usage where studio_id='7e9a0000-0000-0000-0000-000000000001'), 1);
+select expect_num('ai_draft_count: 1', ai_draft_count('7e9a0000-0000-0000-0000-000000000001'::uuid), 1);
+-- Cap reached: a cap of 1 and one used → the gate's used >= cap (the action refuses).
+update notification_config set value='1' where key='ai_drafts_monthly_cap';
+select set_config('t.gate2', ai_draft_gate('7e9a0000-0000-0000-0000-000000000001'::uuid)::text, false);
+select expect_true('cap reached: used >= cap',
+  (((current_setting('t.gate2')::jsonb)->>'used'))::int >= (((current_setting('t.gate2')::jsonb)->>'cap'))::int);
+update notification_config set value='200' where key='ai_drafts_monthly_cap';
+-- member_sees_ai_drafts for the linked member.
+set role authenticated; select login('7e9a0000-0000-0000-0000-0000000000f1');
+select expect_true('member_sees_ai_drafts true when the studio has it on', member_sees_ai_drafts());
+reset role; select login('');
+-- Guards: an instructor is refused the gate and record.
+set role authenticated; select login('7e9a0000-0000-0000-0000-0000000000a3');
+do $$ begin
+  begin perform ai_draft_gate('7e9a0000-0000-0000-0000-000000000001'::uuid);
+    raise exception 'FAIL  instructor should be refused ai_draft_gate';
+  exception when sqlstate 'PT403' then raise notice 'PASS  instructor → ai_draft_gate PT403'; end;
+end $$;
+do $$ begin
+  begin perform record_ai_draft('7e9a0000-0000-0000-0000-000000000001'::uuid,null,'at_risk','m',1,1);
+    raise exception 'FAIL  instructor should be refused record_ai_draft';
+  exception when sqlstate 'PT403' then raise notice 'PASS  instructor → record_ai_draft PT403'; end;
+end $$;
+reset role; select login('');
+-- A member cannot read the usage log (manager-up only).
+set role authenticated; select login('7e9a0000-0000-0000-0000-0000000000f1');
+select expect_num('member cannot read ai_draft_usage (RLS)', (select count(*) from ai_draft_usage), 0);
+reset role; select login('');
 
 -- Anon surface unchanged: none of the new RPCs are anon.
 select expect_num('anon surface stays THIRTEEN',

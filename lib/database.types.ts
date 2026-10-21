@@ -91,6 +91,78 @@ export type Database = {
           },
         ]
       }
+      ai_draft_usage: {
+        Row: {
+          created_at: string
+          id: string
+          input_tokens: number | null
+          member_id: string | null
+          model: string | null
+          output_tokens: number | null
+          situation: string | null
+          staff_id: string | null
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          member_id?: string | null
+          model?: string | null
+          output_tokens?: number | null
+          situation?: string | null
+          staff_id?: string | null
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          member_id?: string | null
+          model?: string | null
+          output_tokens?: number | null
+          situation?: string | null
+          staff_id?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_draft_usage_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_draft_usage_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_draft_usage_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_draft_usage_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_draft_usage_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_insights: {
         Row: {
           action_payload: Json
@@ -6831,6 +6903,7 @@ export type Database = {
       studio_settings: {
         Row: {
           adjacency_minutes: number
+          ai_drafts_enabled: boolean
           assign_requires_availability: boolean
           assignment_confirmations: boolean
           auto_assign_open_classes: boolean
@@ -6918,6 +6991,7 @@ export type Database = {
           setup_progress: Json
           significant_move_hours: number
           studio_id: string
+          studio_voice: string | null
           sub_late_free_cancel: boolean
           suspension_at: number
           suspension_days: number
@@ -6941,6 +7015,7 @@ export type Database = {
         }
         Insert: {
           adjacency_minutes?: number
+          ai_drafts_enabled?: boolean
           assign_requires_availability?: boolean
           assignment_confirmations?: boolean
           auto_assign_open_classes?: boolean
@@ -7028,6 +7103,7 @@ export type Database = {
           setup_progress?: Json
           significant_move_hours?: number
           studio_id: string
+          studio_voice?: string | null
           sub_late_free_cancel?: boolean
           suspension_at?: number
           suspension_days?: number
@@ -7051,6 +7127,7 @@ export type Database = {
         }
         Update: {
           adjacency_minutes?: number
+          ai_drafts_enabled?: boolean
           assign_requires_availability?: boolean
           assignment_confirmations?: boolean
           auto_assign_open_classes?: boolean
@@ -7138,6 +7215,7 @@ export type Database = {
           setup_progress?: Json
           significant_move_hours?: number
           studio_id?: string
+          studio_voice?: string | null
           sub_late_free_cancel?: boolean
           suspension_at?: number
           suspension_days?: number
@@ -7956,6 +8034,8 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: Json
       }
+      ai_draft_count: { Args: { p_studio_id: string }; Returns: number }
+      ai_draft_gate: { Args: { p_studio_id: string }; Returns: Json }
       anthropic_api_key: { Args: never; Returns: string }
       apply_for_shift: {
         Args: {
@@ -9151,6 +9231,7 @@ export type Database = {
         Args: { p_path: string; p_studio_id: string }
         Returns: string
       }
+      member_sees_ai_drafts: { Args: never; Returns: boolean }
       member_shop: { Args: { p_studio_id: string }; Returns: Json }
       member_snapshot: { Args: { p_member_id: string }; Returns: Json }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
@@ -9547,6 +9628,17 @@ export type Database = {
       }
       reconcile_dashboard_narratives: { Args: never; Returns: Json }
       reconcile_notification_sends: { Args: never; Returns: Json }
+      record_ai_draft: {
+        Args: {
+          p_input_tokens: number
+          p_member_id: string
+          p_model: string
+          p_output_tokens: number
+          p_situation: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       record_check_in: {
         Args: { p_booking_id: string; p_method: string }
         Returns: Json

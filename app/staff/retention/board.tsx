@@ -5,7 +5,7 @@ import { StateChip } from "@/components/state-chip";
 import EmailComposer from "@/components/staff/email-composer";
 import { outcomeLine } from "@/lib/retention";
 import RetentionPanel, { type PanelRow } from "@/components/staff/retention-panel";
-import { prefillBulk, sendBulk, sendTest } from "./actions";
+import { prefillBulk, sendBulk, sendTest, draftRetentionBulk } from "./actions";
 
 export type RetentionRow = {
   section: "unconverted" | "drifting" | "at_risk" | "expiring" | "lapsed";
@@ -75,9 +75,9 @@ function Row({ r, selecting, checked, onCheck, onOpen }: {
 }
 
 function BulkComposer({
-  studioId, studioName, situation, memberIds, onClose, onDone,
+  studioId, studioName, aiDrafts, situation, memberIds, onClose, onDone,
 }: {
-  studioId: string; studioName: string; situation: PanelRow["situation"];
+  studioId: string; studioName: string; aiDrafts: boolean; situation: PanelRow["situation"];
   memberIds: string[]; onClose: () => void; onDone: (sentence: string) => void;
 }) {
   const [subject, setSubject] = useState("");
@@ -85,6 +85,7 @@ function BulkComposer({
   const [ready, setReady] = useState(false);
   const [tested, setTested] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const [pending, start] = useTransition();
 
   // Pre-fill once, keeping placeholders so each member is rendered at send time.
@@ -111,19 +112,41 @@ function BulkComposer({
             return { error: r.error ?? "Could not send the test." };
           }}
           actions={
-            <button disabled={pending || !tested}
-              title={tested ? "" : "Send a test first"}
-              onClick={() => start(async () => {
-                const r = await sendBulk(studioId, memberIds, situation, subject, body);
-                if ((r as any).error) { setNote((r as any).error); return; }
-                onDone(`Emailed ${r.sent}. ${r.skipped.length ? `${r.skipped.length} skipped.` : ""}`);
-              })}
-              className="rounded-md px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-              {pending ? "Sending…" : `Send to ${memberIds.length}`}
-            </button>
+            <>
+              <button disabled={pending || !tested}
+                title={tested ? "" : "Send a test first"}
+                onClick={() => start(async () => {
+                  const r = await sendBulk(studioId, memberIds, situation, subject, body);
+                  if ((r as any).error) { setNote((r as any).error); return; }
+                  onDone(`Emailed ${r.sent}. ${r.skipped.length ? `${r.skipped.length} skipped.` : ""}`);
+                })}
+                className="rounded-md px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
+                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                {pending ? "Sending…" : `Send to ${memberIds.length}`}
+              </button>
+              {aiDrafts && (
+                <button type="button" disabled={drafting || !ready}
+                  onClick={async () => {
+                    setDrafting(true); setNote(null); setTested(false);
+                    const r = await draftRetentionBulk(studioId, situation, subject, body);
+                    setDrafting(false);
+                    if (r.ok && r.subject != null && r.body != null) { setSubject(r.subject); setBody(r.body); }
+                    else setNote(r.reason === "not_configured" ? "AI drafts aren't configured on this platform yet."
+                               : r.reason === "cap" ? "This month's AI draft limit is reached."
+                               : "The AI draft couldn't be written — try again.");
+                  }}
+                  className="rounded-md border border-line-2 px-3 py-1.5 text-[13px] text-ink-2 hover:text-ink">
+                  {drafting ? "Drafting…" : "Draft with AI"}
+                </button>
+              )}
+            </>
           }
         />
+        {aiDrafts && (
+          <p className="mt-1.5 text-[12px] text-ink-3">
+            Written by AI in your voice, keeping each member&rsquo;s placeholders — read it before you send.
+          </p>
+        )}
         {note && <p className="mt-2 text-[12.5px] text-ink-2">{note}</p>}
       </div>
     </div>
@@ -131,10 +154,10 @@ function BulkComposer({
 }
 
 function Section({
-  title, count, rows, studioId, studioName, onOpen, onBulkDone,
+  title, count, rows, studioId, studioName, aiDrafts, onOpen, onBulkDone,
 }: {
   title: string; count: string | null; rows: RetentionRow[];
-  studioId: string; studioName: string;
+  studioId: string; studioName: string; aiDrafts: boolean;
   onOpen: (r: RetentionRow) => void; onBulkDone: (s: string) => void;
 }) {
   const [selecting, setSelecting] = useState(false);
@@ -173,7 +196,7 @@ function Section({
         ))}
       </ul>
       {bulk && (
-        <BulkComposer studioId={studioId} studioName={studioName} situation={situation}
+        <BulkComposer studioId={studioId} studioName={studioName} aiDrafts={aiDrafts} situation={situation}
           memberIds={[...picked]} onClose={() => setBulk(false)}
           onDone={(s) => { setBulk(false); setSelecting(false); setPicked(new Set()); onBulkDone(s); }} />
       )}
@@ -182,9 +205,9 @@ function Section({
 }
 
 export default function RetentionBoard({
-  rows, studioId, studioName, outcomes,
+  rows, studioId, studioName, aiDrafts, outcomes,
 }: {
-  rows: RetentionRow[]; studioId: string; studioName: string;
+  rows: RetentionRow[]; studioId: string; studioName: string; aiDrafts: boolean;
   outcomes: { contacted: number; came_back: number };
 }) {
   const [open, setOpen] = useState<RetentionRow | null>(null);
@@ -202,17 +225,17 @@ export default function RetentionBoard({
       )}
       {flash && <p className="mb-3 rounded-md border border-line px-3 py-2 text-[13px] text-ink-2">{flash}</p>}
       <Section title="Free class, not yet converted" count={null} rows={by("unconverted")}
-        studioId={studioId} studioName={studioName} onOpen={setOpen} onBulkDone={setFlash} />
+        studioId={studioId} studioName={studioName} aiDrafts={aiDrafts} onOpen={setOpen} onBulkDone={setFlash} />
       <Section title="Drifting" count={null} rows={by("drifting")}
-        studioId={studioId} studioName={studioName} onOpen={setOpen} onBulkDone={setFlash} />
+        studioId={studioId} studioName={studioName} aiDrafts={aiDrafts} onOpen={setOpen} onBulkDone={setFlash} />
       <Section title="At risk" count={null} rows={by("at_risk")}
-        studioId={studioId} studioName={studioName} onOpen={setOpen} onBulkDone={setFlash} />
+        studioId={studioId} studioName={studioName} aiDrafts={aiDrafts} onOpen={setOpen} onBulkDone={setFlash} />
       <Section title="Expiring this week" count={null} rows={by("expiring")}
-        studioId={studioId} studioName={studioName} onOpen={setOpen} onBulkDone={setFlash} />
+        studioId={studioId} studioName={studioName} aiDrafts={aiDrafts} onOpen={setOpen} onBulkDone={setFlash} />
       <Section title="Lapsed this month" count={null} rows={by("lapsed")}
-        studioId={studioId} studioName={studioName} onOpen={setOpen} onBulkDone={setFlash} />
+        studioId={studioId} studioName={studioName} aiDrafts={aiDrafts} onOpen={setOpen} onBulkDone={setFlash} />
       {open && (
-        <RetentionPanel studioId={studioId} studioName={studioName}
+        <RetentionPanel studioId={studioId} studioName={studioName} aiDrafts={aiDrafts}
           row={{
             member_id: open.member_id, situation: SITUATION[open.section],
             member_name: open.member_name, phone: open.phone,

@@ -26,11 +26,13 @@ export default async function RetentionScreen() {
     return <AppShell {...shell} title="Retention"><Denied what="retention" role={ctx.role} /></AppShell>;
   }
 
-  const [{ data }, { data: outcomesData }, { data: studio }] = await Promise.all([
+  const [{ data }, { data: outcomesData }, { data: studio }, { data: aiSetting }] = await Promise.all([
     supabase.rpc("retention_board", { p_studio_id: ctx.studioId }),
     supabase.rpc("retention_outcomes", { p_studio_id: ctx.studioId }),
     supabase.from("studios").select("name").eq("id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("ai_drafts_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
+  const aiDrafts = aiSetting?.ai_drafts_enabled ?? false;
   const outcomes = (outcomesData as { contacted: number; came_back: number } | null)
     ?? { contacted: 0, came_back: 0 };
   const fmt = (iso: string | null) => {
@@ -70,7 +72,7 @@ export default async function RetentionScreen() {
         then watch whether they come back.
       </p>
       <RetentionBoard rows={rows} studioId={ctx.studioId}
-        studioName={studio?.name ?? "your studio"} outcomes={outcomes} />
+        studioName={studio?.name ?? "your studio"} aiDrafts={aiDrafts} outcomes={outcomes} />
     </AppShell>
   );
 }

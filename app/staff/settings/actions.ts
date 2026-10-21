@@ -1077,12 +1077,16 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
     return { ok: false, message: "Tasks go to owners and managers, or to front desk." };
   if (exclusive && plan === null)
     return { ok: false, message: "Pick the intro offer plan before making it exclusive." };
+  const aiOn = String(fd.get("ai_drafts_enabled") ?? "") === "on";
+  const voiceRaw = String(fd.get("studio_voice") ?? "").trim();
+  const voice = voiceRaw === "" ? null : voiceRaw.slice(0, 2000);
 
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
     .update({ convert_sequence_enabled: on, keep_sequence_enabled: keepOn, retention_tasks_enabled: tasksOn,
               intro_offer_plan_id: plan, intro_offer_days: days,
-              intro_offer_exclusive: exclusive, retention_tasks_to: to })
+              intro_offer_exclusive: exclusive, retention_tasks_to: to,
+              ai_drafts_enabled: aiOn, studio_voice: voice })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
