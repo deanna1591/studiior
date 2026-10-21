@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { renderBody } from "@/lib/email-body";
-import { uploadEmailImage } from "@/app/staff/email-image-actions";
+import { uploadEmailImage, emailFrameChrome, type EmailFrameChrome } from "@/app/staff/email-image-actions";
 
 /**
  * Decision 77 — the shared email composer, used by Campaigns and by the closure
@@ -42,6 +42,10 @@ export default function EmailComposer({
   const [testMsg, setTestMsg] = useState<string | null>(null);
   const [testErr, setTestErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Decision 80a: the real email frame, fetched once, so the preview is the
+  // email as it will send — the studio's header, accent and footer around it.
+  const [chrome, setChrome] = useState<EmailFrameChrome | null>(null);
+  useEffect(() => { emailFrameChrome().then(setChrome).catch(() => {}); }, []);
 
   // Insert an ![](url) image marker at the cursor (or the end).
   const insertAtCursor = (snippet: string) => {
@@ -78,7 +82,8 @@ export default function EmailComposer({
     });
   };
 
-  const preview = renderBody(body);
+  const accent = chrome?.accent || "#78716C";
+  const preview = renderBody(body, { accent });
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -110,6 +115,11 @@ export default function EmailComposer({
         />
         <p className="mt-1 text-[11px] leading-4 text-ink-3">
           Blank line for a new paragraph · <code>**bold**</code> · <code>[text](https://…)</code> · Insert image for a photo.
+          <br />
+          Blocks: <code>[Label](https://…){"{button}"}</code> a button · <code>&gt; quote — name</code> · <code>---</code> a divider ·
+          a card:
+          <br />
+          <code>::: card</code> / <code>name: …</code> / <code>detail: …</code> / <code>price: …</code> / <code>button: Label | https://…</code> / <code>:::</code>
         </p>
         {imgErr && <p className="mt-1 text-[12px] text-coral">{imgErr}</p>}
 
@@ -127,18 +137,33 @@ export default function EmailComposer({
         {testErr && <p className="mt-3 text-[13px] text-coral">{testErr}</p>}
       </div>
 
-      {/* Preview — the email frame exactly as a recipient sees it. */}
+      {/* Preview — the email inside the studio's real frame (header mark + accent
+          rule + footer), at phone width, exactly as a recipient sees it. */}
       <div>
         <span className="block text-[12px] font-medium text-ink-2">Preview</span>
-        <div className="mt-1 rounded-lg border border-line bg-surface p-5">
-          <div className="mb-3 text-[17px] font-semibold text-ink">{studioName}</div>
-          <div className="mb-4 h-[3px] w-11 rounded bg-accent-solid" />
-          <p className="text-[15px] font-semibold text-ink">{subject || "Subject"}</p>
-          {body.trim()
-            ? <div className="email-preview mt-3 text-[14px] leading-[21px] text-ink"
-                   dangerouslySetInnerHTML={{ __html: preview.html }} />
-            : <p className="mt-3 text-[14px] text-ink-3">Your message appears here.</p>}
-          {previewFooter}
+        <div className="mt-1 rounded-lg bg-[#F5F5F4] p-4">
+          <div className="mx-auto max-w-[380px] overflow-hidden rounded-xl bg-white">
+            <div className="px-6 pt-6">
+              {chrome?.logoUrl
+                ? /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={chrome.logoUrl} alt="" className="h-10 w-10 rounded-md object-contain" />
+                : <div className="text-[18px] font-semibold text-ink">{chrome?.studioName ?? studioName}</div>}
+              <div className="mt-4 h-[3px] w-11 rounded" style={{ background: accent }} />
+            </div>
+            <div className="px-6 pb-2 pt-3">
+              <p className="text-[15px] font-semibold text-ink">{subject || "Subject"}</p>
+              {body.trim()
+                ? <div className="email-preview mt-3 text-[14px] leading-[21px] text-ink"
+                       dangerouslySetInnerHTML={{ __html: preview.html }} />
+                : <p className="mt-3 text-[14px] text-ink-3">Your message appears here.</p>}
+              {previewFooter}
+            </div>
+            <div className="mx-6 mt-3 border-t border-line pb-6 pt-3 text-[12px] leading-[17px] text-ink-3">
+              {chrome?.contact && <div>{chrome.contact}</div>}
+              {chrome?.address && <div>{chrome.address}</div>}
+              <div>Choose which emails you get</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -15,7 +15,7 @@ export async function saveTemplateOverride(key: string, subject: string, body: s
   const ctx = await getStaffContext();
   if (!ctx) return { error: "You are not signed in." };
   if (!subject.trim() || !body.trim()) return { error: "Give the email a subject and a body." };
-  const r = renderBody(body);
+  const r = renderBody(body, { accent: "{accent}" });
   const supabase = createClient();
   const { data, error } = await supabase.from("notification_templates_overrides")
     .upsert({ studio_id: ctx.studioId, key, subject, body, body_html: r.html,

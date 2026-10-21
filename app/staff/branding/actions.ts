@@ -40,6 +40,12 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
   const rawPhone = String(fd.get("contact_phone") ?? "").trim();
   const contactPhone = rawPhone === "" ? null : rawPhone;
 
+  // Decision 80a: the Instagram handle, stored WITHOUT the @ (and without a URL
+  // if someone pastes one). Blank → null → the footer simply omits it.
+  const rawIg = String(fd.get("instagram_handle") ?? "").trim()
+    .replace(/^@+/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/+$/, "");
+  const instagramHandle = rawIg === "" ? null : rawIg.slice(0, 60);
+
   // Decision 51: the sign-in sub-line and the Install-page welcome. Both
   // nullable — blank means "show the default sentence", so a studio that never
   // touches them reads exactly as before. Trimmed to a sane length so a pasted
@@ -66,6 +72,7 @@ export async function saveBranding(_prev: BrandingState, fd: FormData): Promise<
     .from("studios")
     .update({ theme_preset: preset, accent_color: accent,
               contact_email: contactEmail, contact_phone: contactPhone,
+              instagram_handle: instagramHandle,
               login_tagline: loginTagline, install_welcome: installWelcome })
     .eq("id", ctx.studioId)
     .select("id");

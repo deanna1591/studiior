@@ -28,7 +28,7 @@ export default async function Branding() {
   const [{ data: studio }, { data: settings }] = await Promise.all([
     supabase
       .from("studios")
-      .select("name, theme_preset, accent_color, logo_url, login_image_url, login_image_focus_x, login_image_focus_y, contact_email, contact_phone, login_tagline, install_welcome")
+      .select("name, theme_preset, accent_color, logo_url, login_image_url, login_image_focus_x, login_image_focus_y, contact_email, contact_phone, instagram_handle, login_tagline, install_welcome")
       .eq("id", ctx.studioId)
       .maybeSingle(),
     supabase
@@ -55,6 +55,7 @@ export default async function Branding() {
         loginImageUrl={studio?.login_image_url ?? null}
         contactEmail={studio?.contact_email ?? ""}
         contactPhone={studio?.contact_phone ?? ""}
+        instagramHandle={studio?.instagram_handle ?? ""}
         loginTagline={studio?.login_tagline ?? ""}
         installWelcome={studio?.install_welcome ?? ""}
         publicInstructorName={(settings?.public_instructor_name ?? "first") as "first" | "full"}

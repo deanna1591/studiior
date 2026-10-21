@@ -7340,6 +7340,7 @@ export type Database = {
           currency: string
           custom_domain: string | null
           id: string
+          instagram_handle: string | null
           install_welcome: string | null
           ios_bundle_id: string | null
           ios_team_id: string | null
@@ -7370,6 +7371,7 @@ export type Database = {
           currency: string
           custom_domain?: string | null
           id?: string
+          instagram_handle?: string | null
           install_welcome?: string | null
           ios_bundle_id?: string | null
           ios_team_id?: string | null
@@ -7400,6 +7402,7 @@ export type Database = {
           currency?: string
           custom_domain?: string | null
           id?: string
+          instagram_handle?: string | null
           install_welcome?: string | null
           ios_bundle_id?: string | null
           ios_team_id?: string | null
@@ -8587,7 +8590,9 @@ export type Database = {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
       }
+      ef_count: { Args: { hay: string; needle: string }; Returns: number }
       effective_free_first: { Args: { p_occurrence_id: string }; Returns: Json }
+      email_on_accent: { Args: { p_hex: string }; Returns: string }
       end_membership: {
         Args: {
           p_keep_credits?: boolean
@@ -8625,6 +8630,22 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_notlike: {
+        Args: { actual: string; label: string; pattern: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {

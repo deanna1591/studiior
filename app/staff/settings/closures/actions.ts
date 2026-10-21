@@ -46,7 +46,7 @@ async function run(fd: FormData, confirm: boolean): Promise<ClosureState> {
   if (notice && (!subject || !message)) {
     return { error: "The notice to members needs a subject and a message." };
   }
-  const rendered = notice ? renderBody(message) : null;
+  const rendered = notice ? renderBody(message, { accent: "{accent}" }) : null;
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("close_studio", {
@@ -96,7 +96,7 @@ export async function closureTestSend(
   const ctx = await getStaffContext();
   if (!ctx) return { error: "You are not signed in." };
   if (!subject.trim() || !message.trim()) return { error: "Add a subject and a message first." };
-  const r = renderBody(message);
+  const r = renderBody(message, { accent: "{accent}" });
   const supabase = createClient();
   const { data, error } = await supabase.rpc("closure_notice_test", {
     p_studio_id: ctx.studioId, p_subject: subject, p_body_html: r.html, p_body_text: r.text,

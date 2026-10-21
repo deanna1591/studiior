@@ -51,7 +51,7 @@ function LoginSheetPreview({ preset, accent, studioName, logoUrl, tagline }: {
 export default function BrandingForm({
   studioName, preset: initialPreset, accent: initialAccent, logoUrl, loginImageUrl,
   loginFocusX, loginFocusY,
-  contactEmail, contactPhone, loginTagline: initialTagline, installWelcome: initialWelcome,
+  contactEmail, contactPhone, instagramHandle, loginTagline: initialTagline, installWelcome: initialWelcome,
   publicInstructorName: initialNameMode,
   timeFormat: initialTimeFormat,
 }: {
@@ -62,6 +62,7 @@ export default function BrandingForm({
   loginFocusY: number;
   contactEmail: string;
   contactPhone: string;
+  instagramHandle: string;
   loginTagline: string;
   installWelcome: string;
   publicInstructorName: "first" | "full";
@@ -218,6 +219,16 @@ export default function BrandingForm({
               <span className="mb-1.5 block text-[13px] leading-[18px] text-ink-2">Phone</span>
               <input name="contact_phone" defaultValue={contactPhone}
                      className={inputClass} placeholder="020 7946 0102" />
+            </label>
+            {/* Decision 80a: the Instagram handle, shown in the email footer as
+                @handle. Stored without the @. */}
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] leading-[18px] text-ink-2">Instagram handle</span>
+              <input name="instagram_handle" defaultValue={instagramHandle}
+                     className={inputClass} placeholder="yourstudio" />
+              <span className="mt-1 block text-[12px] leading-4 text-ink-3">
+                Without the @. It appears in the footer of your emails.
+              </span>
             </label>
           </fieldset>
 

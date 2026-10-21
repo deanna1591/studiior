@@ -64,7 +64,7 @@ export async function saveCampaign(
   id: string, subject: string, body: string, filter: AudienceFilter,
 ): Promise<CampaignResult> {
   const supabase = createClient();
-  const r = renderBody(body);
+  const r = renderBody(body, { accent: "{accent}" });
   const { error } = await supabase
     .from("campaigns")
     .update({ subject, body, body_html: r.html, body_text: r.text,
@@ -93,7 +93,7 @@ export async function audienceCount(id: string, filter: AudienceFilter): Promise
 // reads body_html/body_text and the markup is parsed in ONE place (Next).
 async function persist(id: string, subject: string, body: string, filter: AudienceFilter) {
   const supabase = createClient();
-  const r = renderBody(body);
+  const r = renderBody(body, { accent: "{accent}" });
   await supabase
     .from("campaigns")
     .update({ subject, body, body_html: r.html, body_text: r.text,

@@ -57,7 +57,7 @@ export async function prefillBulk(studioId: string, situation: string) {
 
 export async function sendEmail(memberId: string, situation: string, subject: string, body: string) {
   const supabase = createClient();
-  const { html, text } = renderBody(body);
+  const { html, text } = renderBody(body, { accent: "{accent}" });
   const { data, error } = await supabase.rpc("send_retention_email", {
     p_member_id: memberId, p_situation: situation,
     p_subject: subject, p_body_html: html, p_body_text: text,
@@ -70,7 +70,7 @@ export async function sendEmail(memberId: string, situation: string, subject: st
 export async function sendBulk(
   studioId: string, memberIds: string[], situation: string, subject: string, body: string) {
   const supabase = createClient();
-  const { html, text } = renderBody(body);
+  const { html, text } = renderBody(body, { accent: "{accent}" });
   const { data, error } = await supabase.rpc("send_retention_email_bulk", {
     p_member_ids: memberIds, p_situation: situation,
     p_subject: subject, p_body_html: html, p_body_text: text,
@@ -84,7 +84,7 @@ export async function sendTest(
   studioId: string, subject: string, body: string,
 ): Promise<{ ok: boolean; to?: string; error?: string }> {
   const supabase = createClient();
-  const { html, text } = renderBody(body);
+  const { html, text } = renderBody(body, { accent: "{accent}" });
   const { data, error } = await supabase.rpc("send_retention_test", {
     p_studio_id: studioId, p_subject: subject, p_body_html: html, p_body_text: text,
   });

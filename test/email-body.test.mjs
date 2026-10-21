@@ -81,3 +81,81 @@ test("multiple images are allowed, each full width", () => {
   const { html } = renderBody("![a](https://x.com/1.png)\n\n![b](https://x.com/2.png)");
   assert.equal((html.match(/<img /g) ?? []).length, 2);
 });
+
+// --- Decision 80a blocks ------------------------------------------------------
+
+test("button: [Label](url){button} → a table button in the accent, with the paired text colour", () => {
+  const { html, text } = renderBody("[Book now](https://x.com/book){button}", { accent: "#BEF738" });
+  assert.match(html, /<table role="presentation"/);
+  assert.match(html, /background:#BEF738/);
+  assert.match(html, /color:#14170E/); // lime is light → dark ink paired here
+  assert.match(html, /href="https:\/\/x\.com\/book"/);
+  assert.match(html, />Book now<\/a>/);
+  assert.equal(text, "Book now: https://x.com/book");
+});
+
+test("button: a dark accent pairs white text; default accent is neutral grey", () => {
+  assert.match(renderBody("[x](https://x.com){button}", { accent: "#1A2B4C" }).html, /color:#FFFFFF/);
+  assert.match(renderBody("[x](https://x.com){button}").html, /background:#78716C/);
+});
+
+test("button: the {accent} token survives for a static SQL template (both colours tokenised)", () => {
+  const { html } = renderBody("[Buy](https://x.com){button}", { accent: "{accent}" });
+  assert.match(html, /background:\{accent\}/);
+  assert.match(html, /color:\{accent_on\}/);
+});
+
+test("button: a {placeholder} url IS a button (SQL templates author it, render_notification fills it); inline links are NOT relaxed", () => {
+  const { html } = renderBody("[Buy]({buy_url}){button}\n\nsee [x]({buy_url}) too", { accent: "{accent}" });
+  assert.match(html, /href="\{buy_url\}"[^>]*>Buy<\/a>/); // the button keeps the token
+  assert.match(html, /<p>see \[x\]\(\{buy_url\}\) too<\/p>/); // the inline link stays literal (http-only)
+});
+
+test("button: an unsafe url is not a button", () => {
+  const { html } = renderBody("[x](javascript:1){button}");
+  assert.ok(!/<table/.test(html));
+  assert.match(norm(html), /<p>\[x\]\(javascript:1\)\{button\}<\/p>/);
+});
+
+test("card: ::: card with name/detail/price/button → a bordered card + button", () => {
+  const body = "::: card\nname: 8 Classes Monthly\ndetail: 8 classes · one month\nprice: PHP 1,799\nbutton: Buy it | https://x.com/buy\n:::";
+  const { html, text } = renderBody(body, { accent: "#B85C38" });
+  assert.match(html, /border:1px solid #E7E5E4/);
+  assert.match(html, />8 Classes Monthly<\/div>/);
+  assert.match(html, />8 classes · one month<\/div>/);
+  assert.match(html, />PHP 1,799<\/div>/);
+  assert.match(html, /href="https:\/\/x\.com\/buy"/);
+  assert.equal(text, "8 Classes Monthly\n8 classes · one month\nPHP 1,799\nBuy it: https://x.com/buy");
+});
+
+test("card: ::: plan <id> resolves through a caller resolver", () => {
+  const resolve = (kind, id) =>
+    kind === "plan" && id === "p1"
+      ? { name: "Intro Offer", detail: "3 classes", price: "PHP 1,799", button: { label: "Book", url: "https://x.com/b" } }
+      : null;
+  const { html, text } = renderBody("::: plan p1", { resolve });
+  assert.match(html, />Intro Offer<\/div>/);
+  assert.match(html, /href="https:\/\/x\.com\/b"/);
+  assert.match(text, /^Intro Offer\n3 classes\nPHP 1,799\nBook: https:\/\/x\.com\/b$/);
+});
+
+test("card: ::: plan <id> with NO resolver degrades to the literal text (never broken)", () => {
+  const { html } = renderBody("::: plan p1");
+  assert.ok(!/<table/.test(html));
+  assert.match(norm(html), /<p>::: plan p1<\/p>/);
+});
+
+test("quote: > text — name → an indented quote with the attribution", () => {
+  const { html, text } = renderBody("> It changed my week — Maya");
+  assert.match(html, /border-left:3px solid #E7E5E4/);
+  assert.match(html, /font-style:italic/);
+  assert.match(html, />It changed my week<\/div>/);
+  assert.match(html, />— Maya<\/div>/);
+  assert.equal(text, "It changed my week — Maya");
+});
+
+test("divider: --- → a 1px rule, no plain-text line", () => {
+  const { html, text } = renderBody("before\n\n---\n\nafter");
+  assert.match(html, /border-top:1px solid #E7E5E4/);
+  assert.equal(text, "before\n\nafter");
+});
