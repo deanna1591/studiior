@@ -18,6 +18,11 @@ function initialsOf(full: string): string {
   return full.trim().split(/\s+/).filter(Boolean).slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 }
+/** "Nikko Fictitious" -> "Nikko" — the week block names who is teaching first,
+ *  then the class, so a column of the same format reads by instructor. */
+function firstNameOf(full: string): string {
+  return full.trim().split(/\s+/).filter(Boolean)[0] ?? full;
+}
 import { toStudioWall, fromStudioWall, wallAt, shiftDateKey, studioDateKey } from "@/lib/tz";
 import { fmtTime, fmtClock } from "@/lib/time";
 import { resolveDrag } from "@/lib/drag-safety";
@@ -541,37 +546,92 @@ export default function ScheduleCalendar({
         </span>
       ) : trialsPill;
 
-      // THE NORMAL BLOCK: exactly two lines.
-      //   line 1: time range (left) · headcount (right) — the number a planner
-      //           scans for, mono + tabular so a column of them lines up.
-      //   line 2: tier dot + class name (left, truncate) · Trials marker (right).
-      // Staffing (colour), fullness (the ring) and flex-pending (the dashed edge)
-      // are carried by the block's own styling, not by a third text line — which
-      // is what let a 50-minute block clip. Room, waitlist, applications and the
-      // confirmation marks live in the tooltip and the click-through panel.
+      const unstaffed = event.staffing !== "assigned";
+      // The tier dot (● core · ○ flex · ◆ always) — SHAPE not colour, since
+      // colour already carries staffing. Shared by both views' line 2.
+      const tierDot = showTier && event.tier ? (
+        <>
+          <TierMark tier={event.tier as "core" | "flex" | "always"}
+                    effective={event.effectiveTier as "core" | "flex" | "always" | null}
+                    minimum={event.minimum ?? null} />
+          <span className="sr-only">
+            {event.tier === "flex" ? "Flex class. "
+             : event.tier === "always" ? "Always runs. " : "Core class. "}
+          </span>
+        </>
+      ) : null;
+
+      // THE NORMAL BLOCK: exactly two lines, and both carry what the old third
+      // line did — nothing moves to a third row that a 50-minute block would clip.
+      //   line 1: time range (left) · headcount (right), mono + tabular.
+      //   line 2 (WEEK): tier dot + instructor first name · class name, the class
+      //     name truncating first; below 104px the class name drops (container
+      //     query) and the instructor stands alone. Trials pill/dot at the right.
+      //   line 2 (DAY): tier dot + class name, then the room and status words
+      //     (applied · +N wait · Full · Quiet · On its own · Flex · Runs ·
+      //     ✓/awaiting) as one muted run that truncates before the name. Trials
+      //     pill at the far right.
+      const f = fullness(event);
+      let line2;
+      if (isWeek) {
+        const name = event.resourceId === UNASSIGNED
+          ? null : (instructorNames[event.resourceId] ?? null);
+        line2 = (
+          <div className="flex items-center gap-1.5">
+            <span className="flex min-w-0 flex-1 items-center gap-1 text-ink">
+              {tierDot}
+              <span className="shrink-0 font-medium">
+                {unstaffed ? "Unassigned" : firstNameOf(name ?? event.title)}
+              </span>
+              <span className="wk-cls min-w-0 truncate text-ink-2">· {event.title}</span>
+            </span>
+            {trials}
+          </div>
+        );
+      } else {
+        // The muted room + status run, interleaved with " · ". Room first, then
+        // whichever states apply — the same set the old third line carried.
+        const bits: React.ReactNode[] = [];
+        bits.push(unstaffed ? "Nobody assigned" : (event.room ?? "No room"));
+        if (event.pendingApplications > 0)
+          bits.push(<span key="app"><span className="num">{event.pendingApplications}</span> applied</span>);
+        if (event.waitlistCount > 0)
+          bits.push(<span key="wait" className="num" title={`${event.waitlistCount} on the waitlist`}>+{event.waitlistCount} wait</span>);
+        if (event.waitlistCount === 0 && f === "full") bits.push("Full");
+        if (event.waitlistCount === 0 && f === "quiet" && !event.flexPending) bits.push("Quiet");
+        if (event.standalone)
+          bits.push(<span key="alone" title="Nothing else of this instructor's within 90 minutes">On its own</span>);
+        if (event.flexPending)
+          bits.push(<span key="flex" title="Runs only if it reaches its minimum">Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}</span>);
+        if (event.flexCommitted)
+          bits.push(<span key="runs" title="Committed to run, even below its minimum">Runs</span>);
+        if (assignmentConfirmations && event.assignmentConfirmed)
+          bits.push(<span key="ok" title="The instructor confirmed">✓</span>);
+        if (assignmentConfirmations && event.assignmentAwaiting)
+          bits.push(<span key="aw" title="Awaiting the instructor's confirmation">awaiting</span>);
+        line2 = (
+          <div className="flex items-center gap-1.5">
+            {/* Name holds its width (capped at 70%, truncating only as a last
+                resort) so the muted status run is what gives way first. */}
+            <span className="flex min-w-0 max-w-[70%] shrink-0 items-center gap-1 font-medium text-ink">
+              {tierDot}
+              <span className="min-w-0 truncate">{event.title}</span>
+            </span>
+            <span className="min-w-0 flex-1 truncate text-ink-2">
+              {bits.map((b, i) => <span key={i}>{i > 0 ? " · " : null}{b}</span>)}
+            </span>
+            {trials}
+          </div>
+        );
+      }
+
       return (
         <div className={root}>
           <div className="flex items-baseline gap-1.5">
             <span className="num min-w-0 flex-1 truncate tabular-nums text-ink">{timeRange}</span>
             <span className="num shrink-0 text-[13px] font-semibold tabular-nums text-ink">{headcount}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="flex min-w-0 flex-1 items-center gap-1 font-medium text-ink">
-              {showTier && event.tier && (
-                <>
-                  <TierMark tier={event.tier as "core" | "flex" | "always"}
-                            effective={event.effectiveTier as "core" | "flex" | "always" | null}
-                            minimum={event.minimum ?? null} />
-                  <span className="sr-only">
-                    {event.tier === "flex" ? "Flex class. "
-                     : event.tier === "always" ? "Always runs. " : "Core class. "}
-                  </span>
-                </>
-              )}
-              <span className="min-w-0 truncate">{event.title}</span>
-            </span>
-            {trials}
-          </div>
+          {line2}
         </div>
       );
     },

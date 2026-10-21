@@ -494,11 +494,13 @@ body {
 .rbc-calendar .rbc-timeslot-group { min-height: 46px; }
 .rbc-time-view .rbc-event-label { display: none; }
 .rbc-time-view .rbc-event-content { height: 100%; }
-/* WEEK BLOCK: the block is its own query container, so a column too narrow for
-   the "Trials" pill swaps it for a 6px dot in the same accent. */
+/* WEEK BLOCK: the block is its own query container. Below 104px the class name
+   on line 2 drops so the instructor stands alone, and the "Trials" pill swaps
+   for a 6px dot in the same accent. */
 .rbc-calendar .wk-block { container-type: inline-size; width: 100%; }
 .wk-block .wk-trials-dot { display: none; }
 @container (max-width: 104px) {
+  .wk-block .wk-cls { display: none; }
   .wk-block .wk-trials { display: none; }
   .wk-block .wk-trials-dot { display: inline-block; }
 }
