@@ -332,4 +332,61 @@ select expect_true('a desk booking of an eligible lead is NOT refused use_free_f
 select expect_text('...it books as an ordinary seat',
   current_setting('t.desk')::jsonb->>'status', 'booked');
 
+-- =============================================================================
+-- Decision 30 hotfix — a CANCELLED free first class never counts (78a regression).
+-- book free -> member cancels -> eligible AGAIN -> rebook on the one ledger row.
+-- cancel_booking never touches guest_passes, so the host-null pass survives the
+-- cancel and eligibility goes through the host-null branch — the one that returned
+-- `already_had_free` in its trailing else (the bug). RED-provable.
+-- =============================================================================
+insert into auth.users (id) values ('f9eef9ee-0000-0000-0000-000000000e30');
+insert into profiles (id, email) values ('f9eef9ee-0000-0000-0000-000000000e30','e30@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source, waiver_signed_at) values
+  ('f9eef9ee-0000-0000-0000-00000000ad30','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e30','Cancel','Lead','cancel30@example.com','lead',current_date,'self_signup', now());
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
+    starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('f9eef9ee-0000-0000-0000-00000000c030','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '12 days', now()+interval '12 days'+interval '50 min', 10, 0, 'scheduled','assigned'),
+  ('f9eef9ee-0000-0000-0000-00000000c031','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee002',null,'Reformer',
+    now()+interval '13 days', now()+interval '13 days'+interval '50 min', 10, 0, 'scheduled','assigned');
+
+select expect_true('cancel30: eligible before booking',
+  (free_first_eligibility('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad30') ->> 'ok')::boolean);
+
+-- Book free (as the member), capturing the booking id.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e30',false);
+select set_config('t.bf', book_first_free('f9eef9ee-0000-0000-0000-00000000c030')::text, false);
+-- Cancel it (timely — 7 days out).
+select set_config('t.cx', cancel_booking((current_setting('t.bf')::jsonb->>'booking_id')::uuid)::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('cancel30: book_first_free ok',
+  (current_setting('t.bf')::jsonb->>'ok')::boolean);
+
+-- The fix: eligible AGAIN after cancelling (the host-null pass is still there).
+select expect_true('cancel30: eligible AGAIN after cancelling the free class',
+  (free_first_eligibility('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad30') ->> 'ok')::boolean);
+-- Decision 55 follow-up: the free-class picker shows for them again.
+select expect_true('cancel30: the free-class picker shows for them again',
+  (select count(*) from free_first_eligible_classes_run('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad30',0)) > 0);
+
+-- Rebook free on another class — succeeds, reusing the single once-ever ledger row.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e30',false);
+select set_config('t.bf2', book_first_free('f9eef9ee-0000-0000-0000-00000000c031')::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('cancel30: rebook free succeeds',
+  (current_setting('t.bf2')::jsonb->>'ok')::boolean);
+
+-- End state: ONE host-null guest_passes row, TWO comp bookings (one cancelled, one live).
+select expect_num('cancel30: exactly one host-null guest_passes row',
+  (select count(*) from guest_passes where studio_id='f9eef9ee-0000-0000-0000-000000000001'
+     and host_member_id is null and guest_member_id='f9eef9ee-0000-0000-0000-00000000ad30'), 1);
+select expect_num('cancel30: two comp bookings',
+  (select count(*) from bookings where member_id='f9eef9ee-0000-0000-0000-00000000ad30' and payment_source='comp'), 2);
+select expect_num('cancel30: one of them cancelled',
+  (select count(*) from bookings where member_id='f9eef9ee-0000-0000-0000-00000000ad30'
+     and payment_source='comp' and status in ('cancelled','late_cancelled')), 1);
+select expect_num('cancel30: one of them live (booked)',
+  (select count(*) from bookings where member_id='f9eef9ee-0000-0000-0000-00000000ad30'
+     and payment_source='comp' and status='booked'), 1);
+
 select 'ALL FREE-FIRST TESTS PASSED' as done;
