@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { freeEligibleSet, whichView, nearestEligibleDay, showsTrialsMarker } from "../lib/free-first-view.mjs";
+import { freeEligibleSet, whichView, nearestEligibleDay, trialsMarker } from "../lib/free-first-view.mjs";
 
 test("freeEligibleSet keeps only free_bookable rows", () => {
   const s = freeEligibleSet([
@@ -30,16 +30,19 @@ test("nearestEligibleDay: that day, else nearest, first when no want", () => {
   assert.equal(nearestEligibleDay([], "2026-10-22"), null);             // none
 });
 
-// Decision 30 amendment (b) follow-up — the "Trials" calendar-block marker.
-test("showsTrialsMarker: only an effectively-open OVERRIDE shows it", () => {
-  assert.equal(showsTrialsMarker({ override: "open", effectiveOpen: true }), true);
-  // A rules-open class (no override) gets no marker — it would be on every core class.
-  assert.equal(showsTrialsMarker({ override: null, effectiveOpen: true }), false);
-  // Closed, either way, never.
-  assert.equal(showsTrialsMarker({ override: "closed", effectiveOpen: false }), false);
-  // override 'open' but not effectively open (studio switch off) — no marker.
-  assert.equal(showsTrialsMarker({ override: "open", effectiveOpen: false }), false);
-  // Null / missing state (studio doesn't use free first classes).
-  assert.equal(showsTrialsMarker(null), false);
-  assert.equal(showsTrialsMarker(undefined), false);
+// Decision 30 amendment (b) follow-up — the calendar-block trials marker: EXCEPTIONS
+// in both directions, and only exceptions.
+test("trialsMarker: Trials when an override opens a rules-closed class", () => {
+  assert.equal(trialsMarker({ override: "open", rulesOpen: false }), "trials");
+});
+test("trialsMarker: No trials when an override closes a rules-open class", () => {
+  assert.equal(trialsMarker({ override: "closed", rulesOpen: true }), "no_trials");
+});
+test("trialsMarker: nothing when the override merely repeats the rules, or none", () => {
+  assert.equal(trialsMarker({ override: "open", rulesOpen: true }), null);    // repeats open
+  assert.equal(trialsMarker({ override: "closed", rulesOpen: false }), null); // repeats closed
+  assert.equal(trialsMarker({ override: null, rulesOpen: true }), null);      // follow rules (open)
+  assert.equal(trialsMarker({ override: null, rulesOpen: false }), null);     // follow rules (closed)
+  assert.equal(trialsMarker(null), null);
+  assert.equal(trialsMarker(undefined), null);
 });

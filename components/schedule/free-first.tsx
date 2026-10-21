@@ -12,6 +12,10 @@ export type FreeFirstCardState = {
 };
 
 function noteFor(s: FreeFirstCardState): string {
+  // An override that merely REPEATS the studio rules — say so (and the marker
+  // shows nothing). The Follow-studio-rules link still clears it.
+  if (s.override === "open" && s.rulesOpen) return "Open by studio rules (override not needed)";
+  if (s.override === "closed" && !s.rulesOpen) return "Closed by studio rules (override not needed)";
   if (s.override === "open") return "Opened for this class";
   if (s.override === "closed") return "Closed for this class";
   if (s.effectiveOpen) return "Open by studio rules";

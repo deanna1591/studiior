@@ -10,7 +10,7 @@ import { moveClass } from "./actions";
 import CreateOnSlot, { type SlotDraft } from "./create-slot";
 import BlockPanel, { type BlockFacts } from "@/components/schedule/block-panel";
 import type { FreeFirstCardState } from "@/components/schedule/free-first";
-import { showsTrialsMarker } from "@/lib/free-first-view";
+import { trialsMarker } from "@/lib/free-first-view";
 import { TierMark } from "@/components/tier-mark";
 
 /** Up to two initials, for the month chip where a full name will not fit. */
@@ -526,23 +526,33 @@ export default function ScheduleCalendar({
         );
       }
 
-      // THE "TRIALS" MARKER (Decision 30 amendment b): open to first-timers BY
-      // OVERRIDE only — a rules-open core class would mark every block. A small
-      // pill, --ink on --accent-chip with a 1px border, radius full, sitting on
-      // the RIGHT of line 2 directly under the headcount above it (never centred,
-      // never free-floating). In WEEK view a column too narrow for the pill
-      // swaps it for a 6px dot (container query on .wk-block).
-      const trialsPill = (
+      // THE TRIALS MARKER (Decision 30 amendment b follow-up): EXCEPTIONS only —
+      // "Trials" (accent, --ink on --accent-chip) when an override OPENS a class
+      // the studio rules would close; "No trials" (muted, --ink-2 on --surface)
+      // when an override CLOSES a class the rules would open; nothing when the
+      // override repeats the rules (a pill on every rules-open core class says
+      // nothing). Sits on the RIGHT of line 2 under the headcount. In WEEK view a
+      // column too narrow for the pill swaps it for a 6px dot (container query).
+      const marker = trialsMarker(event.freeFirst);
+      const isTrials = marker === "trials";
+      const trialsPill = marker === null ? null : (
         <span className="shrink-0 rounded-full border px-1 text-[10.5px] font-medium leading-[14px]"
-              style={{ background: "var(--accent-chip)", color: "var(--ink)", borderColor: "var(--line-2)" }}
-              title="Open to first-timers (set for this class)">Trials</span>
+              style={isTrials
+                ? { background: "var(--accent-chip)", color: "var(--ink)", borderColor: "var(--line-2)" }
+                : { background: "var(--surface)", color: "var(--ink-2)", borderColor: "var(--line-2)" }}
+              title={isTrials ? "Open to first-timers (set for this class)"
+                              : "Closed to first-timers (set for this class)"}>
+          {isTrials ? "Trials" : "No trials"}
+        </span>
       );
-      const trials = !showsTrialsMarker(event.freeFirst) ? null : isWeek ? (
+      const trials = marker === null ? null : isWeek ? (
         <span className="shrink-0 leading-none">
           <span className="wk-trials">{trialsPill}</span>
           <span aria-hidden className="wk-trials-dot rounded-full align-middle"
-                style={{ width: 6, height: 6, background: "var(--accent-chip)", border: "1px solid var(--line-2)" }}
-                title="Open to first-timers" />
+                style={{ width: 6, height: 6,
+                         background: isTrials ? "var(--accent-chip)" : "var(--surface)",
+                         border: "1px solid var(--line-2)" }}
+                title={isTrials ? "Open to first-timers" : "Closed to first-timers"} />
         </span>
       ) : trialsPill;
 
