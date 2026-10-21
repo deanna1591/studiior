@@ -26,7 +26,13 @@ export default async function RetentionScreen() {
     return <AppShell {...shell} title="Retention"><Denied what="retention" role={ctx.role} /></AppShell>;
   }
 
-  const { data } = await supabase.rpc("retention_board", { p_studio_id: ctx.studioId });
+  const [{ data }, { data: outcomesData }, { data: studio }] = await Promise.all([
+    supabase.rpc("retention_board", { p_studio_id: ctx.studioId }),
+    supabase.rpc("retention_outcomes", { p_studio_id: ctx.studioId }),
+    supabase.from("studios").select("name").eq("id", ctx.studioId).maybeSingle(),
+  ]);
+  const outcomes = (outcomesData as { contacted: number; came_back: number } | null)
+    ?? { contacted: 0, came_back: 0 };
   const fmt = (iso: string | null) => {
     if (!iso) return null;
     const { day, month } = dayMonthParts(iso, ctx.timeZone);
@@ -48,19 +54,23 @@ export default async function RetentionScreen() {
     plan_name: r.plan_name ?? null,
     date_label: fmtDate(r.expires_on),
     reason: r.reason ?? null,
-    contacted_label: fmt(r.contacted_at),
     task_id: r.task_id,
     task_status: r.task_status,
     suggested_message: r.suggested_message,
+    last_contact_at: r.last_contact_at ?? null,
+    last_contact_method: r.last_contact_method ?? null,
+    outcome: r.outcome ?? null,
+    outcome_days: r.outcome_days ?? null,
   }));
 
   return (
     <AppShell {...shell} title="Retention">
       <p className="mb-4 max-w-2xl text-[13px] leading-[20px] text-ink-2">
-        Members who took a free class and haven&rsquo;t booked again. Reach out by hand — copy their
-        number and the suggested message — then mark them contacted so the sequence stops nagging.
+        Who needs a nudge. Click a member to see them and reach out — email, Viber, a call —
+        then watch whether they come back.
       </p>
-      <RetentionBoard rows={rows} />
+      <RetentionBoard rows={rows} studioId={ctx.studioId}
+        studioName={studio?.name ?? "your studio"} outcomes={outcomes} />
     </AppShell>
   );
 }

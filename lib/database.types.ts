@@ -3352,6 +3352,84 @@ export type Database = {
           },
         ]
       }
+      member_contacts: {
+        Row: {
+          contacted_at: string
+          id: string
+          member_id: string
+          method: string
+          outcome: string | null
+          outcome_at: string | null
+          outcome_days: number | null
+          situation: string
+          staff_id: string | null
+          studio_id: string
+          subject: string | null
+        }
+        Insert: {
+          contacted_at?: string
+          id?: string
+          member_id: string
+          method: string
+          outcome?: string | null
+          outcome_at?: string | null
+          outcome_days?: number | null
+          situation: string
+          staff_id?: string | null
+          studio_id: string
+          subject?: string | null
+        }
+        Update: {
+          contacted_at?: string
+          id?: string
+          member_id?: string
+          method?: string
+          outcome?: string | null
+          outcome_at?: string | null
+          outcome_days?: number | null
+          situation?: string
+          staff_id?: string | null
+          studio_id?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_contacts_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_contacts_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_contacts_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_contacts_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_contacts_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_dismissals: {
         Row: {
           dismissed_at: string
@@ -3951,9 +4029,11 @@ export type Database = {
           assigned_role: string
           close_note: string | null
           closed_at: string | null
+          contact_id: string | null
           contacted_at: string | null
           contacted_by: string | null
           created_at: string
+          due_at: string | null
           id: string
           kind: string
           member_id: string
@@ -3966,9 +4046,11 @@ export type Database = {
           assigned_role?: string
           close_note?: string | null
           closed_at?: string | null
+          contact_id?: string | null
           contacted_at?: string | null
           contacted_by?: string | null
           created_at?: string
+          due_at?: string | null
           id?: string
           kind: string
           member_id: string
@@ -3981,9 +4063,11 @@ export type Database = {
           assigned_role?: string
           close_note?: string | null
           closed_at?: string | null
+          contact_id?: string | null
           contacted_at?: string | null
           contacted_by?: string | null
           created_at?: string
+          due_at?: string | null
           id?: string
           kind?: string
           member_id?: string
@@ -3993,6 +4077,13 @@ export type Database = {
           suggested_message?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "member_tasks_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "member_contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "member_tasks_contacted_by_fkey"
             columns: ["contacted_by"]
@@ -8455,26 +8546,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; sql: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9081,6 +9152,7 @@ export type Database = {
         Returns: string
       }
       member_shop: { Args: { p_studio_id: string }; Returns: Json }
+      member_snapshot: { Args: { p_member_id: string }; Returns: Json }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
       member_waiver_current: {
         Args: { p_member_id: string; p_studio_id: string }
@@ -9480,6 +9552,10 @@ export type Database = {
         Returns: Json
       }
       record_class_pay: { Args: { p_occurrence_id: string }; Returns: Json }
+      record_contact: {
+        Args: { p_member_id: string; p_method: string; p_situation: string }
+        Returns: Json
+      }
       record_document: {
         Args: {
           p_filename: string
@@ -9627,9 +9703,13 @@ export type Database = {
           days_since: number
           expires_on: string
           instructor_name: string
+          last_contact_at: string
+          last_contact_method: string
           member_id: string
           member_name: string
           offer_ends: string
+          outcome: string
+          outcome_days: number
           phone: string
           plan_name: string
           reason: string
@@ -9640,7 +9720,15 @@ export type Database = {
           window_active: boolean
         }[]
       }
+      retention_can_act: { Args: { p_studio_id: string }; Returns: boolean }
       retention_counts: { Args: { p_studio_id: string }; Returns: Json }
+      retention_email_context: {
+        Args: { p_member_id: string; p_situation: string }
+        Returns: Json
+      }
+      retention_outcome_sweep: { Args: { p_now?: string }; Returns: number }
+      retention_outcomes: { Args: { p_studio_id: string }; Returns: Json }
+      retention_task_kind: { Args: { p_situation: string }; Returns: string }
       retention_unconverted_count: {
         Args: { p_studio_id: string }
         Returns: number
@@ -9774,6 +9862,35 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      send_retention_email: {
+        Args: {
+          p_body_html: string
+          p_body_text: string
+          p_member_id: string
+          p_situation: string
+          p_subject: string
+        }
+        Returns: Json
+      }
+      send_retention_email_bulk: {
+        Args: {
+          p_body_html: string
+          p_body_text: string
+          p_member_ids: string[]
+          p_situation: string
+          p_subject: string
+        }
+        Returns: Json
+      }
+      send_retention_test: {
+        Args: {
+          p_body_html: string
+          p_body_text: string
+          p_studio_id: string
+          p_subject: string
+        }
+        Returns: Json
       }
       send_template_test: {
         Args: { p_key: string; p_studio_id: string }
@@ -9980,6 +10097,15 @@ export type Database = {
       }
       snapshot_start_headcount: {
         Args: { p_occurrence_id: string }
+        Returns: Json
+      }
+      snooze_task: {
+        Args: {
+          p_days: number
+          p_member_id: string
+          p_situation: string
+          p_task_id: string
+        }
         Returns: Json
       }
       staff_announcements: { Args: { p_studio_id: string }; Returns: Json }
