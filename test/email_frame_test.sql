@@ -130,4 +130,104 @@ select expect_notlike('SB frame: no {accent} token left', (select html_body from
 select expect_like('SB frame: button text white on neutral', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f4')), '%color:#FFFFFF%');
 select expect_like('SB frame: manage-emails link present', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f4')), '%Choose which emails you get%');
 
+-- ============================================================================
+-- 6. Decision 80a fix — NO token ever reaches a member: render EVERY member-facing
+--    template with a COMPLETE realistic context and assert no "{" remains in the
+--    subject, html or text, and that nothing was stripped (every token resolved).
+--    Plus: the class card's {class_line} (Day · time · room · with instructor), and
+--    the plan card's offer_detail / offer_price / "Buy … — …" button.
+-- ============================================================================
+-- A small class so {class_line} resolves from occurrence_id.
+insert into class_types (id, studio_id, name, color, duration_minutes, default_capacity) values
+  ('e8040000-0000-0000-0000-00000000c7a1','e8040000-0000-0000-0000-000000000001','Reformer Flow','#B85C38',50,10);
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('e8040000-0000-0000-0000-00000000c7b1','e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-00000000000c','Reformer Studio',10);
+insert into instructors (id, studio_id, display_name, status) values
+  ('e8040000-0000-0000-0000-00000000c7c1','e8040000-0000-0000-0000-000000000001','Ada Example','active');
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
+    starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('e8040000-0000-0000-0000-00000000c7d1','e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-00000000000c',
+   'e8040000-0000-0000-0000-00000000c7a1','e8040000-0000-0000-0000-00000000c7b1','e8040000-0000-0000-0000-00000000c7c1','Reformer Flow',
+   now()+interval '2 days', now()+interval '2 days'+interval '50 min', 10, 0, 'scheduled','assigned');
+
+do $$
+declare
+  v_occ uuid := 'e8040000-0000-0000-0000-00000000c7d1';
+  v_ctx jsonb := jsonb_build_object(
+    'class_name','Reformer Flow','occurrence_id', v_occ,
+    'when','Mon 09 Nov at 07:00','where_line',', in Reformer Studio',
+    'when_short','tomorrow','when_time','7:00 AM','day','Monday','time','7:00 AM',
+    'deadline_short','8:00 PM Sun','cancel_deadline','Sun 08 Nov',
+    'manage_link','https://ef-sa.studiior.app/class/x','book_url','https://ef-sa.studiior.app/book',
+    'schedule_url','https://ef-sa.studiior.app/book',
+    'offer_plan_name','Intro Pack','offer_detail','3 classes · valid 30 days','offer_price','₱1,500',
+    'offer_ends','20 Nov 2026','buy_url','https://ef-sa.studiior.app/buy/x',
+    'plan_name','8 Classes Monthly','credits','3','credits_left','3',
+    'expires_on','20 Nov 2026','ends_on','20 Nov 2026','renew_url','https://ef-sa.studiior.app/buy/x',
+    'last_class','Reformer Flow','last_class_date','09 Nov','instructor_first','Ada','instructor_first_name','Ada',
+    'days_since','10','product','Grip socks','quantity','1');
+  k text; v_nid uuid; r record; v_n int := 0;
+  v_keys text[] := array[
+    'booking_confirmed','free_booking_confirmed','flex_booking_pending','flex_booking_confirmed',
+    'flex_booking_not_confirmed','class_reminder','convert_before_class','convert_after_class',
+    'convert_day3','convert_day7','convert_last_day','convert_missed_you',
+    'keep_renew_7','keep_renew_1','keep_renew_0','keep_lapsed_3','keep_credits_7','keep_credits_2',
+    'keep_winback_30','keep_winback_60','keep_drifting','membership_expiring','credit_expiry',
+    'product_order_paid'];
+  -- retention_* are composer SEEDS (sent via the `retention` passthrough with the
+  -- composer's rendered html, never rendered directly), so their text_body carries
+  -- composer markup — not a directly-rendered template.
+begin
+  foreach k in array v_keys loop
+    v_nid := gen_random_uuid();
+    insert into notifications (id, studio_id, member_id, recipient_type, channel, template_key, payload, status, scheduled_for, dedupe_key)
+    values (v_nid,'e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-000000000a01','member','email',
+            k, v_ctx || jsonb_build_object('to_email','mia@frame.example'), 'scheduled', now(), 'every:'||k);
+    select * into r from render_notification(v_nid);
+    if position('{' in coalesce(r.subject,'')) > 0 or position('{' in coalesce(r.html_body,'')) > 0
+       or position('{' in coalesce(r.text_body,'')) > 0 then
+      raise exception 'FAIL  template % leaked a brace', k;
+    end if;
+    if coalesce(array_length(r.stripped,1),0) > 0 then
+      raise exception 'FAIL  template % left tokens unresolved: %', k, array_to_string(r.stripped,', ');
+    end if;
+    v_n := v_n + 1;
+  end loop;
+  raise notice 'PASS  every member-facing template (%) renders with no brace and nothing stripped', v_n;
+end $$;
+
+-- The class card's one detail line, built from the occurrence (Decision 80a fix).
+insert into notifications (id, studio_id, member_id, recipient_type, channel, template_key, payload, status, scheduled_for, dedupe_key) values
+  ('e8040000-0000-0000-0000-0000000000f5','e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-000000000a01','member','email','booking_confirmed',
+   jsonb_build_object('class_name','Reformer Flow','occurrence_id','e8040000-0000-0000-0000-00000000c7d1','where_line','','free_first_html','','manage_link','https://ef-sa.studiior.app/c'),'scheduled',now(),'classline');
+select expect_like('class_line: room in the detail', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f5')), '%Reformer Studio%');
+select expect_like('class_line: with instructor', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f5')), '%with Ada%');
+select expect_like('class_line: separated by middots', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f5')), '% · %');
+
+-- The plan card's detail + price + a specific "Buy … — …" button.
+insert into notifications (id, studio_id, member_id, recipient_type, channel, template_key, payload, status, scheduled_for, dedupe_key) values
+  ('e8040000-0000-0000-0000-0000000000f6','e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-000000000a01','member','email','convert_after_class',
+   jsonb_build_object('class_name','Reformer Flow','instructor_first_name','Ada','offer_plan_name','Intro Pack','offer_detail','3 classes · valid 30 days','offer_price','₱1,500','buy_url','https://ef-sa.studiior.app/buy/x'),'scheduled',now(),'plancard');
+select expect_like('plan card: detail line', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f6')), '%3 classes · valid 30 days%');
+select expect_like('plan card: price line', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f6')), '%₱1,500%');
+select expect_like('plan card: specific button label', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f6')), '%Buy Intro Pack — ₱1,500%');
+select expect_notlike('plan card: no "See your options"', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f6')), '%See your options%');
+
+-- The strip belt: a required token missing is stripped AND surfaced; a known-optional
+-- one (where_line / free_first_html) is not.
+insert into notifications (id, studio_id, member_id, recipient_type, channel, template_key, payload, status, scheduled_for, dedupe_key) values
+  ('e8040000-0000-0000-0000-0000000000f7','e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-000000000a01','member','email','booking_confirmed',
+   jsonb_build_object('class_name','X','occurrence_id','e8040000-0000-0000-0000-00000000c7d1'),'scheduled',now(),'strip');
+select expect_like('strip: a missing required token is reported in stripped',
+  (select array_to_string(stripped,',') from render_notification('e8040000-0000-0000-0000-0000000000f7')), '%manage_link%');
+select expect_notlike('strip: a known-optional token is NOT reported',
+  (select array_to_string(stripped,',') from render_notification('e8040000-0000-0000-0000-0000000000f7')), '%free_first_html%');
+select expect_num('strip: no brace survives in the body',
+  (select case when position('{' in html_body)>0 then 1 else 0 end from render_notification('e8040000-0000-0000-0000-0000000000f7')), 0);
+
+-- fmt_money + plan_card_detail
+select expect_text('fmt_money PHP whole → ₱1,500', fmt_money(150000, 'PHP'), '₱1,500');
+select expect_text('fmt_money CZK suffix', fmt_money(150000, 'CZK'), '1,500 Kč');
+select expect_text('fmt_money USD with cents', fmt_money(149950, 'USD'), '$1,499.50');
+
 select 'email_frame_test OK' as result;

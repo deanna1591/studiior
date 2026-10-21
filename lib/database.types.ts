@@ -4951,6 +4951,55 @@ export type Database = {
           },
         ]
       }
+      notification_render_warnings: {
+        Row: {
+          created_at: string
+          id: number
+          notification_id: string
+          studio_id: string
+          template_key: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          notification_id: string
+          studio_id: string
+          template_key: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          notification_id?: string
+          studio_id?: string
+          template_key?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_render_warnings_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_render_warnings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_render_warnings_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_templates: {
         Row: {
           html_body: string
@@ -8699,6 +8748,10 @@ export type Database = {
         Returns: string
       }
       fmt_clock_s: { Args: { p_studio: string; p_ts: string }; Returns: string }
+      fmt_money: {
+        Args: { p_cents: number; p_currency: string }
+        Returns: string
+      }
       force_commit_occurrence: {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
@@ -9440,6 +9493,7 @@ export type Database = {
         Args: { p_for_date: string; p_membership_id: string }
         Returns: Json
       }
+      plan_card_detail: { Args: { p_plan_id: string }; Returns: string }
       plan_period_end: {
         Args: { p_from: string; p_plan_id: string }
         Returns: string
@@ -9758,6 +9812,7 @@ export type Database = {
           from_name: string
           html_body: string
           reply_to: string
+          stripped: string[]
           subject: string
           text_body: string
           to_email: string

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { renderBody } from "@/lib/email-body";
-import { uploadEmailImage, emailFrameChrome, type EmailFrameChrome } from "@/app/staff/email-image-actions";
+import { uploadEmailImage, emailFrameChrome, resolveEmailCard, type EmailFrameChrome, type ResolvedCard } from "@/app/staff/email-image-actions";
 
 /**
  * Decision 77 — the shared email composer, used by Campaigns and by the closure
@@ -47,6 +47,19 @@ export default function EmailComposer({
   const [chrome, setChrome] = useState<EmailFrameChrome | null>(null);
   useEffect(() => { emailFrameChrome().then(setChrome).catch(() => {}); }, []);
 
+  // Decision 80a: resolve ::: plan <id> / ::: class <id> shorthands for the preview.
+  const [cards, setCards] = useState<Record<string, ResolvedCard | null>>({});
+  useEffect(() => {
+    const wanted = new Set<string>();
+    for (const m of body.matchAll(/^:::\s+(plan|class)\s+(\S+)\s*$/gm)) wanted.add(`${m[1]}:${m[2]}`);
+    for (const key of wanted) {
+      if (key in cards) continue;
+      const [kind, id] = key.split(/:(.+)/);
+      setCards((c) => ({ ...c, [key]: null })); // mark in-flight so we fetch once
+      resolveEmailCard(kind, id).then((r) => setCards((c) => ({ ...c, [key]: r }))).catch(() => {});
+    }
+  }, [body, cards]);
+
   // Insert an ![](url) image marker at the cursor (or the end).
   const insertAtCursor = (snippet: string) => {
     const el = textareaRef.current;
@@ -83,7 +96,10 @@ export default function EmailComposer({
   };
 
   const accent = chrome?.accent || "#78716C";
-  const preview = renderBody(body, { accent });
+  const preview = renderBody(body, {
+    accent,
+    resolve: (kind, id) => cards[`${kind}:${id}`] ?? null,
+  });
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

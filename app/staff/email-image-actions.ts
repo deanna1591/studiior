@@ -79,3 +79,44 @@ export async function emailFrameChrome(): Promise<EmailFrameChrome | null> {
     address,
   };
 }
+
+export type ResolvedCard = { name: string; detail?: string; price?: string; button?: { label: string; url: string } };
+
+/**
+ * Decision 80a — resolve a `::: plan <id>` / `::: class <id>` shorthand to its card
+ * fields for the composer preview, so a studio can drop a live plan card. Reads the
+ * caller's own studio; uses the SAME plan_card_detail / fmt_money the emails use.
+ */
+export async function resolveEmailCard(kind: string, id: string): Promise<ResolvedCard | null> {
+  const ctx = await getStaffContext();
+  if (!ctx) return null;
+  const supabase = createClient();
+  if (kind === "plan") {
+    const { data: p } = await supabase.from("membership_plans")
+      .select("id, name, price_cents, currency").eq("id", id).eq("studio_id", ctx.studioId).maybeSingle();
+    if (!p) return null;
+    const [{ data: detail }, { data: price }] = await Promise.all([
+      supabase.rpc("plan_card_detail", { p_plan_id: p.id }),
+      supabase.rpc("fmt_money", { p_cents: p.price_cents, p_currency: p.currency }),
+    ]);
+    const money = (price as string) ?? "";
+    return {
+      name: p.name as string,
+      detail: (detail as string) || undefined,
+      price: money || undefined,
+      button: { label: money ? `Buy ${p.name} — ${money}` : `See ${p.name}`, url: "{buy_url}" },
+    };
+  }
+  if (kind === "class") {
+    const { data: o } = await supabase.from("class_occurrences")
+      .select("name, starts_at, rooms(name), instructors(display_name)")
+      .eq("id", id).eq("studio_id", ctx.studioId).maybeSingle();
+    if (!o) return null;
+    const room = (o.rooms as { name?: string } | null)?.name;
+    const instr = (o.instructors as { display_name?: string } | null)?.display_name?.split(" ")[0];
+    const day = new Date(o.starts_at as string).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    const detail = [day, room, instr ? `with ${instr}` : null].filter(Boolean).join(" · ");
+    return { name: o.name as string, detail };
+  }
+  return null;
+}
