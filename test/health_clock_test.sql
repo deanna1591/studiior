@@ -10,9 +10,12 @@
 --       0 tasks), even with every sequence switch ON
 --   (d) member joined 5 days ago, studio opened 10 days ago -> new
 --   + studio_opened_on: NULL for an unopened studio, the first attended date else
+--   (e) opened_on (+21d) OVERRIDES a real day -20 attendance inference ->
+--       insufficient_history, and the sweep is a no-op with every switch ON
+--   (f) opened_on (-20d) with NO attendance opens the clock -> first_month_stalled
 --
 -- RED on the old member_health/convert_keep_sweep (drifting + a task created);
--- GREEN with migration 20260832920000.
+-- GREEN with migrations 20260832920000 (c) + 20260832930000 (d).
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -111,5 +114,53 @@ select expect_eq('(c) unopened studio: 0 notifications queued by the sweep',
   (select count(*)::text from notifications where studio_id='14c014c0-0000-0000-0000-000000000001'), '0');
 select expect_eq('(c) unopened studio: 0 member_tasks created',
   (select count(*)::text from member_tasks where studio_id='14c014c0-0000-0000-0000-000000000001'), '0');
+
+-- --- (d) the owner-stated opening date overrides the inference ----------------
+-- SE: attendance on day -20 (would infer open 20d ago) BUT opened_on = +21d, and
+-- every sequence switch ON — so the override, not the switches, stops the sweep.
+-- SF: opened_on = day -20 and NO attendance (inference would be NULL) — the
+-- stated date opens the clock and first_month_stalled behaves as in (b).
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('14c014c0-0000-0000-0000-000000000005','SE override future','14c0-e','Asia/Manila','PHP','active'),
+  ('14c014c0-0000-0000-0000-000000000006','SF override past','14c0-f','Asia/Manila','PHP','active');
+insert into studio_settings (studio_id, opened_on, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled) values
+  ('14c014c0-0000-0000-0000-000000000005', current_date + 21, true, true, true),
+  ('14c014c0-0000-0000-0000-000000000006', current_date - 20, false, false, false);
+insert into locations (id, studio_id, name, is_primary) values
+  ('14c014c0-0000-0000-0000-00000000500c','14c014c0-0000-0000-0000-000000000005','E', true),
+  ('14c014c0-0000-0000-0000-00000000600c','14c014c0-0000-0000-0000-000000000006','F', true);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('14c014c0-0000-0000-0000-0000000cc005','14c014c0-0000-0000-0000-000000000005','Mat',50,10),
+  ('14c014c0-0000-0000-0000-0000000cc006','14c014c0-0000-0000-0000-000000000006','Mat',50,10);
+insert into members (id, studio_id, first_name, last_name, email, joined_on, status) values
+  ('14c014c0-0000-0000-0000-0000000d00e1','14c014c0-0000-0000-0000-000000000005','Me','Early','14c0-me@example.com', current_date - 30, 'lead'),
+  ('14c014c0-0000-0000-0000-0000000d00f1','14c014c0-0000-0000-0000-000000000006','Mf','Stalled','14c0-mf@example.com', current_date - 30, 'lead');
+-- SE's real attendance on day -20 (the inference the override must beat).
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, starts_at, ends_at, capacity, booked_count, status) values
+  ('14c014c0-0000-0000-0000-0000000f00e1','14c014c0-0000-0000-0000-000000000005','14c014c0-0000-0000-0000-00000000500c','14c014c0-0000-0000-0000-0000000cc005','SE class',
+     now()-interval '20 days', now()-interval '20 days'+interval '50 min', 10, 1, 'scheduled');
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('14c014c0-0000-0000-0000-0000000bb0e1','14c014c0-0000-0000-0000-000000000005','14c014c0-0000-0000-0000-0000000f00e1','14c014c0-0000-0000-0000-0000000d00e1','attended','member','drop_in', now()-interval '21 days');
+
+-- (e) opened_on in the future OVERRIDES the day -20 inference.
+select expect_eq('(e) opened_on (+21d) overrides the day -20 attendance inference',
+  (select studio_opened_on('14c014c0-0000-0000-0000-000000000005')::text),
+  (current_date + 21)::text);
+select expect_eq('(e) member reads insufficient_history despite real attendance 20d ago',
+  (member_health('14c014c0-0000-0000-0000-0000000d00e1') ->> 'band'), 'insufficient_history');
+select convert_keep_sweep('14c014c0-0000-0000-0000-000000000005', now());
+select expect_eq('(e) every switch ON but not-yet-open: 0 notifications queued',
+  (select count(*)::text from notifications where studio_id='14c014c0-0000-0000-0000-000000000005'), '0');
+select expect_eq('(e) every switch ON but not-yet-open: 0 member_tasks',
+  (select count(*)::text from member_tasks where studio_id='14c014c0-0000-0000-0000-000000000005'), '0');
+
+-- (f) opened_on in the past opens the clock with no attendance — behaves as (b).
+select expect_eq('(f) opened_on (-20d) opens the studio with no attendance',
+  (select studio_opened_on('14c014c0-0000-0000-0000-000000000006')::text),
+  (current_date - 20)::text);
+select expect_eq('(f) first_month_stalled fires from the stated opening date',
+  ((member_health('14c014c0-0000-0000-0000-0000000d00f1') -> 'signals') @> '["first_month_stalled"]')::text, 'true');
+select expect_eq('(f) and the band is drifting',
+  (member_health('14c014c0-0000-0000-0000-0000000d00f1') ->> 'band'), 'drifting');
 
 do $$ begin raise notice 'health_clock_test: all assertions passed'; end $$;

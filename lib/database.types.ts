@@ -7019,6 +7019,7 @@ export type Database = {
           occurrence_horizon_days: number
           onboarding_completed_at: string | null
           open_time: string | null
+          opened_on: string | null
           pay_period_anchor: string | null
           pay_period_days: number
           pay_period_mode: string
@@ -7131,6 +7132,7 @@ export type Database = {
           occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
           open_time?: string | null
+          opened_on?: string | null
           pay_period_anchor?: string | null
           pay_period_days?: number
           pay_period_mode?: string
@@ -7243,6 +7245,7 @@ export type Database = {
           occurrence_horizon_days?: number
           onboarding_completed_at?: string | null
           open_time?: string | null
+          opened_on?: string | null
           pay_period_anchor?: string | null
           pay_period_days?: number
           pay_period_mode?: string
@@ -8639,7 +8642,6 @@ export type Database = {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
       }
-      ef_count: { Args: { hay: string; needle: string }; Returns: number }
       effective_free_first: { Args: { p_occurrence_id: string }; Returns: Json }
       email_on_accent: { Args: { p_hex: string }; Returns: string }
       end_membership: {
@@ -8679,22 +8681,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_notlike: {
-        Args: { actual: string; label: string; pattern: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -10413,6 +10399,7 @@ export type Database = {
           week_starts_on: number
         }[]
       }
+      studio_opened_on: { Args: { p_studio_id: string }; Returns: string }
       studio_peak_windows: {
         Args: { p_studio_id: string }
         Returns: {
@@ -10482,6 +10469,7 @@ export type Database = {
       sweep_availability_reminders: { Args: never; Returns: Json }
       sweep_booked_count_reconcile: { Args: never; Returns: Json }
       sweep_challenges: { Args: never; Returns: Json }
+      sweep_class_ended_unmarked: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_guest_waivers: { Args: never; Returns: Json }

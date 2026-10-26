@@ -58,6 +58,38 @@ export async function applyHorizon(_prev: SettingsState, fd: FormData) {
 export type PlainState = { ok: boolean; message: string } | null;
 
 /**
+ * Decision 14(d) — the studio's stated opening date. Blank clears it and the
+ * inference in (c) takes over. When set, it overrides the inference: until this
+ * date member health reads insufficient_history and no convert/keep/retention
+ * mail or tasks go out. A plain YYYY-MM-DD, or null.
+ */
+export async function saveOpeningDate(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const raw = String(fd.get("opened_on") ?? "").trim();
+  let value: string | null = null;
+  if (raw !== "") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { ok: false, message: "Give the opening date as YYYY-MM-DD, or leave it blank." };
+    value = raw;
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ opened_on: value })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/studio"); revalidatePath("/");
+  return {
+    ok: true,
+    message: value
+      ? `Saved. Until ${value}, members read as new and no convert, keep or retention emails or tasks are sent.`
+      : "Saved. Opening date cleared — it's inferred from your first attended class again.",
+  };
+}
+
+/**
  * Decision 44 — the studio's one opening window. Optional: Clear sets both null
  * and nothing is flagged anywhere. When set, a class that STARTS outside
  * [open, close] is warned about at creation and on a drag — never blocked. The

@@ -3,6 +3,7 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
 import { staffMemberOrigin } from "@/lib/member-urls-server";
 import OpeningHoursPanel from "../opening-hours";
+import OpeningDatePanel from "../opening-date";
 import LocationPanel from "../location-panel";
 import StudioIdentityPanel from "../studio-identity";
 import SettingsBack from "../back";
@@ -24,7 +25,7 @@ export default async function StudioSettings() {
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: studio }, { data: settings }, { data: loc }, { count: closures }] = await Promise.all([
     supabase.from("studios").select("name, slug, timezone, currency, country").eq("id", ctx.studioId).maybeSingle(),
-    supabase.from("studio_settings").select("open_time, close_time").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("open_time, close_time, opened_on").eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("locations")
       .select("name, address, latitude, longitude, self_checkin_radius_m, self_checkin_accuracy_cap_m, self_checkin_requires_location")
       .eq("studio_id", ctx.studioId).eq("is_primary", true).maybeSingle(),
@@ -56,6 +57,10 @@ export default async function StudioSettings() {
 
       <SettingsSection id="opening-hours" title="Opening hours">
         <OpeningHoursPanel open={hhmm(settings?.open_time)} close={hhmm(settings?.close_time)} />
+      </SettingsSection>
+
+      <SettingsSection id="opening-date" title="Opening date">
+        <OpeningDatePanel openedOn={settings?.opened_on ?? null} />
       </SettingsSection>
 
       <SettingsSection id="location" title="Location & self check-in">

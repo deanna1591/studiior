@@ -269,6 +269,12 @@ A studio that has not opened yet still accrues days-since-joined, so a pre-openi
 
 **On deploy (26 Oct 2026), the STEP-0 premise about Reform was found wrong on live data, and STEP 3 was held.** `studio_opened_on(Reform) = 2026-10-06` — Reform has 2 attended bookings + 3 check-ins (earliest on 6 Oct), so under the shipped definition Reform IS open (20 days before 26 Oct), NOT "opening mid-November / unopened" as STEP 0 recorded. The fix therefore leaves Reform `drifting 67 / new 57 / healthy 1` (the 67 drifting are genuine — members with <3 visits inside a 20-day window — not a pre-opening artifact), and the authorised one-off write (close the `drifting_fyi` tasks as "studio not yet open") was NOT made: its premise is false, and the note would be a false record. Whether 6 Oct's 2 attended + 3 check-ins are a real opening or founder test data is a Reform data decision left for the owner.
 
+### Amendment (d) — the owner can state the opening date (Deanna, 26 Oct 2026)
+
+Reading (c)'s live data settled the open question: Reform's 6 Oct attendance is all one account — the founder's own test account ("Test Test"), one comp booking, one drop-in and self/instructor check-ins on REFORMER BURN — testing the check-in and pay flows before launch. No real member attended. So the inference in (c) opened the studio on test data, and the owner needs a way to say when the studio actually opens.
+
+(d) `studio_settings.opened_on` (date, nullable, default NULL) — when set, it is the studio's opening date and overrides the inference in (c). When NULL, (c)'s inference applies. Shown in Settings → Studio as 'Opening date' with helper text 'Leave blank if you have already opened. Until this date no convert, keep or retention emails or tasks are sent and member health reads insufficient history.' Rationale: owners test their own check-in and pay flows before launch; test attendance must not open the studio. Recorded 2026-10-26.
+
 ---
 
 ## Reasons are member-level, never categorical
