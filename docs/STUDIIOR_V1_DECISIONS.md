@@ -265,7 +265,7 @@ A studio that has not opened yet still accrues days-since-joined, so a pre-openi
 
 (c) A studio opens on the date of its first occurrence with an attended or checked-in record (`studio_opened_on`). A member's health window starts at `greatest(joined_on, studio_opened_on)`. Before the studio opens every member is `insufficient_history`; after it, the existing `new` / `first_month_stalled` / low-engagement thresholds run from the window start. `convert_keep_sweep` skips any studio whose `studio_opened_on` is NULL or in the future (no keep emails, no `drifting_fyi` / `at_risk` tasks). Recorded 2026-10-26.
 
-`studio_opened_on` is deliberately an *attended-or-checked-in* occurrence, not "attendance finalised" (a studio that never runs finalisation would never open) and not "first past non-cancelled occurrence" (Reform's unattended 6 October occurrences would wrongly count as opening).
+`studio_opened_on` is deliberately an *attended-or-checked-in* occurrence, not "attendance finalised" (a studio that never runs finalisation would never open) and not "first past non-cancelled occurrence" (Reform's unattended 6 October occurrences would wrongly count as opening). An **imported** check-in (`check_ins.import_id` set, no occurrence) also opens the studio — a studio that onboarded by importing its history has run, in its prior system — so an import-only studio reads `healthy` for an engaged imported member rather than `insufficient_history`.
 
 ---
 

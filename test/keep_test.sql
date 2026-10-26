@@ -80,6 +80,20 @@ insert into memberships (id, studio_id, member_id, plan_id, status, price_cents,
   ('d0780000-0000-0000-0000-00000000ee20','d0780000-0000-0000-0000-000000000002','d0780000-0000-0000-0000-00000000ad20','d0780000-0000-0000-0000-00000000f0b1','active',250000,'PHP',current_date-23,false,null,((current_setting('t.today')::date + 7) at time zone 'Asia/Manila'),null,null),
   ('d0780000-0000-0000-0000-00000000ee21','d0780000-0000-0000-0000-000000000002','d0780000-0000-0000-0000-00000000ad21','d0780000-0000-0000-0000-00000000f0b2','active',500000,'PHP',current_date-10,false,null,null,(current_setting('t.today')::date + 7),4);
 
+-- KA has opened: a past class with an attended booking, so studio_opened_on(KA) is set.
+-- (Decision 14(c) — convert_keep_sweep is a no-op until the studio opens, and a studio
+-- running keep reminders has, in reality, opened.) KB stays keep-OFF; its precedence
+-- assertions ride sweep_membership_expiring/queue_credit_expiries, which the clock never gates.
+insert into locations (id, studio_id, name, is_primary) values
+  ('d0780000-0000-0000-0000-00000000100c','d0780000-0000-0000-0000-000000000001','KA Loc', true);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('d0780000-0000-0000-0000-0000000cc001','d0780000-0000-0000-0000-000000000001','Mat',50,10);
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, starts_at, ends_at, capacity, booked_count, status) values
+  ('d0780000-0000-0000-0000-0000000f0001','d0780000-0000-0000-0000-000000000001','d0780000-0000-0000-0000-00000000100c','d0780000-0000-0000-0000-0000000cc001','KA open',
+     now()-interval '25 days', now()-interval '25 days'+interval '50 min', 10, 1, 'scheduled');
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('d0780000-0000-0000-0000-0000000bb001','d0780000-0000-0000-0000-000000000001','d0780000-0000-0000-0000-0000000f0001','d0780000-0000-0000-0000-00000000ad01','attended','member','drop_in', now()-interval '26 days');
+
 -- OPT (ad13): mute the sequences.
 insert into notification_preferences (studio_id, member_id, sequence_email) values
   ('d0780000-0000-0000-0000-000000000001','d0780000-0000-0000-0000-00000000ad13', false);
