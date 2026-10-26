@@ -25,7 +25,7 @@ type Klass = {
   flex: boolean; minimum_bookings: number | null; committed: boolean;
   tier: string | null; flex_deadline_short: string | null;
   confirmed: boolean; cover_requested: boolean;
-  checked_in: boolean; checkin_open: boolean;
+  checked_in: boolean; checkin_open: boolean; checkin_count: number;
 };
 
 type Pending = {
@@ -53,29 +53,17 @@ export default async function MySchedule({
   const today = studioToday(ctx.timezone);
   const currentWeek = weekStartOf(today, ctx.week_starts_on);
 
-  // Decision 58: with no ?w, open on the next week this instructor actually
-  // teaches — the current week if it holds a class, else the first future one.
-  // Earlier/Later (an explicit ?w) are honoured as-is.
+  // Decision 54: My schedule speaks in WEEKS. Earlier/Later (an explicit ?w)
+  // move one week and are honoured as-is.
+  const explicit = searchParams.w !== undefined;
   let offset = Number(searchParams.w) || 0;
+  let from = shiftDate(currentWeek, offset * 7);
+  let to = shiftDate(from, 6);
   let nextWeekLine: string | null = null;
-  if (searchParams.w === undefined) {
-    const { data: nw } = await supabase.rpc("instructor_next_teaching_week", {
-      p_instructor_id: ctx.instructor_id,
-    });
-    if (nw && (nw as string) !== currentWeek) {
-      offset = Math.round(
-        (Date.parse(`${nw}T00:00:00Z`) - Date.parse(`${currentWeek}T00:00:00Z`)) / (7 * 86400000));
-    }
-  }
-  // Decision 54: My schedule speaks in WEEKS. Earlier/Later move one week.
-  const from = shiftDate(currentWeek, offset * 7);
-  const to = shiftDate(from, 6);
-  if (offset !== 0 && searchParams.w === undefined) {
-    nextWeekLine = new Intl.DateTimeFormat("en-GB", {
-      timeZone: "UTC", day: "numeric", month: "short",
-    }).format(new Date(`${from}T00:00:00Z`));
-  }
 
+  // Decision 82: the main wave queries the chosen week (current by default)
+  // alongside the two lists — ONE wave. The separate instructor_next_teaching_week
+  // round trip is gone; instructor_week returns next_teaching_week in its payload.
   const [week, pendingData, reqData] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
@@ -87,7 +75,28 @@ export default async function MySchedule({
     supabase.rpc("instructor_assignment_requests", { p_instructor_id: ctx.instructor_id }),
   ]);
 
-  const w = week.data as { state: string; classes: Klass[]; empty_hint: string; confirmations_on: boolean } | null;
+  let w = week.data as
+    { state: string; classes: Klass[]; empty_hint: string; confirmations_on: boolean;
+      next_teaching_week: string | null } | null;
+
+  // Decision 58/82: on the default landing, an empty current week jumps to the
+  // next week this instructor actually teaches — read from instructor_week's own
+  // next_teaching_week, so this costs a SECOND wave ONLY when there is genuinely
+  // nothing this week (the common case — they teach this week — stays one wave).
+  if (!explicit && (w?.classes?.length ?? 0) === 0 && w?.next_teaching_week
+      && w.next_teaching_week !== currentWeek) {
+    const nw = w.next_teaching_week;
+    offset = Math.round(
+      (Date.parse(`${nw}T00:00:00Z`) - Date.parse(`${currentWeek}T00:00:00Z`)) / (7 * 86400000));
+    from = nw; to = shiftDate(from, 6);
+    const { data: w2 } = await supabase.rpc("instructor_week", {
+      p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
+    });
+    w = w2 as typeof w;
+    nextWeekLine = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "UTC", day: "numeric", month: "short",
+    }).format(new Date(`${from}T00:00:00Z`));
+  }
   const classes = w?.classes ?? [];
   // Decision 58: one flag hides every confirm control. When off, the requests
   // reader already returns nothing; this silences the derived "Confirm week"
@@ -333,6 +342,14 @@ function ClassRow({ c, confirmationsOn }: { c: Klass; confirmationsOn: boolean }
           <p className="mt-1.5 text-[12px] leading-[17px] text-ink-3">Confirmed.</p>
         )}
       </Link>
+      {/* Decision 82(b): how many members are checked in, once check-in has
+          opened — you're paid on who's checked in. */}
+      {!off && c.checkin_open && (
+        <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
+          <span className="num">{c.checkin_count}</span> of{" "}
+          <span className="num">{c.booked_count}</span> checked in
+        </p>
+      )}
       {/* Decision 28: check in for pay. A ran, committed class you have not
           checked into, while the window is open. */}
       {!off && c.committed && !c.checked_in && c.checkin_open && (

@@ -105,6 +105,7 @@ select run_sweep('instructor_confirms',   'select sweep_instructor_confirmations
 select run_sweep('waitlist',              'select sweep_waitlist()');
 select run_sweep('cover_escalations',     'select sweep_cover_escalations()');
 select run_sweep('instructor_reminders',  'select sweep_instructor_class_reminders()');
+select run_sweep('class_ended_unmarked',  'select sweep_class_ended_unmarked()');
 
 -- =============================================================================
 -- Inert: the whole opt-in surface wrote nothing for this studio.

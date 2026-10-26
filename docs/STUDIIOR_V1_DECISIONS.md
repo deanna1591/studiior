@@ -259,6 +259,14 @@ At day 14, signal 3 takes over exactly as specified: joined 14–35 days with fe
 
 Because `new` means the signals do not apply, it is decided **before** them, and a member in their first fortnight is `new` even if another signal would otherwise fire.
 
+### Amendment (c) — the clock starts when the studio does (Deanna, 26 Oct 2026)
+
+A studio that has not opened yet still accrues days-since-joined, so a pre-opening lead read `first_month_stalled` → `drifting` and the retention sweep emailed them "we miss you" before a single class had run (Reform: 66 members drifting, 67 open `drifting_fyi` tasks, opening mid-November).
+
+(c) A studio opens on the date of its first occurrence with an attended or checked-in record (`studio_opened_on`). A member's health window starts at `greatest(joined_on, studio_opened_on)`. Before the studio opens every member is `insufficient_history`; after it, the existing `new` / `first_month_stalled` / low-engagement thresholds run from the window start. `convert_keep_sweep` skips any studio whose `studio_opened_on` is NULL or in the future (no keep emails, no `drifting_fyi` / `at_risk` tasks). Recorded 2026-10-26.
+
+`studio_opened_on` is deliberately an *attended-or-checked-in* occurrence, not "attendance finalised" (a studio that never runs finalisation would never open) and not "first past non-cancelled occurrence" (Reform's unattended 6 October occurrences would wrongly count as opening).
+
 ---
 
 ## Reasons are member-level, never categorical
@@ -576,6 +584,27 @@ Check-in, no-show finalisation, instructor headcount and pay, and statements tre
 (f) NOT in scope: sending Viber/SMS, auto-sending anything AI-written, per-instructor outreach tasks, replying to member emails inside the app.
 
 **Build order.** 79a: (a) (b) (c) (d). 79b: (e). Migrations as needed; new enum values in their own file; no new anon RPC — THIRTEEN stays THIRTEEN; every opt-in defaults OFF. Deanna, 21 Oct 2026.
+
+---
+
+## 82 — The member host is slow, and instructors must check everyone in
+
+**Context (STEP 0, measured).** Reform on hosted is tiny — 709 occurrences, 119 bookings, 107 members, 3 check-ins — in Asia/Manila; the Vercel functions run in **iad1 (Virginia)** and Supabase in **us-east-2 (Ohio)**, so function→DB is ~15 ms and **no query is the bottleneck** (the Home bookings join is **7.8 ms**; `member_bootstrap` **27 ms**; `member_activity` **99 ms** — fixed UNION/window overhead for 22 rows, not row volume). What was slow: **every route is `force-dynamic` with no caching, so each request is a serverless invocation** — measured cold TTFB **4.05 s**, warm **~0.7–1.2 s** even for a route that only redirects; there is **no service worker**, so every in-app tap is a full round trip to Virginia; and members are in Manila, ~350–400 ms each way. Client bundles are healthy (87–104 kB First Load JS; none near 200 kB). The DB is not the problem and there is no missing index — the tables are too small for one to matter.
+
+**STEP 1 — what changed.**
+1. **Serial waves.** `my_instructor` re-issued to carry `uses_payroll` + `unread`, so `instructorScreen()` is ONE wave not two (every instructor page). `/account` folds `membershipState` into its `Promise.all` (−1 wave). `instructor_week` re-issued to return `next_teaching_week`, so `/instructor/schedule`'s default landing queries the current week in the main wave and pays a second wave ONLY when this week is empty. No behaviour change; both re-issues are jsonb-additive, ACL/anon untouched.
+2. **History bounds the window.** `member_activity` already computes the running balance over the ALL-TIME `credit_ledger` (per-row balance is `l.bal` or the nearest prior ledger balance), and its payment↔grant rank-joins REQUIRE that all-time universe — so the opening balance is carried for ANY display window by construction, and windowing the internals would risk mis-matching a refund to the wrong purchase. So History asks for the **last 3 months by default** with **"Show earlier"** widening it; balances stay correct across the boundary. **App-only, no re-issue.** (The ~99 ms is fixed overhead that does not shrink with the window; a deeper rewrite is deferred as a correctness risk on the money statement not worth tens of ms.)
+3. **Service worker, member host only.** A `/sw.js` route (bypassing the host rewrite, like `.well-known`) carrying the deploy's commit sha in its cache name; **cache-first for `/_next/static/` and same-origin script/style/font/image** (content-hashed, no personal data), **network pass-through for navigations/RSC/data** (no stale HTML, no personal page cached), old caches purged on activate, `skipWaiting`+`clients.claim`. Registered only from the member layout. A second navigation re-uses the cached chunks and fetches only the document — the ~90 kB of JS/CSS is not re-downloaded over Manila mobile. **Deviation, recorded:** the brief also asked to raise `staleTimes.dynamic` to 30 s on the member host and keep staff at 0; `staleTimes` is a single global build setting with no per-host/per-route form in Next 14.2, so it cannot differ by host in one deployment. Staff stays at **0** (rosters fresh) and the service worker delivers the member-side navigation win instead.
+4. **Cold starts — NOT fixed on the current plan.** The project is on Vercel's **Hobby** plan, which allows at most 2 crons each running **at most once per day** and rejects a sub-daily (`*/5`) schedule at deploy. So the warm cron (`vercel.json` + `/api/warm`, hitting member `/login` and `/instructor/login`) is set to **daily `0 6 * * *`** — it exercises the path but does **not** keep the lambdas warm through the day, so the ~4 s cold start stands. The endpoint is kept so a frequent schedule works the moment the plan allows it. **The real fix is Pro + Fluid Compute / minimum instances** (keeps instances warm without a cron), which needs a plan upgrade — recorded as the owner's call. **Warm-floor profile:** of the ~0.7 s warm `/login`, `studio_by_slug` measured **51 ms on hosted** and the member layout called it **twice** (generateMetadata + generateViewport) — now deduped to one with React `cache()` (~50 ms saved per member render); `member_bootstrap` 27 ms; the middleware `getClaims()` is a LOCAL signature verify (no network). The remaining ~0.5 s is Next SSR + serverless + Manila→Virginia network, with **no middleware/auth one-liner** to cut — the levers are the plan upgrade (warming) now and the DB region later.
+5. **Region (cause 3) — DEFERRED, not done.** Moving the functions to Singapore is refused: with the DB in Ohio, each serial DB wave would cost ~200 ms from sin1 instead of ~15 ms, erasing the gain on every multi-wave page. The right move is the **database to ap-southeast-1 after opening**, as its own decision with a maintenance window. Measured justification: function↔DB ~15 ms today (iad1↔us-east-2); a Manila member's document leg is ~350–400 ms each way regardless; moving the DB near the members (with the functions) cuts the member leg and keeps function↔DB small — a coordinated, post-launch move.
+
+**STEP 2 — instructor check-in reminders (pay is on who's checked in).**
+- **(a) Roster banner while the class is live** — from check-in opens until 30 min after end, a new `live` flag on `instructor_roster` (since `can_check_in` is always true for staff): *"Check everyone in — ask members to check in on their app, or enter their code / scan their QR below. You're paid on who's checked in."* **Dismiss for this class only** (per-device, per-occurrence).
+- **(b) "{checked_in} of {booked} checked in"** on each My-schedule row once check-in has opened — `instructor_week` gains `checkin_count`, shown when `checkin_open`.
+- **(c) `instructor_class_ended_unmarked` email at class end + 5 min**, once per class (dedupe `class_ended_unmarked:{occ}`), login instructors only, for studios with `finalise_attendance` ON (so "mark them before midnight or they count as no-shows" is true; the existing midnight `instructor_unmarked_bookings` stays). New `sweep_class_ended_unmarked()` on a 15-min cron; **editable** (Templates composer, a new "Instructors" group). Gated on `finalise_attendance` so a studio that opted into nothing sends nothing — the all_off canary covers it.
+- **(d) Week-ahead email** gains one standing line: *"Remember to check everyone in — you're paid on who's checked in."*
+
+**Before / after (hosted, warm TTFB unless noted):** _[filled after the deploy is live]_
 
 ---
 

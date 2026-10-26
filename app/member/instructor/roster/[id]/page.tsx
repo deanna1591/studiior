@@ -4,6 +4,7 @@ import InstructorShell from "@/components/instructor/shell";
 import { AskForCover, CheckIn } from "../../actions-ui";
 import ClassTag from "@/components/instructor/class-tag";
 import ScanCheckIn from "@/components/instructor/scan-check-in";
+import CheckinBanner from "@/components/instructor/checkin-banner";
 import { coverRequestAllowed } from "@/lib/cover-window";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ type Roster = {
   occurrence_id: string; name: string; local_time: string; local_date: string;
   capacity: number; booked: number; status: string;
   tier: string | null; flex_deadline_short: string | null;
-  members: Member[]; can_check_in: boolean; withheld: string;
+  members: Member[]; can_check_in: boolean; live: boolean; withheld: string;
 };
 
 /**
@@ -95,6 +96,10 @@ export default async function RosterPage({ params }: { params: { id: string } })
         </p>
         <ClassTag tier={r.tier} flexDeadlineShort={r.flex_deadline_short} />
       </div>
+
+      {/* Decision 82(a): the "check everyone in" banner, while the class is live
+          (check-in open until 30 min after it ends). Dismiss is per class. */}
+      {r.live && <CheckinBanner occurrenceId={r.occurrence_id} />}
 
       {/* Decision 35 §4: scan a member's QR to check them in. Shown only when
           the check-in window is open and somebody is booked (there is nobody to

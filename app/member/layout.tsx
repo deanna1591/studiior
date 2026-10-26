@@ -1,10 +1,28 @@
+import { cache } from "react";
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { currentSlug } from "@/lib/tenant";
 import { accentRamp, neutralAccent, type PresetKey } from "@/lib/theme";
 import { iconVersion } from "@/lib/pwa";
+import RegisterSW from "@/components/member/register-sw";
 import type { Database } from "@/lib/database.types";
+
+/**
+ * Decision 82: generateMetadata AND generateViewport both need the studio, and
+ * each used to make its own studio_by_slug call — ~51 ms on hosted, paid twice
+ * on every member render. React cache() dedupes them to ONE round trip per
+ * request (the two run in the same render), with no behaviour change.
+ */
+const studioForSlug = cache(async (slug: string) => {
+  const anon = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } },
+  );
+  const { data } = await anon.rpc("studio_by_slug", { p_slug: slug });
+  return Array.isArray(data) ? data[0] : data;
+});
 
 /**
  * The member app is the studio's, including its name in the browser tab.
@@ -23,13 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const slug = currentSlug();
   if (!slug) return {};
 
-  const anon = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } },
-  );
-  const { data } = await anon.rpc("studio_by_slug", { p_slug: slug });
-  const studio = Array.isArray(data) ? data[0] : data;
+  const studio = await studioForSlug(slug);
   // An unknown slug used to 404 in middleware, which paid for a studio_by_slug
   // round trip on EVERY request to answer a question this call already answers.
   // notFound() here costs nothing extra.
@@ -58,13 +70,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export async function generateViewport(): Promise<Viewport> {
   const slug = currentSlug();
   if (!slug) return {};
-  const anon = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } },
-  );
-  const { data } = await anon.rpc("studio_by_slug", { p_slug: slug });
-  const studio = Array.isArray(data) ? data[0] : data;
+  const studio = await studioForSlug(slug);
   if (!studio) return {};
   const preset = (studio.theme_preset ?? "warm") as PresetKey;
   const accent = studio.accent_color ?? neutralAccent(preset);
@@ -83,6 +89,9 @@ export default function MemberLayout({
 }) {
   return (
     <>
+      {/* Decision 82: the member-host service worker — member + instructor pages
+          both live under this layout, and the staff host never renders it. */}
+      <RegisterSW />
       {children}
       {modal}
     </>

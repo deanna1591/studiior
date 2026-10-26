@@ -54,20 +54,18 @@ export type InstructorContext = {
  */
 export async function instructorScreen() {
   const supabase = createClient();
+  // Decision 82: my_instructor now carries uses_payroll + unread, so the portal
+  // context is ONE round trip. It used to be my_instructor, then a second wave
+  // for [studio_uses_payroll, instructor_notifications] — paid on every
+  // instructor screen before the page did any work of its own.
   const { data } = await supabase.rpc("my_instructor");
-  const ctx = data as InstructorContext | null;
+  const ctx = data as (InstructorContext & { uses_payroll?: boolean }) | null;
   if (!ctx?.instructor_id) redirect("/instructor/login");
   // Payroll is opt-in (migration 139): the Pay tab shows only when the studio
-  // uses the guarantee system. A studio that pays in its own books shows the
-  // instructor no Pay tab at all — absent, not an empty screen. The unread
-  // count rides alongside so the bell is right on every screen (limit 1 — only
-  // the count is wanted here, the list is fetched where it is shown).
-  const [{ data: uses }, { data: notif }] = await Promise.all([
-    supabase.rpc("studio_uses_payroll", { p_studio_id: ctx.studio_id }),
-    supabase.rpc("instructor_notifications", { p_instructor_id: ctx.instructor_id, p_limit: 1 }),
-  ]);
-  ctx.usesPayroll = uses === true;
-  ctx.unread = Number((notif as { unread?: number } | null)?.unread ?? 0);
+  // uses the guarantee system — a studio that pays in its own books shows no Pay
+  // tab (absent, not empty). The unread count drives the bell on every screen.
+  ctx.usesPayroll = ctx.uses_payroll === true;
+  ctx.unread = Number((data as { unread?: number } | null)?.unread ?? 0);
   return { ctx, supabase };
 }
 

@@ -707,7 +707,11 @@ reset role; select set_config('request.jwt.claim.sub', null, false);
 --     assign, unassign AND cancel.
 -- =============================================================================
 insert into rooms (id, studio_id, location_id, name, capacity) values
-  ('a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','R23',10);
+  ('a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','R23',10),
+  -- R24: E (series 5007) gets its OWN room. It shared room 1a01 with an earlier
+  -- fixture, and whether that fixture's occurrence lands on date m2 depends on
+  -- today — a date-fragile room clash. A dedicated room makes E deterministic.
+  ('a543a543-0000-0000-0000-000000001a04','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','R24',10);
 -- Two Mondays in month m (first Monday + 14 and + 21, both in-month).
 select set_config('t.m2', (current_setting('t.mon')::date + 14)::text, false);
 select set_config('t.m3', (current_setting('t.mon')::date + 21)::text, false);
@@ -743,7 +747,7 @@ values
   ('a543a543-0000-0000-0000-000000033004','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a03','a543a543-0000-0000-0000-000000005006','Two Time Series',10,
    (current_setting('t.m3')::date + time '18:30') at time zone 'Europe/Prague',(current_setting('t.m3')::date + time '19:20') at time zone 'Europe/Prague','scheduled','open'),
   -- 5007 E: a DIFFERENT series, exact same slot as A (Monday m2 06:30), own room.
-  ('a543a543-0000-0000-0000-000000033005','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a01','a543a543-0000-0000-0000-000000005007','Same Slot Other',10,
+  ('a543a543-0000-0000-0000-000000033005','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','a543a543-0000-0000-0000-000000001a04','a543a543-0000-0000-0000-000000005007','Same Slot Other',10,
    (current_setting('t.m2')::date + time '06:30') at time zone 'Europe/Prague',(current_setting('t.m2')::date + time '07:20') at time zone 'Europe/Prague','scheduled','open');
 
 -- 23a. ASSIGN 'month' from A (06:30) → only the two 06:30 Mondays; the 18:30

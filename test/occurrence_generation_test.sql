@@ -72,6 +72,12 @@ insert into studio_staff (id, studio_id, user_id, email, role) values
 insert into rooms (id, studio_id, location_id, name, capacity) values
   ('0ccc0ccc-0000-0000-0000-00000000ee01','0ccc0ccc-0000-0000-0000-000000000001','0ccc0ccc-0000-0000-0000-00000000000c','Room A',10),
   ('0ccc0ccc-0000-0000-0000-00000000ee02','0ccc0ccc-0000-0000-0000-000000000001','0ccc0ccc-0000-0000-0000-00000000000c','Room B',10),
+  -- Room C: dedicated to the amendment-c series (c201) so no other fixture's
+  -- occurrence can occupy its slot — otherwise a shared-room clash makes
+  -- generate_occurrences skip a Wednesday, and which Wednesday depends on
+  -- today's date (date-fragile: t.wed2 landed on a PRG-MORNING collision).
+  ('0ccc0ccc-0000-0000-0000-00000000ee04','0ccc0ccc-0000-0000-0000-000000000001','0ccc0ccc-0000-0000-0000-00000000000c','Room C',10),
+  ('0ccc0ccc-0000-0000-0000-00000000ee05','0ccc0ccc-0000-0000-0000-000000000001','0ccc0ccc-0000-0000-0000-00000000000c','Room D',10),
   ('0ccc0ccc-0000-0000-0000-00000000ee03','0ccc0ccc-0000-0000-0000-000000000002','0ccc0ccc-0000-0000-0000-00000000000d','Room M',10);
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
   ('0ccc0ccc-0000-0000-0000-00000000cc01','0ccc0ccc-0000-0000-0000-000000000001','Reformer',50,10),
@@ -842,7 +848,7 @@ insert into class_series (id, studio_id, location_id, class_type_id, name, room_
    capacity, duration_minutes, rrule, starts_on, time_of_day)
 values ('0ccc0ccc-0000-0000-0000-00000000c201','0ccc0ccc-0000-0000-0000-000000000001',
         '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01','Wed Seven',
-        '0ccc0ccc-0000-0000-0000-00000000ee01', null, 10, 50,
+        '0ccc0ccc-0000-0000-0000-00000000ee04', null, 10, 50,  -- dedicated Room C (no shared-room clash)
         'FREQ=WEEKLY;BYDAY=WE', current_date + 7, '07:00');
 
 select expect_num('amendment-c: the Wed 07:00 series materialised t.wed at 07:00',
@@ -895,7 +901,7 @@ insert into class_series (id, studio_id, location_id, class_type_id, name, room_
    capacity, duration_minutes, rrule, starts_on, time_of_day)
 values ('0ccc0ccc-0000-0000-0000-00000000c202','0ccc0ccc-0000-0000-0000-000000000001',
         '0ccc0ccc-0000-0000-0000-00000000000c','0ccc0ccc-0000-0000-0000-00000000cc01','Wed Seven B',
-        '0ccc0ccc-0000-0000-0000-00000000ee02', null, 10, 50,
+        '0ccc0ccc-0000-0000-0000-00000000ee05', null, 10, 50,  -- dedicated Room D (no shared-room clash)
         'FREQ=WEEKLY;BYDAY=WE', current_date + 7, '07:00');
 select set_config('t.movedocc',
   (select id::text from class_occurrences where series_id='0ccc0ccc-0000-0000-0000-00000000c202'

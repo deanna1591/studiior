@@ -17,15 +17,17 @@ export const dynamic = "force-dynamic";
 export default async function Account() {
   const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
     await memberScreen();
-  const { live } = await membershipState(supabase, ctx.memberId);
-
+  // Decision 82: membershipState joins the same wave (it depends on nothing in
+  // it), so Account is one round trip after the context rather than two.
   // Decision 63: the Shop entry appears only when the studio has products, and
   // My orders only when this member has ordered something.
-  const [{ data: shop }, { data: orders }, { data: aiDrafts }] = await Promise.all([
+  const [membership, { data: shop }, { data: orders }, { data: aiDrafts }] = await Promise.all([
+    membershipState(supabase, ctx.memberId),
     supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
     supabase.rpc("member_orders"),
     supabase.rpc("member_sees_ai_drafts"),
   ]);
+  const { live } = membership;
   const hasProducts = Array.isArray(shop) && shop.length > 0;
   const hasOrders = Array.isArray(orders) && orders.length > 0;
 

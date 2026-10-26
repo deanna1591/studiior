@@ -65,5 +65,8 @@ export const config = {
   // handlers (/.well-known/assetlinks.json and /apple-app-site-association) are
   // never rewritten into /member or session-refreshed — they must be served
   // directly, host-aware, with no redirect.
-  matcher: ["/((?!api|\\.well-known|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
+  // Decision 82: `sw.js` is excluded for the same reason — the service-worker
+  // script (app/sw.js/route.ts) must be served at /sw.js with scope "/", not
+  // rewritten into /member.
+  matcher: ["/((?!api|\\.well-known|sw\\.js|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
 };

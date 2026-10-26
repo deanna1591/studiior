@@ -187,8 +187,13 @@ select 'a55ea55e-0000-0000-0000-000000000001','a55ea55e-0000-0000-0000-000000000
        (case when i % 2 = 0 then 'a55ea55e-0000-0000-0000-00000000ee01'
                             else 'a55ea55e-0000-0000-0000-00000000ee02' end)::uuid,
        'Reformer', 10,
-       ((current_date + 7) + time '09:00' + make_interval(hours => i)) at time zone 'Europe/Prague',
-       ((current_date + 7) + time '09:50' + make_interval(hours => i)) at time zone 'Europe/Prague',
+       -- These six must fall OUTSIDE Cara's fixed Nov-2026 validity window so
+       -- only Anna and Ben split them (3/3). current_date + 7 drifts into
+       -- November in late October (date-fragile: Cara then qualifies and the
+       -- split became 2/2/2). Clamp to >= 1 Dec 2026 — always future on any dev
+       -- run date and always clear of Cara's November window.
+       (greatest(current_date + 7, date '2026-12-01') + time '09:00' + make_interval(hours => i)) at time zone 'Europe/Prague',
+       (greatest(current_date + 7, date '2026-12-01') + time '09:50' + make_interval(hours => i)) at time zone 'Europe/Prague',
        'scheduled', 'open'
   from generate_series(0,5) i;
 
