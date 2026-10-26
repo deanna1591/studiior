@@ -43,7 +43,9 @@ const PLAN_FILTERS: { key: string; label: string; match: (m: Row) => boolean }[]
   { key: "free_booked", label: "Free class booked", match: (m) => m.plan_state === "free_only" && m.free_stage === "booked" },
   { key: "free_taken", label: "Free class taken", match: (m) => m.plan_state === "free_only" && m.free_stage === "taken" },
   { key: "free_missed", label: "Free class missed", match: (m) => m.plan_state === "free_only" && m.free_stage === "missed" },
-  { key: "none", label: "Signed up, nothing booked", match: (m) => m.plan_state === "none" },
+  { key: "unpaid", label: "Unpaid booking", match: (m) => m.has_unpaid_booking },
+  // A member with an unpaid booking is excluded here — they DID book.
+  { key: "none", label: "Signed up, nothing booked", match: (m) => m.plan_state === "none" && !m.has_unpaid_booking },
 ];
 
 type Row = {
@@ -53,6 +55,7 @@ type Row = {
   current_plan_name: string | null; plan_type: string | null;
   expires_on: string | null; credits_remaining: number | null;
   plan_state: string; complimentary: boolean; free_stage: string | null;
+  has_unpaid_booking: boolean;
 };
 
 export default async function Members({
@@ -322,6 +325,10 @@ export default async function Members({
  *  chip; free-only and no-plan carry the chip alone. */
 function PlanLine({ m, timeZone }: { m: Row; timeZone: string }) {
   const ps = m.plan_state;
+  // A live unpaid drop-in on a future class — shown in place of "Signed up,
+  // nothing booked" (they DID book). Takes precedence, since it asks the studio
+  // to collect payment.
+  if (m.has_unpaid_booking) return <StateChip state="unpaid_booking" />;
   // Members list polish (20 Oct 2026): the free cohort shows its stage in place
   // of "Free class only"; "none" is renamed via the chip. A free_only member
   // with no resolvable stage (comp cancelled) falls back to "Free class only".

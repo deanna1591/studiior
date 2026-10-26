@@ -205,6 +205,14 @@ select expect_text('1st free seat is provisional', (t_book_free(5, '17a10000-000
 select expect_text('2nd free seat is provisional', (t_book_free(6, '17a10000-0000-0000-0000-00000000c001') ->> 'provisional'), 'true');
 select expect_num('both free seats are provisional so far',
   (select count(*) from bookings where occurrence_id='17a10000-0000-0000-0000-00000000c001' and provisional), 2);
+-- (b) the provisional path is unchanged: each provisional free seat queues
+-- free_booking_pending at booking, never free_booking_confirmed or the plan card.
+select expect_num('a provisional free seat queues free_booking_pending',
+  (select count(*) from notifications where template_key='free_booking_pending'
+     and (payload->>'occurrence_id')='17a10000-0000-0000-0000-00000000c001'), 2);
+select expect_num('and zero booking_confirmed for the provisional free seats',
+  (select count(*) from notifications where template_key='booking_confirmed'
+     and (payload->>'occurrence_id')='17a10000-0000-0000-0000-00000000c001'), 0);
 select expect_num('no free_booking_confirmed queued yet',
   (select count(*) from notifications where template_key='free_booking_confirmed'
      and (payload->>'occurrence_id')='17a10000-0000-0000-0000-00000000c001'), 0);

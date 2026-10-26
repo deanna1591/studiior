@@ -9273,6 +9273,7 @@ export type Database = {
           free_stage: string
           had_free_class: boolean
           has_ever_paid: boolean
+          has_unpaid_booking: boolean
           health_band: string
           health_reason: string
           id: string

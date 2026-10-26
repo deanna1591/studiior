@@ -113,6 +113,31 @@ select expect_num('it is recorded in the shared ledger, with NO host',
   (select count(*) from guest_passes where guest_member_id='f9eef9ee-0000-0000-0000-00000000ad01' and host_member_id is null), 1);
 select expect_text('a second free class is refused', current_setting('t.f1b')::jsonb->>'reason', 'already_had_free');
 
+-- (a) The booking receipt is the FREE-CLASS confirmation, never the plan/price
+-- card. The booking insert fires the notification trigger BEFORE book_first_free
+-- writes the guest_pass; the studiior.free_first flag makes the trigger queue
+-- free_booking_confirmed. Studio A has no free_first_confirm_at, so NEW1's seat
+-- is NON-provisional — the case that used to fall through to booking_confirmed.
+select expect_num('a non-provisional free class queues exactly one booking receipt',
+  (select count(*) from notifications
+    where member_id='f9eef9ee-0000-0000-0000-00000000ad01'
+      and dedupe_key = 'booking_confirmed:'||(current_setting('t.f1')::jsonb->>'booking_id')), 1);
+select expect_text('and it is the free-class confirmation, not the plan/price card',
+  (select template_key from notifications
+    where member_id='f9eef9ee-0000-0000-0000-00000000ad01'
+      and dedupe_key = 'booking_confirmed:'||(current_setting('t.f1')::jsonb->>'booking_id')), 'free_booking_confirmed');
+select expect_num('zero booking_confirmed for the free class',
+  (select count(*) from notifications
+    where member_id='f9eef9ee-0000-0000-0000-00000000ad01' and template_key='booking_confirmed'), 0);
+select expect_true('its payload has class_name, day, time, manage_link populated — no raw { tokens',
+  (select coalesce(payload->>'class_name','') <> '' and coalesce(payload->>'class_name','') not like '%{%'
+       and coalesce(payload->>'day','')  <> '' and coalesce(payload->>'day','')  not like '%{%'
+       and coalesce(payload->>'time','') <> '' and coalesce(payload->>'time','') not like '%{%'
+       and coalesce(payload->>'manage_link','') like 'https://%/class/%'
+     from notifications
+    where member_id='f9eef9ee-0000-0000-0000-00000000ad01'
+      and dedupe_key = 'booking_confirmed:'||(current_setting('t.f1')::jsonb->>'booking_id')));
+
 -- =============================================================================
 -- 2. Cross-door. NEW1 took the free class via signup; a HOST trying to bring
 --    new1@example.com as a guest is refused the same way.
@@ -283,6 +308,17 @@ select set_config('t.belt_act',
 select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_true('an active member with a plan is not diverted to the free path',
   current_setting('t.belt_act') is distinct from 'use_free_first');
+-- (c) that normal paid booking still queues booking_confirmed (the else branch is
+-- unchanged) — not the free-class template.
+select expect_text('a normal paid booking queues booking_confirmed',
+  (select template_key from notifications
+    where member_id='f9eef9ee-0000-0000-0000-00000000ad10'
+      and (payload->>'occurrence_id')='f9eef9ee-0000-0000-0000-00000000c003'
+      and template_key in ('booking_confirmed','free_booking_confirmed','free_booking_pending','flex_booking_pending')),
+  'booking_confirmed');
+select expect_num('and no free-class template for the paid booking',
+  (select count(*) from notifications
+    where member_id='f9eef9ee-0000-0000-0000-00000000ad10' and template_key='free_booking_confirmed'), 0);
 
 -- After the free class, the ordinary path returns for that member.
 set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e11',false);

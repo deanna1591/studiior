@@ -377,4 +377,27 @@ select expect_raises('SA owner PT403 on SB member_plan_overview',
   $$ select * from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000b1') $$, 'PT403');
 reset role;
 
+-- (d) has_unpaid_booking — a live unpaid drop-in on a FUTURE occurrence (cc01 is
+-- +5 days). True for the unpaid one; false once a succeeded payment settles it;
+-- false once cancelled. plan_state stays 'none' (the chip is additive).
+insert into members (id, studio_id, email, first_name, last_name, status) values
+  ('5a1e5a1e-0000-0000-0000-0000000e000d','5a1e5a1e-0000-0000-0000-0000000000a1','dropunp@example.com','Drop','Unpaid','lead'),
+  ('5a1e5a1e-0000-0000-0000-0000000e000e','5a1e5a1e-0000-0000-0000-0000000000a1','droppaid@example.com','Drop','Paid','lead'),
+  ('5a1e5a1e-0000-0000-0000-0000000e000f','5a1e5a1e-0000-0000-0000-0000000000a1','dropcan@example.com','Drop','Cancelled','lead');
+insert into bookings (id, studio_id, member_id, occurrence_id, status, payment_source) values
+  ('5a1e5a1e-0000-0000-0000-0000000bb0d1','5a1e5a1e-0000-0000-0000-0000000000a1','5a1e5a1e-0000-0000-0000-0000000e000d','5a1e5a1e-0000-0000-0000-00000000cc01','booked','drop_in'),
+  ('5a1e5a1e-0000-0000-0000-0000000bb0e1','5a1e5a1e-0000-0000-0000-0000000000a1','5a1e5a1e-0000-0000-0000-0000000e000e','5a1e5a1e-0000-0000-0000-00000000cc01','booked','drop_in'),
+  ('5a1e5a1e-0000-0000-0000-0000000bb0f1','5a1e5a1e-0000-0000-0000-0000000000a1','5a1e5a1e-0000-0000-0000-0000000e000f','5a1e5a1e-0000-0000-0000-00000000cc01','cancelled','drop_in');
+insert into payments (studio_id, member_id, booking_id, amount_cents, currency, status, provider, method, paid_at) values
+  ('5a1e5a1e-0000-0000-0000-0000000000a1','5a1e5a1e-0000-0000-0000-0000000e000e','5a1e5a1e-0000-0000-0000-0000000bb0e1',15000,'CZK','succeeded','manual','cash', now());
+
+select expect_true('(d) has_unpaid_booking true for an unpaid future drop-in',
+  (select has_unpaid_booking from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000d'));
+select expect_true('(d) false once a succeeded payment settles it',
+  (select not has_unpaid_booking from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000e'));
+select expect_true('(d) false once the drop-in is cancelled',
+  (select not has_unpaid_booking from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000f'));
+select expect_txt('(d) plan_state stays none for the unpaid drop-in (chip is additive)',
+  (select plan_state from member_plan_overview('5a1e5a1e-0000-0000-0000-0000000000a1') where id='5a1e5a1e-0000-0000-0000-0000000e000d'), 'none');
+
 select 'sales_test: all assertions passed' as result;
