@@ -1376,6 +1376,12 @@ A free first class (Decision 30) must never be the only person in a room, becaus
 
 **Follow-up, 20 Oct 2026:** the control moves from the roster page to the Schedule calendar's class popup (between "Or open it as a shift" and "Open the full roster"), because the owner opens classes while looking at the week, not on the day. Removed from the roster page. A calendar block whose class is effectively open to first-timers by override shows a small "Trials" marker. Same RPC, same roles.
 
+### Amendment (c) — "Make this their free class" from the roster (Deanna, 27 Oct 2026)
+
+**STEP 0 found:** nine Reform members had a provisional free seat released by the three-confirmation sweep, were then wrongly told they had used their free class (pre-288), and booked unpaid drop-ins instead — each now holds a host-null `guest_passes` ledger row, no comp/attended free seat, no membership, and one unpaid drop-in on a class open to first-timers.
+
+(c) Staff (owner or manager) can convert a live unpaid drop-in booking into the member's free first class from the roster ("Make this their free class"). Allowed only when the booking is unpaid, not cancelled and a drop-in, the member is free-first eligible judged as if this booking did not exist, and the class is open to first-timers; otherwise refused with the reason. The conversion happens in place in one transaction: the booking becomes a confirmed free first class (never provisional, so the confirmation sweep cannot release it), the once-ever guest_passes row is written or reused, and free_booking_confirmed is queued. It counts as the member's free class. No credits, payments or holding fees are touched. Recorded 2026-10-27.
+
 ---
 
 ## 29 — Instructor claiming: inverting how a month gets staffed, per tenant

@@ -8485,6 +8485,10 @@ export type Database = {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
       }
+      convert_booking_to_free_first: {
+        Args: { p_booking_id: string }
+        Returns: Json
+      }
       convert_keep_sweep: {
         Args: { p_now?: string; p_studio_id: string }
         Returns: Json
@@ -8757,7 +8761,11 @@ export type Database = {
         }[]
       }
       free_first_eligibility: {
-        Args: { p_member_id: string; p_studio_id: string }
+        Args: {
+          p_exclude_booking?: string
+          p_member_id: string
+          p_studio_id: string
+        }
         Returns: Json
       }
       free_first_eligible_classes_run: {

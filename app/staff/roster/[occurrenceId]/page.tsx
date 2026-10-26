@@ -12,6 +12,7 @@ import { computeAssignCandidates } from "@/lib/assign";
 import CheckInButton from "./check-in-button";
 import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
+import MakeFreeButton from "./make-free-button";
 import ReleasePay from "./release-pay";
 import RunAnyway from "./run-anyway";
 import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
@@ -110,6 +111,23 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
   // high-minimum core) class to run? The pure helper decides the label from the
   // occurrence + the studio's guarantee switches; the RPC is the real boundary.
   const manager = isManagerUp(ctx.role);
+
+  // Decision 30 (c): which booked drop-ins are UNPAID (no succeeded/partially-
+  // refunded payment) — managers can convert those into the member's free first
+  // class. Only fetch when there is a manager and a drop-in to consider.
+  const dropinIds = manager
+    ? (bookings ?? []).filter((b) => b.status === "booked" && b.payment_source === "drop_in").map((b) => b.id)
+    : [];
+  const paidBookings = new Set<string>();
+  if (dropinIds.length) {
+    const { data: paidRows } = await supabase
+      .from("payments")
+      .select("booking_id")
+      .in("booking_id", dropinIds)
+      .in("status", ["succeeded", "partially_refunded"]);
+    for (const p of paidRows ?? []) if (p.booking_id) paidBookings.add(p.booking_id as string);
+  }
+
   const { data: gs } = manager
     ? await supabase.from("studio_settings")
         .select("guarantees_enabled, flex_enabled, core_min_bookings, flex_min_bookings")
@@ -340,6 +358,9 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
                 )}
                 {guestOf.has(b.member_id) && !b.members?.waiver_signed_at && (
                   <PaperWaiverButton memberId={b.member_id} occurrenceId={occ.id} />
+                )}
+                {manager && b.status === "booked" && b.payment_source === "drop_in" && !paidBookings.has(b.id) && (
+                  <MakeFreeButton bookingId={b.id} occurrenceId={occ.id} />
                 )}
                 {(notesFor.get(b.member_id) ?? []).map((n, i) => (
                   <p key={i} className="mt-1 pl-9 text-[12px] leading-[18px]"

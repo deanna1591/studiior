@@ -338,3 +338,43 @@ export async function setFreeFirstOverride(_prev: FreeFirstState, fd: FormData):
     why: r.why ?? "rules", reason: null,
   };
 }
+
+export type ConvertFreeState = { ok: true; message: string } | { ok: false; message: string } | null;
+
+/**
+ * Decision 30 amendment (c): convert a live unpaid drop-in into the member's free
+ * first class, in place. convert_booking_to_free_first is the boundary (owner or
+ * manager); it re-checks everything and refuses as a reason. The eligibility
+ * reasons come back as the helper's codes, mapped here to a sentence.
+ */
+export async function convertToFreeFirst(_prev: ConvertFreeState, fd: FormData): Promise<ConvertFreeState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const bookingId = String(fd.get("booking_id") ?? "");
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("convert_booking_to_free_first", { p_booking_id: bookingId });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "Only owners and managers can do this." };
+    return { ok: false, message: error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string } | null;
+  if (!r?.ok) {
+    const reason = r?.reason ?? "";
+    const msg =
+      reason === "booking is paid" ? "This booking is already paid."
+      : reason === "booking is cancelled" ? "This booking is cancelled."
+      : reason === "not a drop-in booking" ? "That is not a drop-in booking."
+      : reason === "class is not open to first-timers" ? "This class is not open to first-timers."
+      : reason === "already_had_free" || reason === "already_member" ? "This member has already used their free class."
+      : reason === "not_first" ? "This member is not a first-timer here."
+      : reason === "missed_twice" ? "This member has missed their free class twice."
+      : reason === "not_enabled" ? "Free first classes are not turned on."
+      : "That could not be done.";
+    return { ok: false, message: msg };
+  }
+
+  revalidatePath(`/roster/${occurrenceId}`);
+  return { ok: true, message: "Done — this is now their free first class." };
+}
