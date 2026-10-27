@@ -111,7 +111,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 
 | Action | O | M | I | FD | Mem |
 |---|---|---|---|---|---|
-| Book a member into a class | ✅ | ✅ | ❌ | ✅ | ⚠️¹² |
+| Book a member into a class | ✅ | ✅ | ⚠️²³ | ✅ | ⚠️¹² |
 | Cancel a booking | ✅ | ✅ | ❌ | ✅ | ⚠️¹² |
 | Override the eligibility gate | ✅ | ✅ | ❌ | ✅ | ❌ |
 | Waive a late-cancel fee | ✅ | ✅ | ❌ | ✅ | ❌ |
@@ -123,6 +123,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 
 Chapter 7 excludes the social layer, so "who's going" is a V2 question for members.
 ¹² Own bookings only.
+²³ Instructor: only a class they teach, **today**, as a **walk-in** (or a same-day Move-here) checked in at once — not general on-behalf booking (Decision 81a). Scoped in SQL to a published occurrence that is theirs and is today.
 
 Waitlist order is strictly FIFO and nobody can reorder it, including the Owner. Business Rules §4.1 — a queue people believe in is worth more than a queue that can be adjusted.
 
@@ -135,7 +136,8 @@ Waitlist order is strictly FIFO and nobody can reorder it, including the Owner. 
 | Check a member in | ✅ | ✅ | ✅ | ✅ | ⚠️¹³ |
 | View class roster | ✅ | ✅ | ⚠️⁹ | ✅ | ❌ |
 | Correct a no-show | ✅ | ✅ | ❌ | ✅ | ❌ |
-| Create walk-in booking + check-in | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Create walk-in booking + check-in | ✅ | ✅ | ⚠️²³ | ✅ | ❌ |
+| Move a member's same-day booking into own class | ✅ | ✅ | ⚠️²³ | ✅ | ❌ |
 | View own attendance history | — | — | — | — | ✅ |
 
 ¹³ Self check-in by presenting a rotating QR code, scanned at the desk.
@@ -148,14 +150,14 @@ Waitlist order is strictly FIFO and nobody can reorder it, including the Owner. 
 |---|---|---|---|---|---|
 | View membership plans | ✅ | ✅ | ❌ | ✅ | 👁¹⁴ |
 | Create / edit plans | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Sell membership / pack / drop-in | ✅ | ✅ | ❌ | ✅ | ⚠️¹⁵ |
+| Sell membership / pack / drop-in | ✅ | ✅ | ⚠️²⁴ | ✅ | ⚠️¹⁵ |
 | View a member's membership | ✅ | ✅ | ❌ | ✅ | ⚠️¹⁶ |
 | Approve freeze | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Request freeze | — | — | — | — | ✅ |
 | Cancel membership at period end | ✅ | ✅ | ❌ | ❌ | ✅ |
 | Cancel immediately with refund | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Upgrade / downgrade | ✅ | ✅ | ❌ | ⚠️¹⁷ | ✅ |
-| Take a payment | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Take a payment | ✅ | ✅ | ⚠️²⁴ | ✅ | ✅ |
 | Issue refund | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Adjust credits manually | ✅ | ✅ | ❌ | ❌ | ❌ |
 | View payment history | ✅ | ✅ | ❌ | ⚠️¹⁸ | ⚠️¹⁶ |
@@ -168,6 +170,7 @@ Waitlist order is strictly FIFO and nobody can reorder it, including the Owner. 
 ¹⁶ Own only.
 ¹⁷ Upgrade yes, downgrade no — downgrades touch proration and commitment terms.
 ¹⁸ Individual transactions to answer a member's question. Not studio-wide revenue.
+²⁴ Instructor: only for a class they teach, **today**, taking a desk payment (GCash / cash / card terminal) or selling a plan to that person, **attributed to them** (Decision 81a). Refunds, `mark_membership_paid`, the member profile and payment history stay **❌**.
 
 Instructors have no access to any of this. Enforced by RLS policy, not by hiding menu items.
 
@@ -231,12 +234,14 @@ Instructors have no access to any of this. Enforced by RLS policy, not by hiding
 Inside the same staff app, mobile-first:
 
 1. **My Schedule** — their week, today first.
-2. **Class Roster** — who's booked, first-timer and birthday badges, pinned notes, one-tap check-in.
+2. **Class Roster** — who's booked, first-timer and birthday badges, pinned notes, one-tap check-in. **Decision 81a (only for a class they teach, today):** Add a walk-in (name/email/mobile → free first class or drop-in, checked in at once); **Paid at desk** / **Sold a plan at desk** (GCash / cash / card terminal, attributed to them); **Move here** a member's same-day booking from another class.
 3. **Member Quick View** — photo, preferred name, attendance summary, goals, notes. Nothing financial.
 4. **My Availability** — recurring weekly pattern plus dated exceptions. Write access to own rows only.
 5. **My Stats** — classes taught, weekly teaching streak, personal targets, badges, active instructor challenges. No comparison to other instructors.
 
-**Still not in V1:** substitution requests, payroll, pay rates, cross-instructor performance comparison. Those remain in the Chapter 18 parking lot.
+**My Pay** (Decision 28, shipped) gains a **desk payments** list under Decision 81a — the GCash / cash / card-terminal payments this instructor recorded today (date, member, amount, method, reference), so they can reconcile the terminal and GCash at end of day. **It is a reconciliation list, not pay**, and shows only payments they recorded themselves.
+
+**Still not in V1:** substitution requests, cross-instructor performance comparison. Those remain in the Chapter 18 parking lot. (Payroll and pay rates shipped in Decision 22/28.)
 
 Screens 1–3 reuse roster and check-in logic already built for Front Desk. Screens 4–5 are new work.
 
