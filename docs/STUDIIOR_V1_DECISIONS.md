@@ -511,6 +511,12 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 84 — Password reset (2026-10-27)
+
+All three logins (member, instructor, staff) get self-service reset. **Mechanism:** anon `resetPasswordForEmail` → Supabase recovery link → per-host `/auth/callback` → per-host `/reset` page where the recovery session calls `updateUser({password})`; then sign out all other sessions (scope `'others'`). **No service-role client is introduced** — `auth.admin.generateLink` is rejected for that reason. The request is a Next server action, not an RPC; the anon RPC surface stays EXACTLY THIRTEEN. The request returns the same response whether or not the email exists; Supabase's existing rate limits apply; links expire in 1 hour. The recovery email is Studiior-branded and project-wide (`recovery.html`): one button, expiry line, "if you didn't ask for this, ignore it". Staff reset is Studiior-generic by nature (a staff user may belong to several studios). **84b (later):** move reset, confirm and invite emails into the per-studio 80a frame via the Send Email auth hook.
+
+---
+
 ## 76 — Group packages (Barkada)
 
 **Decision.** A studio can sell a GROUP plan: `membership_plans.type = 'group'`, with `name`, `price_cents`, `group_size` (2..capacity), one class for the whole group together, an optional class-type restriction (reusing `restrictions.class_type_ids`), a book-by window (`group_book_within_days`, default 30), conversion-bonus eligibility, and `featured`/`badge` like any plan. `'group'` is a NEW `plan_type` enum value, so — house rule, a new enum value cannot be used in the transaction that adds it — it is added in its own migration first and used in the next.

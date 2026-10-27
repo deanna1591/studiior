@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function MemberLogin({
   searchParams,
 }: {
-  searchParams: { next?: string; error?: string };
+  searchParams: { next?: string; error?: string; reset?: string };
 }) {
   const slug = currentSlug();
   // Decision 57: carry ?next across to the signup link too, so a buyer who
@@ -127,7 +127,22 @@ export default async function MemberLogin({
             to refract. Over the accent gradient this is a solid sheet: blur over
             a flat field is fog with a compositor layer attached. */}
         <div className={`${image ? "m-glass" : "m-panel"} px-5 pb-8 pt-6`}>
+          {/* Decision 84: a finished reset returns here with ?reset=1. */}
+          {searchParams?.reset && (
+            <p className="m-sub mb-3 rounded-xl px-3 py-2" role="status"
+               style={image
+                 ? { background: "rgb(255 255 255 / 0.14)", color: "#FFFFFF" }
+                 : { background: "var(--lime-tint)", color: "var(--ink)" }}>
+              Password updated. Sign in with your new password.
+            </p>
+          )}
           <LoginForm onImage={!!image} next={next} />
+
+          {/* Decision 84 */}
+          <Link href="/forgot" className="m-micro mt-3 block text-center underline underline-offset-4"
+                style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>
+            Forgot your password?
+          </Link>
 
           <Link
             href={`/signup${nextQ}`}

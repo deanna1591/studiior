@@ -7,6 +7,7 @@ import { getMemberContext } from "@/lib/auth";
 import { stripeFor } from "@/lib/stripe";
 import { memberOrigin, currentMemberOrigin } from "@/lib/tenant";
 import { buildAuthCallback } from "@/lib/auth-redirect";
+import { requestOutcome, resetNext, validateNewPassword } from "@/lib/password-reset";
 import { fmtDeadlineShort } from "@/lib/time";
 
 export type SignInResult = { error: string } | { ok: true } | null;
@@ -517,21 +518,46 @@ export async function signUp(_prev: ClaimState, fd: FormData): Promise<ClaimStat
 }
 
 /**
- * Send a password-reset link (Decision 41: same per-studio redirect as signUp).
+ * Decision 84: send a password-reset link (same per-studio redirect as signUp).
  * The link returns to the studio's own /auth/callback, which establishes the
- * recovery session and lands on the member settings screen. Always reports ok —
- * never reveal whether an address has an account. No forgot-password screen
- * calls this yet; it exists so the reset link is per-studio the day one does.
+ * recovery session and hands off to the /reset page; the role travels so /reset
+ * knows which login to return to. Always reports ok and never branches on the
+ * result — the response is the same whether or not the address has an account.
  */
 export async function requestPasswordReset(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
-  if (!email) return { error: "We need an email address." };
+  const role = String(fd.get("role") ?? "");
+  const outcome = requestOutcome(email);
+  if ("error" in outcome) return outcome;
 
   const origin = currentMemberOrigin();
   const supabase = createClient();
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: origin ? buildAuthCallback(origin, "/settings") : undefined,
+    redirectTo: origin ? buildAuthCallback(origin, resetNext(role)) : undefined,
   });
+  return { ok: true };
+}
+
+/**
+ * Decision 84: set the new password from the recovery session the /reset page
+ * runs in, then sign out EVERY OTHER session (scope 'others') so a cookie
+ * elsewhere is dropped while this device stays signed in. Returns { ok } and
+ * the client navigates to the role's login — a member server-action redirect
+ * would render the STAFF app (see useAuthAction) — where ?reset=1 shows a
+ * one-line acknowledgement.
+ */
+export async function completePasswordReset(_prev: ClaimState, fd: FormData): Promise<ClaimState> {
+  const check = validateNewPassword(String(fd.get("password") ?? ""), String(fd.get("confirm") ?? ""));
+  if ("error" in check) return check;
+
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({ password: String(fd.get("password") ?? "") });
+  if (error) {
+    return /session|jwt|logged|auth/i.test(error.message)
+      ? { error: "This reset link has expired. Request a new one." }
+      : { error: error.message };
+  }
+  await supabase.auth.signOut({ scope: "others" });
   return { ok: true };
 }
 

@@ -1,5 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useFormState, useFormStatus } from "react-dom";
 import { signIn } from "../actions";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
@@ -9,6 +12,14 @@ function Submit() {
   return <button className={buttonClass} disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>;
 }
 
+/** Decision 84: a finished reset returns here with ?reset=1. useSearchParams
+ *  needs a Suspense boundary, so it lives in its own component. */
+function ResetNotice() {
+  return useSearchParams().get("reset")
+    ? <Notice kind="ok">Password updated. Sign in with your new password.</Notice>
+    : null;
+}
+
 export default function StaffLogin() {
   const [error, action] = useFormState(signIn, null);
 
@@ -16,6 +27,7 @@ export default function StaffLogin() {
     <div className="mx-auto max-w-sm px-5 py-16">
       <h1 className="text-xl font-semibold tracking-tight">Studiior — staff</h1>
       <p className="mb-6 mt-1 text-sm text-ink-3">Sign in to manage the schedule.</p>
+      <Suspense fallback={null}><ResetNotice /></Suspense>
       {error && <Notice kind="error">{error}</Notice>}
       <form action={action} className="space-y-4">
         <Field label="Email">
@@ -26,6 +38,10 @@ export default function StaffLogin() {
         </Field>
         <Submit />
       </form>
+      {/* Decision 84 */}
+      <Link href="/forgot" className="mt-4 block text-sm text-ink-3 underline underline-offset-4">
+        Forgot your password?
+      </Link>
       {/*
         Local development only. The condition is written inline, around the JSX
         itself, rather than wrapped in a <DevOnly> component: Next replaces

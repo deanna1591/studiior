@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { zonedToUtc } from "@/lib/time";
 import { staffMemberOrigin } from "@/lib/member-urls-server";
 import { standaloneFlexSentence, outsideHoursSentence } from "@/lib/flex-copy";
 import { standbyText, openingHoursText } from "@/app/staff/series/shared";
+import { buildAuthCallback } from "@/lib/auth-redirect";
+import { requestOutcome, resetNext, validateNewPassword } from "@/lib/password-reset";
 
 export async function signIn(_prev: string | null, formData: FormData) {
   const supabase = createClient();
@@ -23,6 +26,55 @@ export async function signOut() {
   const supabase = createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+/**
+ * Decision 84 — staff password reset. The staff host (app.studiior.com) has no
+ * studio slug and a staff user may belong to several studios, so the reset is
+ * Studiior-generic: the link returns to this same host's /auth/callback, and
+ * the recovery email is the project-wide recovery.html. Always the same
+ * response whether or not the address exists.
+ */
+export type ResetRequestState = { ok: true } | { error: string } | null;
+
+export async function requestPasswordReset(
+  _prev: ResetRequestState, fd: FormData,
+): Promise<ResetRequestState> {
+  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  const outcome = requestOutcome(email);
+  if ("error" in outcome) return outcome;
+
+  const host = headers().get("host") ?? "";
+  const local = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+  const origin = host ? `${local ? "http" : "https"}://${host}` : null;
+
+  const supabase = createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: origin ? buildAuthCallback(origin, resetNext("staff")) : undefined,
+  });
+  return { ok: true };
+}
+
+/**
+ * Decision 84 — set the new password from the recovery session, sign out other
+ * sessions, and land on the staff login. A staff server-action redirect is
+ * fine (the staff host has no subdomain to lose, unlike the member app).
+ */
+export async function completePasswordReset(
+  _prev: string | null, fd: FormData,
+): Promise<string | null> {
+  const check = validateNewPassword(String(fd.get("password") ?? ""), String(fd.get("confirm") ?? ""));
+  if ("error" in check) return check.error;
+
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({ password: String(fd.get("password") ?? "") });
+  if (error) {
+    return /session|jwt|logged|auth/i.test(error.message)
+      ? "This reset link has expired. Request a new one."
+      : error.message;
+  }
+  await supabase.auth.signOut({ scope: "others" });
+  redirect("/login?reset=1");
 }
 
 export type CreateClassState = { ok: false; message: string } | { ok: true; message: string } | null;

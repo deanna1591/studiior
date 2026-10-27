@@ -26,12 +26,13 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   url.pathname = `/${app}${url.pathname === "/" ? "" : url.pathname}`;
 
-  // Decision 41: the auth callback establishes the session itself (it sets the
-  // cookies from the code/OTP exchange), and there is NO session yet when a
-  // member arrives on a confirmation link. Rewrite it into the member subtree
-  // so the route is reached, but do not run the session refresh below — let the
-  // route handler own the cookie write.
-  if (app === "member" && request.nextUrl.pathname === "/auth/callback") {
+  // Decision 41 / 84: the auth callback establishes the session itself (it sets
+  // the cookies from the code/OTP exchange), and there is NO session yet when a
+  // member arrives on a confirmation link OR anyone (member, instructor, staff)
+  // arrives on a password-reset link. Rewrite it into the host's own subtree
+  // (url.pathname already carries /${app}) so the route is reached, but do not
+  // run the session refresh below — let the route handler own the cookie write.
+  if (request.nextUrl.pathname === "/auth/callback") {
     return NextResponse.rewrite(url, { request: { headers: forwarded } });
   }
 

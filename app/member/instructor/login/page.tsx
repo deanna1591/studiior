@@ -14,7 +14,11 @@ export const dynamic = "force-dynamic";
  * places and a single form that guessed would sometimes guess wrong. Branded
  * as the studio through the same pre-login lookup the member login uses.
  */
-export default async function InstructorLogin() {
+export default async function InstructorLogin({
+  searchParams,
+}: {
+  searchParams: { reset?: string };
+}) {
   const slug = currentSlug();
   const anon = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,9 +42,20 @@ export default async function InstructorLogin() {
         <p className="m-sub mt-2 text-ink-2">
           Your week, your rosters, cover, availability and what you are owed.
         </p>
+        {/* Decision 84: a finished reset returns here with ?reset=1. */}
+        {searchParams?.reset && (
+          <p className="m-sub mt-3 text-ink" role="status"
+             style={{ borderLeft: "3px solid var(--lime-text)", paddingLeft: 8 }}>
+            Password updated. Sign in with your new password.
+          </p>
+        )}
         <LoginForm />
+        {/* Decision 84 — forgot password, carrying the instructor role. */}
+        <Link href="/forgot?role=instructor" className="m-micro mt-4 block text-center text-ink-3 underline underline-offset-4">
+          Forgot your password?
+        </Link>
         {/* The mirror of the member login's cross-link (Deanna, 30 Sep). */}
-        <Link href="/login" className="m-micro mt-4 block text-center text-ink-3 underline underline-offset-4">
+        <Link href="/login" className="m-micro mt-3 block text-center text-ink-3 underline underline-offset-4">
           Member? Sign in here
         </Link>
       </main>

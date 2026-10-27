@@ -64,6 +64,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     hostname === "lvh.me" || hostname.endsWith(".localhost") || hostname.endsWith(".lvh.me");
   const base = `${local ? "http" : "https"}://${host}`;
 
+  // Decision 84: the password-reset flow. A recovery link's next targets
+  // /reset, and recovery is NOT signup — so skip the claim + confirmDestination
+  // path below (an instructor resetting a password has no member row to claim,
+  // which would send them to /signup). The /reset page decides what to show
+  // from whether the recovery session was established; a failed exchange simply
+  // sets no session and /reset shows "expired", so this holds for failed too.
+  if (next === "/reset" || next.startsWith("/reset?")) {
+    return NextResponse.redirect(new URL(next, base));
+  }
+
   if (failed) {
     return NextResponse.redirect(new URL(confirmDestination(false, null, next), base));
   }

@@ -170,6 +170,11 @@ additional_redirect_urls = [
   "http://127.0.0.1:3000/**",
   "http://*.lvh.me:3000/**",
   "http://*.localhost:3000/**",
+  # Decision 84: the staff host (app.studiior.com) is NOT a *.studiior.app
+  # subdomain, so the password-reset link back to its /auth/callback needs its
+  # own allow-list entry. Hosted must add the same in the dashboard — see
+  # CLAUDE.md / the Decision 84 manual steps.
+  "https://app.studiior.com/**",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -270,6 +275,15 @@ otp_expiry = 3600
 [auth.email.template.confirmation]
 subject = "Confirm your email"
 content_path = "./supabase/templates/confirm.html"
+
+# Decision 84: the password-reset email. Project-wide like the confirmation
+# above (Supabase auth templates are one-per-project), so Studiior-branded, no
+# studio tokens. 84b moves reset/confirm/invite into the per-studio 80a frame
+# via the Send Email auth hook. The hosted copy must be pasted into the
+# dashboard once (Authentication -> Email Templates -> Reset password).
+[auth.email.template.recovery]
+subject = "Reset your Studiior password"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
