@@ -282,7 +282,7 @@ content_path = "./supabase/templates/confirm.html"
 # via the Send Email auth hook. The hosted copy must be pasted into the
 # dashboard once (Authentication -> Email Templates -> Reset password).
 [auth.email.template.recovery]
-subject = "Reset your Studiior password"
+subject = "Reset your password for your studio's booking app"
 content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
