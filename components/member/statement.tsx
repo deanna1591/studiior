@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
-import { filterStatement, groupByMonth, type StatementRow } from "@/lib/statement";
+import { filterStatement, groupByMonth, moneyLine, type StatementRow } from "@/lib/statement";
 import type { TimeFormat } from "@/lib/time";
 
 /**
@@ -23,9 +23,10 @@ function href(r: StatementRow): string | null {
   return null;
 }
 
-export default function Statement({ rows, timeZone, timeFormat }:
-  { rows: StatementRow[]; timeZone: string; timeFormat: TimeFormat }) {
+export default function Statement({ rows, timeZone, timeFormat, currency }:
+  { rows: StatementRow[]; timeZone: string; timeFormat: TimeFormat; currency: string }) {
   const [which, setWhich] = useState<"all" | "classes" | "credits">("all");
+  const money = (c: number) => formatMoney(c, currency);
   const monthLabel = (at: string) =>
     new Intl.DateTimeFormat("en-GB", { timeZone, month: "long", year: "numeric" }).format(new Date(at));
   const dayLabel = (at: string) =>
@@ -62,16 +63,14 @@ export default function Statement({ rows, timeZone, timeFormat }:
                 {g.items.map((r, i) => {
                   const cd = r.credit_delta ?? 0;
                   const to = href(r);
+                  const second = moneyLine(r, money);
                   const body = (
                     <>
                       <span className="min-w-0 flex-1">
                         <span className="m-body block truncate text-ink">{r.title}</span>
                         <span className="m-micro block text-ink-3">
                           {dayLabel(r.at)}
-                          {r.detail && <> · {r.detail}</>}
-                          {cd !== 0 && (
-                            <> · <span className="num">{cd > 0 ? "+" : ""}{cd}</span> credit{Math.abs(cd) === 1 ? "" : "s"}</>
-                          )}
+                          {second && <> · {second}</>}
                         </span>
                       </span>
                       <span className="shrink-0 pl-2 text-right">

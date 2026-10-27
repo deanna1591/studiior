@@ -1,13 +1,25 @@
+import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
+import { moneyLine } from "@/lib/statement";
 import { dayMonthParts, fmtTime, type TimeFormat } from "@/lib/time";
 
+/** A member_activity row carried through from the profile page. */
 type Ev = {
   id: string;
-  type: string;
-  occurred_at: string;
+  kind: string;
+  at: string;
   title: string;
-  description: string | null;
-  metadata: unknown;
+  detail: string | null;
+  credit_delta: number | null;
+  balance_after: number | null;
+  amount_cents: number | null;
+  currency: string | null;
+  occurrence_id: string | null;
+  booking_id: string | null;
+  membership_id: string | null;
+  plan_name: string | null;
+  due_cents: number | null;
+  is_free_first: boolean | null;
 };
 
 /**
@@ -20,6 +32,12 @@ type Ev = {
  * Only `payment` and `cancelled` get colour, because they are the only two an
  * owner scans for. Colouring every attendance would make a healthy member's
  * timeline a solid block of lime and tell them nothing.
+ *
+ * Decision 83: the row is a LINK (never a button — nothing acts from the
+ * journey). A class row opens that class's roster, scrolled to this member;
+ * a money row jumps to the membership (or, for a manager, the payments) panel
+ * on this same page. The second line is moneyLine — the same plain-words line
+ * the member sees in /history — and a running balance rides the credit rows.
  */
 const DOT: Record<string, string> = {
   joined: "var(--lime-text)",
@@ -44,12 +62,24 @@ const DOT: Record<string, string> = {
   message_sent: "var(--ink-3)",
 };
 
-export function TimelineList({ events, timeZone, timeFormat = "24h" }: { events: Ev[]; timeZone: string; timeFormat?: TimeFormat }) {
+const PAYMENT_KINDS = new Set(["purchase", "refund", "payment_failed"]);
+
+export function TimelineList({ events, timeZone, timeFormat = "24h", memberId, manager, currency }:
+  { events: Ev[]; timeZone: string; timeFormat?: TimeFormat; memberId: string; manager: boolean; currency: string }) {
+  const money = (c: number) => formatMoney(c, currency);
+
+  function href(e: Ev): string | null {
+    if (e.occurrence_id) return `/roster/${e.occurrence_id}?member=${memberId}`;
+    if (PAYMENT_KINDS.has(e.kind)) return manager ? "#payments" : "#membership";
+    if (e.membership_id || (e.credit_delta ?? 0) !== 0) return "#membership";
+    return null;
+  }
+
   const groups: { label: string; items: Ev[] }[] = [];
   for (const e of events) {
     const label = new Intl.DateTimeFormat("en-GB", {
       timeZone, month: "long", year: "numeric",
-    }).format(new Date(e.occurred_at));
+    }).format(new Date(e.at));
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.items.push(e);
     else groups.push({ label, items: [e] });
@@ -64,35 +94,53 @@ export function TimelineList({ events, timeZone, timeFormat = "24h" }: { events:
           </h3>
           <ul className="space-y-0">
             {g.items.map((e) => {
-              const { day, month } = dayMonthParts(e.occurred_at, timeZone);
-              const meta = (e.metadata ?? {}) as { amount_cents?: number; currency?: string };
-              return (
-                <li key={e.id} className="flex gap-3 border-b border-line py-1.5 last:border-0">
+              const { day, month } = dayMonthParts(e.at, timeZone);
+              const cd = e.credit_delta ?? 0;
+              const second = moneyLine(e, money);
+              const to = href(e);
+              const body = (
+                <>
                   <span className="num w-[52px] shrink-0 pt-px text-[12px] text-ink-3">
                     {day} <span className="font-sans">{month}</span>
                   </span>
                   <span
                     className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ background: DOT[e.type] ?? "var(--line-2)" }}
+                    style={{ background: DOT[e.kind] ?? "var(--line-2)" }}
                     aria-hidden
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] leading-[18px] text-ink">
                       {e.title}
-                      {e.type === "attended" && (
+                      {e.kind === "attended" && (
                         <span className="ml-1.5 num text-[11px] text-ink-3">
-                          {fmtTime(e.occurred_at, timeZone, timeFormat)}
+                          {fmtTime(e.at, timeZone, timeFormat)}
                         </span>
                       )}
                     </span>
-                    {e.description && (
-                      <span className="block text-[11px] leading-4 text-ink-3">{e.description}</span>
+                    {second && (
+                      <span className="block text-[11px] leading-4 text-ink-3">{second}</span>
                     )}
                   </span>
-                  {meta.amount_cents != null && meta.currency && (
-                    <span className="num shrink-0 pt-px text-[12px] text-ink-2">
-                      {formatMoney(meta.amount_cents, meta.currency)}
-                    </span>
+                  <span className="shrink-0 pt-px text-right">
+                    {e.amount_cents != null && e.currency && (
+                      <span className="num block text-[12px] text-ink-2">
+                        {formatMoney(e.amount_cents, e.currency)}
+                      </span>
+                    )}
+                    {(cd !== 0 || e.amount_cents != null) && e.balance_after != null && (
+                      <span className="num block text-[11px] leading-4 text-ink-3">
+                        Balance {e.balance_after}
+                      </span>
+                    )}
+                  </span>
+                </>
+              );
+              return (
+                <li key={e.id} className="border-b border-line last:border-0">
+                  {to ? (
+                    <Link href={to} className="-mx-2 flex gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-paper">{body}</Link>
+                  ) : (
+                    <div className="flex gap-3 py-1.5">{body}</div>
                   )}
                 </li>
               );

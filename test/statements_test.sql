@@ -185,6 +185,33 @@ update bookings set credit_entry_id = '57a70000-0000-0000-0000-0000000ed005' whe
 insert into credit_ledger (id, studio_id, member_id, membership_id, delta, reason, balance_after, created_at) values
   ('57a70000-0000-0000-0000-0000000ed006','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a01','57a70000-0000-0000-0000-0000000a5001',2,'manual',10, now()-interval '13 days');
 
+-- ---- Decision 83: plan_name / due_cents / is_free_first on the statement ------
+-- On Mo Two (e0a02), so e0a01's counts above are untouched. A public drop-in plan
+-- gives an unpaid drop-in a price to show.
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, visibility, status) values
+  ('57a70000-0000-0000-0000-0000000f0a02','57a70000-0000-0000-0000-00000000a001','Drop-in','drop_in',15000,'CZK','public','active');
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, status) values
+  ('57a70000-0000-0000-0000-0000000ecd01','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10, now()-interval '12 days', now()-interval '12 days'+interval '50 min','scheduled'),
+  ('57a70000-0000-0000-0000-0000000ecd02','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10, now()-interval '11 days', now()-interval '11 days'+interval '50 min','scheduled'),
+  ('57a70000-0000-0000-0000-0000000ecf01','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10, now()-interval '10 days', now()-interval '10 days'+interval '50 min','scheduled'),
+  ('57a70000-0000-0000-0000-0000000ece01','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10, now()-interval '9 days', now()-interval '9 days'+interval '50 min','scheduled');
+-- (b) an UNPAID drop-in (no payment) and a PAID one (a succeeded payment).
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('57a70000-0000-0000-0000-000000bbd001','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ecd01','57a70000-0000-0000-0000-0000000e0a02','booked','member','drop_in', now()-interval '12 days'),
+  ('57a70000-0000-0000-0000-000000bbd002','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ecd02','57a70000-0000-0000-0000-0000000e0a02','booked','member','drop_in', now()-interval '11 days');
+insert into payments (id, studio_id, member_id, booking_id, amount_cents, currency, status, provider, description, paid_at, created_at) values
+  ('57a70000-0000-0000-0000-0000000fa002','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a02','57a70000-0000-0000-0000-000000bbd002',15000,'CZK','succeeded','manual','Drop-in', now()-interval '11 days', now()-interval '11 days');
+-- (c) a free first class: a comp booking with a host-null guest pass.
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('57a70000-0000-0000-0000-000000bbf001','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ecf01','57a70000-0000-0000-0000-0000000e0a02','booked','member','comp', now()-interval '10 days');
+insert into guest_passes (studio_id, host_member_id, guest_member_id, guest_email, occurrence_id, guest_booking_id, status) values
+  ('57a70000-0000-0000-0000-00000000a001', null, '57a70000-0000-0000-0000-0000000e0a02','57a7-m2@t','57a70000-0000-0000-0000-0000000ecf01','57a70000-0000-0000-0000-000000bbf001','confirmed');
+-- (d) a moved class she holds a live booking on.
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('57a70000-0000-0000-0000-000000bbe001','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ece01','57a70000-0000-0000-0000-0000000e0a02','booked','member','drop_in', now()-interval '9 days');
+insert into occurrence_events (studio_id, occurrence_id, kind, at) values
+  ('57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ece01','moved', now()-interval '9 days'+interval '1 hour');
+
 set role authenticated;
 select set_config('request.jwt.claim.sub','57a70000-0000-0000-0000-0000000e0b01',false);
 
@@ -229,6 +256,31 @@ select expect_num('75a scope: staff can read the member statement',
   (select count(*) from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01')), 8);
 select expect_num('75a staff: the staff-only joined row is present',
   (select count(*) from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where kind='joined'), 1);
+reset role;
+
+-- =============================================================================
+-- C2. Decision 83 — plan_name / due_cents / is_free_first (read as the owner).
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','57a70000-0000-0000-0000-0000000f1001',false);
+-- (a) a booking drawn from a pack names the plan (balance 9 is asserted above).
+select expect_text('83 stmt: a pack booking names its plan',
+  (select plan_name from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb011' and kind='booked'), '10-Pack');
+-- (b) an unpaid drop-in shows the amount due and no plan; a paid one shows neither.
+select expect_num('83 stmt: an unpaid drop-in shows the amount due',
+  (select due_cents from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbd001' and kind='booked'), 15000);
+select expect_text('83 stmt: an unpaid drop-in has no plan name',
+  (select coalesce(plan_name,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbd001' and kind='booked'), '<null>');
+select expect_text('83 stmt: a paid drop-in shows no amount due',
+  (select coalesce(due_cents::text,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbd002' and kind='booked'), '<null>');
+-- (c) a free first class is flagged, with no plan.
+select expect_text('83 stmt: a free first class is flagged is_free_first',
+  (select case when is_free_first then 'yes' else 'no' end from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbf001' and kind='free_first'), 'yes');
+select expect_text('83 stmt: a free first class has no plan name',
+  (select coalesce(plan_name,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbf001' and kind='free_first'), '<null>');
+-- (d) the moved occurrence still produces its row.
+select expect_num('83 stmt: a moved occurrence row is present',
+  (select count(*) from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where kind='rescheduled'), 1);
 reset role;
 
 -- =============================================================================

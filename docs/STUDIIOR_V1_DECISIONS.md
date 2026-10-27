@@ -511,6 +511,12 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 83 — Journey and History rows say what happened and where the money went (2026-10-27)
+
+One feed, `member_activity`, serves both the member History and the staff Journey. Every row names the class (or the plan) and the date. A booking row says what it drew from: "Drew 1 from {plan} — {n} left", or "Free first class", or for an unpaid drop-in "Unpaid — {amount} due". A cancellation row says "Credit returned to {plan}" or "Class used". Money rows show the amount. The running balance shows on both screens. Rows link to the real thing, never duplicate its controls: a class row opens the class page for a member and the roster (with that member highlighted) for staff; a money row opens the membership and payment panel on the member's profile. Cancel, book again and record payment stay where they live today. There is no Reschedule anywhere; the history line for a moved class reads "Class moved to {day} {time}". `member_activity` keeps its guard and grants — anon stays EXACTLY THIRTEEN.
+
+---
+
 ## 84 — Password reset (2026-10-27)
 
 All three logins (member, instructor, staff) get self-service reset. **Mechanism:** anon `resetPasswordForEmail` → Supabase recovery link → per-host `/auth/callback` → per-host `/reset` page where the recovery session calls `updateUser({password})`; then sign out all other sessions (scope `'others'`). **No service-role client is introduced** — `auth.admin.generateLink` is rejected for that reason. The request is a Next server action, not an RPC; the anon RPC surface stays EXACTLY THIRTEEN. The request returns the same response whether or not the email exists; Supabase's existing rate limits apply; links expire in 1 hour. The recovery email is Studiior-branded and project-wide (`recovery.html`): one button, expiry line, "if you didn't ask for this, ignore it". Staff reset is Studiior-generic by nature (a staff user may belong to several studios). **84b (later, sequenced to follow Decision 83):** move reset, confirm and invite emails into the per-studio 80a frame via the Send Email auth hook. (Housekeeping 27 Oct: the recovery email copy and subject now say "your studio's booking app" with a lighter "runs its bookings on Studiior" line, matching the dashboard; still project-wide, no studio tokens.)

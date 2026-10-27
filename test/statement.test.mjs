@@ -2,7 +2,7 @@
 //   node --test test/statement.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isMoneyRow, filterStatement, groupByMonth, withRunningBalance } from "../lib/statement.mjs";
+import { isMoneyRow, filterStatement, groupByMonth, withRunningBalance, moneyLine } from "../lib/statement.mjs";
 
 // Newest-first, as member_activity returns.
 const rows = [
@@ -40,6 +40,24 @@ test("groupByMonth preserves newest-first order and groups contiguously", () => 
   assert.deepEqual(g.map((x) => x.label), ["March 2026", "February 2026"]);
   assert.equal(g[0].items.length, 3);
   assert.equal(g[1].items.length, 3);
+});
+
+test("moneyLine (Decision 83): the row's second line in plain words", () => {
+  const peso = (c) => `₱${(c / 100).toLocaleString("en-US")}`;
+  // free first wins over everything.
+  assert.equal(moneyLine({ is_free_first: true, credit_delta: 0, plan_name: null }), "Free first class");
+  // an unpaid drop-in shows the amount due via the bound formatter.
+  assert.equal(moneyLine({ due_cents: 15000, credit_delta: 0, plan_name: null }, peso), "Unpaid — ₱150 due");
+  // a booking drawn from a pack names the plan and the balance left.
+  assert.equal(moneyLine({ credit_delta: -1, plan_name: "10-Pack", balance_after: 9 }), "Drew 1 from 10-Pack — 9 left");
+  // a credit returned to the plan.
+  assert.equal(moneyLine({ credit_delta: 1, plan_name: "10-Pack", detail: "Credit returned" }), "Credit returned to 10-Pack");
+  // a late cancel with no plan falls to its detail ("Class used").
+  assert.equal(moneyLine({ credit_delta: 0, plan_name: null, detail: "Class used" }), "Class used");
+  // an unclaimed +2 adjustment with no plan and no detail.
+  assert.equal(moneyLine({ credit_delta: 2, plan_name: null, detail: null }), "2 credits added");
+  // a purchase row (no delta, no plan, no detail) — the title + amount say it.
+  assert.equal(moneyLine({ credit_delta: 0, amount_cents: 500000, plan_name: null, detail: null }), null);
 });
 
 test("withRunningBalance recomputes balance_after from deltas (oldest first)", () => {

@@ -119,27 +119,24 @@ export default async function MemberDetail({
         .eq("member_id", params.id).order("created_at", { ascending: false }).limit(20)
     : { data: null };
 
-  // Decision 75a: map the statement rows to the TimelineList shape. Non-managers
-  // keep the existing display choice — the pure money rows are withheld (the
-  // class rows that merely carry a credit delta stay).
+  // Decision 75a: the journey reads member_activity. Decision 83: carry the ids,
+  // the running balance and plan_name / due_cents / is_free_first through so
+  // TimelineList can link each row (class rows to the roster, money rows to the
+  // membership/payment panel), show the balance, and say in plain words what
+  // happened (moneyLine). Non-managers keep the display choice — the pure money
+  // rows are withheld (class rows that merely carry a credit delta stay).
   const MONEY_KINDS = new Set(["purchase", "refund", "payment_failed", "credits_added", "credit_adjustment"]);
   type Act = { at: string; kind: string; title: string; detail: string | null;
-    credit_delta: number | null; amount_cents: number | null; currency: string | null;
-    occurrence_id: string | null; booking_id: string | null; membership_id: string | null };
+    credit_delta: number | null; balance_after: number | null;
+    amount_cents: number | null; currency: string | null;
+    occurrence_id: string | null; booking_id: string | null; membership_id: string | null;
+    plan_name: string | null; due_cents: number | null; is_free_first: boolean | null };
   const journey = ((activity ?? []) as Act[])
     .filter((e) => manager || !MONEY_KINDS.has(e.kind))
-    .map((e, i) => {
-      const cd = e.credit_delta ?? 0;
-      const creditNote = cd !== 0 ? `${cd > 0 ? "+" : ""}${cd} credit${Math.abs(cd) === 1 ? "" : "s"}` : null;
-      return {
-        id: `${e.kind}:${e.occurrence_id ?? e.booking_id ?? e.membership_id ?? "x"}:${e.at}:${i}`,
-        type: e.kind,
-        occurred_at: e.at,
-        title: e.title,
-        description: [e.detail, creditNote].filter(Boolean).join(" · ") || null,
-        metadata: { amount_cents: e.amount_cents, currency: e.currency },
-      };
-    });
+    .map((e, i) => ({
+      id: `${e.kind}:${e.occurrence_id ?? e.booking_id ?? e.membership_id ?? "x"}:${e.at}:${i}`,
+      ...e,
+    }));
 
   // Goal progress is computed, never read off member_goals.current_value —
   // that column has never been written and every goal read "0 of 12".
@@ -301,7 +298,7 @@ export default async function MemberDetail({
               <Empty>Nothing recorded yet. Their first visit will start this off.</Empty>
             ) : (
               <>
-                <TimelineList events={journey.slice(0, JOURNEY_SHOWN)} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
+                <TimelineList events={journey.slice(0, JOURNEY_SHOWN)} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} memberId={params.id} manager={manager} currency={ctx.currency} />
                 {journey.length > JOURNEY_SHOWN && (
                   <p className="mt-3 text-[12px] leading-4 text-ink-3">
                     <span className="num">{journey.length - JOURNEY_SHOWN}</span> earlier
@@ -313,7 +310,7 @@ export default async function MemberDetail({
           </section>
 
           {manager && (
-            <section className="s-card p-5">
+            <section id="payments" className="s-card scroll-mt-4 p-5">
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="s-head">Payments</h2>
                 <NavLink href={`/members/${params.id}/payment`}>Record a payment</NavLink>
@@ -368,7 +365,7 @@ export default async function MemberDetail({
 
         {/* ---------- the facts ---------- */}
         <div className="space-y-8">
-          <section className="s-card p-5">
+          <section id="membership" className="s-card scroll-mt-4 p-5">
             <h2 className="s-head mb-3">Membership</h2>
             {!live ? (
               <Empty quiet>

@@ -18,10 +18,11 @@ import RunAnyway from "./run-anyway";
 import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
+import ScrollToMember from "./scroll-to-member";
 
 export const dynamic = "force-dynamic";
 
-export default async function Roster({ params }: { params: { occurrenceId: string } }) {
+export default async function Roster({ params, searchParams }: { params: { occurrenceId: string }; searchParams: { member?: string } }) {
   const screen = await staffScreen("/roster");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
@@ -286,6 +287,7 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
         <Empty>Nobody has booked yet. They will appear here as they do.</Empty>
       ) : (
         <Rows>
+          {searchParams?.member && <ScrollToMember memberId={searchParams.member} />}
           {booked.map((b) => {
             const band = bandOf(b.members?.health_band);
             // Only the bands that ask something of you. A wall of "healthy"
@@ -293,8 +295,13 @@ export default async function Roster({ params }: { params: { occurrenceId: strin
             // chip here is that front desk sees it while the member is
             // standing in front of them.
             const flag = band === "drifting" || band === "at_risk";
+            // Decision 83: a Journey link arrives with ?member=… — that row is
+            // given an id (so it can be scrolled to) and a persistent ring.
+            const jumped = searchParams?.member === b.member_id;
             return (
-              <div key={b.id} className="px-3 py-2.5">
+              <div key={b.id}
+                id={jumped ? `roster-member-${b.member_id}` : undefined}
+                className={`scroll-mt-24 px-3 py-2.5${jumped ? " rounded-lg ring-1 ring-ink-3" : ""}`}>
                 <div className="flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {/* The member's own photograph, so an instructor can put a

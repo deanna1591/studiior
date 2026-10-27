@@ -8686,6 +8686,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9145,9 +9153,12 @@ export type Database = {
           credit_delta: number
           currency: string
           detail: string
+          due_cents: number
+          is_free_first: boolean
           kind: string
           membership_id: string
           occurrence_id: string
+          plan_name: string
           title: string
         }[]
       }

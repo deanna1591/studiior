@@ -36,10 +36,17 @@ export default async function History({
     ? "2000-01-01"
     : new Date(Date.UTC(y, m - 1 - 2, 1)).toISOString().slice(0, 10);
 
-  const { data: activity } = await supabase.rpc("member_activity", {
-    p_member_id: ctx.memberId, p_from: from, p_to: "2100-01-01",
-  });
+  const [{ data: activity }, { data: studio }] = await Promise.all([
+    supabase.rpc("member_activity", {
+      p_member_id: ctx.memberId, p_from: from, p_to: "2100-01-01",
+    }),
+    // The studio's currency, for moneyLine's "Unpaid — ₱150 due" (a booked row
+    // carries no currency of its own). studios_member_read lets a member read
+    // their own studio's row, so this needs no new bootstrap field.
+    supabase.from("studios").select("currency").eq("id", ctx.studioId).maybeSingle(),
+  ]);
   const rows = (activity ?? []) as StatementRow[];
+  const currency = studio?.currency ?? rows.find((r) => r.currency)?.currency ?? "USD";
 
   // There is older history to load when the window shows fewer visits than the
   // member's lifetime count — no extra query, and it never hides real history.
@@ -66,7 +73,7 @@ export default async function History({
         <p className="m-micro mb-3 text-ink-3">Showing the last 3 months.</p>
       )}
 
-      <Statement rows={rows} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
+      <Statement rows={rows} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} currency={currency} />
 
       {moreOlder && (
         <Link href="/history?all=1"
