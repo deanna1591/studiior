@@ -515,6 +515,30 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 One feed, `member_activity`, serves both the member History and the staff Journey. Every row names the class (or the plan) and the date. A booking row says what it drew from: "Drew 1 from {plan} — {n} left", or "Free first class", or for an unpaid drop-in "Unpaid — {amount} due". A cancellation row says "Credit returned to {plan}" or "Class used". Money rows show the amount. The running balance shows on both screens. Rows link to the real thing, never duplicate its controls: a class row opens the class page for a member and the roster (with that member highlighted) for staff; a money row opens the membership and payment panel on the member's profile. Cancel, book again and record payment stay where they live today. There is no Reschedule anywhere; the history line for a moved class reads "Class moved to {day} {time}". `member_activity` keeps its guard and grants — anon stays EXACTLY THIRTEEN.
 
+### Amendment (a), 2026-10-28 — the row wording every surface uses
+
+Every row says which class, when, with whom, and what it cost. This table is the canonical wording for every surface (it supersedes the sentence fragments in the paragraph above). One shared helper builds it; no surface keeps its own phrasing.
+
+| Row | First line | Second line |
+|---|---|---|
+| Booked, from a plan | Booked {class} | {Day} {date}, {time} with {instructor} · 1 class from {plan}, {n} left |
+| Booked, free first class | Booked {class} | {Day} {date}, {time} with {instructor} · Free first class |
+| Booked, unpaid drop-in | Booked {class} | {Day} {date}, {time} with {instructor} · Drop-in, {amount} due at the desk |
+| Booked, paid drop-in | Booked {class} | {Day} {date}, {time} with {instructor} · Drop-in, paid |
+| Attended | Attended {class} | {Day} {date}, {time} with {instructor} |
+| No-show | Missed {class} | {Day} {date}, {time} · Class used from {plan}, {n} left / Free class used / Nothing owed |
+| Cancelled in time | Cancelled {class} | {Day} {date}, {time} · Class returned to {plan}, {n} left / Free class kept |
+| Cancelled late | Cancelled late {class} | {Day} {date}, {time} · Class used from {plan}, {n} left |
+| Cancelled by the studio | Studio cancelled {class} | {Day} {date}, {time} · Class returned to {plan}, {n} left |
+| Class moved | {class} moved | Now {Day} {date}, {time} |
+| Bought a plan | Bought {plan} | {amount} · {classes} classes, valid to {date} · {method} at the desk |
+| Paid for a drop-in | Paid for {class} | {amount} · {method} at the desk |
+| Classes added or adjusted | {k} classes added to {plan} | {reason} · {n} left |
+| Plan ended | {plan} ended | {unused} class(es) unused |
+| Joined | Joined the studio | |
+
+Staff surfaces append " · recorded by {name}" on desk payments; member surfaces do not. Rows stay links as built (member to the class page, staff to the roster or the payment panel). No em dashes.
+
 ---
 
 ## 84 — Password reset (2026-10-27)

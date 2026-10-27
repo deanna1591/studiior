@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
-import { moneyLine } from "@/lib/statement";
-import { dayMonthParts, fmtTime, type TimeFormat } from "@/lib/time";
+import { rowLine, statementTitle } from "@/lib/statement";
+import { dayMonthParts, type TimeFormat } from "@/lib/time";
 
 /** A member_activity row carried through from the profile page. */
 type Ev = {
@@ -20,6 +20,14 @@ type Ev = {
   plan_name: string | null;
   due_cents: number | null;
   is_free_first: boolean | null;
+  occurrence_start: string | null;
+  instructor_first: string | null;
+  credits_left_after: number | null;
+  payment_method: string | null;
+  recorded_by_name: string | null;
+  plan_classes: number | null;
+  plan_valid_to: string | null;
+  unused_credits: number | null;
 };
 
 /**
@@ -36,8 +44,9 @@ type Ev = {
  * Decision 83: the row is a LINK (never a button — nothing acts from the
  * journey). A class row opens that class's roster, scrolled to this member;
  * a money row jumps to the membership (or, for a manager, the payments) panel
- * on this same page. The second line is moneyLine — the same plain-words line
- * the member sees in /history — and a running balance rides the credit rows.
+ * on this same page. The title (statementTitle) and the second line (rowLine)
+ * are the same shared helper the member sees in /history, with forStaff so a
+ * desk payment also names who recorded it; a running balance rides credit rows.
  */
 const DOT: Record<string, string> = {
   joined: "var(--lime-text)",
@@ -96,7 +105,9 @@ export function TimelineList({ events, timeZone, timeFormat = "24h", memberId, m
             {g.items.map((e) => {
               const { day, month } = dayMonthParts(e.at, timeZone);
               const cd = e.credit_delta ?? 0;
-              const second = moneyLine(e, money);
+              // The left column already carries the event date, so rowLine owns
+              // the second line alone (forStaff: desk payments name the recorder).
+              const second = rowLine(e, money, { tz: timeZone, timeFormat }, true);
               const to = href(e);
               const body = (
                 <>
@@ -110,12 +121,7 @@ export function TimelineList({ events, timeZone, timeFormat = "24h", memberId, m
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] leading-[18px] text-ink">
-                      {e.title}
-                      {e.kind === "attended" && (
-                        <span className="ml-1.5 num text-[11px] text-ink-3">
-                          {fmtTime(e.at, timeZone, timeFormat)}
-                        </span>
-                      )}
+                      {statementTitle(e)}
                     </span>
                     {second && (
                       <span className="block text-[11px] leading-4 text-ink-3">{second}</span>

@@ -130,7 +130,11 @@ export default async function MemberDetail({
     credit_delta: number | null; balance_after: number | null;
     amount_cents: number | null; currency: string | null;
     occurrence_id: string | null; booking_id: string | null; membership_id: string | null;
-    plan_name: string | null; due_cents: number | null; is_free_first: boolean | null };
+    plan_name: string | null; due_cents: number | null; is_free_first: boolean | null;
+    occurrence_start: string | null; instructor_first: string | null;
+    credits_left_after: number | null; payment_method: string | null;
+    recorded_by_name: string | null; plan_classes: number | null;
+    plan_valid_to: string | null; unused_credits: number | null };
   const journey = ((activity ?? []) as Act[])
     .filter((e) => manager || !MONEY_KINDS.has(e.kind))
     .map((e, i) => ({

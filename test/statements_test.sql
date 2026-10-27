@@ -212,6 +212,34 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, source, p
 insert into occurrence_events (studio_id, occurrence_id, kind, at) values
   ('57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ece01','moved', now()-interval '9 days'+interval '1 hour');
 
+-- ---- Decision 83 (a): e0a03 for a no-show-from-a-plan, a desk purchase (method +
+-- recorder + classes + valid-to), and a plan that ended. Separate member, so the
+-- e0a01/e0a02 counts above are untouched. The owner gets a recorder full name.
+update profiles set full_name = 'Olive Owner' where id = '57a70000-0000-0000-0000-0000000f1001';
+insert into auth.users (id) values ('57a70000-0000-0000-0000-0000000e0b03');
+insert into profiles (id, email) values ('57a70000-0000-0000-0000-0000000e0b03','57a7-m3u@t');
+insert into members (id, studio_id, first_name, last_name, email, status, user_id, joined_on) values
+  ('57a70000-0000-0000-0000-0000000e0a03','57a70000-0000-0000-0000-00000000a001','Max','Three','57a7-m3@t','active','57a70000-0000-0000-0000-0000000e0b03', current_date-40);
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits, validity_days) values
+  ('57a70000-0000-0000-0000-0000000f0a03','57a70000-0000-0000-0000-00000000a001','5-Pack','class_pack',250000,'CZK',5,90);
+-- A cancelled membership (ended, NOT refunded) with a 2-credit forfeit at the end.
+insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on, expires_on, credits_remaining, cancelled_at) values
+  ('57a70000-0000-0000-0000-0000000a5003','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a03','57a70000-0000-0000-0000-0000000f0a03','cancelled',250000,'CZK',current_date-20, current_date+30, 0, now()-interval '2 days');
+insert into payments (id, studio_id, member_id, membership_id, amount_cents, currency, status, provider, method, recorded_by, description, paid_at, created_at) values
+  ('57a70000-0000-0000-0000-0000000fa003','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a03','57a70000-0000-0000-0000-0000000a5003',250000,'CZK','succeeded','manual','cash','57a70000-0000-0000-0000-0000000f1001','5-Pack', now()-interval '20 days', now()-interval '20 days');
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, instructor_id, status) values
+  ('57a70000-0000-0000-0000-0000000ec014','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10, now()-interval '17 days', now()-interval '17 days'+interval '50 min','57a70000-0000-0000-0000-0000000d0a01','scheduled');
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, membership_id, booked_at, no_show_at) values
+  ('57a70000-0000-0000-0000-000000bb0014','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ec014','57a70000-0000-0000-0000-0000000e0a03','no_show','member','class_pack','57a70000-0000-0000-0000-0000000a5003', now()-interval '18 days', now()-interval '17 days');
+-- +5 purchase (bal 5), -1 the no-show's consume (bal 4), -2 the end forfeit (bal 2).
+insert into credit_ledger (id, studio_id, member_id, membership_id, delta, reason, balance_after, created_at) values
+  ('57a70000-0000-0000-0000-0000000ed010','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a03','57a70000-0000-0000-0000-0000000a5003', 5,'purchase',5, now()-interval '20 days');
+insert into credit_ledger (id, studio_id, member_id, membership_id, delta, reason, booking_id, balance_after, created_at) values
+  ('57a70000-0000-0000-0000-0000000ed012','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a03','57a70000-0000-0000-0000-0000000a5003',-1,'booking','57a70000-0000-0000-0000-000000bb0014',4, now()-interval '18 days');
+update bookings set credit_entry_id='57a70000-0000-0000-0000-0000000ed012' where id='57a70000-0000-0000-0000-000000bb0014';
+insert into credit_ledger (id, studio_id, member_id, membership_id, delta, reason, balance_after, created_at) values
+  ('57a70000-0000-0000-0000-0000000ed011','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000e0a03','57a70000-0000-0000-0000-0000000a5003',-2,'manual',2, now()-interval '2 days');
+
 set role authenticated;
 select set_config('request.jwt.claim.sub','57a70000-0000-0000-0000-0000000e0b01',false);
 
@@ -281,6 +309,77 @@ select expect_text('83 stmt: a free first class has no plan name',
 -- (d) the moved occurrence still produces its row.
 select expect_num('83 stmt: a moved occurrence row is present',
   (select count(*) from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where kind='rescheduled'), 1);
+reset role;
+
+-- =============================================================================
+-- C3. Decision 83 (a) — occurrence_start, instructor_first, credits_left_after,
+--     payment_method, recorded_by_name, plan_classes, plan_valid_to,
+--     unused_credits, across the row kinds (read as the owner).
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','57a70000-0000-0000-0000-0000000f1001',false);
+
+-- Booked from a plan: the class instant is carried for the "{Day} {date}, {time}" line.
+select expect_text('83a: a booked row carries the class start',
+  (select case when occurrence_start is not null then 'yes' else 'no' end from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb011' and kind='booked'), 'yes');
+
+-- Cancelled in time: names the plan it returned to, and the balance after the return (9).
+select expect_text('83a: a timely cancellation names the plan it returned to',
+  (select plan_name from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb012' and kind='cancelled'), '10-Pack');
+select expect_num('83a: a timely cancellation shows credits after the return',
+  (select credits_left_after from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb012' and kind='cancelled'), 9);
+
+-- Cancelled late: a class used from the plan, balance after (8).
+select expect_num('83a: a late cancellation shows credits used (8 left)',
+  (select credits_left_after from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb013' and kind='late_cancelled'), 8);
+
+-- Online purchase (no method, no recorder): plan_classes carried, recorder null.
+select expect_text('83a: an online purchase has no desk method',
+  (select coalesce(payment_method,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where kind='purchase'), '<null>');
+select expect_text('83a: an online purchase has no recorder name',
+  (select coalesce(recorded_by_name,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where kind='purchase'), '<null>');
+select expect_num('83a: a purchase carries the plan class count (10)',
+  (select plan_classes from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where kind='purchase'), 10);
+
+-- Free first: no plan credit touched.
+select expect_text('83a: a free first class shows no plan credit',
+  (select coalesce(credits_left_after::text,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbf001' and kind='free_first'), '<null>');
+
+-- An active membership never produces a plan_ended row.
+select expect_num('83a: an active membership has no plan_ended row',
+  (select count(*) from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where kind='plan_ended'), 0);
+
+-- No-show from a plan: names the plan, the balance at the no-show (4), the instructor.
+select expect_text('83a: a no-show from a plan names the plan',
+  (select plan_name from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bb0014' and kind='no_show'), '5-Pack');
+select expect_num('83a: a no-show from a plan shows the credits left (4)',
+  (select credits_left_after from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bb0014' and kind='no_show'), 4);
+select expect_text('83a: a no-show carries the instructor first name',
+  (select instructor_first from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bb0014' and kind='no_show'), 'Ira');
+
+-- No-show on an unpaid drop-in (b0001, section B): nothing owed, no plan, no credit.
+select expect_text('83a: an unpaid drop-in no-show has no plan',
+  (select coalesce(plan_name,'<null>') from member_activity('57a70000-0000-0000-0000-0000000b0001','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb201' and kind='no_show'), '<null>');
+select expect_text('83a: an unpaid drop-in no-show shows no credits left',
+  (select coalesce(credits_left_after::text,'<null>') from member_activity('57a70000-0000-0000-0000-0000000b0001','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-0000000bb201' and kind='no_show'), '<null>');
+
+-- Desk purchase: method, recorder name, plan class count, valid-to date.
+select expect_text('83a: a desk purchase shows the method',
+  (select payment_method from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='purchase' and membership_id='57a70000-0000-0000-0000-0000000a5003'), 'cash');
+select expect_text('83a: a desk purchase carries the recorder name',
+  (select recorded_by_name from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='purchase' and membership_id='57a70000-0000-0000-0000-0000000a5003'), 'Olive Owner');
+select expect_num('83a: a desk purchase carries the plan class count (5)',
+  (select plan_classes from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='purchase' and membership_id='57a70000-0000-0000-0000-0000000a5003'), 5);
+select expect_text('83a: a desk purchase carries the valid-to date',
+  (select plan_valid_to::text from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='purchase' and membership_id='57a70000-0000-0000-0000-0000000a5003'), (current_date+30)::text);
+
+-- Plan ended (not a refund): one row, names the plan, counts the forfeited classes.
+select expect_num('83a: an ended plan produces one plan_ended row',
+  (select count(*) from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='plan_ended'), 1);
+select expect_text('83a: the ended plan names the plan',
+  (select plan_name from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='plan_ended'), '5-Pack');
+select expect_num('83a: the ended plan shows classes unused (2)',
+  (select unused_credits from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='plan_ended'), 2);
 reset role;
 
 -- =============================================================================

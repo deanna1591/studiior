@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
-import { filterStatement, groupByMonth, moneyLine, type StatementRow } from "@/lib/statement";
+import { filterStatement, groupByMonth, rowLine, statementTitle, type StatementRow } from "@/lib/statement";
 import type { TimeFormat } from "@/lib/time";
 
 /**
@@ -63,14 +63,18 @@ export default function Statement({ rows, timeZone, timeFormat, currency }:
                 {g.items.map((r, i) => {
                   const cd = r.credit_delta ?? 0;
                   const to = href(r);
-                  const second = moneyLine(r, money);
+                  // rowLine owns the second line. A class row already carries its
+                  // own "{Day} {date}, {time}"; a money/credit row does not, so
+                  // lead with the row's own day there (never both).
+                  const line = rowLine(r, money, { tz: timeZone, timeFormat }, false);
+                  const second = [r.occurrence_start ? null : dayLabel(r.at), line]
+                    .filter(Boolean).join(" · ") || null;
                   const body = (
                     <>
                       <span className="min-w-0 flex-1">
-                        <span className="m-body block truncate text-ink">{r.title}</span>
+                        <span className="m-body block truncate text-ink">{statementTitle(r)}</span>
                         <span className="m-micro block text-ink-3">
-                          {dayLabel(r.at)}
-                          {second && <> · {second}</>}
+                          {second}
                         </span>
                       </span>
                       <span className="shrink-0 pl-2 text-right">

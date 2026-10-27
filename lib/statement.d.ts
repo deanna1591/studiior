@@ -13,9 +13,19 @@ export interface StatementRow {
   plan_name?: string | null;
   due_cents?: number | null;
   is_free_first?: boolean | null;
+  occurrence_start?: string | null;
+  instructor_first?: string | null;
+  credits_left_after?: number | null;
+  payment_method?: string | null;
+  recorded_by_name?: string | null;
+  plan_classes?: number | null;
+  plan_valid_to?: string | null;
+  unused_credits?: number | null;
 }
+export type TzArg = string | { tz: string; timeFormat?: "12h" | "24h" };
 export function isMoneyRow(r: Pick<StatementRow, "credit_delta" | "amount_cents">): boolean;
-export function moneyLine(row: StatementRow, money?: (cents: number) => string): string | null;
+export function statementTitle(row: StatementRow): string;
+export function rowLine(row: StatementRow, money?: (cents: number) => string, tz?: TzArg, forStaff?: boolean): string | null;
 export function filterStatement<T extends StatementRow>(rows: T[], which: "all" | "classes" | "credits"): T[];
 export function groupByMonth<T extends StatementRow>(rows: T[], monthLabel: (at: string) => string): { label: string; items: T[] }[];
 export function withRunningBalance<T extends StatementRow>(rowsNewestFirst: T[]): T[];

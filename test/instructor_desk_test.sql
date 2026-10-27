@@ -8,9 +8,15 @@
 -- scoped by instructor_scope(), is_desk_up NOT widened, every desk payment
 -- attributed to them. Cases (a)-(i) from the decision.
 --
--- "Today" is derived from now() in the studio timezone; the one fragility is a
--- run within ~45 min of UTC midnight (the class is now()+45min). Acceptable,
--- like the other date-relative suites.
+-- "Today" is derived from now() in the studio timezone (UTC here). The today
+-- occurrences are PINNED to fixed morning wall-clock times on today's date via
+-- date_trunc('day', now()) + an hour offset, NOT now()+N min — the same room
+-- AND instructor (occ_*_no_overlap) force a >=50-min stagger, so a relative base
+-- spanning 3.5h straddled UTC midnight and dropped a same-day class to tomorrow
+-- (the (e) "booked elsewhere today" / (e2) "class is full" assertions). Pinning
+-- the base removes the straddle with no room or ordering change: scope needs
+-- only same-day, the check-in window is off, and (d)'s alternatives always keep
+-- tomorrow's c0c7. A past-but-today class is fine (no future gate on the walk-in).
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -72,14 +78,15 @@ insert into membership_plans (id, studio_id, name, type, price_cents, currency, 
   ('81de81de-0000-0000-0000-00000000a05e','81de81de-0000-0000-0000-000000000001','10-Class Pack','class_pack',900000,'PHP',10,120,'public','active'),
   ('81de81de-0000-0000-0000-00000000a0ff','81de81de-0000-0000-0000-000000000001','Staff Comp','class_pack',0,'PHP',10,120,'staff_only','active');
 
--- Occurrences, all TODAY (now()+45min) except the tomorrow one.
+-- Occurrences, all TODAY at fixed morning wall times (date_trunc('day',now())
+-- + an hour offset) except the tomorrow one — see the header note on pinning.
 insert into class_occurrences (id, studio_id, location_id, series_id, class_type_id, room_id, instructor_id, starts_at, ends_at, capacity, status, staffing, name) values
-  ('81de81de-0000-0000-0000-0000000000c1','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', now()+interval '45 min', now()+interval '95 min', 6, 'scheduled','assigned','Reformer'),
-  ('81de81de-0000-0000-0000-0000000000c2','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', now()+interval '210 min', now()+interval '260 min', 5, 'scheduled','assigned','Reformer'),
-  ('81de81de-0000-0000-0000-00000000c0fc','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', now()+interval '100 min', now()+interval '150 min', 1, 'scheduled','assigned','Reformer'),
-  ('81de81de-0000-0000-0000-00000000c0c6','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', now()+interval '155 min', now()+interval '205 min', 3, 'scheduled','assigned','Reformer'),
-  ('81de81de-0000-0000-0000-00000000c0c7','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', now()+interval '1 day', now()+interval '1 day 50 min', 3, 'scheduled','assigned','Reformer'),
-  ('81de81de-0000-0000-0000-00000000c0c8','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0002','81de81de-0000-0000-0000-0000000d0002', now()+interval '45 min', now()+interval '95 min', 3, 'scheduled','assigned','Reformer');
+  ('81de81de-0000-0000-0000-0000000000c1','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', date_trunc('day',now())+interval '8 h', date_trunc('day',now())+interval '8 h 50 min', 6, 'scheduled','assigned','Reformer'),
+  ('81de81de-0000-0000-0000-0000000000c2','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', date_trunc('day',now())+interval '11 h', date_trunc('day',now())+interval '11 h 50 min', 5, 'scheduled','assigned','Reformer'),
+  ('81de81de-0000-0000-0000-00000000c0fc','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', date_trunc('day',now())+interval '9 h', date_trunc('day',now())+interval '9 h 50 min', 1, 'scheduled','assigned','Reformer'),
+  ('81de81de-0000-0000-0000-00000000c0c6','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', date_trunc('day',now())+interval '10 h', date_trunc('day',now())+interval '10 h 50 min', 3, 'scheduled','assigned','Reformer'),
+  ('81de81de-0000-0000-0000-00000000c0c7','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0001','81de81de-0000-0000-0000-0000000d0001', date_trunc('day',now())+interval '1 day 8 h', date_trunc('day',now())+interval '1 day 8 h 50 min', 3, 'scheduled','assigned','Reformer'),
+  ('81de81de-0000-0000-0000-00000000c0c8','81de81de-0000-0000-0000-000000000001','81de81de-0000-0000-0000-00000000000a',null,'81de81de-0000-0000-0000-00000000cc01','81de81de-0000-0000-0000-0000000b0002','81de81de-0000-0000-0000-0000000d0002', date_trunc('day',now())+interval '8 h', date_trunc('day',now())+interval '8 h 50 min', 3, 'scheduled','assigned','Reformer');
 
 -- Members: a pack holder, a plain one, one booked elsewhere today, one for the
 -- full class. All existing members have a signed waiver so their check-in is not
