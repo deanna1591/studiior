@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { objectPathFromPublicUrl } from "@/lib/storage";
 
 export type AnnFormState = { error: string } | null;
 export type CoverState = { ok: boolean; message: string } | null;
@@ -17,9 +18,10 @@ async function storeCover(id: string, studioId: string, file: File): Promise<Cov
   if (file.size > 2_000_000) return { ok: false, message: "That photo is over 2 MB. Export it around 1600px wide." };
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return { ok: false, message: "JPEG, PNG or WebP." };
   const supabase = createClient();
+  const { data: prev } = await supabase.from("announcements").select("image_url").eq("id", id).maybeSingle();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${studioId}/announcement-${id}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from("studio-branding").upload(path, file, { cacheControl: "3600", upsert: false });
+  const { error } = await supabase.storage.from("studio-branding").upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (error) return /row-level security|Unauthorized/i.test(error.message)
     ? { ok: false, message: "Only owners and managers can change the photo." } : { ok: false, message: error.message };
   const { data: pub } = supabase.storage.from("studio-branding").getPublicUrl(path);
@@ -27,6 +29,8 @@ async function storeCover(id: string, studioId: string, file: File): Promise<Cov
     .update({ image_url: pub.publicUrl, image_focus_x: 50, image_focus_y: 50 }).eq("id", id).select("id");
   if (upErr) return { ok: false, message: upErr.message };
   if (!rows?.length) return { ok: false, message: "The photo uploaded but the announcement could not be updated." };
+  const old = objectPathFromPublicUrl(prev?.image_url, "studio-branding");
+  if (old && old !== path) await supabase.storage.from("studio-branding").remove([old]);
   return { ok: true, message: "Photo updated. Set the focal point below so it crops well on a phone." };
 }
 

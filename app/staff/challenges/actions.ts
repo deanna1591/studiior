@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { objectPathFromPublicUrl } from "@/lib/storage";
 
 export type ChallengeFormState = { error: string } | null;
 export type CoverState = { ok: boolean; message: string } | null;
@@ -23,10 +24,11 @@ async function storeCover(challengeId: string, studioId: string, file: File): Pr
     return { ok: false, message: "JPEG, PNG or WebP." };
   }
   const supabase = createClient();
+  const { data: prev } = await supabase.from("challenges").select("cover_image_url").eq("id", challengeId).maybeSingle();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${studioId}/challenge-${challengeId}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage.from("studio-branding")
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+    .upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (error) {
     return /row-level security|Unauthorized/i.test(error.message)
       ? { ok: false, message: "Only owners and managers can change the cover." }
@@ -38,6 +40,8 @@ async function storeCover(challengeId: string, studioId: string, file: File): Pr
     .eq("id", challengeId).select("id");
   if (upErr) return { ok: false, message: upErr.message };
   if (!rows?.length) return { ok: false, message: "The photo uploaded but the challenge could not be updated." };
+  const old = objectPathFromPublicUrl(prev?.cover_image_url, "studio-branding");
+  if (old && old !== path) await supabase.storage.from("studio-branding").remove([old]);
   return { ok: true, message: "Cover updated. Set the focal point below so it crops well on a phone." };
 }
 

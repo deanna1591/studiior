@@ -127,7 +127,7 @@ export async function uploadProductPhoto(productId: string, fd: FormData): Promi
 
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${ctx.studioId}/${productId}/${Date.now()}.${ext}`;
-  const up = await supabase.storage.from(BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+  const up = await supabase.storage.from(BUCKET).upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (up.error) {
     return /row-level security|Unauthorized|denied/i.test(up.error.message)
       ? { ok: false, message: "You cannot set this product's photo." }

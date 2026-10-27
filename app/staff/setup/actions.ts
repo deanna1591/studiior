@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { objectPathFromPublicUrl } from "@/lib/storage";
 
 export type SetupState = { error: string } | null;
 
@@ -84,11 +85,12 @@ export async function uploadClassTypeImage(_prev: SetupState, fd: FormData): Pro
   }
 
   const supabase = createClient();
+  const { data: prev } = await supabase.from("class_types").select("image_url").eq("id", id).maybeSingle();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${ctx.studioId}/class-types/${id}-${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
-    .from("studio-branding").upload(path, file, { cacheControl: "3600", upsert: false });
+    .from("studio-branding").upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (error) {
     return /row-level security|Unauthorized/i.test(error.message)
       ? refusal("class types")
@@ -100,6 +102,10 @@ export async function uploadClassTypeImage(_prev: SetupState, fd: FormData): Pro
     .from("class_types").update({ image_url: pub.publicUrl }).eq("id", id).select("id");
   if (upErr) return { error: upErr.message };
   if (!data?.length) return refusal("class types");
+
+  // Best-effort: drop the previous photo if it was ours, so re-uploads do not orphan.
+  const old = objectPathFromPublicUrl(prev?.image_url, "studio-branding");
+  if (old && old !== path) await supabase.storage.from("studio-branding").remove([old]);
 
   revalidatePath("/class-types");
   revalidatePath(`/class-types/${id}`);

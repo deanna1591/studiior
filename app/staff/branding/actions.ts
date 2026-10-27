@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
 import { isHex, PRESET_KEYS, type PresetKey } from "@/lib/theme";
+import { objectPathFromPublicUrl } from "@/lib/storage";
+
+// Egress (CLAUDE.md): a branding image is immutable by filename (every upload
+// stamps a timestamp into the path, so a replaced image is a NEW url), so it is
+// safe to serve for a year. "3600" (1 hour) made the CDN re-fetch hourly.
+const IMMUTABLE_YEAR = "31536000, immutable";
 
 export type BrandingState = { ok: boolean; message: string } | null;
 
@@ -109,6 +115,8 @@ export async function uploadLogo(_prev: BrandingState, fd: FormData): Promise<Br
   }
 
   const supabase = createClient();
+  // The old object, so a replace does not leave an orphan in the bucket.
+  const { data: prev } = await supabase.from("studios").select("logo_url").eq("id", ctx.studioId).maybeSingle();
   // The studio id is the first path segment, which is what the storage policy
   // checks — a session cannot write into another studio's folder.
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
@@ -116,7 +124,7 @@ export async function uploadLogo(_prev: BrandingState, fd: FormData): Promise<Br
 
   const { error } = await supabase.storage
     .from("studio-branding")
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+    .upload(path, file, { cacheControl: IMMUTABLE_YEAR, upsert: false });
   if (error) {
     return /row-level security|Unauthorized/i.test(error.message)
       ? { ok: false, message: "Only the studio owner can change the logo." }
@@ -130,6 +138,10 @@ export async function uploadLogo(_prev: BrandingState, fd: FormData): Promise<Br
   if (!rows || rows.length === 0) {
     return { ok: false, message: "The image uploaded but the studio record could not be updated." };
   }
+
+  // Best-effort: drop the previous logo if it was ours. Never blocks the new one.
+  const old = objectPathFromPublicUrl(prev?.logo_url, "studio-branding");
+  if (old && old !== path) await supabase.storage.from("studio-branding").remove([old]);
 
   revalidatePath("/branding");
   return { ok: true, message: "Logo updated." };
@@ -171,12 +183,13 @@ export async function uploadLoginImage(_prev: BrandingState, fd: FormData): Prom
   }
 
   const supabase = createClient();
+  const { data: prev } = await supabase.from("studios").select("login_image_url").eq("id", ctx.studioId).maybeSingle();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${ctx.studioId}/login-${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from("studio-branding")
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+    .upload(path, file, { cacheControl: IMMUTABLE_YEAR, upsert: false });
   if (error) {
     return /row-level security|Unauthorized/i.test(error.message)
       ? { ok: false, message: "Only the studio owner can change the login photo." }
@@ -190,6 +203,9 @@ export async function uploadLoginImage(_prev: BrandingState, fd: FormData): Prom
   if (!rows || rows.length === 0) {
     return { ok: false, message: "The photo uploaded but the studio record could not be updated." };
   }
+
+  const old = objectPathFromPublicUrl(prev?.login_image_url, "studio-branding");
+  if (old && old !== path) await supabase.storage.from("studio-branding").remove([old]);
 
   revalidatePath("/branding");
   return { ok: true, message: "Login photo updated. Members see it before they sign in." };

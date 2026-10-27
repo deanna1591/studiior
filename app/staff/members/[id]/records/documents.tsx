@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice } from "@/components/ui";
 import { uploadDocument, deleteDocument, uploadMemberPhoto, type RecordState } from "./actions";
+import ShrinkImageInput from "@/components/shrink-image-input";
 
 export type Doc = {
   id: string; kind: string; filename: string; storage_path: string;
@@ -176,9 +177,8 @@ export function PhotoUpload({ memberId, name, url }: {
         <label className="inline-flex cursor-pointer items-center rounded-lg px-3 py-1.5 text-[12.5px] font-medium"
                style={{ background: "var(--paper)", color: "var(--ink-2)" }}>
           {url ? "Replace photo" : "Add a photo"}
-          <input type="file" name="photo" accept="image/png,image/jpeg,image/webp"
-                 className="sr-only"
-                 onChange={(e) => e.currentTarget.form?.requestSubmit()} />
+          <ShrinkImageInput name="photo" accept="image/png,image/jpeg,image/webp"
+                 maxPx={512} mode="square" autoSubmit className="sr-only" />
         </label>
         {state && <Notice kind={state.ok ? "ok" : "error"}>{state.message}</Notice>}
       </form>

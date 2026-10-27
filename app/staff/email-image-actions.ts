@@ -28,7 +28,7 @@ export async function uploadEmailImage(fd: FormData): Promise<EmailImageResult> 
   const path = `${ctx.studioId}/email-${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from("studio-branding")
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+    .upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (error) {
     return /row-level security|Unauthorized/i.test(error.message)
       ? { error: "Your role cannot upload images." }

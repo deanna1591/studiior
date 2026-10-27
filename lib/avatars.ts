@@ -12,12 +12,15 @@ type Client = SupabaseClient<Database>;
  * not a URL, and every render signs it. Instructor avatars are ordinary public
  * URLs and do not come through here; the studio publishes those deliberately.
  *
- * An hour is long enough for a page and short enough that a URL pasted into a
- * chat stops working. A failure returns null and the caller falls back to
+ * 24 hours (egress, CLAUDE.md): a signed URL changes every TTL window, so a
+ * SHORT TTL defeats the CDN/browser cache and re-egresses the photo on every
+ * staff roster/profile render. A day is long enough that a normal day's viewing
+ * reuses one cached URL, and short enough that a URL pasted into a chat stops
+ * working by the next day. A failure returns null and the caller falls back to
  * initials, because a broken image is worse than no image.
  */
 const BUCKET = "member-avatars";
-const TTL_SECONDS = 3600;
+const TTL_SECONDS = 86400;
 
 export async function signAvatar(supabase: Client, path: string | null | undefined) {
   if (!path) return null;

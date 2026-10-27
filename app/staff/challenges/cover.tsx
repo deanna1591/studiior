@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonQuietClass } from "@/components/ui";
 import FocalPicker from "@/components/focal-picker";
 import { uploadChallengeCover, saveChallengeCoverFocus, type CoverState } from "./actions";
+import ShrinkImageInput from "@/components/shrink-image-input";
 
 function Btn({ children }: { children: React.ReactNode }) {
   const { pending } = useFormStatus();
@@ -46,7 +47,7 @@ export default function ChallengeCover({ challengeId, coverUrl, focusX, focusY }
         <label className="block text-[12px] font-semibold text-ink-2 mb-1">
           {coverUrl ? "Replace the cover" : "Add a cover photo"}
         </label>
-        <input name="cover" type="file" accept="image/png,image/jpeg,image/webp"
+        <ShrinkImageInput name="cover" accept="image/png,image/jpeg,image/webp" maxPx={1280} mode="fit"
                className="block w-full text-[13px] text-ink-2 file:mr-3 file:rounded-full file:border-0 file:bg-paper file:px-3 file:py-1.5 file:text-[13px]" />
         <div className="mt-3"><Btn>Upload</Btn></div>
         <p className="mt-1 text-[11px] text-ink-3">

@@ -687,7 +687,7 @@ export async function uploadAvatar(
 
   const { error } = await supabase.storage
     .from("member-avatars")
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+    .upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (error) {
     return /row-level security|Unauthorized/i.test(error.message)
       ? { ok: false, message: "That photo could not be saved to your account." }

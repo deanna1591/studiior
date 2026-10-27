@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import FocalPicker from "@/components/focal-picker";
 import { uploadAnnouncementCover, saveAnnouncementCoverFocus, type CoverState } from "./actions";
 import { Notice } from "@/components/ui";
+import ShrinkImageInput from "@/components/shrink-image-input";
 
 function Btn({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -31,7 +32,7 @@ export default function AnnouncementCover({ id, imageUrl, focusX, focusY }: {
       )}
       <form action={upAction}>
         <input type="hidden" name="announcement_id" value={id} />
-        <input name="cover" type="file" accept="image/png,image/jpeg,image/webp"
+        <ShrinkImageInput name="cover" accept="image/png,image/jpeg,image/webp" maxPx={1280} mode="fit"
                className="mb-2 block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-surface" />
         <Btn label={imageUrl ? "Replace photo" : "Upload a photo"} />
       </form>

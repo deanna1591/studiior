@@ -6,6 +6,7 @@ import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
 import { saveClassType, uploadClassTypeImage, saveClassTypeFocus, type SetupState } from "../setup/actions";
 import FocalPicker from "@/components/focal-picker";
 import { PHONE_HERO } from "@/lib/focal";
+import ShrinkImageInput from "@/components/shrink-image-input";
 
 export type ClassTypeDraft = {
   id?: string; name: string; description: string | null; duration_minutes: number;
@@ -90,7 +91,7 @@ export default function ClassTypeForm({ draft, mode }: { draft: ClassTypeDraft; 
             No photo yet. Members see a card with no picture on it.
           </p>
         )}
-        <input name="image" type="file" accept="image/png,image/jpeg,image/webp"
+        <ShrinkImageInput name="image" accept="image/png,image/jpeg,image/webp" maxPx={800} mode="fit"
                className="block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-paper" />
         <p className="text-[12px] leading-4 text-ink-3">
           Shown on the member&rsquo;s class list and detail screen. Landscape, under 2 MB.

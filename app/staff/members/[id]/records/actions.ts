@@ -181,7 +181,7 @@ export async function uploadMemberPhoto(_prev: RecordState, fd: FormData): Promi
   const supabase = createClient();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `${memberId}/avatar-${Date.now()}.${ext}`;
-  const up = await supabase.storage.from("member-avatars").upload(path, file, { upsert: false });
+  const up = await supabase.storage.from("member-avatars").upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (up.error) return { ok: false, message: say(up.error.message) };
 
   const { data, error } = await supabase.from("members")

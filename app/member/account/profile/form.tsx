@@ -5,6 +5,7 @@ import { updateProfile, uploadAvatar } from "../../actions";
 import Avatar from "@/components/member/avatar";
 import IconChip from "@/components/member/icon-chip";
 import { Note } from "@/components/member/ui";
+import ShrinkImageInput from "@/components/shrink-image-input";
 
 function Save({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -54,7 +55,7 @@ export default function ProfileForm({
           {photoState && <Note ok={photoState.ok}>{photoState.message}</Note>}
           <label className="block">
             <span className="sr-only">Choose a photo</span>
-            <input name="avatar" type="file" accept="image/png,image/jpeg,image/webp"
+            <ShrinkImageInput name="avatar" accept="image/png,image/jpeg,image/webp" maxPx={512} mode="square"
                    className="block w-full text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-ink file:px-3 file:py-2 file:text-[13px] file:text-surface" />
           </label>
           <p className="m-meta mt-1.5 text-ink-3">

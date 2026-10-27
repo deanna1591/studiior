@@ -44,7 +44,7 @@ export async function uploadMyPhoto(fd: FormData): Promise<PhotoResult> {
 
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${who.studioId}/${who.instructorId}/${Date.now()}.${ext}`;
-  const up = await supabase.storage.from(BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+  const up = await supabase.storage.from(BUCKET).upload(path, file, { cacheControl: "31536000, immutable", upsert: false });
   if (up.error) {
     return /row-level security|Unauthorized|denied/i.test(up.error.message)
       ? { ok: false, message: "That photo could not be saved." }

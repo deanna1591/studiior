@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { renderBody } from "@/lib/email-body";
+import { shrinkImage } from "@/lib/image-shrink";
 import { uploadEmailImage, emailFrameChrome, resolveEmailCard, type EmailFrameChrome, type ResolvedCard } from "@/app/staff/email-image-actions";
 
 /**
@@ -78,8 +79,12 @@ export default function EmailComposer({
     setImgErr(null);
     if (!file) return;
     setUploading(true);
+    // Egress (CLAUDE.md): an inline email image is served to every recipient
+    // who loads images, so shrink it to ≤1280px before upload. An SVG passes
+    // through untouched; a decode failure leaves the original.
+    const small = await shrinkImage(file, { maxPx: 1280, mode: "fit" });
     const fd = new FormData();
-    fd.set("image", file);
+    fd.set("image", small);
     const res = await uploadEmailImage(fd);
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";

@@ -9,6 +9,7 @@ import { loginTagline as taglineText, installWelcome as welcomeText } from "@/li
 import { Notice, buttonClass, inputClass } from "@/components/ui";
 import { saveBranding, uploadLogo, uploadLoginImage, saveLoginFocus, type BrandingState } from "./actions";
 import Preview from "./preview";
+import ShrinkImageInput from "@/components/shrink-image-input";
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -243,7 +244,8 @@ export default function BrandingForm({
             <img src={logoUrl} alt="Current logo"
                  className="h-12 w-12 rounded border border-line object-cover" />
           )}
-          <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          <ShrinkImageInput name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                 maxPx={512} mode="fit" keepAlpha
                  className="block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-paper" />
           <p className="text-[12px] leading-4 text-ink-3">
             Square works best — it sits at 28px in the app header. Under 2 MB.
@@ -288,7 +290,8 @@ export default function BrandingForm({
               No photo yet, so members see your accent as a full-screen colour instead.
             </p>
           )}
-          <input name="login_image" type="file" accept="image/png,image/jpeg,image/webp"
+          <ShrinkImageInput name="login_image" accept="image/png,image/jpeg,image/webp"
+                 maxPx={1280} mode="fit"
                  className="block w-full text-[13px] file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[13px] file:text-paper" />
           <p className="text-[12px] leading-4 text-ink-3">
             The whole sign-in screen, so a wide shot of the studio works better
