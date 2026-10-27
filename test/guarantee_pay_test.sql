@@ -1086,6 +1086,146 @@ select expect_num('...and queues NO core_committed (no login to reach)',
     where template_key='core_committed'
       and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fd')::bigint, 0);
 
+
+
+-- 18. DECISION 81b — AN UNPAID DROP-IN IS HELD, NOT COUNTED, UNTIL IT IS PAID
+-- An unpaid drop-in (payment_source='drop_in' with no succeeded/partially_refunded
+-- payment — the pay_first predicate) holds its seat for capacity but is excluded
+-- from the commitment count, the flex latch, and the start-of-class snapshot, so
+-- it never keeps a flex class alive and never adds to the instructor's pay until
+-- it is paid. A desk payment (81a) makes it count from that moment. The seat is
+-- kept until class time; an unpaid no-show owes nothing (Decision 73).
+-- A dedicated instructor (no login) + room, so nothing collides with the
+-- occurrences the earlier sections left for Cara Coach.
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+update studio_settings set flex_deadline_mode = 'hours_before', flex_deadline_hours = 168,
+       require_waiver = false
+ where studio_id = '9a179a17-0000-0000-0000-000000000001';
+
+insert into instructors (id, studio_id, staff_id, display_name) values
+ ('9a179a17-0000-0000-0000-0000810bd181','9a179a17-0000-0000-0000-000000000001', null, '81b Coach');
+insert into rooms (id, studio_id, location_id, name, capacity) values
+ ('9a179a17-0000-0000-0000-0000810bee8b','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-00000000000c','81b Room',6);
+select set_config('request.jwt.claim.sub','9a179a17-0000-0000-0000-0000000000a1',false);
+set role authenticated;
+select set_instructor_rate('9a179a17-0000-0000-0000-0000810bd181', current_date - 60,
+  80000, 7500, 2, 20000, 150000, 200000, 250000, 'senior');
+reset role;
+select set_config('request.jwt.claim.sub', null, false);
+
+insert into members (id, studio_id, first_name, last_name, email, status) values
+ ('9a179a17-0000-0000-0000-0000810b0001','9a179a17-0000-0000-0000-000000000001','Paid','One','gp-81b-p1@example.com','active'),
+ ('9a179a17-0000-0000-0000-0000810b0002','9a179a17-0000-0000-0000-000000000001','Paid','Two','gp-81b-p2@example.com','active'),
+ ('9a179a17-0000-0000-0000-0000810b0003','9a179a17-0000-0000-0000-000000000001','Unpaid','Drop','gp-81b-u@example.com','active');
+
+-- ---- (a) flex min 3, two PAID drop-ins + one UNPAID → not confirmed at cutoff,
+--         and the UNPAID third seat (booked through book_class, so booked_count
+--         reaches 3 and the latch trigger fires) does NOT latch the class. -------
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, room_id,
+                               instructor_id, capacity, starts_at, ends_at,
+                               flex, minimum_bookings, guarantee_tier, booked_count)
+values ('9a179a17-0000-0000-0000-0000810ba0a1','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        '81b A: unpaid at cutoff','9a179a17-0000-0000-0000-0000810bee8b','9a179a17-0000-0000-0000-0000810bd181',6,
+        now() + interval '2 hours', now() + interval '2 hours 50 min', true, 3, 'flex', 2);
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source) values
+ ('9a179a17-0000-0000-0000-0000810bb0a1','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0a1','9a179a17-0000-0000-0000-0000810b0001','booked','drop_in'),
+ ('9a179a17-0000-0000-0000-0000810bb0a2','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0a1','9a179a17-0000-0000-0000-0000810b0002','booked','drop_in');
+insert into payments (studio_id, member_id, booking_id, amount_cents, currency, status) values
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0001','9a179a17-0000-0000-0000-0000810bb0a1',15000,'CZK','succeeded'),
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0002','9a179a17-0000-0000-0000-0000810bb0a2',15000,'CZK','succeeded');
+-- The third seat: an UNPAID drop-in, booked the real way (booked_count 2 -> 3,
+-- the AFTER UPDATE OF booked_count latch trigger fires).
+select book_class('9a179a17-0000-0000-0000-0000810ba0a1','9a179a17-0000-0000-0000-0000810b0003','member');
+select expect_num('(a) book_class took booked_count to 3 (the unpaid seat occupies capacity)',
+  (select booked_count from class_occurrences where id='9a179a17-0000-0000-0000-0000810ba0a1')::bigint, 3);
+select expect_true('(a) the flex latch is NOT set by an unpaid drop-in (paid seats only)',
+  (select flex_reached_minimum_at is null from class_occurrences where id='9a179a17-0000-0000-0000-0000810ba0a1'));
+select expect_text('(a) 2 paid + 1 unpaid at the cutoff -> not confirmed',
+  (evaluate_commitment('9a179a17-0000-0000-0000-0000810ba0a1') ->> 'decision'), 'not_running');
+select expect_num('(a) booked_at_cutoff counts the two paid seats only',
+  (select booked_at_cutoff from class_occurrences where id='9a179a17-0000-0000-0000-0000810ba0a1')::bigint, 2);
+
+-- ---- (b) same, but the drop-in is PAID at the desk (81a) before the cutoff -> confirmed
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, room_id,
+                               instructor_id, capacity, starts_at, ends_at,
+                               flex, minimum_bookings, guarantee_tier, booked_count)
+values ('9a179a17-0000-0000-0000-0000810ba0b2','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        '81b B: paid at desk before cutoff','9a179a17-0000-0000-0000-0000810bee8b','9a179a17-0000-0000-0000-0000810bd181',6,
+        now() + interval '3 hours', now() + interval '3 hours 50 min', true, 3, 'flex', 2);
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source) values
+ ('9a179a17-0000-0000-0000-0000810bb0b1','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0b2','9a179a17-0000-0000-0000-0000810b0001','booked','drop_in'),
+ ('9a179a17-0000-0000-0000-0000810bb0b2','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0b2','9a179a17-0000-0000-0000-0000810b0002','booked','drop_in');
+insert into payments (studio_id, member_id, booking_id, amount_cents, currency, status) values
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0001','9a179a17-0000-0000-0000-0000810bb0b1',15000,'CZK','succeeded'),
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0002','9a179a17-0000-0000-0000-0000810bb0b2',15000,'CZK','succeeded');
+select book_class('9a179a17-0000-0000-0000-0000810ba0b2','9a179a17-0000-0000-0000-0000810b0003','member');
+select expect_true('(b) record_desk_dropin_paid settles the drop-in',
+  ((record_desk_dropin_paid(
+      (select id from bookings where occurrence_id='9a179a17-0000-0000-0000-0000810ba0b2' and member_id='9a179a17-0000-0000-0000-0000810b0003'),
+      'cash', 15000, '81b-b')) ->> 'ok')::boolean);
+select expect_text('(b) after the desk payment, the cutoff confirms the class',
+  (evaluate_commitment('9a179a17-0000-0000-0000-0000810ba0b2') ->> 'decision'), 'committed');
+select expect_num('(b) booked_at_cutoff now counts all three (the drop-in is paid)',
+  (select booked_at_cutoff from class_occurrences where id='9a179a17-0000-0000-0000-0000810ba0b2')::bigint, 3);
+
+-- ---- (c) committed class; the drop-in pays after cutoff, before start -> the
+--         start snapshot counts them and the pay headcount includes them. --------
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, room_id,
+                               instructor_id, capacity, starts_at, ends_at,
+                               flex, minimum_bookings, guarantee_tier, booked_count,
+                               committed_at, booked_at_cutoff)
+values ('9a179a17-0000-0000-0000-0000810ba0c3','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        '81b C: paid after cutoff','9a179a17-0000-0000-0000-0000810bee8b','9a179a17-0000-0000-0000-0000810bd181',6,
+        now() - interval '1 min', now() + interval '49 min', true, 3, 'flex', 3,
+        now() - interval '30 min', 2);
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source) values
+ ('9a179a17-0000-0000-0000-0000810bb0c1','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0c3','9a179a17-0000-0000-0000-0000810b0001','booked','drop_in'),
+ ('9a179a17-0000-0000-0000-0000810bb0c2','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0c3','9a179a17-0000-0000-0000-0000810b0002','booked','drop_in'),
+ ('9a179a17-0000-0000-0000-0000810bb0c3','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0c3','9a179a17-0000-0000-0000-0000810b0003','booked','drop_in');
+insert into payments (studio_id, member_id, booking_id, amount_cents, currency, status) values
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0001','9a179a17-0000-0000-0000-0000810bb0c1',15000,'CZK','succeeded'),
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0002','9a179a17-0000-0000-0000-0000810bb0c2',15000,'CZK','succeeded');
+-- The drop-in pays at the desk after the cutoff, before the start snapshot runs.
+select record_desk_dropin_paid('9a179a17-0000-0000-0000-0000810bb0c3','cash',15000,'81b-c');
+select snapshot_start_headcount('9a179a17-0000-0000-0000-0000810ba0c3');
+select expect_num('(c) booked_at_start counts a drop-in paid after the cutoff',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-0000810ba0c3')::bigint, 3);
+select expect_num('(c) pay headcount is greatest(cutoff 2, start 3) = 3',
+  (compute_class_pay('9a179a17-0000-0000-0000-0000810ba0c3') -> 'basis' ->> 'booked_paid')::bigint, 3);
+
+-- ---- (d) committed class; the drop-in never pays and no-shows -> owes nothing,
+--         excluded from the start snapshot and the pay headcount. ----------------
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, room_id,
+                               instructor_id, capacity, starts_at, ends_at,
+                               flex, minimum_bookings, guarantee_tier, booked_count,
+                               committed_at, booked_at_cutoff)
+values ('9a179a17-0000-0000-0000-0000810ba0d4','9a179a17-0000-0000-0000-000000000001',
+        '9a179a17-0000-0000-0000-00000000000c','9a179a17-0000-0000-0000-00000000cc01',
+        '81b D: unpaid no-show','9a179a17-0000-0000-0000-0000810bee8b','9a179a17-0000-0000-0000-0000810bd181',6,
+        now() - interval '2 hours', now() - interval '1 hour 10 min', true, 3, 'flex', 3,
+        now() - interval '3 hours', 2);
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source) values
+ ('9a179a17-0000-0000-0000-0000810bb0d1','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0d4','9a179a17-0000-0000-0000-0000810b0001','attended','drop_in'),
+ ('9a179a17-0000-0000-0000-0000810bb0d2','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0d4','9a179a17-0000-0000-0000-0000810b0002','attended','drop_in'),
+ ('9a179a17-0000-0000-0000-0000810bb0d3','9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810ba0d4','9a179a17-0000-0000-0000-0000810b0003','no_show','drop_in');
+insert into payments (studio_id, member_id, booking_id, amount_cents, currency, status) values
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0001','9a179a17-0000-0000-0000-0000810bb0d1',15000,'CZK','succeeded'),
+ ('9a179a17-0000-0000-0000-000000000001','9a179a17-0000-0000-0000-0000810b0002','9a179a17-0000-0000-0000-0000810bb0d2',15000,'CZK','succeeded');
+select snapshot_start_headcount('9a179a17-0000-0000-0000-0000810ba0d4');
+select expect_num('(d) booked_at_start excludes the unpaid no-show drop-in',
+  (select booked_at_start from class_occurrences where id='9a179a17-0000-0000-0000-0000810ba0d4')::bigint, 2);
+select expect_num('(d) pay headcount excludes the unpaid seat (greatest 2, 2)',
+  (compute_class_pay('9a179a17-0000-0000-0000-0000810ba0d4') -> 'basis' ->> 'booked_paid')::bigint, 2);
+select expect_true('(d) the unpaid no-show has no succeeded payment -- owes nothing',
+  not exists (select 1 from payments p join bookings b on b.id = p.booking_id
+               where b.occurrence_id='9a179a17-0000-0000-0000-0000810ba0d4'
+                 and b.member_id='9a179a17-0000-0000-0000-0000810b0003'
+                 and p.status in ('succeeded','partially_refunded')));
+
 -- Anon: force_commit is not reachable, and the anon surface stays EXACTLY THIRTEEN.
 select expect_true('force_commit_occurrence is not anon-executable',
   not has_function_privilege('anon', 'force_commit_occurrence(uuid, text)'::regprocedure, 'execute'));
