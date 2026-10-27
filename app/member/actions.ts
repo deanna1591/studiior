@@ -162,6 +162,7 @@ const FREE_FIRST_REASONS: Record<string, string> = {
   not_enabled: "This studio isn't offering a free first class right now.",
   already_had_free: "You've already had your free class here.",
   not_first: "This isn't your first class — it's a drop-in or covered by your plan.",
+  missed: "Your free class was used when you missed it. Here are the plans.",
   peak_not_allowed: "Free classes aren't offered at peak times. You can still book this one paying.",
   flex_not_allowed: "Your free class is for our core classes — pick one of those.",
   not_trial_class: "This class isn't open for free first classes. Pick another one.",

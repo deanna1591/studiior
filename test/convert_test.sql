@@ -188,12 +188,12 @@ insert into notification_preferences (studio_id, member_id, sequence_email) valu
   ('c0780000-0000-0000-0000-000000000001','c0780000-0000-0000-0000-00000000ad13', false);
 
 -- =============================================================================
--- 1. ELIGIBILITY — the no-show second chance.
+-- 1. ELIGIBILITY — Decision 30 (d): one no-show uses the free class.
 -- =============================================================================
-select expect_text('one no-show => eligible again',
-  free_first_eligibility('c0780000-0000-0000-0000-000000000001','c0780000-0000-0000-0000-00000000ad01')->>'ok', 'true');
-select expect_text('two no-shows => missed_twice',
-  free_first_eligibility('c0780000-0000-0000-0000-000000000001','c0780000-0000-0000-0000-00000000ad02')->>'reason', 'missed_twice');
+select expect_text('one no-show => missed (Decision 30 (d))',
+  free_first_eligibility('c0780000-0000-0000-0000-000000000001','c0780000-0000-0000-0000-00000000ad01')->>'reason', 'missed');
+select expect_text('two no-shows => still missed (missed_twice retired)',
+  free_first_eligibility('c0780000-0000-0000-0000-000000000001','c0780000-0000-0000-0000-00000000ad02')->>'reason', 'missed');
 select expect_text('attended a free class => already_had_free (not eligible)',
   free_first_eligibility('c0780000-0000-0000-0000-000000000001','c0780000-0000-0000-0000-00000000ad03')->>'reason', 'already_had_free');
 select expect_text('a paid attended class => not_first',

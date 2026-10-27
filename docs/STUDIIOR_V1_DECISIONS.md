@@ -1394,6 +1394,10 @@ A free first class (Decision 30) must never be the only person in a room, becaus
 
 (c) Staff (owner or manager) can convert a live unpaid drop-in booking into the member's free first class from the roster ("Make this their free class"). Allowed only when the booking is unpaid, not cancelled and a drop-in, the member is free-first eligible judged as if this booking did not exist, and the class is open to first-timers; otherwise refused with the reason. The conversion happens in place in one transaction: the booking becomes a confirmed free first class (never provisional, so the confirmation sweep cannot release it), the once-ever guest_passes row is written or reused, and free_booking_confirmed is queued. It counts as the member's free class. No credits, payments or holding fees are touched. Recorded 2026-10-27.
 
+### Amendment (d) — a no-show on the free first class uses it (Deanna, 27 Oct 2026)
+
+(d) A no-show on the free first class uses it. Cancelling before the cut-off keeps it (unchanged). free_first_eligibility returns 'missed' after one no-show (replaces missed_twice). The missed-you email offers the intro plan rather than a second free class. Rationale: the studio and the instructor are paid for the seat whether or not the member comes. Recorded 2026-10-27.
+
 ---
 
 ## 29 — Instructor claiming: inverting how a month gets staffed, per tenant

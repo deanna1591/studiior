@@ -369,7 +369,7 @@ export async function convertToFreeFirst(_prev: ConvertFreeState, fd: FormData):
       : reason === "class is not open to first-timers" ? "This class is not open to first-timers."
       : reason === "already_had_free" || reason === "already_member" ? "This member has already used their free class."
       : reason === "not_first" ? "This member is not a first-timer here."
-      : reason === "missed_twice" ? "This member has missed their free class twice."
+      : reason === "missed" ? "This member missed their free class."
       : reason === "not_enabled" ? "Free first classes are not turned on."
       : "That could not be done.";
     return { ok: false, message: msg };
