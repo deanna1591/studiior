@@ -30,3 +30,8 @@ withdraw_from_shift -> request_cover                 # instructor withdraws thei
 queue_availability_reminders -> instructor_month_covered  # called from sweep_availability_reminders (service context); instructor_month_covered is_service_context passes
 record_manual_payment -> advance_membership_period  # desk renewal; record_manual_payment is is_desk_up-guarded, so advance_membership_period's is_desk_up guard passes
 sweep_membership_periods -> advance_membership_period  # service sweep (Decision 61 rolls a comp membership); is_service_context passes
+
+book_first_free -> free_first_eligibility           # the member books their OWN free class; free_first_eligibility is_self passes (Decision 81a split it into a guarded wrapper + _run twin)
+convert_booking_to_free_first -> free_first_eligibility  # manager/service converts a drop-in; is_desk_up/is_service passes
+free_first_eligible_classes_run -> free_first_eligibility  # the member's own free-class picker (self) or service; guard passes
+book_class -> free_first_eligibility                 # the free-first belt fires only for a self-serve lead (v_is_self); free_first_eligibility is_self passes

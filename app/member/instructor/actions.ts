@@ -425,3 +425,74 @@ export async function declineAssignment(_prev: InstructorState, form: FormData):
   revalidatePath("/instructor"); revalidatePath("/instructor/schedule");
   return { ok: "Cover requested — the studio will arrange it. The class stays yours until it's covered." };
 }
+
+// ---------------------------------------------------------------------------
+// Decision 81a — the desk, from the instructor's roster. Every one of these is
+// scoped in SQL (instructor_scope: a published class that is theirs and is
+// today); this layer only renders the reason. Payments are attributed to the
+// instructor (recorded_by = auth.uid()).
+// ---------------------------------------------------------------------------
+export type WalkInAlt = { occurrence_id: string; name: string; start: string; seats_left: number };
+export type WalkInResult =
+  | { ok: true; seat: "free_first" | "plan" | "drop_in"; due_cents: number | null;
+      new_member: boolean; checked_in: boolean; checkin_reason: string | null;
+      booking_id: string; member_id: string }
+  | { ok: false; reason: string; booking_id?: string; class_name?: string; when?: string;
+      member_id?: string; new_member?: boolean; alternatives?: WalkInAlt[] };
+
+export async function addWalkIn(
+  occurrenceId: string, name: string, email: string, mobile: string,
+): Promise<WalkInResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("add_walk_in", {
+    p_occurrence: occurrenceId, p_name: name, p_email: email, p_mobile: mobile,
+  });
+  if (error) return { ok: false, reason: error.message };
+  revalidatePath(`/instructor/roster/${occurrenceId}`);
+  return data as unknown as WalkInResult;
+}
+
+export type DeskResult = { ok: true } | { ok: false; reason: string };
+
+export async function recordDeskDropinPaid(
+  bookingId: string, occurrenceId: string, method: string, amountCents: number, reference: string,
+): Promise<DeskResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("record_desk_dropin_paid", {
+    p_booking: bookingId, p_method: method, p_amount_cents: amountCents, p_reference: reference,
+  });
+  if (error) return { ok: false, reason: error.message };
+  const r = data as { ok: boolean; reason?: string } | null;
+  if (!r?.ok) return { ok: false, reason: r?.reason ?? "That could not be recorded." };
+  revalidatePath(`/instructor/roster/${occurrenceId}`);
+  return { ok: true };
+}
+
+export async function sellPlanAtDesk(
+  occurrenceId: string, memberId: string, planId: string, method: string, reference: string, useForToday: boolean,
+): Promise<DeskResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("sell_plan_at_desk", {
+    p_occurrence: occurrenceId, p_member: memberId, p_plan: planId,
+    p_method: method, p_reference: reference, p_use_for_today: useForToday,
+  });
+  if (error) return { ok: false, reason: error.message };
+  const r = data as { ok: boolean; reason?: string } | null;
+  if (!r?.ok) return { ok: false, reason: r?.reason ?? "That could not be recorded." };
+  revalidatePath(`/instructor/roster/${occurrenceId}`);
+  return { ok: true };
+}
+
+export async function moveBookingHere(
+  bookingId: string, targetOccurrenceId: string,
+): Promise<DeskResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("move_booking_here", {
+    p_booking: bookingId, p_target: targetOccurrenceId,
+  });
+  if (error) return { ok: false, reason: error.message };
+  const r = data as { ok: boolean; reason?: string } | null;
+  if (!r?.ok) return { ok: false, reason: r?.reason ?? "That could not be done." };
+  revalidatePath(`/instructor/roster/${targetOccurrenceId}`);
+  return { ok: true };
+}

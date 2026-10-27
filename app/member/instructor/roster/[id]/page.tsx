@@ -6,6 +6,7 @@ import ClassTag from "@/components/instructor/class-tag";
 import ScanCheckIn from "@/components/instructor/scan-check-in";
 import CheckinBanner from "@/components/instructor/checkin-banner";
 import { coverRequestAllowed } from "@/lib/cover-window";
+import { AddWalkIn, DeskPay, type DeskPlan } from "../../desk-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }] = await Promise.all([
+  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }, { data: payData }, { data: planData }] = await Promise.all([
     supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
     // Decision 78c: a drifting member's heads-up + their usual class (null when
     // retention tasks are off; the reader is guarded to this class's instructor).
@@ -47,8 +48,21 @@ export default async function RosterPage({ params }: { params: { id: string } })
       .eq("studio_id", ctx.studio_id).maybeSingle(),
     // FIX B: the class start instant, so cover is offered only before it starts.
     supabase.from("class_occurrences").select("starts_at").eq("id", params.id).maybeSingle(),
-    supabase.from("studios").select("contact_email, contact_phone").eq("id", ctx.studio_id).maybeSingle(),
+    supabase.from("studios").select("contact_email, contact_phone, currency").eq("id", ctx.studio_id).maybeSingle(),
+    // Decision 81a: per-booking pay state (an instructor is denied `payments` by
+    // RLS, so the marker/buttons read through this instructor-scoped reader),
+    // and the studio's sellable plans for the "Sold a plan at desk" sheet.
+    supabase.rpc("instructor_roster_pay", { p_occurrence: params.id }),
+    supabase.from("membership_plans").select("id, name, price_cents")
+      .eq("studio_id", ctx.studio_id).eq("visibility", "public").eq("status", "active")
+      .order("price_cents"),
   ]);
+  const currency = studio?.currency ?? "USD";
+  const plans = (planData ?? []) as DeskPlan[];
+  const pay = new Map<string, { member_id: string; payment_source: string; paid: boolean; due_cents: number | null }>(
+    ((payData ?? []) as { booking_id: string; member_id: string; payment_source: string; paid: boolean; due_cents: number | null }[])
+      .map((p) => [p.booking_id, p]),
+  );
   const r = data as Roster | null;
   // FIX B: a cover request is only open before the class starts (comparing
   // instants; request_cover refuses a started class too, even on a stale page).
@@ -189,10 +203,26 @@ export default async function RosterPage({ params }: { params: { id: string } })
                   ))}
                 </ul>
               )}
+
+              {/* Decision 81a: take a desk payment / sell a plan. "Paid at desk"
+                  shows on an unpaid drop-in only; "Sold a plan" on any row. */}
+              {(() => {
+                const p = pay.get(m.booking_id);
+                if (!p) return null;
+                const unpaid = p.payment_source === "drop_in" && !p.paid;
+                if (!unpaid && plans.length === 0) return null;
+                return (
+                  <DeskPay occurrenceId={r.occurrence_id} memberId={m.member_id} bookingId={m.booking_id}
+                           unpaidDropin={unpaid} dueCents={p.due_cents} currency={currency} plans={plans} />
+                );
+              })()}
             </li>
           ))}
         </ul>
       )}
+
+      {/* Decision 81a: add a walk-in to this class. */}
+      {r.status === "scheduled" && <AddWalkIn occurrenceId={r.occurrence_id} currency={currency} />}
 
       {r.status === "scheduled" && (coverOpen ? (
         <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} autoAccept={autoAccept} />

@@ -8072,6 +8072,15 @@ export type Database = {
         }
         Returns: string
       }
+      add_walk_in: {
+        Args: {
+          p_email: string
+          p_mobile: string
+          p_name: string
+          p_occurrence: string
+        }
+        Returns: Json
+      }
       adjust_stock: {
         Args: {
           p_delta: number
@@ -8686,14 +8695,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -8769,6 +8770,14 @@ export type Database = {
         }[]
       }
       free_first_eligibility: {
+        Args: {
+          p_exclude_booking?: string
+          p_member_id: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      free_first_eligibility_run: {
         Args: {
           p_exclude_booking?: string
           p_member_id: string
@@ -9060,6 +9069,18 @@ export type Database = {
           usual_class: string
         }[]
       }
+      instructor_roster_pay: {
+        Args: { p_occurrence: string }
+        Returns: {
+          booking_id: string
+          due_cents: number
+          member_id: string
+          member_name: string
+          paid: boolean
+          payment_source: string
+        }[]
+      }
+      instructor_scope: { Args: { p_occurrence: string }; Returns: string }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       instructor_valid_on: {
         Args: { p_instructor_id: string; p_on: string }
@@ -9352,6 +9373,10 @@ export type Database = {
           n: number
         }[]
       }
+      move_booking_here: {
+        Args: { p_booking: string; p_target: string }
+        Returns: Json
+      }
       move_occurrence: {
         Args: {
           p_clear_instructor?: boolean
@@ -9363,6 +9388,18 @@ export type Database = {
           p_starts_at?: string
         }
         Returns: Json
+      }
+      my_desk_payments: {
+        Args: never
+        Returns: {
+          amount_cents: number
+          currency: string
+          kind: string
+          member_name: string
+          method: string
+          paid_at: string
+          reference: string
+        }[]
       }
       my_instructor: { Args: never; Returns: Json }
       my_month_roster: {
@@ -9729,6 +9766,15 @@ export type Database = {
         Args: { p_member_id: string; p_method: string; p_situation: string }
         Returns: Json
       }
+      record_desk_dropin_paid: {
+        Args: {
+          p_amount_cents: number
+          p_booking: string
+          p_method: string
+          p_reference: string
+        }
+        Returns: Json
+      }
       record_document: {
         Args: {
           p_filename: string
@@ -9743,6 +9789,23 @@ export type Database = {
         Returns: Json
       }
       record_manual_payment: {
+        Args: {
+          p_amount_cents: number
+          p_booking_id?: string
+          p_currency?: string
+          p_description?: string
+          p_kind: string
+          p_member_id: string
+          p_method: string
+          p_method_note?: string
+          p_paid_at?: string
+          p_plan_id?: string
+          p_reference?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      record_manual_payment_run: {
         Args: {
           p_amount_cents: number
           p_booking_id?: string
@@ -10004,6 +10067,17 @@ export type Database = {
           p_booking_id: string
           p_lat?: number
           p_lng?: number
+        }
+        Returns: Json
+      }
+      sell_plan_at_desk: {
+        Args: {
+          p_member: string
+          p_method: string
+          p_occurrence: string
+          p_plan: string
+          p_reference: string
+          p_use_for_today: boolean
         }
         Returns: Json
       }

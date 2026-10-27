@@ -2,10 +2,48 @@ import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import PayStatementView, { type Statement } from "@/components/pay/statement";
+import { formatMoney } from "@/lib/plans";
+import { fmtClock } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 type Period = { period_id: string; starts_on: string; ends_on: string; status: string };
+type DeskPayment = { paid_at: string; member_name: string; amount_cents: number;
+  currency: string; method: string; reference: string | null; kind: string };
+
+const METHOD_LABEL: Record<string, string> = { gcash: "GCash", cash: "Cash", card_terminal: "Card" };
+
+/**
+ * Decision 81a(d) — the desk payments THIS instructor recorded (last 60 days),
+ * so they can reconcile the terminal and GCash at end of day. Money they took
+ * for the studio; NOT part of their pay. Read-only; from my_desk_payments
+ * (scoped to recorded_by = the caller).
+ */
+function DeskPayments({ rows, tz, fmt }: { rows: DeskPayment[]; tz: string; fmt: "12h" | "24h" }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-6">
+      <p className="text-[15px] font-semibold leading-5 text-ink">Desk payments you took</p>
+      <p className="m-sub mt-0.5 text-ink-3">Money you took at the desk for the studio. Not part of your pay.</p>
+      <ul className="mt-2 space-y-1.5">
+        {rows.map((p, i) => (
+          <li key={i} className="m-card flex items-center justify-between px-3 py-2.5">
+            <span className="min-w-0">
+              <span className="block truncate text-[14px] leading-5 text-ink">{p.member_name}</span>
+              <span className="m-sub block text-ink-3">
+                <span className="num">{new Intl.DateTimeFormat("en-GB", { timeZone: tz, day: "numeric", month: "short" }).format(new Date(p.paid_at))}</span>
+                {" "}<span className="num">{fmtClock(p.paid_at, tz, fmt)}</span>
+                {" · "}{METHOD_LABEL[p.method] ?? p.method}{p.kind === "plan" ? " · plan" : p.kind === "drop-in" ? " · drop-in" : ""}
+                {p.reference ? ` · ${p.reference}` : ""}
+              </span>
+            </span>
+            <span className="num shrink-0 pl-2 text-[14px] text-ink">{formatMoney(p.amount_cents, p.currency)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const dmy = (iso: string) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short" })
@@ -21,12 +59,17 @@ const dmy = (iso: string) =>
 export default async function PayPage({ searchParams }: { searchParams: { period?: string } }) {
   const { ctx, supabase } = await instructorScreen();
 
-  const [{ data: periodsData }, { data: studio }] = await Promise.all([
+  const [{ data: periodsData }, { data: studio }, { data: deskData }, { data: settings }] = await Promise.all([
     supabase.rpc("instructor_pay_periods", { p_instructor_id: ctx.instructor_id }),
-    supabase.from("studios").select("contact_email").eq("id", ctx.studio_id).maybeSingle(),
+    supabase.from("studios").select("contact_email, timezone").eq("id", ctx.studio_id).maybeSingle(),
+    supabase.rpc("my_desk_payments"),
+    supabase.from("studio_settings").select("time_format").eq("studio_id", ctx.studio_id).maybeSingle(),
   ]);
   const periods = (periodsData ?? []) as Period[];
   const contactEmail = studio?.contact_email ?? null;
+  const tz = studio?.timezone ?? "UTC";
+  const fmt = (settings?.time_format === "12h" ? "12h" : "24h") as "12h" | "24h";
+  const desk = (deskData ?? []) as DeskPayment[];
 
   if (periods.length === 0) {
     return (
@@ -37,6 +80,7 @@ export default async function PayPage({ searchParams }: { searchParams: { period
             Once your studio opens a pay period, every class you teach lands here with what it paid.
           </p>
         </div>
+        <DeskPayments rows={desk} tz={tz} fmt={fmt} />
       </InstructorShell>
     );
   }
@@ -75,6 +119,8 @@ export default async function PayPage({ searchParams }: { searchParams: { period
       <p className="m-sub mt-5 text-ink-3">
         These are the studio&rsquo;s figures. If something looks wrong, tell them — nothing here can be edited from this screen.
       </p>
+
+      <DeskPayments rows={desk} tz={tz} fmt={fmt} />
     </InstructorShell>
   );
 }
