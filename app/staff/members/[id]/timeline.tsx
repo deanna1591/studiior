@@ -28,6 +28,8 @@ type Ev = {
   plan_classes: number | null;
   plan_valid_to: string | null;
   unused_credits: number | null;
+  payment_source: string | null;
+  is_paid: boolean | null;
 };
 
 /**

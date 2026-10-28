@@ -525,11 +525,13 @@ Every row says which class, when, with whom, and what it cost. This table is the
 | Booked, free first class | Booked {class} | {Day} {date}, {time} with {instructor} · Free first class |
 | Booked, unpaid drop-in | Booked {class} | {Day} {date}, {time} with {instructor} · Drop-in, {amount} due at the desk |
 | Booked, paid drop-in | Booked {class} | {Day} {date}, {time} with {instructor} · Drop-in, paid |
+| Booked, complimentary | Booked {class} | {Day} {date}, {time} with {instructor} · Complimentary |
 | Attended | Attended {class} | {Day} {date}, {time} with {instructor} |
 | No-show | Missed {class} | {Day} {date}, {time} · Class used from {plan}, {n} left / Free class used / Nothing owed |
 | Cancelled in time | Cancelled {class} | {Day} {date}, {time} · Class returned to {plan}, {n} left / Free class kept |
 | Cancelled late | Cancelled late {class} | {Day} {date}, {time} · Class used from {plan}, {n} left |
 | Cancelled by the studio | Studio cancelled {class} | {Day} {date}, {time} · Class returned to {plan}, {n} left |
+| Cancelled, complimentary or free first | Cancelled {class} | {Day} {date}, {time} · Complimentary / Free class kept |
 | Class moved | {class} moved | Now {Day} {date}, {time} |
 | Bought a plan | Bought {plan} | {amount} · {classes} classes, valid to {date} · {method} at the desk |
 | Paid for a drop-in | Paid for {class} | {amount} · {method} at the desk |

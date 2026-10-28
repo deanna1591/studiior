@@ -134,7 +134,8 @@ export default async function MemberDetail({
     occurrence_start: string | null; instructor_first: string | null;
     credits_left_after: number | null; payment_method: string | null;
     recorded_by_name: string | null; plan_classes: number | null;
-    plan_valid_to: string | null; unused_credits: number | null };
+    plan_valid_to: string | null; unused_credits: number | null;
+    payment_source: string | null; is_paid: boolean | null };
   const journey = ((activity ?? []) as Act[])
     .filter((e) => manager || !MONEY_KINDS.has(e.kind))
     .map((e, i) => ({

@@ -62,10 +62,20 @@ test("83a rowLine: booked, free first class", () => {
   assert.equal(rowLine({ kind: "free_first", occurrence_start: START, instructor_first: "Ada" }, peso, TZ, false), `${WHEN} · Free first class`);
 });
 test("83a rowLine: booked, unpaid drop-in shows the amount due at the desk", () => {
-  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada", due_cents: 15000 }, peso, TZ, false), `${WHEN} · Drop-in, ₱150 due at the desk`);
+  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada", payment_source: "drop_in", is_paid: false, due_cents: 15000 }, peso, TZ, false), `${WHEN} · Drop-in, ₱150 due at the desk`);
 });
-test("83a rowLine: booked, paid drop-in", () => {
-  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada" }, peso, TZ, false), `${WHEN} · Drop-in, paid`);
+test("83a rowLine: booked, paid drop-in (drop_in + is_paid only)", () => {
+  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada", payment_source: "drop_in", is_paid: true }, peso, TZ, false), `${WHEN} · Drop-in, paid`);
+});
+test("83a rowLine: booked, complimentary (comp, not a free first class)", () => {
+  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada", payment_source: "comp", is_free_first: false }, peso, TZ, false), `${WHEN} · Complimentary`);
+});
+test("83a rowLine: booked, any other combination carries NO money text (never a wrong one)", () => {
+  // a membership seat, an unpaid drop-in with no due, and a bare row all render
+  // the when-phrase alone — a comp/unknown seat must not read "Drop-in, paid".
+  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada", payment_source: "membership" }, peso, TZ, false), WHEN);
+  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada", payment_source: "drop_in", is_paid: false }, peso, TZ, false), WHEN);
+  assert.equal(rowLine({ kind: "booked", occurrence_start: START, instructor_first: "Ada" }, peso, TZ, false), WHEN);
 });
 test("83a rowLine: attended is just the when-phrase", () => {
   assert.equal(rowLine({ kind: "attended", occurrence_start: START, instructor_first: "Ada" }, peso, TZ, false), WHEN);
@@ -77,10 +87,12 @@ test("83a rowLine: no-show from a plan (no instructor), free, nothing owed", () 
   assert.equal(rowLine({ kind: "no_show", occurrence_start: START, is_free_first: true }, peso, TZ, false), `${base} · Free class used`);
   assert.equal(rowLine({ kind: "no_show", occurrence_start: START }, peso, TZ, false), `${base} · Nothing owed`);
 });
-test("83a rowLine: cancelled in time returns the credit / keeps the free class", () => {
+test("83a rowLine: cancelled returns the credit / keeps the free class / comp / nothing for a drop-in", () => {
   const base = rowLine({ kind: "cancelled", occurrence_start: START }, peso, TZ, false);
   assert.equal(rowLine({ kind: "cancelled", occurrence_start: START, plan_name: "10-Pack", credits_left_after: 9 }, peso, TZ, false), `${base} · Class returned to 10-Pack, 9 left`);
   assert.equal(rowLine({ kind: "cancelled", occurrence_start: START, is_free_first: true }, peso, TZ, false), `${base} · Free class kept`);
+  assert.equal(rowLine({ kind: "cancelled", occurrence_start: START, payment_source: "comp" }, peso, TZ, false), `${base} · Complimentary`);
+  assert.equal(rowLine({ kind: "cancelled", occurrence_start: START, payment_source: "drop_in" }, peso, TZ, false), base);
 });
 test("83a rowLine: cancelled late uses the class", () => {
   const base = rowLine({ kind: "late_cancelled", occurrence_start: START }, peso, TZ, false);

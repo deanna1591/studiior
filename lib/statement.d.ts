@@ -21,6 +21,8 @@ export interface StatementRow {
   plan_classes?: number | null;
   plan_valid_to?: string | null;
   unused_credits?: number | null;
+  payment_source?: string | null;
+  is_paid?: boolean | null;
 }
 export type TzArg = string | { tz: string; timeFormat?: "12h" | "24h" };
 export function isMoneyRow(r: Pick<StatementRow, "credit_delta" | "amount_cents">): boolean;

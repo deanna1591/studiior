@@ -211,6 +211,12 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, source, p
   ('57a70000-0000-0000-0000-000000bbe001','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ece01','57a70000-0000-0000-0000-0000000e0a02','booked','member','drop_in', now()-interval '9 days');
 insert into occurrence_events (studio_id, occurrence_id, kind, at) values
   ('57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ece01','moved', now()-interval '9 days'+interval '1 hour');
+-- (e) Decision 83 (a) follow-up: a comp seat that is NOT a free first class (no
+-- guest pass) — a complimentary seat, distinct from the free-first comp above.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, status) values
+  ('57a70000-0000-0000-0000-0000000ecc01','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10, now()-interval '8 days', now()-interval '8 days'+interval '50 min','scheduled');
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('57a70000-0000-0000-0000-000000bbc001','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ecc01','57a70000-0000-0000-0000-0000000e0a02','booked','member','comp', now()-interval '8 days');
 
 -- ---- Decision 83 (a): e0a03 for a no-show-from-a-plan, a desk purchase (method +
 -- recorder + classes + valid-to), and a plan that ended. Separate member, so the
@@ -380,6 +386,30 @@ select expect_text('83a: the ended plan names the plan',
   (select plan_name from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='plan_ended'), '5-Pack');
 select expect_num('83a: the ended plan shows classes unused (2)',
   (select unused_credits from member_activity('57a70000-0000-0000-0000-0000000e0a03','2000-01-01','2030-01-01') where kind='plan_ended'), 2);
+reset role;
+
+-- =============================================================================
+-- C4. Decision 83 (a) follow-up — payment_source + is_paid for comp / drop-in
+--     seats (read as the owner).
+-- =============================================================================
+set role authenticated;
+select set_config('request.jwt.claim.sub','57a70000-0000-0000-0000-0000000f1001',false);
+-- A comp seat that is NOT a free first class: payment_source 'comp', not free-first.
+select expect_text('83a comp: a comp non-free-first booking carries payment_source comp',
+  (select payment_source from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbc001' and kind='booked'), 'comp');
+select expect_text('83a comp: a comp non-free-first booking is not free-first',
+  (select case when is_free_first then 'yes' else 'no' end from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbc001' and kind='booked'), 'no');
+-- A paid drop-in: payment_source 'drop_in', is_paid true.
+select expect_text('83a comp: a paid drop-in carries payment_source drop_in',
+  (select payment_source from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbd002' and kind='booked'), 'drop_in');
+select expect_text('83a comp: a paid drop-in is_paid true',
+  (select case when is_paid then 'yes' else 'no' end from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbd002' and kind='booked'), 'yes');
+-- An unpaid drop-in: is_paid false.
+select expect_text('83a comp: an unpaid drop-in is_paid false',
+  (select case when is_paid then 'yes' else 'no' end from member_activity('57a70000-0000-0000-0000-0000000e0a02','2000-01-01','2030-01-01') where booking_id='57a70000-0000-0000-0000-000000bbd001' and kind='booked'), 'no');
+-- A non-booking row (a purchase) carries no payment_source and null is_paid.
+select expect_text('83a comp: a money row has null payment_source and is_paid',
+  (select coalesce(payment_source,'<null>')||'/'||coalesce(is_paid::text,'<null>') from member_activity('57a70000-0000-0000-0000-0000000e0a01','2000-01-01','2030-01-01') where kind='purchase'), '<null>/<null>');
 reset role;
 
 -- =============================================================================

@@ -9186,11 +9186,13 @@ export type Database = {
           due_cents: number
           instructor_first: string
           is_free_first: boolean
+          is_paid: boolean
           kind: string
           membership_id: string
           occurrence_id: string
           occurrence_start: string
           payment_method: string
+          payment_source: string
           plan_classes: number
           plan_name: string
           plan_valid_to: string
