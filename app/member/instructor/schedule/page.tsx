@@ -2,7 +2,10 @@ import Link from "next/link";
 import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { ConfirmWeek, ConfirmSeriesAssignments, ConfirmOrDecline } from "../actions-ui";
+import { markGuide } from "../actions";
 import PayCheckIn from "../pay-checkin";
+import GuideHint from "@/components/instructor/guide-hint";
+import { HINTS } from "@/lib/instructor-guide";
 import ClassTag from "@/components/instructor/class-tag";
 
 export const dynamic = "force-dynamic";
@@ -151,6 +154,12 @@ export default async function MySchedule({
 
   return (
     <InstructorShell ctx={ctx} title="My schedule">
+      {/* Decision 85: first-time hint about cover — this is where a class is
+          tapped and "Can't make it" lives. */}
+      {!ctx.hints_seen?.cover && (
+        <GuideHint text={HINTS.cover}
+          onDismiss={async () => { "use server"; return markGuide("cover"); }} />
+      )}
       {week.error && (
         <div className="m-card mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)" }} role="alert">

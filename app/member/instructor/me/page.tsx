@@ -5,7 +5,9 @@ import { SignOut } from "@/components/member/sign-out";
 import { CalendarFeedControl } from "@/components/member/calendar-feed";
 import { mintFeed, revokeFeed } from "@/lib/feed-actions";
 import PhotoUpload from "@/components/instructor/photo-upload";
+import ShowIntroAgain from "@/components/instructor/show-intro-again";
 import { uploadMyPhoto, removeMyPhoto } from "./actions";
+import { markGuide } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +124,18 @@ export default async function MePage() {
         </span>
         <span className="shrink-0 text-ink-3">›</span>
       </Link>
+
+      {/* Decision 85: the Studio Guide, and a way to see the intro again. */}
+      <div className="m-card mt-4 px-4 py-4">
+        <Link href="/instructor/guide" className="flex items-center gap-3">
+          <span className="flex-1">
+            <span className="block text-[15px] leading-5 text-ink">Studio Guide</span>
+            <span className="m-sub mt-0.5 block text-ink-3">How the app works, in a minute.</span>
+          </span>
+          <span className="shrink-0 text-ink-3">›</span>
+        </Link>
+        <ShowIntroAgain onReset={async () => { "use server"; return markGuide("reset"); }} />
+      </div>
 
       <p className="m-sub mt-5 text-ink-3">
         Add this to your home screen and it opens like an app. There is nothing

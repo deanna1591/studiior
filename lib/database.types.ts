@@ -3198,6 +3198,8 @@ export type Database = {
           core_weekly_cap: number | null
           created_at: string
           display_name: string
+          guide_seen_at: string | null
+          hints_seen: Json
           id: string
           is_demo: boolean
           staff_id: string | null
@@ -3213,6 +3215,8 @@ export type Database = {
           core_weekly_cap?: number | null
           created_at?: string
           display_name: string
+          guide_seen_at?: string | null
+          hints_seen?: Json
           id?: string
           is_demo?: boolean
           staff_id?: string | null
@@ -3228,6 +3232,8 @@ export type Database = {
           core_weekly_cap?: number | null
           created_at?: string
           display_name?: string
+          guide_seen_at?: string | null
+          hints_seen?: Json
           id?: string
           is_demo?: boolean
           staff_id?: string | null
@@ -4206,10 +4212,12 @@ export type Database = {
           emergency_contact: Json | null
           first_name: string
           first_visit_at: string | null
+          guide_seen_at: string | null
           health_band: string | null
           health_computed_at: string | null
           health_reason: string | null
           health_signals: Json
+          hints_seen: Json
           id: string
           is_demo: boolean
           joined_on: string
@@ -4240,10 +4248,12 @@ export type Database = {
           emergency_contact?: Json | null
           first_name: string
           first_visit_at?: string | null
+          guide_seen_at?: string | null
           health_band?: string | null
           health_computed_at?: string | null
           health_reason?: string | null
           health_signals?: Json
+          hints_seen?: Json
           id?: string
           is_demo?: boolean
           joined_on?: string
@@ -4274,10 +4284,12 @@ export type Database = {
           emergency_contact?: Json | null
           first_name?: string
           first_visit_at?: string | null
+          guide_seen_at?: string | null
           health_band?: string | null
           health_computed_at?: string | null
           health_reason?: string | null
           health_signals?: Json
+          hints_seen?: Json
           id?: string
           is_demo?: boolean
           joined_on?: string
@@ -8695,12 +8707,20 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_null: {
+        Args: { actual: unknown; label: string }
+        Returns: undefined
+      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
+      expect_raises: {
+        Args: { code: string; label: string; sql: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
         Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
@@ -8973,6 +8993,7 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: number
       }
+      instructor_guide_mark: { Args: { p_hint: string }; Returns: undefined }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
       instructor_month_covered: {

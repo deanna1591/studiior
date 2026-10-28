@@ -4,6 +4,9 @@ import InstructorShell from "@/components/instructor/shell";
 import PayStatementView, { type Statement } from "@/components/pay/statement";
 import { formatMoney } from "@/lib/plans";
 import { fmtClock } from "@/lib/time";
+import { markGuide } from "../actions";
+import GuideHint from "@/components/instructor/guide-hint";
+import { HINTS } from "@/lib/instructor-guide";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +99,11 @@ export default async function PayPage({ searchParams }: { searchParams: { period
 
   return (
     <InstructorShell ctx={ctx} title="My pay">
+      {/* Decision 85: first-time hint on My pay. */}
+      {!ctx.hints_seen?.pay && (
+        <GuideHint text={HINTS.pay}
+          onDismiss={async () => { "use server"; return markGuide("pay"); }} />
+      )}
       {/* period picker — newest first, the selected one filled */}
       <div className="-mt-1 mb-3 flex flex-wrap gap-2">
         {periods.map((p) => {

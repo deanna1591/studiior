@@ -2,6 +2,9 @@ import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { AskForCover, CheckIn } from "../../actions-ui";
+import { markGuide } from "../../actions";
+import GuideHint from "@/components/instructor/guide-hint";
+import { HINTS } from "@/lib/instructor-guide";
 import ClassTag from "@/components/instructor/class-tag";
 import ScanCheckIn from "@/components/instructor/scan-check-in";
 import CheckinBanner from "@/components/instructor/checkin-banner";
@@ -103,6 +106,11 @@ export default async function RosterPage({ params }: { params: { id: string } })
 
   return (
     <InstructorShell ctx={ctx} title={r.name}>
+      {/* Decision 85: first-time hint on the roster. */}
+      {!ctx.hints_seen?.roster && (
+        <GuideHint text={HINTS.roster}
+          onDismiss={async () => { "use server"; return markGuide("roster"); }} />
+      )}
       <div className="-mt-3 mb-4 flex items-center gap-2">
         <p className="m-sub text-ink-2">
           {day} at <span className="num">{r.local_time}</span> ·{" "}

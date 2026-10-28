@@ -496,3 +496,19 @@ export async function moveBookingHere(
   revalidatePath(`/instructor/roster/${targetOccurrenceId}`);
   return { ok: true };
 }
+
+/**
+ * Decision 85 — mark a bit of the Studio Guide as seen. 'intro' sets the
+ * five-card intro seen (Got it), 'reset' un-marks it (Show the intro again),
+ * any other value records a dismissed one-line hint. instructor_guide_mark
+ * refuses a non-instructor; the flag is per person, so revalidate the screens
+ * that read it.
+ */
+export async function markGuide(hint: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.rpc("instructor_guide_mark", { p_hint: hint });
+  revalidatePath("/instructor");
+  revalidatePath("/instructor/me");
+  revalidatePath("/instructor/schedule");
+  revalidatePath("/instructor/pay");
+}

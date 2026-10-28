@@ -1821,3 +1821,73 @@ Reform opens 9 Nov with no front desk: the instructor is the only staff in the r
 - **Instructor desk actions are new SECURITY DEFINER RPCs scoped to a PUBLISHED occurrence that is theirs AND is today in studio time; `is_desk_up` is NOT widened** (widening it would give instructors desk powers in every studio, every day). They delegate to the existing internals — `activate_purchase`, the `record_manual_payment` body, `record_check_in('instructor')` — which already attribute `recorded_by = auth.uid()`. **Owners and managers keep today's member-profile pages unchanged.** A walk-in seat is booked DIRECTLY (`book_class` only admits a desk or self caller, and `book_first_free` is self-only), then checked in with `record_check_in('instructor')`.
 - **Refusals, house style:** `class is full`, `that booking is not today`, `not your class`, `member already has a seat in this class`, `payment already recorded`, `plan not for sale here`.
 - **Stays the instructor's ❌:** refunds, `mark_membership_paid`, the member profile, waiver disputes. The instructor never sees contact details or payment history beyond the walk-in/desk action in front of them. Permissions §7/§8/§9/§13 are amended for 81a (`docs/STUDIIOR_V1_PERMISSIONS.md`).
+
+## 85 — Studio Guide (2026-10-28)
+
+The instructor app and the member app carry their own walkthrough so studios do not write guidebooks. Platform-wide text, studio-neutral, with {studio_name} filled in; per-studio override is a later decision if a tenant asks. Three parts, all reading from one text file per app (lib/instructor-guide.mjs, later lib/member-guide.mjs): (1) a Studio Guide screen reachable from the Me tab and a small card on the home screen, with short sections and a Go there link to the real screen; (2) a first-open intro of five cards ending on Got it, shown once per person and remembered on their account, with Show the intro again on the Me tab; (3) one-line first-time hints on the screens that matter, dismissed once and remembered the same way. No spotlight tours. The wording below is the record; the code carries it verbatim. Instructor first; the member guide follows as 85b.
+
+### INTRO CARDS (five)
+
+1. "Welcome to {studio_name}" / "This app is your roster, your pay and your schedule. Five things to know, thirty seconds."
+2. "Check everyone in" / "Before class starts, every person on the floor gets checked in. Scan their code or tap their name. Anyone left unchecked is marked a no-show after class."
+3. "Walk-ins are one button" / "Someone at the door who is not on the roster? Add a walk-in at the bottom of the roster. The app works out whether it is their free first class, their plan, or a drop-in."
+4. "Take payment at the desk" / "An unpaid seat shows Paid at desk and Sold a plan at desk. Take the money first, record it second. Every payment is tagged with your name."
+5. "Can't make a class?" / "Ask for cover from the class. The class stays yours until someone else has it. Your pay is released when you tap Checked in for pay."
+
+### HINTS (three, one line each)
+
+roster: "Check everyone in before class starts. Walk-ins go at the bottom."
+pay: "Tap Checked in for pay at every class. It is what releases your pay."
+cover: "The class stays yours until someone else has it."
+
+### SECTIONS (title / lines / go)
+
+Before class / /instructor/schedule
+- Arrive early, open My schedule, and read the roster before anyone arrives.
+- Tap the class. You will see who is booked, who is checked in, and notes such as first class or waiver not signed.
+- Count seats against bodies. The roster never lets a class overbook, so an extra person is in the wrong class.
+- A class marked not running was cancelled. Anyone who turns up can go into the next class with a seat.
+
+Checking in / /instructor/roster
+- Every person must be checked in before class starts. It is what tells the system they came.
+- Scan their code, or tap Check in on their row. Check everyone in checks in everyone still unticked, so only use it after you have counted.
+- First class on us: a first-timer. Welcome them by name and show them around.
+- Waiver not signed: they sign on your phone or on paper before they take the class.
+- Not booked into this class: see Walk-ins.
+
+Walk-ins / /instructor/roster
+- Add a walk-in is at the bottom of the roster: name, email, mobile, then Add.
+- New person: their account is created, the seat is their free first class, and they are checked in. They get one welcome email.
+- Returning person: the app uses their plan if they have one, otherwise it is a drop-in to pay at the desk.
+- Booked into another class today: the app offers Move them here. No fee, and they are checked in.
+- Class full: the app lists the next classes with a free seat. Never add a seat beyond capacity.
+
+Payments at the desk / /instructor/roster
+- Take the money first, record it second, before class starts.
+- An unpaid row shows the amount due. Tap Paid at desk, pick the method, add the reference, Record payment.
+- Someone buying a plan: Sold a plan at desk, pick the plan, method, reference. Tick Use it for today's class if they are in this class as a drop-in.
+- Every payment is recorded under your name. Never record a payment you did not see go through.
+- Refunds and plan changes are not yours. Tell the studio.
+
+After class / /instructor/schedule
+- If everyone who came was checked in, there is nothing to do. The system closes the class for you.
+- Forgot someone? Check them in before you leave. Once the class is closed, tell the studio and they will fix it.
+- If a class ends with nobody checked in, you get a reminder. Open the roster and check people in while you remember.
+
+Can't make a class / /instructor/open
+- Open the class, tap Can't make it, say why, and ask a colleague or anyone who can take it.
+- The class stays yours until someone else has it and the studio has approved. Do not assume.
+- Open classes lists classes that need an instructor. Take this class makes it yours if it fits your availability.
+- Fill in My availability each month before the studio builds the schedule.
+
+Your pay / /instructor/pay
+- Tap Checked in for pay when you arrive at every class. It releases your pay for that class.
+- My pay shows each period, each class, covers, and the total.
+- Desk payments you took are the studio's money, not your pay. They are listed so you can reconcile at the end of the day.
+- A question on a statement goes to the studio from that screen.
+
+Who to call / /instructor/me
+- Refunds, plan changes, a wrong charge, a disputed no-show: the studio handles these. Pass it on the same day.
+- Injury or anything medical: first aid, then call the studio.
+- A member who cannot log in: Forgot your password on the login screen sends them a reset link.
+- You see today's roster, not members' profiles or payment history. That is by design.

@@ -3,6 +3,8 @@ import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import AnnounceStrip from "@/components/member/announce-strip";
 import { AcceptCover } from "./actions-ui";
+import { markGuide } from "./actions";
+import IntroCards from "@/components/instructor/intro-cards";
 import ClassTag from "@/components/instructor/class-tag";
 import { notifLabel, relTime, type NotifItem } from "@/lib/instructor-notify";
 import { notificationHref } from "@/lib/notification-href";
@@ -168,6 +170,12 @@ export default async function InstructorHome() {
 
   return (
     <InstructorShell ctx={ctx}>
+      {/* Decision 85: first-open intro, once per person, while guide_seen_at is
+          null. Got it on the last card marks it seen. */}
+      {ctx.guide_seen_at == null && (
+        <IntroCards studioName={ctx.studio_name}
+          onDone={async () => { "use server"; return markGuide("intro"); }} />
+      )}
       {/* Banner announcements (audience instructors/both) — a filled strip at
           the top, no dismiss in the portal. */}
       <AnnounceStrip items={annBanners} dismissible={false} />
@@ -322,6 +330,15 @@ export default async function InstructorHome() {
       {quiet && (
         <p className="m-sub mt-5 text-ink-3">Nothing needs you today.</p>
       )}
+
+      {/* Decision 85: a quiet way into the Studio Guide, always available. */}
+      <Link href="/instructor/guide" className="m-card mt-5 flex items-center gap-3 px-4 py-3.5">
+        <span className="flex-1">
+          <span className="block text-[15px] leading-5 text-ink">New here? Read the Studio Guide</span>
+          <span className="m-sub mt-0.5 block text-ink-3">How the app works, in a minute.</span>
+        </span>
+        <span className="shrink-0 text-ink-3">›</span>
+      </Link>
     </InstructorShell>
   );
 }

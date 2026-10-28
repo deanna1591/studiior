@@ -44,6 +44,11 @@ export type InstructorContext = {
   time_format: "24h" | "12h";
   /** Unread in-app notifications, for the bell. Resolved once per screen. */
   unread: number;
+  /** Decision 85 — the per-person guide flags: whether the five-card intro has
+   *  been seen, and which one-line hints have been dismissed. Both from
+   *  my_instructor; the DB holds nothing studio-specific. */
+  guide_seen_at: string | null;
+  hints_seen: Record<string, boolean>;
 };
 
 /**
@@ -66,6 +71,9 @@ export async function instructorScreen() {
   // tab (absent, not empty). The unread count drives the bell on every screen.
   ctx.usesPayroll = ctx.uses_payroll === true;
   ctx.unread = Number((data as { unread?: number } | null)?.unread ?? 0);
+  // Decision 85: normalise the guide flags (my_instructor returns them snake-cased).
+  ctx.guide_seen_at = (ctx.guide_seen_at ?? null) as string | null;
+  ctx.hints_seen = (ctx.hints_seen ?? {}) as Record<string, boolean>;
   return { ctx, supabase };
 }
 
