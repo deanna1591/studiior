@@ -348,4 +348,115 @@ select expect_true('the brief carries an unconverted_free line',
 select expect_text('...and its button opens the retention list',
   (select action_payload->>'href' from ai_insights where studio_id='c0780000-0000-0000-0000-000000000001' and type='unconverted_free' limit 1), '/retention');
 
+-- =============================================================================
+-- 10. DECISION 78 (d) — the signed-up-but-never-booked nudge.
+--     convert_book_first at day 1 and again at day 7 for a signed-up member who
+--     has never booked and is still free-first eligible; sends before opening;
+--     gated by the convert switch; capped per night, oldest first.
+-- =============================================================================
+-- Three fresh studios, all convert ON + free_first ON + NOT opened (no attended
+-- record), each with ONE published future class so the block has something to
+-- book. Studio B (convert OFF) is reused for the switch-off case.
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('c0780000-0000-0000-0000-0000000000d4','BookFirst D','c078-d4','Asia/Manila','PHP','active'),
+  ('c0780000-0000-0000-0000-0000000000d5','BookFirst E','c078-d5','Asia/Manila','PHP','active'),
+  ('c0780000-0000-0000-0000-0000000000d6','BookFirst F','c078-d6','Asia/Manila','PHP','active');
+insert into studio_settings (studio_id, free_first_class_enabled, convert_sequence_enabled, convert_book_first_daily_cap) values
+  ('c0780000-0000-0000-0000-0000000000d4', true, true, 30),
+  ('c0780000-0000-0000-0000-0000000000d5', true, true, 30),
+  ('c0780000-0000-0000-0000-0000000000d6', true, true, 30);
+insert into locations (id, studio_id, name, is_primary) values
+  ('c0780000-0000-0000-0000-00000000d40a','c0780000-0000-0000-0000-0000000000d4','Main',true),
+  ('c0780000-0000-0000-0000-00000000d50a','c0780000-0000-0000-0000-0000000000d5','Main',true),
+  ('c0780000-0000-0000-0000-00000000d60a','c0780000-0000-0000-0000-0000000000d6','Main',true);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('c0780000-0000-0000-0000-0000000ccd04','c0780000-0000-0000-0000-0000000000d4','Reformer',50,10),
+  ('c0780000-0000-0000-0000-0000000ccd05','c0780000-0000-0000-0000-0000000000d5','Reformer',50,10),
+  ('c0780000-0000-0000-0000-0000000ccd06','c0780000-0000-0000-0000-0000000000d6','Reformer',50,10);
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('c0780000-0000-0000-0000-0000000eed04','c0780000-0000-0000-0000-0000000000d4','c0780000-0000-0000-0000-00000000d40a','R',20),
+  ('c0780000-0000-0000-0000-0000000eed05','c0780000-0000-0000-0000-0000000000d5','c0780000-0000-0000-0000-00000000d50a','R',20),
+  ('c0780000-0000-0000-0000-0000000eed06','c0780000-0000-0000-0000-0000000000d6','c0780000-0000-0000-0000-00000000d60a','R',20);
+-- one published (publication off => month_published true) future class each
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('c0780000-0000-0000-0000-00000000fd04','c0780000-0000-0000-0000-0000000000d4','c0780000-0000-0000-0000-00000000d40a','c0780000-0000-0000-0000-0000000ccd04','c0780000-0000-0000-0000-0000000eed04',null,'R', ((current_setting('t.today')::date + 10) + time '07:00') at time zone 'Asia/Manila', ((current_setting('t.today')::date + 10) + time '07:50') at time zone 'Asia/Manila',10,0,'scheduled','open'),
+  ('c0780000-0000-0000-0000-00000000fd05','c0780000-0000-0000-0000-0000000000d5','c0780000-0000-0000-0000-00000000d50a','c0780000-0000-0000-0000-0000000ccd05','c0780000-0000-0000-0000-0000000eed05',null,'R', ((current_setting('t.today')::date + 10) + time '07:00') at time zone 'Asia/Manila', ((current_setting('t.today')::date + 10) + time '07:50') at time zone 'Asia/Manila',10,0,'scheduled','open'),
+  ('c0780000-0000-0000-0000-00000000fd06','c0780000-0000-0000-0000-0000000000d6','c0780000-0000-0000-0000-00000000d60a','c0780000-0000-0000-0000-0000000ccd06','c0780000-0000-0000-0000-0000000eed06',null,'R', ((current_setting('t.today')::date + 10) + time '07:00') at time zone 'Asia/Manila', ((current_setting('t.today')::date + 10) + time '07:50') at time zone 'Asia/Manila',10,0,'scheduled','open');
+-- D: mA joined 2d ago (step 1), mB joined 8d ago (step 7), mC joined 2d ago but HAS a booking
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source) values
+  ('c0780000-0000-0000-0000-0000000ad4a1','c0780000-0000-0000-0000-0000000000d4',null,'Anna','Day1','d4a@example.com','lead',current_setting('t.today')::date - 2,'self_signup'),
+  ('c0780000-0000-0000-0000-0000000ad4b1','c0780000-0000-0000-0000-0000000000d4',null,'Bea','Day8','d4b@example.com','lead',current_setting('t.today')::date - 8,'self_signup'),
+  ('c0780000-0000-0000-0000-0000000ad4c1','c0780000-0000-0000-0000-0000000000d4',null,'Cara','Booked','d4c@example.com','lead',current_setting('t.today')::date - 2,'self_signup'),
+  ('c0780000-0000-0000-0000-0000000ad5d1','c0780000-0000-0000-0000-0000000000d5',null,'Dana','Preopen','d5d@example.com','lead',current_setting('t.today')::date - 2,'self_signup'),
+  ('c0780000-0000-0000-0000-0000000ad0be','c0780000-0000-0000-0000-000000000002',null,'Ethan','Offstudio','bE@example.com','lead',current_setting('t.today')::date - 2,'self_signup');
+-- mC has a booking => "never held a booking" is false => excluded
+insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
+  ('c0780000-0000-0000-0000-0000000bd4c1','c0780000-0000-0000-0000-0000000000d4','c0780000-0000-0000-0000-00000000fd04','c0780000-0000-0000-0000-0000000ad4c1','booked','member','drop_in', now());
+-- F: 40 eligible members, joined 1..40 days ago (oldest = 40 days)
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source)
+select ('c0780000-0000-0000-0000-e00000' || lpad(to_hex(g), 6, '0'))::uuid,
+       'c0780000-0000-0000-0000-0000000000d6', null,
+       'F' || g, 'Member', 'f' || g || '@example.com', 'lead',
+       current_setting('t.today')::date - g, 'self_signup'
+  from generate_series(1, 40) g;
+
+-- run the sweeps once (fixed anchor = today 12:00 Manila)
+select set_config('t.d4', convert_keep_sweep('c0780000-0000-0000-0000-0000000000d4', current_setting('t.pnow')::timestamptz)::text, false);
+select set_config('t.d5', convert_keep_sweep('c0780000-0000-0000-0000-0000000000d5', current_setting('t.pnow')::timestamptz)::text, false);
+select convert_keep_sweep('c0780000-0000-0000-0000-000000000002', current_setting('t.pnow')::timestamptz);
+
+-- (a) joined 2 days ago, no bookings, eligible -> one email, step 1
+select expect_num('(a) day-1 nudge sent once',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-0000000000d4'
+     and template_key='convert_book_first' and member_id='c0780000-0000-0000-0000-0000000ad4a1'), 1);
+select expect_true('(a) and it is the step-1 dedupe key',
+  exists(select 1 from notifications where dedupe_key='convert_book_first:1:c0780000-0000-0000-0000-0000000ad4a1'));
+
+-- (b) joined 8 days ago -> step 7, and only once across a second run
+select expect_num('(b) day-7 nudge sent once',
+  (select count(*) from notifications where dedupe_key='convert_book_first:7:c0780000-0000-0000-0000-0000000ad4b1'), 1);
+select convert_keep_sweep('c0780000-0000-0000-0000-0000000000d4', current_setting('t.pnow')::timestamptz);
+select expect_num('(b) still once after a second run (dedupe)',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-0000000000d4'
+     and template_key='convert_book_first' and member_id='c0780000-0000-0000-0000-0000000ad4b1'), 1);
+
+-- (c) a member with any booking gets nothing
+select expect_num('(c) a member who has booked gets no nudge',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-0000000000d4'
+     and template_key='convert_book_first' and member_id='c0780000-0000-0000-0000-0000000ad4c1'), 0);
+
+-- (d) studio not yet open but with published classes -> still sends
+select expect_text('(d) the studio is not open (rest of the sweep skips)',
+  (current_setting('t.d5')::jsonb)->>'skipped', 'not_opened');
+select expect_num('(d) but the book-first nudge still went out',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-0000000000d5'
+     and template_key='convert_book_first' and member_id='c0780000-0000-0000-0000-0000000ad5d1'), 1);
+
+-- (e) studio switch off -> nothing
+select expect_num('(e) convert sequence off: no nudge',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-000000000002'
+     and template_key='convert_book_first'), 0);
+
+-- (f) 40 eligible, cap 30 -> 30 tonight (oldest first), the other 10 next run
+select set_config('t.f1', convert_keep_sweep('c0780000-0000-0000-0000-0000000000d6', current_setting('t.pnow')::timestamptz)::text, false);
+select expect_num('(f) cap 30: exactly 30 queued on the first run',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-0000000000d6'
+     and template_key='convert_book_first'), 30);
+select expect_num('(f) oldest first: the 40-days-ago sign-up is in',
+  (select count(*) from notifications n join members m on m.id=n.member_id
+    where n.studio_id='c0780000-0000-0000-0000-0000000000d6' and n.template_key='convert_book_first'
+      and m.joined_on = current_setting('t.today')::date - 40), 1);
+select expect_num('(f) oldest first: the newest (1 day ago) is NOT in yet',
+  (select count(*) from notifications n join members m on m.id=n.member_id
+    where n.studio_id='c0780000-0000-0000-0000-0000000000d6' and n.template_key='convert_book_first'
+      and m.joined_on = current_setting('t.today')::date - 1), 0);
+select convert_keep_sweep('c0780000-0000-0000-0000-0000000000d6', current_setting('t.pnow')::timestamptz);
+select expect_num('(f) the other 10 go out on the next run -> 40 total',
+  (select count(*) from notifications where studio_id='c0780000-0000-0000-0000-0000000000d6'
+     and template_key='convert_book_first'), 40);
+select expect_num('(f) ...and the newest now has one',
+  (select count(*) from notifications n join members m on m.id=n.member_id
+    where n.studio_id='c0780000-0000-0000-0000-0000000000d6' and n.template_key='convert_book_first'
+      and m.joined_on = current_setting('t.today')::date - 1), 1);
+
 select 'convert_test: all assertions passed' as done;

@@ -615,6 +615,10 @@ Check-in, no-show finalisation, instructor headcount and pay, and statements tre
 
 **Build order.** 78a Convert (b, c, the unconverted list, the day-7 task, the tasks table since c needs it) — hosted push held until Reform's closure notice has been sent. 78b Keep (d). 78c Act (remaining e, f, Settings page with all toggles and templates). Each its own migration(s); new enum values in their own migration; no new anon RPC — THIRTEEN stays THIRTEEN. Deanna, 14 Oct 2026.
 
+### Amendment (d) — the signed-up-but-never-booked nudge (Deanna, 28 Oct 2026)
+
+(d) A member who signed up, has never held a booking, and is eligible for a free first class receives convert_book_first one day after signing up and again at day 7 if still nothing booked; any booking stops it. It sends whenever the studio has published bookable classes, including before the opening date (exempt from the Decision 14 (c) opening skip), because it asks for a booking rather than following a class. Gated by Run the convert sequence; one per member per step via dedupe. At most convert_book_first_daily_cap emails per studio per night (default 30), oldest sign-ups first; the rest wait for the next night. Recorded 2026-10-28.
+
 ---
 
 ## 79 — Retention page: see the person, send the right message, learn what worked

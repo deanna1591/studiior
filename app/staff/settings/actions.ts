@@ -1112,13 +1112,18 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
   const aiOn = String(fd.get("ai_drafts_enabled") ?? "") === "on";
   const voiceRaw = String(fd.get("studio_voice") ?? "").trim();
   const voice = voiceRaw === "" ? null : voiceRaw.slice(0, 2000);
+  const capRaw = String(fd.get("convert_book_first_daily_cap") ?? "").trim();
+  const cap = capRaw === "" ? 30 : Math.trunc(Number(capRaw));
+  if (!Number.isFinite(cap) || cap < 0 || cap > 1000)
+    return { ok: false, message: "Book-your-free-class emails per night must be between 0 and 1000." };
 
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
     .update({ convert_sequence_enabled: on, keep_sequence_enabled: keepOn, retention_tasks_enabled: tasksOn,
               intro_offer_plan_id: plan, intro_offer_days: days,
               intro_offer_exclusive: exclusive, retention_tasks_to: to,
-              ai_drafts_enabled: aiOn, studio_voice: voice })
+              ai_drafts_enabled: aiOn, studio_voice: voice,
+              convert_book_first_daily_cap: cap })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };

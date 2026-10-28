@@ -6986,6 +6986,7 @@ export type Database = {
           conversion_bonus_cents: number
           conversion_bonus_enabled: boolean
           conversion_window_days: number
+          convert_book_first_daily_cap: number
           convert_sequence_enabled: boolean
           core_claim_default_cap: number
           core_cutoff_hours: number
@@ -7099,6 +7100,7 @@ export type Database = {
           conversion_bonus_cents?: number
           conversion_bonus_enabled?: boolean
           conversion_window_days?: number
+          convert_book_first_daily_cap?: number
           convert_sequence_enabled?: boolean
           core_claim_default_cap?: number
           core_cutoff_hours?: number
@@ -7212,6 +7214,7 @@ export type Database = {
           conversion_bonus_cents?: number
           conversion_bonus_enabled?: boolean
           conversion_window_days?: number
+          convert_book_first_daily_cap?: number
           convert_sequence_enabled?: boolean
           core_claim_default_cap?: number
           core_cutoff_hours?: number
@@ -8746,16 +8749,12 @@ export type Database = {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       expect_true: {
         Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_txt: {
-        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
@@ -9206,10 +9205,6 @@ export type Database = {
       join_challenge: {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
-      }
-      kard: {
-        Args: { k: Json; p_field: string; p_key: string }
-        Returns: string
       }
       mark_assignment_confirmed: {
         Args: { p_occurrence_id: string }

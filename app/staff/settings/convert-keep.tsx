@@ -19,13 +19,13 @@ function Save() {
  */
 export default function ConvertKeepPanel({
   enabled, keepEnabled, tasksEnabled, planId, days, exclusive, tasksTo, plans,
-  aiDrafts, studioVoice,
+  aiDrafts, studioVoice, bookFirstCap,
 }: {
   enabled: boolean; keepEnabled: boolean; tasksEnabled: boolean;
   planId: string | null; days: number;
   exclusive: boolean; tasksTo: string;
   plans: { id: string; name: string }[];
-  aiDrafts: boolean; studioVoice: string | null;
+  aiDrafts: boolean; studioVoice: string | null; bookFirstCap: number;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveConvertKeep, null);
   return (
@@ -44,6 +44,19 @@ export default function ConvertKeepPanel({
             </span>
           </span>
         </label>
+
+        <div className="mt-3 border-t border-line pt-3">
+          <label className="block text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Book-your-free-class emails per night</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Members who signed up but never booked get a nudge at day 1 and day 7. This caps how
+              many go out each night, oldest first.
+            </span>
+            <input type="number" name="convert_book_first_daily_cap" min={0} max={1000} step={1}
+                   defaultValue={bookFirstCap}
+                   className="mt-1.5 w-24 rounded border border-line-2 bg-paper px-2 py-1 text-[13px] text-ink num" />
+          </label>
+        </div>
 
         <div className="mt-3 border-t border-line pt-3">
           <label className="block text-[13px] leading-[19px] text-ink">
