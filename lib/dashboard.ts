@@ -34,6 +34,11 @@ export type Kpi = {
   trend?: Trend | null;
   tone?: "normal" | "amber";
   href: string;
+  /** Decision 86. Extra links under the headline href, each opening a narrower
+   *  list the card's sub-counts stand for (the active card's "came in last 30
+   *  days" and "joined this month"). Rendered beside the card, never nested
+   *  inside its own anchor. */
+  links?: { label: string; href: string }[];
   forecast?: boolean;
   empty_hint?: string;
 };
@@ -123,7 +128,7 @@ export async function dashboardData(
 
   const [
     kpis, revenue, heatmap, health, activity, tasks, month, absent,
-    nRevenue, nAttendance, nLead, challengeKpi, guestKpi, recent, tiers, retention,
+    nRevenue, nAttendance, nLead, challengeKpi, freeFirstKpi, recent, tiers, retention,
     retentionCounts, retentionSetting,
   ] = await Promise.all([
     supabase.rpc("dashboard_kpis", { p_studio_id: studioId }),
@@ -140,9 +145,11 @@ export async function dashboardData(
     // §9. Null (and so appended to nothing) for a studio with no challenge — the
     // KPI is present only once the feature is in use.
     supabase.rpc("dashboard_challenge_kpi", { p_studio_id: studioId }),
-    // Decision 26. Null (and so appended to nothing) unless the studio runs guest
-    // passes and has had at least one guest.
-    supabase.rpc("dashboard_guest_kpi", { p_studio_id: studioId }),
+    // Decision 86. The free-first conversion card (Decision 30). Null (and so
+    // appended to nothing) unless the studio runs free first classes and has had
+    // at least one. The host-guest card (Decision 26) is NOT on the dashboard —
+    // its number survives only as one line on the free-class members list.
+    supabase.rpc("dashboard_free_first_kpi", { p_studio_id: studioId }),
     // Decision 56. The newest bookings/cancellations (30, sliced to 10 on the
     // client) and the tier suggestions — zero rows when neither tier is on.
     supabase.rpc("dashboard_recent_bookings", { p_studio_id: studioId, p_limit: 30 }),
@@ -172,7 +179,7 @@ export async function dashboardData(
         forecast_months_needed: number; forecast_months_have: number } | null;
       // Each optional KPI is its own function so dashboard_kpis need not be
       // re-issued for one card; appended here, and absent when null.
-      const extra = [challengeKpi.data, guestKpi.data].filter(Boolean) as Kpi[];
+      const extra = [challengeKpi.data, freeFirstKpi.data].filter(Boolean) as Kpi[];
       if (base && extra.length) return { ...base, cards: [...base.cards, ...extra] };
       return base;
     })(),

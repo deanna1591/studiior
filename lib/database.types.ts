@@ -8593,6 +8593,10 @@ export type Database = {
       }
       dashboard_forecast_min_months: { Args: never; Returns: number }
       dashboard_free_first_kpi: { Args: { p_studio_id: string }; Returns: Json }
+      dashboard_free_first_members: {
+        Args: { p_studio_id: string }
+        Returns: Json
+      }
       dashboard_guest_kpi: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_health: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_heatmap: {
@@ -8617,6 +8621,33 @@ export type Database = {
         }
         Returns: Json
       }
+      dashboard_occupancy_30d: {
+        Args: { p_studio_id: string }
+        Returns: {
+          booked: number
+          capacity: number
+          instructor: string
+          name: string
+          occurrence_id: string
+          pct: number
+          room: string
+          starts_at: string
+        }[]
+      }
+      dashboard_payments_on: {
+        Args: { p_date: string; p_studio_id: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          item: string
+          member_id: string
+          member_name: string
+          method: string
+          paid_at: string
+          payment_id: string
+          recorded_by: string
+        }[]
+      }
       dashboard_pct_floor: { Args: never; Returns: number }
       dashboard_recent_bookings: {
         Args: { p_limit?: number; p_studio_id: string }
@@ -8636,6 +8667,10 @@ export type Database = {
       }
       dashboard_source_label: { Args: { p_src: string }; Returns: string }
       dashboard_tasks: { Args: { p_studio_id: string }; Returns: Json }
+      dashboard_today_classes: {
+        Args: { p_date: string; p_studio_id: string }
+        Returns: Json
+      }
       dashboard_trend: {
         Args: { p_basis: string; p_now: number; p_prior: number }
         Returns: Json
@@ -8707,20 +8742,20 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_null: {
-        Args: { actual: unknown; label: string }
-        Returns: undefined
-      }
       expect_num: {
         Args: { actual: number; label: string; want: number }
         Returns: undefined
       }
       expect_raises: {
-        Args: { code: string; label: string; sql: string }
+        Args: { label: string; stmt: string; want_sqlstate: string }
         Returns: undefined
       }
       expect_true: {
         Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_txt: {
+        Args: { actual: string; label: string; want: string }
         Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
@@ -9172,6 +9207,10 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      kard: {
+        Args: { k: Json; p_field: string; p_key: string }
+        Returns: string
+      }
       mark_assignment_confirmed: {
         Args: { p_occurrence_id: string }
         Returns: Json
@@ -9356,6 +9395,7 @@ export type Database = {
           health_band: string
           health_reason: string
           id: string
+          joined_on: string
           last_name: string
           last_visit_at: string
           lifetime_visits: number

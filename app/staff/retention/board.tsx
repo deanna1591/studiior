@@ -167,7 +167,10 @@ function Section({
   const situation = SITUATION[rows[0].section];
 
   return (
-    <section className="mb-7">
+    // Decision 86: the id is the section key, so the dashboard's at-risk card
+    // can land on /retention#at_risk. scroll-mt keeps the heading clear of the
+    // sticky top bar.
+    <section id={rows[0].section} className="mb-7 scroll-mt-20">
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
         {count && <span className="text-[12px] text-ink-3">{count}</span>}

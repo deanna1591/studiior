@@ -44,15 +44,9 @@ function TrendLine({ t, kind, currency }: { t: Trend; kind: Kpi["kind"]; currenc
   );
 }
 
-function Card({ c }: { c: Kpi }) {
-  const amber = c.tone === "amber" && c.state === "ok";
+function CardBody({ c }: { c: Kpi }) {
   return (
-    <Link
-      href={c.href}
-      className={`panel group block p-4 transition hover:shadow-[0_2px_4px_rgb(20_23_14_/_0.06),0_14px_34px_-14px_rgb(20_23_14_/_0.18)] ${
-        amber ? "border-edge-amber bg-amber-tint" : ""
-      }`}
-    >
+    <>
       <p className="text-[11px] font-medium uppercase leading-4 tracking-[0.06em] text-ink-2">
         {c.label}
       </p>
@@ -79,6 +73,44 @@ function Card({ c }: { c: Kpi }) {
           )}
         </>
       )}
+    </>
+  );
+}
+
+function Card({ c }: { c: Kpi }) {
+  const amber = c.tone === "amber" && c.state === "ok";
+  const hover =
+    "transition hover:shadow-[0_2px_4px_rgb(20_23_14_/_0.06),0_14px_34px_-14px_rgb(20_23_14_/_0.18)]";
+  const tint = amber ? "border-edge-amber bg-amber-tint" : "";
+
+  // Decision 86. A card may carry sub-links (the active card's "came in the
+  // last 30 days" / "joined this month"). An anchor cannot nest inside an
+  // anchor, so the headline is one Link and the sub-links are siblings under it
+  // inside a plain panel, rather than the whole card being one Link.
+  if (c.links && c.links.length > 0 && c.state === "ok") {
+    return (
+      <div className={`panel block p-4 ${tint}`}>
+        <Link href={c.href} className={`group block ${hover}`}>
+          <CardBody c={c} />
+        </Link>
+        <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-line pt-2">
+          {c.links.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="text-[11px] leading-4 text-lime-text underline-offset-2 hover:underline"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Link href={c.href} className={`panel group block p-4 ${hover} ${tint}`}>
+      <CardBody c={c} />
     </Link>
   );
 }

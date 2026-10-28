@@ -7,6 +7,7 @@ import { HealthBand, HealthChip, bandOf, isLoud, type Band } from "@/components/
 import { StateChip } from "@/components/state-chip";
 import { MessageLink } from "@/components/message-link";
 import { defaultSortMode } from "@/lib/members-list";
+import { studioToday } from "@/lib/dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ type Row = {
   current_plan_name: string | null; plan_type: string | null;
   expires_on: string | null; credits_remaining: number | null;
   plan_state: string; complimentary: boolean; free_stage: string | null;
-  has_unpaid_booking: boolean;
+  has_unpaid_booking: boolean; joined_on: string | null;
 };
 
 export default async function Members({
@@ -94,6 +95,20 @@ export default async function Members({
   } else if (filter === "no_app") {
     shown = shown.filter((m) => !m.user_id);
     membershipFilterLabel = "No app yet";
+  } else if (filter === "can_book") {
+    // Decision 86. The active-members card: a member who can book RIGHT NOW is
+    // one on a usable plan — the same two plan_states the "On a plan" plan chip
+    // gathers, so the card and this list are the one definition.
+    shown = shown.filter((m) => m.plan_state === "on_plan" || m.plan_state === "expiring");
+    membershipFilterLabel = "Can book now";
+  } else if (filter === "attended_30d") {
+    const cutoff = Date.now() - 30 * 864e5;
+    shown = shown.filter((m) => m.last_visit_at != null && Date.parse(m.last_visit_at) >= cutoff);
+    membershipFilterLabel = "Came in the last 30 days";
+  } else if (filter === "joined_month") {
+    const monthStart = studioToday(ctx.timeZone).slice(0, 8) + "01";
+    shown = shown.filter((m) => m.joined_on != null && m.joined_on >= monthStart);
+    membershipFilterLabel = "Joined this month";
   } else if (spec?.bands) {
     shown = shown.filter((m) => spec.bands!.includes(bandOf(m.health_band)));
   }
@@ -198,7 +213,7 @@ export default async function Members({
               No app
               <span className="num ml-1.5 opacity-60">{all.filter((m) => !m.user_id).length}</span>
             </Pill>
-            {membershipFilterLabel && (filter === "past_due" || filter === "payment") && (
+            {membershipFilterLabel && filter !== "no_app" && (
               <Pill href={href({ filter })} active>{membershipFilterLabel}</Pill>
             )}
           </PillRow>

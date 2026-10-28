@@ -1891,3 +1891,18 @@ Who to call / /instructor/me
 - Injury or anything medical: first aid, then call the studio.
 - A member who cannot log in: Forgot your password on the login screen sends them a reset link.
 - You see today's roster, not members' profiles or payment history. That is by design.
+
+## 86 — Dashboard cards open the list they counted (2026-10-28)
+
+Every card on the staff home opens the list of exactly the things it counted, for the same day or window, with names and a link onward to the roster, the member or the payment. Today is the studio's local day everywhere. A card with nothing to show says so in words on the card and still opens its (empty) list. No em dashes in card text.
+
+Definitions, targets and the list each opens:
+
+- **Today's revenue.** Money taken today in the studio's day, all methods and sources (the sum of every succeeded or partially-refunded payment). Opens a new per-payment list for today: one row per payment (time, member, item, amount, method, recorded by), with a total. The list total and the card value are the same number, by construction (both the sum of today's payments) — not the Sales screen, whose rows are one-per-purchase by month and would not add up to the card. A payment row links to that member's payment panel.
+- **Today's bookings.** Seats in today's classes (not bookings made today — the definition changes from what the card counted before). Opens Today's classes: each class in time order with its booked members, the seat kind (plan / free first / drop-in paid / drop-in unpaid / complimentary) and checked-in state; the class links to its roster, a name to the member.
+- **Attendance.** Of people booked into today's classes that have already ended, the share who came. Opens the same Today's classes list restricted to ended classes (the same page, `?ended=1`), attended or no-show per row, with the day's percentage.
+- **Active members.** Members who can book right now — a live plan or classes left — not merely status active. A second line reads "N came in the last 30 days". Opens Members filtered to can-book, showing plan and classes left; the second line opens Members who attended in the last 30 days; "joined this month" opens Members joined this month.
+- **Members at risk.** Members in the at-risk band. Opens the Retention board at its At risk section (`/retention#at_risk`). (The old `/members?band=at_risk` href was a dead param — the members list reads `?filter=`, never `?band=` — so it had been landing unfiltered.)
+- **Average class occupancy.** Seats filled over capacity across classes that ran in the last 30 days. Opens Classes, last 30 days: booked / capacity per class, emptiest first.
+- **Challenge participation.** Members in the current challenge and how many finished. Opens that challenge's participants with progress — the href carries the challenge id (`/challenges/{id}`), not the challenge list.
+- **The conversion card (free first).** Of members who have taken a free first class, how many then bought a plan, shown as "n of m". This is the free-first conversion (Decision 30), and it is the eighth card; its existing label "First-timers converted" stands. Opens Members who took a free class: free class date, converted yes or no, plan bought; an unconverted row links to the retention reach-out. There are eight cards, not nine: the host-brought-guest conversion (Decision 26) is dropped from the dashboard. Its number survives as one line on the free-class members page — "n brought by a member" — and nothing more.
