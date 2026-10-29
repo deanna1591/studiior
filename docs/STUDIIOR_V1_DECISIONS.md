@@ -1896,6 +1896,98 @@ Who to call / /instructor/me
 - A member who cannot log in: Forgot your password on the login screen sends them a reset link.
 - You see today's roster, not members' profiles or payment history. That is by design.
 
+### Amendment (a) — the Studio Guide shows the real buttons (Deanna, 29 Oct 2026)
+
+(a) The guide shows the thing to tap, not just its name. Three element types, drawn by the app from its own components so they always match the instructor's screen and the studio's theme: a step (one short instruction with the real tab icon or button shown inline), a screen picture (a simplified rendering of a whole screen built from the real components with made-up names, with a one-line caption), and an Important box (a bordered, tinted box for a rule that costs money or trust if missed; at most one per section). Content is platform-wide and studio-neutral; {studio_name} is the only token; no prices, no studio names, no em dashes. The content below is the record; the code carries it verbatim. Recorded 2026-10-29.
+
+NOTATION: [tab X] = the tab-bar icon with its label; [button X] = the real button; [screen X] = a screen picture; a line starting Important: = an Important box.
+
+INTRO CARDS
+1. Welcome to {studio_name} / Your roster, your pay and your schedule are all here. These are the five things you will use most. / [tab My schedule] [tab Open classes] [tab My pay] [tab Me]
+2. Check everyone in / Check in every member before class starts. Scan their code or tap their name. Anyone not checked in is marked as a no-show after class. / [button Check in]
+3. Walk-ins / Someone at the door who is not on the roster? Tap Add a walk-in at the bottom of the roster. The app does the rest. / [button Add a walk-in]
+4. Payments at the desk / Take the payment from the client first, then record it in the app. Every payment is saved under your name. / [button Paid at desk] [button Sold a plan at desk]
+5. Can't make a class? / Ask for cover from the class. The class is still yours until someone else takes it. And tap Checked in for pay at every class. That is what releases your pay. / [button Ask for cover] [button Checked in for pay]
+Last card button: Got it.
+
+HINTS (one line, shown once, button drawn inline)
+roster: Check in everyone before class starts. Walk-ins are at the bottom. [button Check in]
+pay: Tap Checked in for pay at every class. It releases your pay. [button Checked in for pay]
+cover: The class is still yours until someone else takes it. [button Can't make it]
+
+SECTION 1. Before class (go: /instructor/schedule)
+1. Arrive 15 minutes early. Open [tab My schedule]. Today's classes are listed with how many people are booked.
+2. Tap your class to open the roster. You will see who is booked, who is already checked in, and a note on anyone who needs attention.
+3. [screen Roster]
+4. Notes you may see on a row: First class on us (a first-timer, welcome them and show them around), Waiver not signed (they sign before class), Unpaid (they pay at the desk before class).
+5. Count the people in the room against the roster. The app never overbooks, so an extra person is in the wrong class. Check their booking time.
+6. A class marked Not running is cancelled. If someone shows up for it, put them in the next class with a free seat. See Walk-ins.
+
+SECTION 2. Checking in (go: the roster)
+Important: Check in every member before class starts. Anyone not checked in is marked as a no-show, which may cost them a credit or a fee.
+1. Fastest: tap [button Scan a member's code] and scan the QR code on their phone. Their row is ticked.
+2. No phone? Tap [button Check in] on their row.
+3. [button Check everyone in] ticks everyone at once. Use it only after you have counted the room. It also ticks people who are not there.
+4. If the app says They need to sign the studio waiver first: they sign on your phone, or on paper. For paper, tap [button Paper waiver signed] on their row. No waiver, no class.
+5. If the app says They aren't booked into this class: they are a walk-in. See the next section.
+6. If the app says The check-in window is closed: it is too early. It opens on its own before class.
+
+SECTION 3. Walk-ins (go: the roster)
+A walk-in is anyone in the studio who is not on your roster.
+1. Scroll to the bottom of the roster. Tap [button Add a walk-in].
+2. [screen Add a walk-in]
+3. Type their name, email and mobile. Tap [button Add]. The line under the button tells you what happened.
+4. Added, free first class: a new member. Their account is created, they are booked and checked in. Nothing to pay. Give them the waiver.
+5. Added, on their plan: a member with classes left. Nothing to pay.
+6. Added, drop-in, amount due: a member with no plan. They pay before class and you record it. See Payments at the desk.
+7. They're booked into another class today: tap [button Move them here]. Their booking moves to this class, no fee, and they are checked in.
+8. This class is full: the app shows the next classes with free seats. Offer one of those. Never add a seat over capacity.
+
+SECTION 4. Payments at the desk (go: the roster)
+Important: Take the payment from the client first, then record it in the app. Only record a payment you saw go through. Every payment is saved under your name.
+1. An unpaid seat shows Unpaid and the amount on its row, with two buttons.
+2. [screen Paid at desk]
+3. Drop-in paid: tap [button Paid at desk]. Choose GCash, Cash or Card. Keep the amount. Type the reference number if there is one. Tap [button Record payment]. The row turns paid and the member gets a receipt.
+4. Buying a plan: tap [button Sold a plan at desk]. Choose the plan (the price fills in), the method, the reference. Tap [button Record sale]. The plan starts today.
+5. If they are in this class as an unpaid drop-in, tick Use it for today's class before you record the sale. Today's class comes off the new plan, so they do not pay twice.
+6. You can only record payments for a class you are teaching today. For any other day, they pay online or on their next visit.
+7. Refunds and plan changes are done by the studio, not you. Pass it on.
+
+SECTION 5. After class (go: /instructor/schedule)
+If everyone was checked in, you are done. After the class ends, the app marks check-ins as attended and everyone else as no-shows.
+1. Forgot someone? Check them in before you leave: [tab My schedule], tap the class, tap [button Check in] on their row.
+2. If the class is already closed (the row is grey), message the studio with the name and the class. They will fix it.
+3. If a class ends with nobody checked in, you get a notification. Open the roster and check in everyone who came.
+
+SECTION 6. Can't make a class (go: /instructor/shifts)
+Important: The class is still yours until someone else takes it and the studio approves. Asking is not the same as covered.
+1. Open [tab My schedule], tap the class, tap [button Can't make it].
+2. Say why, then choose a colleague or Anyone who can take it. Send.
+3. You will get a notification when it is covered. Until then, you are teaching it.
+4. To take someone else's class, open [tab Open classes] and tap [button Take this class]. If it fits your availability, it is yours right away. If not, the studio decides.
+5. Fill in My availability under [tab Me] every month before the schedule is made.
+
+SECTION 7. Your pay (go: /instructor/pay)
+Important: Tap Checked in for pay at every class you teach, including covers. It releases your pay for that class.
+1. [button Checked in for pay] is at the top of every roster. Tap it when you arrive.
+2. Open [tab My pay] to see this period and past statements: each class, the rate, covers, and the total.
+3. If you have any questions about your statement or your pay, send them to the studio from that screen. That keeps your question with the statement.
+4. Desk payments you took is also on [tab My pay]. This is the studio's money you recorded at the desk, listed so you can balance the terminal and e-wallet at the end of the day. It is not part of your pay.
+
+SECTION 8. Who to call (go: /instructor/me)
+These are handled by the studio, not in the app. If a member asks, tell them the studio will sort it, and pass it on the same day.
+1. Refunds, wrong charges, plan changes, or a no-show they say is unfair: message the studio with the name, the class and what happened.
+2. Injury or anything medical: first aid first, then call the studio.
+3. A member who cannot log in: they tap Forgot your password? on the login screen. Nothing for you to do.
+4. A class record that is wrong after the class closed: message the studio with the name and the class.
+5. Terminal or e-wallet down: let the member take the class, leave the row unpaid, and tell the studio. They pay next visit.
+6. You see today's roster only, not member profiles or payment history. That is by design.
+
+SCREEN PICTURES
+Roster: class header with the Checked in for pay button, four member rows (one ticked, one with First class on us, one with Waiver not signed, one with Unpaid and its two buttons), Add a walk-in at the bottom. Caption: Your roster before class. Every row needs a tick before you start.
+Add a walk-in: the Name, Email and Mobile fields, the Add button, and the result line Added, free first class. Caption: Type their details and tap Add. The line under the button tells you what happened.
+Paid at desk: an unpaid row opened, with the GCash, Cash and Card chips, the amount filled in, the Reference field, and Record payment. Caption: Take the payment from the client first, then record it here.
+
 ## 86 — Dashboard cards open the list they counted (2026-10-28)
 
 Every card on the staff home opens the list of exactly the things it counted, for the same day or window, with names and a link onward to the roster, the member or the payment. Today is the studio's local day everywhere. A card with nothing to show says so in words on the card and still opens its (empty) list. No em dashes in card text.

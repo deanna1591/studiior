@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { INTRO_CARDS, fillStudio } from "@/lib/instructor-guide";
+import { INTRO_CARDS, INTRO_DONE_LABEL, fillStudio } from "@/lib/instructor-guide";
+import { GuideRefs } from "@/components/instructor/guide-ui";
 
 /**
  * Decision 85 — the first-open intro: five cards, shown once per person on the
@@ -43,6 +44,7 @@ export default function IntroCards({
         {fillStudio(card.title, studioName)}
       </h2>
       <p className="mt-1.5 text-[14px] leading-[21px] text-ink-2">{card.body}</p>
+      <GuideRefs refs={card.refs} />
       <div className="mt-4 flex items-center gap-2">
         <div className="flex flex-1 items-center gap-1.5" aria-hidden>
           {INTRO_CARDS.map((_, k) => (
@@ -60,7 +62,7 @@ export default function IntroCards({
         <button type="button" onClick={() => (last ? finish() : go(i + 1))}
           className="m-tap rounded-full px-5 text-[13px] font-bold"
           style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-          {last ? "Got it" : "Next"}
+          {last ? INTRO_DONE_LABEL : "Next"}
         </button>
       </div>
     </section>

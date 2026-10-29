@@ -108,7 +108,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
     <InstructorShell ctx={ctx} title={r.name}>
       {/* Decision 85: first-time hint on the roster. */}
       {!ctx.hints_seen?.roster && (
-        <GuideHint text={HINTS.roster}
+        <GuideHint text={HINTS.roster.text} refs={HINTS.roster.refs}
           onDismiss={async () => { "use server"; return markGuide("roster"); }} />
       )}
       <div className="-mt-3 mb-4 flex items-center gap-2">

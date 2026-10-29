@@ -157,7 +157,7 @@ export default async function MySchedule({
       {/* Decision 85: first-time hint about cover — this is where a class is
           tapped and "Can't make it" lives. */}
       {!ctx.hints_seen?.cover && (
-        <GuideHint text={HINTS.cover}
+        <GuideHint text={HINTS.cover.text} refs={HINTS.cover.refs}
           onDismiss={async () => { "use server"; return markGuide("cover"); }} />
       )}
       {week.error && (
