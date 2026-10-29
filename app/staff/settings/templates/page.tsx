@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
-import { TEMPLATE_GROUPS } from "@/lib/templates";
+import { TEMPLATE_GROUPS, featureSet, isTemplateVisible } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -21,19 +21,32 @@ export default async function TemplatesScreen() {
     return <AppShell {...shell} title="Templates"><Denied what="templates" role={ctx.role} /></AppShell>;
   }
 
-  const [{ data: overrides }, { data: existing }, { data: settings }] = await Promise.all([
+  const [{ data: overrides }, { data: existing }, { data: settings }, { count: productCount }] = await Promise.all([
     supabase.from("notification_templates_overrides").select("key").eq("studio_id", ctx.studioId),
     supabase.from("notification_templates").select("key"),
-    supabase.from("studio_settings").select("disabled_templates").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings")
+      .select("disabled_templates, flex_enabled, free_first_class_enabled, guest_passes_enabled, challenges_enabled, guarantees_enabled")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("studio_id", ctx.studioId),
   ]);
   const customised = new Set((overrides ?? []).map((o: { key: string }) => o.key));
   // Only show keys that actually exist as templates — the grouped list names the
   // whole member/instructor set, but a studio only has the ones seeded for it.
   const present = new Set((existing ?? []).map((t: { key: string }) => t.key));
   const disabled = new Set(((settings?.disabled_templates as string[] | null) ?? []));
+  // Hide a feature's templates while that feature is off (not deleted; the switch
+  // is kept, and it returns when the feature is turned on).
+  const features = featureSet({
+    flex: settings?.flex_enabled ?? false,
+    freeFirst: settings?.free_first_class_enabled ?? false,
+    guest: settings?.guest_passes_enabled ?? false,
+    challenges: settings?.challenges_enabled ?? false,
+    shop: (productCount ?? 0) > 0,
+    guarantees: settings?.guarantees_enabled ?? false,
+  });
 
   const groups = TEMPLATE_GROUPS
-    .map((g) => ({ ...g, keys: g.keys.filter((k) => present.has(k.key)) }))
+    .map((g) => ({ ...g, keys: g.keys.filter((k) => present.has(k.key) && isTemplateVisible(k.key, features)) }))
     .filter((g) => g.keys.length > 0);
 
   return (
@@ -49,9 +62,14 @@ export default async function TemplatesScreen() {
           <div className="divide-y divide-line rounded border border-line bg-surface">
             {g.keys.map((k) => (
               <Link key={k.key} href={`/settings/templates/${k.key}`}
-                className="flex items-center justify-between px-3.5 py-2.5 hover:bg-paper">
-                <span className="text-[13px] text-ink">{k.label}</span>
-                <span className="flex items-center gap-2">
+                className="flex items-start justify-between gap-3 px-3.5 py-2.5 hover:bg-paper">
+                <span className="min-w-0">
+                  <span className="block text-[13px] text-ink">{k.label}</span>
+                  <span className="mt-0.5 block text-[12px] leading-[17px] text-ink-3">
+                    {k.audience} · {k.when}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2 pt-0.5">
                   {disabled.has(k.key) && (
                     <span className="rounded bg-paper px-1.5 py-0.5 text-[11px] text-ink-2">Off</span>
                   )}

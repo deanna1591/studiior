@@ -25,7 +25,7 @@ export default async function MembershipSettings() {
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Memberships & payments"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
 
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }] = await Promise.all([
+  const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }, { data: tplOverrides }] = await Promise.all([
     supabase.from("studio_settings")
       .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, guest_passes_enabled, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates")
       .eq("studio_id", ctx.studioId).maybeSingle(),
@@ -34,6 +34,7 @@ export default async function MembershipSettings() {
     supabase.from("membership_plans").select("id", { count: "exact", head: true }).eq("studio_id", ctx.studioId).not("max_active_members", "is", null),
     supabase.from("challenges").select("id", { count: "exact", head: true }).eq("studio_id", ctx.studioId).eq("audience", "member").limit(1),
     supabase.from("membership_plans").select("id, name").eq("studio_id", ctx.studioId).eq("status", "active").order("sort_order"),
+    supabase.from("notification_templates_overrides").select("key").eq("studio_id", ctx.studioId),
   ]);
 
   const fmtDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -89,6 +90,8 @@ export default async function MembershipSettings() {
           aiDrafts={s?.ai_drafts_enabled ?? false} studioVoice={s?.studio_voice ?? null}
           bookFirstCap={s?.convert_book_first_daily_cap ?? 30}
           disabledTemplates={(s?.disabled_templates as string[] | null) ?? []}
+          customisedTemplates={(tplOverrides ?? []).map((o) => o.key as string)}
+          freeFirstEnabled={s?.free_first_class_enabled ?? false}
           plans={(activePlans ?? []).map((p) => ({ id: p.id as string, name: p.name as string }))} />
       </SettingsSection>
 

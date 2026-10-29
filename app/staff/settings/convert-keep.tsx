@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { useFormState } from "react-dom";
 import { Notice, buttonQuietClass } from "@/components/ui";
-import { templateKeysForMaster } from "@/lib/templates";
+import { templateKeysForMaster, type TemplateKey } from "@/lib/templates";
 import { setTemplateEnabled } from "@/app/staff/settings/templates/actions";
 import { saveConvertKeep, type PlainState } from "./actions";
 
@@ -21,8 +22,8 @@ function Save() {
  * switch above still has to be on for any of these to send.
  */
 function TemplateToggleList({
-  master, keys, disabled,
-}: { master: "convert" | "keep"; keys: { key: string; label: string }[]; disabled: Set<string> }) {
+  master, keys, disabled, customised,
+}: { master: "convert" | "keep"; keys: TemplateKey[]; disabled: Set<string>; customised: Set<string> }) {
   const router = useRouter();
   const [off, setOff] = useState<Set<string>>(new Set(disabled));
   const [pending, start] = useTransition();
@@ -52,14 +53,23 @@ function TemplateToggleList({
         {keys.map((k) => {
           const isOff = off.has(k.key);
           return (
-            <div key={k.key} className="flex items-center justify-between py-1.5">
-              <span className="text-[13px] text-ink">{k.label}</span>
-              <button type="button" onClick={() => toggle(k.key)} disabled={pending}
-                aria-pressed={!isOff}
-                className={`shrink-0 rounded px-2.5 py-1 text-[12px] font-medium disabled:opacity-50 ${
-                  isOff ? "border border-line-2 bg-surface text-ink-2 hover:text-ink" : "bg-accent-chip text-ink"}`}>
-                {isOff ? "Off" : "On"}
-              </button>
+            <div key={k.key} className="flex items-start justify-between gap-3 py-2">
+              <span className="min-w-0">
+                <Link href={`/settings/templates/${k.key}`}
+                  className="text-[13px] text-ink underline-offset-2 hover:underline">{k.label}</Link>
+                <span className="mt-0.5 block text-[12px] leading-[17px] text-ink-3">{k.when}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2 pt-0.5">
+                {customised.has(k.key)
+                  ? <span className="rounded bg-accent-chip px-1.5 py-0.5 text-[11px] text-ink">Customised</span>
+                  : <span className="text-[12px] text-ink-3">Default</span>}
+                <button type="button" onClick={() => toggle(k.key)} disabled={pending}
+                  aria-pressed={!isOff}
+                  className={`rounded px-2.5 py-1 text-[12px] font-medium disabled:opacity-50 ${
+                    isOff ? "border border-line-2 bg-surface text-ink-2 hover:text-ink" : "bg-accent-chip text-ink"}`}>
+                  {isOff ? "Off" : "On"}
+                </button>
+              </span>
             </div>
           );
         })}
@@ -77,17 +87,18 @@ function TemplateToggleList({
  */
 export default function ConvertKeepPanel({
   enabled, keepEnabled, tasksEnabled, planId, days, exclusive, tasksTo, plans,
-  aiDrafts, studioVoice, bookFirstCap, disabledTemplates,
+  aiDrafts, studioVoice, bookFirstCap, disabledTemplates, customisedTemplates, freeFirstEnabled,
 }: {
   enabled: boolean; keepEnabled: boolean; tasksEnabled: boolean;
   planId: string | null; days: number;
   exclusive: boolean; tasksTo: string;
   plans: { id: string; name: string }[];
   aiDrafts: boolean; studioVoice: string | null; bookFirstCap: number;
-  disabledTemplates: string[];
+  disabledTemplates: string[]; customisedTemplates: string[]; freeFirstEnabled: boolean;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveConvertKeep, null);
   const off = new Set(disabledTemplates);
+  const customised = new Set(customisedTemplates);
   return (
     <div className="max-w-2xl">
     <form action={action}>
@@ -233,8 +244,12 @@ export default function ConvertKeepPanel({
       </a>
     </form>
 
-    <TemplateToggleList master="convert" keys={templateKeysForMaster("convert")} disabled={off} />
-    <TemplateToggleList master="keep" keys={templateKeysForMaster("keep")} disabled={off} />
+    {/* The convert emails only ever fire for a free-first taker, so the list is
+        hidden while free first class is off — the keys keep their switches. */}
+    {freeFirstEnabled && (
+      <TemplateToggleList master="convert" keys={templateKeysForMaster("convert")} disabled={off} customised={customised} />
+    )}
+    <TemplateToggleList master="keep" keys={templateKeysForMaster("keep")} disabled={off} customised={customised} />
     </div>
   );
 }
