@@ -1,5 +1,6 @@
 import { Icon } from "@/components/member/icons";
 import { TABS, BUTTONS } from "@/lib/guide-ui-registry";
+import { splitGuideText } from "@/lib/instructor-guide";
 import type { GuideRef as Ref } from "@/lib/instructor-guide";
 
 /**
@@ -20,13 +21,18 @@ import type { GuideRef as Ref } from "@/lib/instructor-guide";
  */
 
 const BUTTON_CLASS = "inline-flex items-center rounded-full px-3 py-1 text-[12px] leading-4 font-bold";
+// Inline chips sit on the text baseline with a 4px gap each side, and wrap with
+// the sentence (they are inline elements, so a long line breaks around them).
+const INLINE = " align-baseline mx-1";
 
-/** One ui ref as a chip. A screen ref is block-level (GuideScreen), not inline. */
-export function GuideRef({ refr }: { refr: Ref }) {
+/** One ui ref as a chip. Inline (the default) renders it on the text baseline;
+ *  a screen ref is block-level (GuideScreen), never here. */
+export function GuideRef({ refr, inline = true }: { refr: Ref; inline?: boolean }) {
+  const gap = inline ? INLINE : "";
   if (refr.kind === "tab") {
     const t = TABS[refr.key];
     return (
-      <span className="inline-flex items-center gap-1 rounded-lg border border-line-2 bg-surface px-2 py-1 text-[12px] leading-4 font-medium text-ink">
+      <span className={`inline-flex items-center gap-1 rounded-lg border border-line-2 bg-surface px-2 py-0.5 text-[12px] leading-4 font-medium text-ink${gap}`}>
         {t && <Icon name={t.icon} size={13} className="text-ink-2" />}
         {refr.key}
       </span>
@@ -35,24 +41,30 @@ export function GuideRef({ refr }: { refr: Ref }) {
   if (refr.kind === "button") {
     const variant = BUTTONS[refr.key] ?? "outline";
     if (variant === "solid") {
-      return <span className={BUTTON_CLASS} style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>{refr.key}</span>;
+      return <span className={BUTTON_CLASS + gap} style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>{refr.key}</span>;
     }
     if (variant === "tint") {
-      return <span className={BUTTON_CLASS} style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>{refr.key}</span>;
+      return <span className={BUTTON_CLASS + gap} style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>{refr.key}</span>;
     }
-    return <span className="inline-flex items-center rounded-full border border-line-2 bg-surface px-3 py-1 text-[12px] leading-4 font-medium text-ink">{refr.key}</span>;
+    return <span className={`inline-flex items-center rounded-full border border-line-2 bg-surface px-3 py-1 text-[12px] leading-4 font-medium text-ink${gap}`}>{refr.key}</span>;
   }
   return null;
 }
 
-/** The chips that follow a line, wrapped. Null when there are none. */
-export function GuideRefs({ refs }: { refs?: Ref[] }) {
-  const chips = (refs ?? []).filter((r) => r.kind !== "screen");
-  if (chips.length === 0) return null;
+/** A guide line with its chips inline, exactly where each control is named —
+ *  "Open [tab My schedule], tap the class, tap [button Can't make it]." renders
+ *  the text runs and the chips in order, on one flowing line that wraps. The ONE
+ *  parser (splitGuideText) decides the runs, so the node test asserts on the
+ *  same split: no text run carries a bracket, every ref run resolves to a chip. */
+export function GuideText({ text }: { text: string }) {
   return (
-    <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-      {chips.map((r, i) => <GuideRef key={i} refr={r} />)}
-    </span>
+    <>
+      {splitGuideText(text).map((run, i) =>
+        run.t === "text"
+          ? <span key={i}>{run.value}</span>
+          : <GuideRef key={i} refr={{ kind: run.kind, key: run.key }} />,
+      )}
+    </>
   );
 }
 

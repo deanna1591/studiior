@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { INTRO_CARDS, INTRO_DONE_LABEL, fillStudio } from "@/lib/instructor-guide";
-import { GuideRefs } from "@/components/instructor/guide-ui";
+import { GuideText } from "@/components/instructor/guide-ui";
 
 /**
  * Decision 85 — the first-open intro: five cards, shown once per person on the
@@ -43,8 +43,9 @@ export default function IntroCards({
       <h2 className="mt-1 text-[20px] font-semibold leading-7 text-ink">
         {fillStudio(card.title, studioName)}
       </h2>
-      <p className="mt-1.5 text-[14px] leading-[21px] text-ink-2">{card.body}</p>
-      <GuideRefs refs={card.refs} />
+      <p className="mt-1.5 text-[14px] leading-[25px] text-ink-2">
+        <GuideText text={card.body} />
+      </p>
       <div className="mt-4 flex items-center gap-2">
         <div className="flex flex-1 items-center gap-1.5" aria-hidden>
           {INTRO_CARDS.map((_, k) => (

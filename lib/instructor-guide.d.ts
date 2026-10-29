@@ -1,7 +1,10 @@
 export interface GuideRef { kind: "tab" | "button" | "screen"; key: string }
-export interface IntroCard { title: string; body: string; refs: GuideRef[] }
-export interface GuideHintContent { text: string; refs: GuideRef[] }
-export interface GuideStep { text?: string; refs?: GuideRef[]; screen?: string; caption?: string }
+export type GuideRun =
+  | { t: "text"; value: string }
+  | { t: "ref"; kind: "tab" | "button"; key: string };
+export interface IntroCard { title: string; body: string }
+export interface GuideHintContent { text: string }
+export interface GuideStep { text?: string; screen?: string; caption?: string }
 export interface GuideSection {
   title: string;
   go: string;
@@ -9,6 +12,7 @@ export interface GuideSection {
   intro?: string;
   steps: GuideStep[];
 }
+export function splitGuideText(text: string): GuideRun[];
 export const INTRO_CARDS: IntroCard[];
 export const INTRO_DONE_LABEL: string;
 export const HINTS: { roster: GuideHintContent; pay: GuideHintContent; cover: GuideHintContent };

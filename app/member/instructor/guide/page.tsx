@@ -2,7 +2,7 @@ import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { SECTIONS } from "@/lib/instructor-guide";
-import { GuideRefs, GuideScreen, ImportantBox } from "@/components/instructor/guide-ui";
+import { GuideText, GuideScreen, ImportantBox } from "@/components/instructor/guide-ui";
 import { Icon } from "@/components/member/icons";
 
 export const dynamic = "force-dynamic";
@@ -46,9 +46,8 @@ export default async function GuidePage() {
                     <div key={i} className="flex gap-2.5">
                       <span className="num mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
                             style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>{n}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13.5px] leading-[20px] text-ink-2">{step.text}</span>
-                        <GuideRefs refs={step.refs} />
+                      <span className="min-w-0 flex-1 text-[13.5px] leading-[24px] text-ink-2">
+                        <GuideText text={step.text ?? ""} />
                       </span>
                     </div>
                   );

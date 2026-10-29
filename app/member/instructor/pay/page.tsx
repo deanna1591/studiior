@@ -101,7 +101,7 @@ export default async function PayPage({ searchParams }: { searchParams: { period
     <InstructorShell ctx={ctx} title="My pay">
       {/* Decision 85: first-time hint on My pay. */}
       {!ctx.hints_seen?.pay && (
-        <GuideHint text={HINTS.pay.text} refs={HINTS.pay.refs}
+        <GuideHint text={HINTS.pay.text}
           onDismiss={async () => { "use server"; return markGuide("pay"); }} />
       )}
       {/* period picker — newest first, the selected one filled */}
