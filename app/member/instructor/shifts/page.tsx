@@ -170,7 +170,8 @@ export default async function ShiftsPage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="min-w-0 truncate text-[15px] leading-5 text-ink">{o.name}</span>
-                    <ClassTag tier={o.tier} flexDeadlineShort={o.flex_deadline_short} />
+                    <ClassTag tier={o.tier} flexDeadlineShort={o.flex_deadline_short}
+                      guaranteesEnabled={ctx.guaranteesEnabled} flexEnabled={ctx.flexEnabled} />
                   </span>
                   <span className="m-sub block text-ink-3">
                     {o.when_label}{o.room_name ? ` · ${o.room_name}` : ""}

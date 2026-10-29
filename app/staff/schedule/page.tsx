@@ -391,7 +391,7 @@ export default async function Schedule({
                     <ShowAllToggle anchor={anchor} view={view} showAll={showAll} instructor={instructorFilter} />
                   )}
                   <JumpToDate anchor={anchor} view={view} instructor={instructorFilter} />
-                  <NavLink href="/schedule/flex">Flex</NavLink>
+                  {(settings?.flex_enabled ?? false) && <NavLink href="/schedule/flex">Flex</NavLink>}
                   <NavLink href="/shifts/applications">Applications</NavLink>
                   <NavLink href="/classes/new">Add a class</NavLink>
                 </>

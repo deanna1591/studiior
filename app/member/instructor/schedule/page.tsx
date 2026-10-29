@@ -259,7 +259,8 @@ export default async function MySchedule({
                       b.klass?.local_start ?? b.pending!.local_start))
                   .map((row, i) =>
                     row.klass
-                      ? <ClassRow key={row.klass.occurrence_id} c={row.klass} confirmationsOn={confirmationsOn} />
+                      ? <ClassRow key={row.klass.occurrence_id} c={row.klass} confirmationsOn={confirmationsOn}
+                          guaranteesEnabled={ctx.guaranteesEnabled} flexEnabled={ctx.flexEnabled} />
                       : <PendingRow key={`p-${row.pending!.occurrence_id}-${i}`} p={row.pending!} />
                   )}
               </ul>
@@ -305,7 +306,9 @@ function PendingRow({ p }: { p: Pending }) {
   );
 }
 
-function ClassRow({ c, confirmationsOn }: { c: Klass; confirmationsOn: boolean }) {
+function ClassRow({ c, confirmationsOn, guaranteesEnabled, flexEnabled }: {
+  c: Klass; confirmationsOn: boolean; guaranteesEnabled: boolean; flexEnabled: boolean;
+}) {
   const off = c.status === "cancelled";
 
   return (
@@ -322,7 +325,8 @@ function ClassRow({ c, confirmationsOn }: { c: Klass; confirmationsOn: boolean }
                 {c.name}
               </span>
               <ClassTag tier={c.tier} flex={c.flex} committed={c.committed}
-                        cancelled={off} flexDeadlineShort={c.flex_deadline_short} />
+                        cancelled={off} flexDeadlineShort={c.flex_deadline_short}
+                        guaranteesEnabled={guaranteesEnabled} flexEnabled={flexEnabled} />
             </span>
             <span className="m-sub block text-ink-3">
               {c.room_name ?? "No room"} · {c.local_start}–{c.local_end}

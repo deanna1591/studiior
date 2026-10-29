@@ -187,7 +187,8 @@ export default async function InstructorHome() {
               {nextWeekLabel ? <>Next class · week of <span className="num">{nextWeekLabel}</span></> : "Next class"}
             </p>
             <ClassTag tier={next.tier} flex={next.flex} committed={next.committed}
-                      flexDeadlineShort={next.flex_deadline_short} />
+                      flexDeadlineShort={next.flex_deadline_short}
+                      guaranteesEnabled={ctx.guaranteesEnabled} flexEnabled={ctx.flexEnabled} />
           </div>
           <p className="mt-1 text-[19px] font-semibold leading-6 text-ink">{next.name}</p>
           <p className="mt-1 text-[14px] leading-5 text-ink-2">
@@ -233,7 +234,8 @@ export default async function InstructorHome() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="min-w-0 truncate text-[14px] text-ink">{c.class_name}</span>
-                        <ClassTag tier={c.tier} flexDeadlineShort={c.flex_deadline_short} />
+                        <ClassTag tier={c.tier} flexDeadlineShort={c.flex_deadline_short}
+                          guaranteesEnabled={ctx.guaranteesEnabled} flexEnabled={ctx.flexEnabled} />
                       </span>
                       <span className="m-sub block text-ink-3">
                         {coverWhen(c.date, c.time)}{c.room ? ` · ${c.room}` : ""} · <span className="num">{c.booked}/{c.capacity}</span> booked

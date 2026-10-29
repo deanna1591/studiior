@@ -116,7 +116,8 @@ export default async function RosterPage({ params }: { params: { id: string } })
           {day} at <span className="num">{r.local_time}</span> ·{" "}
           <span className="num">{r.booked}</span>/<span className="num">{r.capacity}</span> booked
         </p>
-        <ClassTag tier={r.tier} flexDeadlineShort={r.flex_deadline_short} />
+        <ClassTag tier={r.tier} flexDeadlineShort={r.flex_deadline_short}
+          guaranteesEnabled={ctx.guaranteesEnabled} flexEnabled={ctx.flexEnabled} />
       </div>
 
       {/* Decision 82(a): the "check everyone in" banner, while the class is live

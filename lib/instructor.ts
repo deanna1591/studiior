@@ -49,6 +49,11 @@ export type InstructorContext = {
    *  my_instructor; the DB holds nothing studio-specific. */
   guide_seen_at: string | null;
   hints_seen: Record<string, boolean>;
+  /** The studio's guarantee/flex switches, so the instructor-facing core/flex tag
+   *  shows only the tier the studio actually runs (both off = no tag). Read in the
+   *  SAME wave as my_instructor, so no extra serial hop (Decision 82). */
+  guaranteesEnabled: boolean;
+  flexEnabled: boolean;
 };
 
 /**
@@ -63,9 +68,19 @@ export async function instructorScreen() {
   // context is ONE round trip. It used to be my_instructor, then a second wave
   // for [studio_uses_payroll, instructor_notifications] — paid on every
   // instructor screen before the page did any work of its own.
-  const { data } = await supabase.rpc("my_instructor");
+  // my_instructor is one round trip; the studio's guarantee/flex switches ride
+  // the SAME wave (parallel, not a serial hop) so the core/flex tag can show only
+  // the tier the studio runs. settings_staff_read scopes the row to the
+  // instructor's own studio(s); we pick the one this portal is for.
+  const [{ data }, { data: settingsRows }] = await Promise.all([
+    supabase.rpc("my_instructor"),
+    supabase.from("studio_settings").select("studio_id, guarantees_enabled, flex_enabled"),
+  ]);
   const ctx = data as (InstructorContext & { uses_payroll?: boolean }) | null;
   if (!ctx?.instructor_id) redirect("/instructor/login");
+  const gs = (settingsRows ?? []).find((r) => r.studio_id === ctx.studio_id);
+  ctx.guaranteesEnabled = gs?.guarantees_enabled ?? false;
+  ctx.flexEnabled = gs?.flex_enabled ?? false;
   // Payroll is opt-in (migration 139): the Pay tab shows only when the studio
   // uses the guarantee system — a studio that pays in its own books shows no Pay
   // tab (absent, not empty). The unread count drives the bell on every screen.

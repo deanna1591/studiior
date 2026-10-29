@@ -282,6 +282,7 @@ export default function ClaimCalendar({
       {sheet && (
         <ClaimSheet
           row={sheet.row} over={sheet.over} cap={coreCap} studioName={studioName}
+          guaranteesEnabled={!!terms?.guarantees_enabled} flexEnabled={!!terms?.flex_enabled}
           whenLabel={`${longDay(sheet.row.date)} · ${disp(sheet.row.time)} – ${endTime(sheet.row.time, sheet.row.duration_minutes)}${sheet.row.room ? ` · ${sheet.row.room}` : ""}`}
           onClose={() => setSheet(null)}
         />
@@ -291,14 +292,23 @@ export default function ClaimCalendar({
 }
 
 function ClaimSheet({
-  row, over, cap, studioName, whenLabel, onClose,
+  row, over, cap, studioName, whenLabel, onClose, guaranteesEnabled, flexEnabled,
 }: {
-  row: ClaimClassRow; over: boolean; cap: number; studioName: string; whenLabel: string; onClose: () => void;
+  row: ClaimClassRow; over: boolean; cap: number; studioName: string; whenLabel: string;
+  onClose: () => void; guaranteesEnabled: boolean; flexEnabled: boolean;
 }) {
   const [state, action] = useFormState<ClaimState, FormData>(claimClass, null);
   const core = row.tier === "core";
   const done = state && "ok" in state;
   const pct = cap > 0 ? Math.min(100, Math.round((row.week_core / cap) * 100)) : 0;
+  // The tier chip follows the same rule as the legend: nothing when the studio
+  // runs neither system, and the EFFECTIVE tier otherwise (a tier whose switch is
+  // off runs regardless, so it reads "Always runs").
+  const anyTier = guaranteesEnabled || flexEnabled;
+  const effTier = row.tier === "flex" ? (flexEnabled ? "flex" : "always")
+    : row.tier === "core" ? (guaranteesEnabled ? "core" : "always")
+    : "always";
+  const tierLabel = effTier === "core" ? "Core class" : effTier === "flex" ? "Flex class" : "Always runs";
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
@@ -307,10 +317,12 @@ function ClaimSheet({
            style={{ boxShadow: "0 -10px 44px rgba(22,19,17,.2)" }}>
         <div className="mx-auto mb-4 h-[5px] w-9 rounded-full" style={{ background: "var(--line-2)" }} />
 
-        <span className="mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider"
-              style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-          <Mark tier={row.tier} mine={false} /> {core ? "Core class" : row.tier === "always" ? "Always runs" : "Flex class"}
-        </span>
+        {anyTier && (
+          <span className="mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider"
+                style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+            <Mark tier={effTier} mine={false} /> {tierLabel}
+          </span>
+        )}
         <h2 className="text-[21px] font-extrabold leading-tight tracking-tight text-ink">{row.class_name}</h2>
         <p className="num mt-1 text-[13px] font-medium text-ink-2">{whenLabel}</p>
 

@@ -53,12 +53,16 @@ export default async function FlexDecisions() {
   if (!settings?.flex_enabled) {
     return (
       <AppShell {...shell} title="Flex classes"
-                actions={<NavLink href="/schedule">Back to the schedule</NavLink>}>
+                actions={<>
+                  <NavLink href="/settings/classes#core">Settings → Guarantees</NavLink>
+                  <NavLink href="/schedule">Back to the schedule</NavLink>
+                </>}>
         <Empty>
-          Flex classes are switched off. Every class runs whatever the headcount,
-          which is how this studio works today. Turning it on lets a series run
-          only if it reaches a minimum by a deadline — and members never see the
-          difference either way.
+          Flex classes are off for this studio. Every class runs whatever the
+          headcount, which is how this studio works today. Turn it on in{" "}
+          <Link href="/settings/classes#core" className="underline underline-offset-2">Settings → Guarantees</Link>{" "}
+          to let a series run only if it reaches a minimum by a deadline — members
+          never see the difference either way.
         </Empty>
       </AppShell>
     );
