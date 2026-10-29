@@ -27,6 +27,29 @@ export async function saveTemplateOverride(key: string, subject: string, body: s
   return { ok: true, sentence: "Saved. This studio's members now get your version." };
 }
 
+// Decision 78e — switch one email on or off for this studio. The off keys live in
+// studio_settings.disabled_templates (manager-up RLS is the boundary); the queue
+// choke points read it, so an off key is never sent. The master switch still wins:
+// turning an email on here does nothing while its sequence master is off.
+export async function setTemplateEnabled(key: string, enabled: boolean): Promise<TplResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "You are not signed in." };
+  const supabase = createClient();
+  const { data: s } = await supabase.from("studio_settings")
+    .select("disabled_templates").eq("studio_id", ctx.studioId).maybeSingle();
+  const current: string[] = (s?.disabled_templates as string[] | null) ?? [];
+  const next = enabled
+    ? current.filter((k) => k !== key)
+    : Array.from(new Set([...current, key]));
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ disabled_templates: next }).eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: "Nothing changed. Owners and managers only." };
+  revalidatePath(`/settings/templates/${key}`); revalidatePath("/settings/templates");
+  revalidatePath("/settings/memberships");
+  return { ok: true, sentence: enabled ? "This email is on." : "This email is off — members won't get it." };
+}
+
 export async function resetTemplateOverride(key: string): Promise<TplResult> {
   const ctx = await getStaffContext();
   if (!ctx) return { error: "You are not signed in." };

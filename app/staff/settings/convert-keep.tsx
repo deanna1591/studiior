@@ -1,13 +1,71 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { useFormState } from "react-dom";
 import { Notice, buttonQuietClass } from "@/components/ui";
+import { templateKeysForMaster } from "@/lib/templates";
+import { setTemplateEnabled } from "@/app/staff/settings/templates/actions";
 import { saveConvertKeep, type PlainState } from "./actions";
 
 function Save() {
   const { pending } = useFormStatus();
   return <button className={buttonQuietClass} disabled={pending}>{pending ? "Saving…" : "Save"}</button>;
+}
+
+/**
+ * Decision 78e — the per-email switches beneath a master switch. Each toggle
+ * saves on its own (like the plans-reorder featured/badge controls), writing
+ * studio_settings.disabled_templates through setTemplateEnabled. The master
+ * switch above still has to be on for any of these to send.
+ */
+function TemplateToggleList({
+  master, keys, disabled,
+}: { master: "convert" | "keep"; keys: { key: string; label: string }[]; disabled: Set<string> }) {
+  const router = useRouter();
+  const [off, setOff] = useState<Set<string>>(new Set(disabled));
+  const [pending, start] = useTransition();
+  const toggle = (key: string) => {
+    const enable = off.has(key);
+    start(async () => {
+      const r = await setTemplateEnabled(key, enable);
+      if (!("error" in r)) {
+        setOff((prev) => {
+          const n = new Set(prev);
+          if (enable) n.delete(key); else n.add(key);
+          return n;
+        });
+        router.refresh();
+      }
+    });
+  };
+  return (
+    <div className="mt-3 rounded border border-line bg-surface px-3.5 py-3">
+      <div className="text-[13px] font-medium text-ink">
+        {master === "convert" ? "Which convert emails to send" : "Which keep emails to send"}
+      </div>
+      <p className="mt-0.5 text-[12px] leading-[18px] text-ink-3">
+        Switch any one off and it is never sent. The master switch above still has to be on.
+      </p>
+      <div className="mt-2 divide-y divide-line">
+        {keys.map((k) => {
+          const isOff = off.has(k.key);
+          return (
+            <div key={k.key} className="flex items-center justify-between py-1.5">
+              <span className="text-[13px] text-ink">{k.label}</span>
+              <button type="button" onClick={() => toggle(k.key)} disabled={pending}
+                aria-pressed={!isOff}
+                className={`shrink-0 rounded px-2.5 py-1 text-[12px] font-medium disabled:opacity-50 ${
+                  isOff ? "border border-line-2 bg-surface text-ink-2 hover:text-ink" : "bg-accent-chip text-ink"}`}>
+                {isOff ? "Off" : "On"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -19,17 +77,20 @@ function Save() {
  */
 export default function ConvertKeepPanel({
   enabled, keepEnabled, tasksEnabled, planId, days, exclusive, tasksTo, plans,
-  aiDrafts, studioVoice, bookFirstCap,
+  aiDrafts, studioVoice, bookFirstCap, disabledTemplates,
 }: {
   enabled: boolean; keepEnabled: boolean; tasksEnabled: boolean;
   planId: string | null; days: number;
   exclusive: boolean; tasksTo: string;
   plans: { id: string; name: string }[];
   aiDrafts: boolean; studioVoice: string | null; bookFirstCap: number;
+  disabledTemplates: string[];
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveConvertKeep, null);
+  const off = new Set(disabledTemplates);
   return (
-    <form action={action} className="max-w-2xl">
+    <div className="max-w-2xl">
+    <form action={action}>
       {state && <Notice kind={state.ok ? "ok" : "error"}>{state.message}</Notice>}
 
       <div className="rounded border border-line bg-surface px-3.5 py-3">
@@ -171,5 +232,9 @@ export default function ConvertKeepPanel({
         <span className="text-[13px] text-ink-2">Edit →</span>
       </a>
     </form>
+
+    <TemplateToggleList master="convert" keys={templateKeysForMaster("convert")} disabled={off} />
+    <TemplateToggleList master="keep" keys={templateKeysForMaster("keep")} disabled={off} />
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { renderBody } from "@/lib/email-body";
 
 export type EmailImageResult = { url?: string; error?: string };
 
@@ -119,4 +120,44 @@ export async function resolveEmailCard(kind: string, id: string): Promise<Resolv
     return { name: o.name as string, detail };
   }
   return null;
+}
+
+export type PreviewResult = { subject?: string; html?: string; stripped?: string[]; error?: string };
+
+/**
+ * Decision 80d — render a composed email through the REAL frame for the live
+ * preview. The markup body is turned into HTML here (the ONE renderer, with the
+ * {accent} token so render_email fills the studio's own colour, exactly as the
+ * send path does), then preview_template wraps it in the studio's frame with a
+ * sample context and NO notification row written (the RPC is STABLE). Returns the
+ * full-document HTML the composer drops into an iframe. Manager-up in the RPC.
+ */
+export async function previewEmail(templateKey: string, subject: string, body: string): Promise<PreviewResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "You are not signed in." };
+
+  // Pre-resolve any ::: plan/class card shorthands so renderBody's sync resolver
+  // can fill them (the composer used to do this client-side; it is server-side now).
+  const cards: Record<string, ResolvedCard | null> = {};
+  for (const m of body.matchAll(/^:::\s+(plan|class)\s+(\S+)\s*$/gm)) {
+    const key = `${m[1]}:${m[2]}`;
+    if (key in cards) continue;
+    cards[key] = await resolveEmailCard(m[1], m[2]);
+  }
+  const html = renderBody(body, {
+    accent: "{accent}",
+    resolve: (kind, idv) => cards[`${kind}:${idv}`] ?? null,
+  }).html;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("preview_template", {
+    p_studio_id: ctx.studioId, p_key: templateKey, p_subject: subject, p_body: html,
+  });
+  if (error) {
+    return /PT403|manager|owner/i.test(error.message)
+      ? { error: "Your role cannot preview templates." }
+      : { error: error.message };
+  }
+  const r = (data ?? {}) as { subject?: string; html?: string; stripped?: string[] };
+  return { subject: r.subject, html: r.html, stripped: r.stripped ?? [] };
 }

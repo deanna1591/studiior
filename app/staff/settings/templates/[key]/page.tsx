@@ -26,14 +26,16 @@ export default async function TemplateEditScreen({ params }: { params: { key: st
     return <AppShell {...shell} title="Templates"><Denied what="templates" role={ctx.role} /></AppShell>;
   }
 
-  const [{ data: def }, { data: ov }] = await Promise.all([
+  const [{ data: def }, { data: ov }, { data: settings }] = await Promise.all([
     supabase.from("notification_templates").select("subject, text_body").eq("key", key).maybeSingle(),
     supabase.from("notification_templates_overrides").select("subject, body")
       .eq("studio_id", ctx.studioId).eq("key", key).maybeSingle(),
+    supabase.from("studio_settings").select("disabled_templates").eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
   if (!def) notFound();
   const placeholders = placeholdersFrom(def.subject, def.text_body);
+  const enabled = !((settings?.disabled_templates as string[] | null) ?? []).includes(key);
 
   return (
     <AppShell {...shell} title={templateLabel(key)}>
@@ -49,6 +51,7 @@ export default async function TemplateEditScreen({ params }: { params: { key: st
         overrideBody={ov?.body ?? null}
         placeholders={placeholders}
         studioName={ctx.studioName}
+        enabled={enabled}
       />
     </AppShell>
   );

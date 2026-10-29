@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import EmailComposer from "@/components/staff/email-composer";
 import { Notice, buttonQuietClass } from "@/components/ui";
-import { saveTemplateOverride, resetTemplateOverride, sendTemplateTest } from "@/app/staff/settings/templates/actions";
+import { saveTemplateOverride, resetTemplateOverride, sendTemplateTest, setTemplateEnabled } from "@/app/staff/settings/templates/actions";
 
 /**
  * Decision 78c — edit one notification template for this studio. The shared
@@ -14,12 +14,12 @@ import { saveTemplateOverride, resetTemplateOverride, sendTemplateTest } from "@
  */
 export default function TemplateEditor({
   templateKey, label, defaultSubject, defaultBody, overrideSubject, overrideBody,
-  placeholders, studioName,
+  placeholders, studioName, enabled: initialEnabled,
 }: {
   templateKey: string; label: string;
   defaultSubject: string; defaultBody: string;
   overrideSubject: string | null; overrideBody: string | null;
-  placeholders: string[]; studioName: string;
+  placeholders: string[]; studioName: string; enabled: boolean;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState(overrideSubject ?? defaultSubject);
@@ -27,6 +27,8 @@ export default function TemplateEditor({
   const hasOverride = overrideSubject !== null;
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [togglePending, startToggle] = useTransition();
 
   const run = (fn: () => Promise<{ ok: true; sentence?: string } | { error: string }>) =>
     start(async () => {
@@ -35,13 +37,41 @@ export default function TemplateEditor({
       else { setMsg({ ok: true, text: r.sentence ?? "Saved." }); router.refresh(); }
     });
 
+  const toggle = () => {
+    const next = !enabled;
+    startToggle(async () => {
+      const r = await setTemplateEnabled(templateKey, next);
+      if ("error" in r) setMsg({ ok: false, text: r.error });
+      else { setEnabled(next); setMsg({ ok: true, text: r.sentence ?? "Saved." }); router.refresh(); }
+    });
+  };
+
   return (
     <div className="max-w-2xl">
       {msg && <Notice kind={msg.ok ? "ok" : "error"}>{msg.text}</Notice>}
+
+      <div className="mb-4 flex items-start justify-between gap-4 rounded border border-line bg-surface px-3.5 py-3">
+        <span className="text-[13px] leading-[19px] text-ink">
+          <span className="font-medium">Send this email</span>
+          <span className="block text-[12px] leading-[18px] text-ink-3">
+            {enabled
+              ? "Members get this email. Switch it off to stop sending it without changing anything else."
+              : "This email is off — members don't get it. Its sequence master switch, if any, still has to be on for it to send."}
+          </span>
+        </span>
+        <button type="button" onClick={toggle} disabled={togglePending}
+          aria-pressed={enabled}
+          className={`shrink-0 rounded px-3 py-1.5 text-[13px] font-medium disabled:opacity-50 ${
+            enabled ? "bg-accent-chip text-ink" : "border border-line-2 bg-surface text-ink-2 hover:text-ink"}`}>
+          {enabled ? "On" : "Off"}
+        </button>
+      </div>
+
       <EmailComposer
         subject={subject} onSubject={setSubject}
         body={body} onBody={setBody}
         studioName={studioName}
+        templateKey={templateKey}
         onSendTest={async () => {
           const r = await sendTemplateTest(templateKey, subject, body);
           router.refresh();

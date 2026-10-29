@@ -6996,6 +6996,7 @@ export type Database = {
           cover_auto_accept_enabled: boolean
           cover_escalation_hours: number
           created_at: string
+          disabled_templates: string[]
           dropin_payment_window_minutes: number
           finalise_attendance: boolean
           finalise_days_after: number
@@ -7110,6 +7111,7 @@ export type Database = {
           cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
+          disabled_templates?: string[]
           dropin_payment_window_minutes?: number
           finalise_attendance?: boolean
           finalise_days_after?: number
@@ -7224,6 +7226,7 @@ export type Database = {
           cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
+          disabled_templates?: string[]
           dropin_payment_window_minutes?: number
           finalise_attendance?: boolean
           finalise_days_after?: number
@@ -8745,18 +8748,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9629,6 +9620,15 @@ export type Database = {
         }[]
       }
       plan_seats_taken: { Args: { p_plan_id: string }; Returns: number }
+      preview_template: {
+        Args: {
+          p_body: string
+          p_key: string
+          p_studio_id: string
+          p_subject: string
+        }
+        Returns: Json
+      }
       product_low_stock: {
         Args: { p_studio_id: string }
         Returns: {
@@ -9949,6 +9949,24 @@ export type Database = {
         Returns: Json
       }
       remove_staff: { Args: { p_staff_id: string }; Returns: Json }
+      render_email: {
+        Args: {
+          p_first_name?: string
+          p_html: string
+          p_payload: Json
+          p_recipient_type: string
+          p_studio_id: string
+          p_subject: string
+          p_template_key: string
+          p_text: string
+        }
+        Returns: {
+          html_body: string
+          stripped: string[]
+          subject: string
+          text_body: string
+        }[]
+      }
       render_notification: {
         Args: { p_notification_id: string }
         Returns: {
@@ -10595,6 +10613,10 @@ export type Database = {
           status: string
         }[]
       }
+      studio_template_enabled: {
+        Args: { p_key: string; p_studio_id: string }
+        Returns: boolean
+      }
       studio_today: { Args: { p_studio_id: string }; Returns: string }
       studio_unconfirmed_pay_count: {
         Args: { p_studio_id: string }
@@ -10655,6 +10677,10 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      template_sample_context: {
+        Args: { p_first_name: string; p_studio_id: string; p_to_email: string }
+        Returns: Json
+      }
       tier_suggestions: {
         Args: { p_studio_id: string }
         Returns: {

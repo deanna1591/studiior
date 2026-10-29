@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { renderBody } from "@/lib/email-body";
 import { shrinkImage } from "@/lib/image-shrink";
-import { uploadEmailImage, emailFrameChrome, resolveEmailCard, type EmailFrameChrome, type ResolvedCard } from "@/app/staff/email-image-actions";
+import { uploadEmailImage, previewEmail } from "@/app/staff/email-image-actions";
 
 /**
- * Decision 77 — the shared email composer, used by Campaigns and by the closure
- * notice. Subject, a plain textarea with a small fixed markup (blank line =
- * paragraph, **bold**, [text](https://url), ![alt](url) via Insert image), a
- * live preview rendered by the ONE renderer (lib/email-body), and "Send me a
- * test". Everything studio-specific — the audience/resume controls, the send
- * buttons, the in-frame footer — is passed in, so both callers reuse it
- * unchanged.
+ * Decision 77 / 80d — the shared email composer, used by Campaigns, the closure
+ * notice, every template screen and the retention board. Subject, a plain
+ * textarea with a small fixed markup (blank line = paragraph, **bold**,
+ * [text](https://url), ![alt](url) via Insert image), a live preview, and "Send
+ * me a test". The preview is the REAL email: the body is sent to preview_template,
+ * which wraps it in the studio's own frame with a sample context and writes no
+ * notification row, and the result is shown in an iframe at Mobile (375) or
+ * Desktop (600) width — the hand-built React frame is gone. Everything
+ * studio-specific is passed in, so every caller reuses it unchanged.
  */
 export default function EmailComposer({
-  subject, onSubject, body, onBody, studioName,
+  subject, onSubject, body, onBody, studioName, templateKey = "campaign",
   onSendTest, previewFooter, children, actions,
   subjectPlaceholder = "What members will see first",
   bodyPlaceholder = "Plain text. Leave a blank line between paragraphs.\n\n**bold**, [a link](https://…), and Insert image for a photo.",
@@ -25,9 +26,11 @@ export default function EmailComposer({
   body: string;
   onBody: (v: string) => void;
   studioName: string;
+  /** The notification key to render through — defaults to the campaign frame. */
+  templateKey?: string;
   /** Persist + fire the test send. Returns a sentence or an error. */
   onSendTest: () => Promise<{ sentence?: string; error?: string }>;
-  /** Shown inside the preview frame after the body (unsubscribe / system block). */
+  /** A caption shown under the preview (unsubscribe line / closure system block). */
   previewFooter?: ReactNode;
   /** Extra compose controls under the textarea (audience filters / resume date). */
   children?: ReactNode;
@@ -43,23 +46,25 @@ export default function EmailComposer({
   const [testMsg, setTestMsg] = useState<string | null>(null);
   const [testErr, setTestErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  // Decision 80a: the real email frame, fetched once, so the preview is the
-  // email as it will send — the studio's header, accent and footer around it.
-  const [chrome, setChrome] = useState<EmailFrameChrome | null>(null);
-  useEffect(() => { emailFrameChrome().then(setChrome).catch(() => {}); }, []);
 
-  // Decision 80a: resolve ::: plan <id> / ::: class <id> shorthands for the preview.
-  const [cards, setCards] = useState<Record<string, ResolvedCard | null>>({});
+  // Decision 80d: the preview is the real frame, rendered server-side by
+  // preview_template, shown in an iframe. Debounced so typing is not a request
+  // per keystroke; width toggles between a phone and a desktop inbox.
+  const [mode, setMode] = useState<"mobile" | "desktop">("mobile");
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [previewErr, setPreviewErr] = useState<string | null>(null);
+  const [, startPreview] = useTransition();
   useEffect(() => {
-    const wanted = new Set<string>();
-    for (const m of body.matchAll(/^:::\s+(plan|class)\s+(\S+)\s*$/gm)) wanted.add(`${m[1]}:${m[2]}`);
-    for (const key of wanted) {
-      if (key in cards) continue;
-      const [kind, id] = key.split(/:(.+)/);
-      setCards((c) => ({ ...c, [key]: null })); // mark in-flight so we fetch once
-      resolveEmailCard(kind, id).then((r) => setCards((c) => ({ ...c, [key]: r }))).catch(() => {});
-    }
-  }, [body, cards]);
+    const t = setTimeout(() => {
+      startPreview(async () => {
+        const r = await previewEmail(templateKey, subject, body);
+        if (r.error) { setPreviewErr(r.error); return; }
+        setPreviewErr(null);
+        setPreviewHtml(r.html ?? "");
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [templateKey, subject, body]);
 
   // Insert an ![](url) image marker at the cursor (or the end).
   const insertAtCursor = (snippet: string) => {
@@ -99,12 +104,6 @@ export default function EmailComposer({
       if (r.error) setTestErr(r.error); else setTestMsg(r.sentence ?? "Test sent.");
     });
   };
-
-  const accent = chrome?.accent || "#78716C";
-  const preview = renderBody(body, {
-    accent,
-    resolve: (kind, id) => cards[`${kind}:${id}`] ?? null,
-  });
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -158,34 +157,37 @@ export default function EmailComposer({
         {testErr && <p className="mt-3 text-[13px] text-coral">{testErr}</p>}
       </div>
 
-      {/* Preview — the email inside the studio's real frame (header mark + accent
-          rule + footer), at phone width, exactly as a recipient sees it. */}
+      {/* Preview — the real email, rendered through the studio's frame by
+          preview_template (no notification row), at a phone or desktop width. */}
       <div>
-        <span className="block text-[12px] font-medium text-ink-2">Preview</span>
-        <div className="mt-1 rounded-lg bg-[#F5F5F4] p-4">
-          <div className="mx-auto max-w-[380px] overflow-hidden rounded-xl bg-white">
-            <div className="px-6 pt-6">
-              {chrome?.logoUrl
-                ? /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={chrome.logoUrl} alt="" className="h-10 w-10 rounded-md object-contain" />
-                : <div className="text-[18px] font-semibold text-ink">{chrome?.studioName ?? studioName}</div>}
-              <div className="mt-4 h-[3px] w-11 rounded" style={{ background: accent }} />
-            </div>
-            <div className="px-6 pb-2 pt-3">
-              <p className="text-[15px] font-semibold text-ink">{subject || "Subject"}</p>
-              {body.trim()
-                ? <div className="email-preview mt-3 text-[14px] leading-[21px] text-ink"
-                       dangerouslySetInnerHTML={{ __html: preview.html }} />
-                : <p className="mt-3 text-[14px] text-ink-3">Your message appears here.</p>}
-              {previewFooter}
-            </div>
-            <div className="mx-6 mt-3 border-t border-line pb-6 pt-3 text-[12px] leading-[17px] text-ink-3">
-              {chrome?.contact && <div>{chrome.contact}</div>}
-              {chrome?.address && <div>{chrome.address}</div>}
-              <div>Choose which emails you get</div>
-            </div>
+        <div className="flex items-center justify-between">
+          <span className="block text-[12px] font-medium text-ink-2">Preview</span>
+          <div className="flex overflow-hidden rounded border border-line-2 text-[12px]">
+            {(["mobile", "desktop"] as const).map((m) => (
+              <button key={m} type="button" onClick={() => setMode(m)}
+                aria-pressed={mode === m}
+                className={`px-2.5 py-1 font-medium ${mode === m ? "bg-accent-chip text-ink" : "bg-surface text-ink-3 hover:text-ink"}`}>
+                {m === "mobile" ? "Mobile" : "Desktop"}
+              </button>
+            ))}
           </div>
         </div>
+        <div className="mt-1 overflow-x-auto rounded-lg bg-[#F5F5F4] p-4">
+          {previewHtml
+            ? <iframe title={`${studioName} email preview`} srcDoc={previewHtml} sandbox=""
+                style={{ width: mode === "mobile" ? 375 : 600, height: 640, border: 0, background: "#fff" }}
+                className="mx-auto block rounded" />
+            : <div className="mx-auto flex items-center justify-center rounded bg-white text-[13px] text-ink-3"
+                   style={{ width: mode === "mobile" ? 375 : 600, height: 640 }}>
+                Your message appears here.
+              </div>}
+        </div>
+        {previewErr && <p className="mt-2 text-[12px] text-coral">{previewErr}</p>}
+        {previewFooter && (
+          <div className="mt-2 rounded border border-line bg-paper px-3 py-2 text-[12px] leading-[17px] text-ink-3">
+            {previewFooter}
+          </div>
+        )}
       </div>
     </div>
   );

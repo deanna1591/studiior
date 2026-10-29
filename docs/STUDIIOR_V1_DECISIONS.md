@@ -619,6 +619,10 @@ Check-in, no-show finalisation, instructor headcount and pay, and statements tre
 
 (d) A member who signed up, has never held a booking, and is eligible for a free first class receives convert_book_first one day after signing up and again at day 7 if still nothing booked; any booking stops it. It sends whenever the studio has published bookable classes, including before the opening date (exempt from the Decision 14 (c) opening skip), because it asks for a booking rather than following a class. Gated by Run the convert sequence; one per member per step via dedupe. At most convert_book_first_daily_cap emails per studio per night (default 30), oldest sign-ups first; the rest wait for the next night. Recorded 2026-10-28.
 
+### Amendment (e) — a studio can switch off any one email (Deanna, 29 Oct 2026)
+
+(e) A studio may silence any single template without turning off a whole sequence. `studio_settings.disabled_templates text[]` (default `'{}'`; a key present = that email is off), registered in the settings registry. One predicate `studio_template_enabled(studio, key)` = `key <> all(disabled_templates)`, checked in BOTH queue choke points — `queue_notification` (member mail) and `queue_shift_notice` (instructor mail) — so one switch governs every path. **Default ON** (nothing disabled, today's behaviour) and **the master switch wins**: a sequence whose master is off never reaches the per-email gate, so the per-email switch only ever silences mail the master lets through. Checked at QUEUE time; a notification already queued still sends. Surfaced in two places so the owner finds it where they expect it: an On/Off control on each template's own `/settings/templates/[key]` screen, and a per-email list under each master switch on Settings → Convert and keep (the convert sequence's keys and the keep sequence's keys). No new anon RPC — THIRTEEN stays.
+
 ---
 
 ## 79 — Retention page: see the person, send the right message, learn what worked
@@ -670,6 +674,14 @@ Check-in, no-show finalisation, instructor headcount and pay, and statements tre
 (e) NOT in scope: multi-column layouts, product grids, a theme gallery, per-email colour overrides, A/B testing.
 
 **Build order.** 80a: (a) (b) (c) — every email looks right within days. 80b: (d). No new anon RPC — THIRTEEN; every new Branding option defaults to today's look where one exists; commit + git push + db push back to back after the gate, because a GitHub push is a production deploy. Deanna, 21 Oct 2026.
+
+### Amendment (80c follow-on) — every member and instructor email is editable, grouped (Deanna, 29 Oct 2026)
+
+The Templates screen (Decision 78c) lists only the convert / keep / retention / closure / instructor keys; `render_notification` already prefers a per-studio override for ANY key. Extend `/settings/templates` to the whole member- and instructor-facing set, grouped: **Bookings · Classes · Plans and credits · Account · Convert · Keep · Retention · Closures · Instructors**. The extension is pure `lib/templates.mjs` data — the groups grow and `isEditableTemplate` widens — and the list is filtered to keys that actually exist in `notification_templates` (a key with no row would `notFound` its editor). No SQL and no new route: `render_notification` honours an override by key, `send_template_test` renders any key, and the `/settings/templates/[key]` editor is key-generic. THIRTEEN stays.
+
+### Amendment (80d follow-on) — one preview, the real frame, mobile and desktop (Deanna, 29 Oct 2026)
+
+The composer's preview is a hand-built React look-alike of the email frame at a fixed ~380px, so it can disagree with what members receive. Replace it with the real thing. New read-only `preview_template(studio, key, subject, body)` — manager-up, SECURITY DEFINER — builds the same complete sample context `send_template_test` uses and returns `render_notification`'s HTML **without queueing a notification row**; not anon (the anon surface stays EXACTLY THIRTEEN). One preview component renders that HTML in an iframe with a **Mobile (375px) / Desktop (600px)** toggle and is used by Campaigns, every template screen and the closure composer; the hand-built React frame is deleted. The two specifics confirmed in STEP 0: the switch of 78(e) is checked in both `queue_notification` and `queue_shift_notice` (instructor mail does not pass the former), and this preview is a new RPC returning HTML, never a reuse of `send_template_test`, which queues.
 
 ---
 

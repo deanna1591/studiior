@@ -125,6 +125,7 @@ export default function CloseForm({ today, studioName, horizonDays }:
             subject={subject} onSubject={setSubject}
             body={message} onBody={setMessage}
             studioName={studioName}
+            templateKey="studio_closure_notice"
             subjectPlaceholder="We open on 16 November"
             onSendTest={async () => closureTestSend(subject, message, resumes)}
             previewFooter={
