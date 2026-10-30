@@ -107,9 +107,15 @@ export default function EmailComposer({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    // Item 1: a CONTAINER query (globals.css .email-compose) — the two columns
+    // appear only when the composer's OWN box is wide enough for a 420px preview
+    // beside the editor, so it stacks in a narrow modal/sheet at any viewport and
+    // splits on the full-width templates editor above ~1100px (the editor flexes,
+    // min-w-0 so a long line can't force overflow; the preview is a fixed 420px).
+    <div className="email-compose">
+    <div className="email-compose-row flex flex-col gap-6">
       {/* Compose */}
-      <div>
+      <div className="email-compose-editor min-w-0">
         <label className="block text-[12px] font-medium text-ink-2">Subject</label>
         <input
           value={subject} onChange={(e) => onSubject(e.target.value)}
@@ -160,7 +166,7 @@ export default function EmailComposer({
 
       {/* Preview — the real email, rendered through the studio's frame by
           preview_template (no notification row), at a phone or desktop width. */}
-      <div>
+      <div className="email-compose-preview w-full">
         <div className="flex items-center justify-between">
           <span className="block text-[12px] font-medium text-ink-2">Preview</span>
           <div className="flex overflow-hidden rounded border border-line-2 text-[12px]">
@@ -188,6 +194,7 @@ export default function EmailComposer({
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

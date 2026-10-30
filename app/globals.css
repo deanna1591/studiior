@@ -807,3 +807,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .settings-flash { animation: none; }
 }
+
+/* Email composer (Decision 77 shared composer) — item 1: the editor and preview
+   split into two columns ONLY when the composer's own box is wide enough for a
+   420px preview beside the editor. A container query (not a viewport one) so the
+   same component stacks in a narrow modal/sheet at any window width, and splits
+   on the full-width templates editor above ~1100px (its wrapper widens past
+   1100, so the composer crosses 760 there). Unsupported → stays stacked, which
+   still fits. */
+.email-compose { container-type: inline-size; }
+@container (min-width: 760px) {
+  .email-compose-row { flex-direction: row; align-items: flex-start; }
+  .email-compose-editor { flex: 1 1 0%; min-width: 0; }
+  .email-compose-preview { width: 420px; flex: 0 0 420px; }
+}

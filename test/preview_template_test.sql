@@ -80,6 +80,32 @@ begin
   raise notice 'PASS: 4 a non-manager is refused PT403';
 end $$;
 
+-- 6. Item 2 — the list tokens carry THREE sample classes, so a template that
+--    lays out a list shows one in the preview (was nothing / a single row).
+create temporary table _c as
+  select template_sample_context('b0800000-0000-0000-0000-000000000001', 'x@example.com', 'Sam') as c;
+select expect((select c->>'next_three' from _c) like '%; %'
+  and (select c->>'next_three' from _c) like '%Reformer Flow%',
+  '6 next_three is three sample classes');
+select expect((select c->>'next_three_line' from _c) like ' Here are the next ones%'
+  and (select c->>'next_three_line' from _c) like '%Mat Pilates%',
+  '6b next_three_line is a leading-space clause carrying the samples');
+select expect((select c->>'next_three_html' from _c) like '%<a %'
+  and (select c->>'next_three_html' from _c) like '%Barre%',
+  '6c next_three_html is a linked list');
+select expect(array_length(string_to_array((select c->>'class_list' from _c), chr(10)), 1) = 3,
+  '6d class_list has three rows');
+select expect(array_length(string_to_array((select c->>'roster' from _c), chr(10)), 1) = 3,
+  '6e roster has three rows');
+select expect((select c->>'roster_html' from _c) like '<ul%<li>%<li>%<li>%',
+  '6f roster_html is a three-item list');
+create temporary table _n as
+  select preview_template('b0800000-0000-0000-0000-000000000001', 'convert_after_class',
+    'S', '<p>Book another.{next_three_line}</p>') as r;
+select expect((select r->>'html' from _n) like '%Here are the next ones%'
+  and (select r->>'html' from _n) like '%Reformer Flow%',
+  '6g a preview of a {next_three_line} body renders the list inline');
+
 -- 5. The anon surface is unchanged.
 select expect((select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
                 where ns.nspname = 'public'

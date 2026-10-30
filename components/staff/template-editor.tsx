@@ -47,7 +47,10 @@ export default function TemplateEditor({
   };
 
   return (
-    <div className="max-w-2xl">
+    // Item 1: the toggle + notice stay a readable 2xl; the composer widens above
+    // 1100px so its editor/preview columns have room (it caps itself when stacked).
+    <div>
+      <div className="max-w-2xl">
       {msg && <Notice kind={msg.ok ? "ok" : "error"}>{msg.text}</Notice>}
 
       <div className="mb-4 flex items-start justify-between gap-4 rounded border border-line bg-surface px-3.5 py-3">
@@ -66,7 +69,9 @@ export default function TemplateEditor({
           {enabled ? "On" : "Off"}
         </button>
       </div>
+      </div>
 
+      <div className="mt-4 max-w-2xl min-[1100px]:max-w-none">
       <EmailComposer
         subject={subject} onSubject={setSubject}
         body={body} onBody={setBody}
@@ -112,6 +117,7 @@ export default function TemplateEditor({
           </p>
         </div>
       </EmailComposer>
+      </div>
     </div>
   );
 }

@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { previewBox } from "@/lib/email-preview-size";
 
 /**
  * Decision 80 follow-up — the email preview that fits the screen.
  *
  * The email frame (render_email) is fluid: a content card at width 100% /
- * max-width 600px with a (max-width:480px) media query. So:
- *  - Mobile renders the HTML in a 375px iframe and the frame REFLOWS to phone
- *    width — no scaling, no clipping (a pane narrower than 375 scrolls rather
- *    than clips).
- *  - Desktop renders in a 600px iframe; when the pane is narrower than 600 the
+ * max-width 600px with a (max-width:480px) media query. So (lib/email-preview-size
+ * owns the sizing, so the node test checks the shipped rule):
+ *  - Mobile renders the HTML in an iframe whose width is min(375, column) — 375
+ *    normally, the column when it is narrower — and the frame REFLOWS to that
+ *    width; no scaling, no clipping, never wider than the column.
+ *  - Desktop renders in a 600px iframe; when the column is narrower than 600 the
  *    iframe is scaled down with a CSS transform to fit, never clipped.
  * The iframe height follows its content (read from the same-origin srcdoc after
  * load, and on any reflow). sandbox is "allow-same-origin" only — no scripts run
@@ -19,12 +21,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export default function EmailPreview({ html, mode }: { html: string; mode: "mobile" | "desktop" }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const [paneW, setPaneW] = useState(600);
+  const [paneW, setPaneW] = useState(0);
   const [contentH, setContentH] = useState(420);
-  const baseW = mode === "mobile" ? 375 : 600;
 
-  // The pane's usable width (minus its 16px padding each side), so Desktop can
-  // scale to fit it.
+  // The pane's usable width (minus its 16px padding each side), so the box can
+  // be sized to fit it (0 = not measured yet).
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
@@ -48,15 +49,14 @@ export default function EmailPreview({ html, mode }: { html: string; mode: "mobi
     return () => clearTimeout(t);
   }, [html, mode, measure]);
 
-  // Desktop shrinks to fit a narrow pane; mobile is always 1:1 (and scrolls if
-  // the pane is narrower than 375, so the phone layout is never clipped).
-  const scale = mode === "desktop" && paneW > 0 && paneW < baseW ? paneW / baseW : 1;
-  const boxW = baseW * scale;
+  // Mobile reflows to min(375, column); desktop lays out at 600 and scales down
+  // to fit. boxW <= column, so the preview never overflows (lib/email-preview-size).
+  const { renderW, scale, boxW } = previewBox({ mode, avail: paneW });
   const boxH = contentH * scale;
 
   return (
     <div ref={wrapRef} className="mt-1 overflow-x-auto rounded-lg bg-[#F5F5F4] p-4">
-      <div className="mx-auto" style={{ width: boxW, height: boxH }}>
+      <div className="mx-auto" style={{ width: boxW, maxWidth: "100%", height: boxH }}>
         <iframe
           ref={frameRef}
           title="Email preview"
@@ -65,7 +65,7 @@ export default function EmailPreview({ html, mode }: { html: string; mode: "mobi
           onLoad={measure}
           className="block rounded bg-white"
           style={{
-            width: baseW,
+            width: renderW,
             height: contentH,
             border: 0,
             transform: scale === 1 ? undefined : `scale(${scale})`,
