@@ -129,12 +129,25 @@ insert into class_occurrences (id, studio_id, location_id, class_type_id, room_i
 insert into bookings (id, studio_id, occurrence_id, member_id, status, booked_at) values
   ('9c079c07-0000-0000-0000-0000000b0001','9c079c07-0000-0000-0000-000000000001','9c079c07-0000-0000-0000-00000000ab01','9c079c07-0000-0000-0000-0000000111a1','booked', now());
 
-update bookings set status = 'cancelled' where id='9c079c07-0000-0000-0000-0000000b0001';
+-- cancelled_at stamped as the real cancel path (cancel_booking) does, so the
+-- task-4 {cancelled_count} (cancellations out of that class today) counts it.
+update bookings set status = 'cancelled', cancelled_at = now() where id='9c079c07-0000-0000-0000-0000000b0001';
 select expect_num('a member cancelling a committed class reassures the instructor, once',
   (select count(*) from notifications where template_key='booking_cancelled_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1'), 1);
 select expect_true('the reassurance states the unchanged pay (975 PHP)',
   (select (payload ->> 'amount') = '975 PHP' from notifications
     where template_key='booking_cancelled_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1' limit 1));
+-- Housekeeping task 4: the notice carries the cancellation count today, the live
+-- seats and the capacity.
+select expect_num('task 4: {cancelled_count} is the cancellations out of that class today',
+  (select (payload ->> 'cancelled_count')::bigint from notifications
+    where template_key='booking_cancelled_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1' limit 1), 1);
+select expect_num('task 4: {booked} is the live seat count',
+  (select (payload ->> 'booked')::bigint from notifications
+    where template_key='booking_cancelled_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1' limit 1), 3);
+select expect_num('task 4: {capacity} is the room capacity',
+  (select (payload ->> 'capacity')::bigint from notifications
+    where template_key='booking_cancelled_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1' limit 1), 6);
 
 -- A NON-committed class: cancelling a booked seat reassures nobody.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,

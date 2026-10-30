@@ -41,6 +41,19 @@ test("a non-http link is NOT a link — the literal source is kept (escaped)", (
   assert.ok(!/<a /.test(html));
 });
 
+test("task 8: an inline link whose URL is a {token} keeps the token in the href", () => {
+  const { html, text } = renderBody("See [Manage this booking]({manage_link}) to change it.");
+  assert.equal(norm(html),
+    '<p>See <a href="{manage_link}">Manage this booking</a> to change it.</p>');
+  assert.equal(text, "See Manage this booking to change it.");
+});
+
+test("task 8: a non-token, non-http inline URL still falls through to literal text", () => {
+  const { html } = renderBody("[bad]({not a token})");
+  assert.ok(!/<a /.test(html));
+  assert.match(norm(html), /<p>\[bad\]\(\{not a token\}\)<\/p>/);
+});
+
 test("![alt](url) on its own line → a full-width img; text becomes [alt]", () => {
   const { html, text } = renderBody("before\n\n![our studio](https://cdn.example.com/a.jpg)\n\nafter");
   assert.match(html, /<img src="https:\/\/cdn\.example\.com\/a\.jpg" alt="our studio"[^>]*width:100%/);
@@ -105,10 +118,10 @@ test("button: the {accent} token survives for a static SQL template (both colour
   assert.match(html, /color:\{accent_on\}/);
 });
 
-test("button: a {placeholder} url IS a button (SQL templates author it, render_notification fills it); inline links are NOT relaxed", () => {
+test("button: a {placeholder} url IS a button; an inline {token} link is now an anchor too (task 8)", () => {
   const { html } = renderBody("[Buy]({buy_url}){button}\n\nsee [x]({buy_url}) too", { accent: "{accent}" });
   assert.match(html, /href="\{buy_url\}"[^>]*>Buy<\/a>/); // the button keeps the token
-  assert.match(html, /<p>see \[x\]\(\{buy_url\}\) too<\/p>/); // the inline link stays literal (http-only)
+  assert.match(html, /<p>see <a href="\{buy_url\}">x<\/a> too<\/p>/); // the inline link keeps the token in the href
 });
 
 test("button: an unsafe url is not a button", () => {

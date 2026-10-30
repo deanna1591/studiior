@@ -4,8 +4,17 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
+import { fmtClock } from "@/lib/time";
 import { addWalkIn, moveBookingHere, recordDeskDropinPaid, sellPlanAtDesk,
          type WalkInResult, type DeskResult } from "./actions";
+
+/** A "class is full" alternative's time, in the STUDIO timezone (task 11). */
+function altWhen(start: string, tz: string, timeFormat: "24h" | "12h"): string {
+  const day = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, weekday: "short", day: "numeric", month: "short",
+  }).format(new Date(start));
+  return `${day} ${fmtClock(start, tz, timeFormat)}`;
+}
 
 /** Decision 81a — the desk, from the roster. All amounts via formatMoney. */
 export type DeskPlan = { id: string; name: string; price_cents: number };
@@ -22,7 +31,9 @@ function Reason({ text }: { text: string }) {
 }
 
 // ---- Add walk-in -----------------------------------------------------------
-export function AddWalkIn({ occurrenceId, currency }: { occurrenceId: string; currency: string }) {
+export function AddWalkIn({ occurrenceId, currency, tz, timeFormat }: {
+  occurrenceId: string; currency: string; tz: string; timeFormat: "24h" | "12h";
+}) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [name, setName] = useState("");
@@ -88,7 +99,7 @@ export function AddWalkIn({ occurrenceId, currency }: { occurrenceId: string; cu
             {(res.alternatives ?? []).map((a) => (
               <li key={a.occurrence_id}>
                 <Link href={`/instructor/roster/${a.occurrence_id}`} className="text-[13px] text-ink-2 underline underline-offset-4">
-                  {a.name} — {new Date(a.start).toLocaleString()} · {a.seats_left} left
+                  {a.name} — {altWhen(a.start, tz, timeFormat)} · {a.seats_left} left
                 </Link>
               </li>
             ))}

@@ -231,7 +231,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
       )}
 
       {/* Decision 81a: add a walk-in to this class. */}
-      {r.status === "scheduled" && <AddWalkIn occurrenceId={r.occurrence_id} currency={currency} />}
+      {r.status === "scheduled" && <AddWalkIn occurrenceId={r.occurrence_id} currency={currency} tz={ctx.timezone} timeFormat={ctx.time_format} />}
 
       {r.status === "scheduled" && (coverOpen ? (
         <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} autoAccept={autoAccept} />

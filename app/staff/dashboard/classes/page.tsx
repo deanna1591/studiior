@@ -132,8 +132,10 @@ export default async function ClassesTodayPage({
                         </Link>
                         <span className="flex items-baseline gap-2 text-[11px] leading-4 text-ink-3">
                           <span>{SEAT_LABEL[m.seat_kind]}</span>
-                          {c.ended && (
-                            <span className={m.state === "attended" || m.checked_in ? "text-lime-text" : m.state === "no_show" ? "text-coral-deep" : "text-ink-3"}>
+                          {/* "Checked in" is live for a today class before it ends;
+                              "Did not attend" / "Not marked" are only for ended classes. */}
+                          {(m.checked_in || c.ended) && (
+                            <span className={m.checked_in ? "text-lime-text" : m.state === "no_show" ? "text-coral-deep" : "text-ink-3"}>
                               {m.checked_in ? "Checked in" : m.state === "no_show" ? "Did not attend" : "Not marked"}
                             </span>
                           )}

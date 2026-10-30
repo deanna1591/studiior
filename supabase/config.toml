@@ -274,7 +274,7 @@ otp_expiry = 3600
 # (Authentication -> Email Templates -> Confirm signup); see CLAUDE.md.
 [auth.email.template.confirmation]
 subject = "Confirm your email"
-content_path = "./supabase/templates/confirm.html"
+content_path = "./supabase/templates/confirmation.html"
 
 # Decision 84: the password-reset email. Project-wide like the confirmation
 # above (Supabase auth templates are one-per-project), so Studiior-branded, no
@@ -284,6 +284,14 @@ content_path = "./supabase/templates/confirm.html"
 [auth.email.template.recovery]
 subject = "Reset your password for your studio's booking app"
 content_path = "./supabase/templates/recovery.html"
+
+# Housekeeping (task 12): the change-email confirmation, mirroring the committed
+# recovery/confirm frame (project-wide, Studiior-branded, no studio tokens). The
+# hosted copy must be pasted into the dashboard once (Authentication -> Email
+# Templates -> Change email address); see CLAUDE.md.
+[auth.email.template.email_change]
+subject = "Confirm your new email for your studio's booking app"
+content_path = "./supabase/templates/email_change.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

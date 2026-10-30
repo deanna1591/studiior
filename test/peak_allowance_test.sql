@@ -92,11 +92,16 @@ insert into studios (id, name, slug, timezone, currency, status) values
   ('9eac9eac-0000-0000-0000-000000000003','Plain Peak','peak-plain','Europe/Prague','CZK','active'),
   ('9eac9eac-0000-0000-0000-000000000009','Not Yours','peak-notyours','Europe/Prague','CZK','active');
 
-insert into studio_settings (studio_id, peak_allowance_enabled) values
-  ('9eac9eac-0000-0000-0000-000000000001', true),
-  ('9eac9eac-0000-0000-0000-000000000002', false),
-  ('9eac9eac-0000-0000-0000-000000000003', false),
-  ('9eac9eac-0000-0000-0000-000000000009', false);
+-- booking_cutoff_minutes = 0 explicitly: migration 210 made the default 30 for a
+-- studio that does not set it, and the suspension "can still book TODAY" fixture
+-- (studio …0001) clamps its same-day class to 23:59 Manila — which lands inside a
+-- 30-min cutoff in the last half hour before Manila midnight, flapping the gate.
+-- The fixture's comment already assumes a 0 cutoff; this makes it true.
+insert into studio_settings (studio_id, peak_allowance_enabled, booking_cutoff_minutes) values
+  ('9eac9eac-0000-0000-0000-000000000001', true,  0),
+  ('9eac9eac-0000-0000-0000-000000000002', false, 0),
+  ('9eac9eac-0000-0000-0000-000000000003', false, 0),
+  ('9eac9eac-0000-0000-0000-000000000009', false, 0);
 
 insert into locations (id, studio_id, name, is_primary) values
   ('9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-000000000001','Main',true),
