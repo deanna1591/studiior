@@ -94,6 +94,17 @@ select expect_like('SA frame: address in footer', (select html_body from render_
 select expect_like('SA frame: manage-emails link', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%Choose which emails you get%');
 select expect_like('SA frame: accent rule uses the studio accent', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%height:3px;width:44px;background:#B85C38%');
 
+-- Fluid frame (80 follow-up): the content card is width 100% / max-width 600px and
+-- reflows on a phone — a <style> media query shrinks padding/text under 480px, and
+-- images are capped. The fixed width:600px style is gone (the MSO ghost keeps the
+-- width="600" attribute for Outlook, asserted above).
+select expect_like('SA frame: fluid media query present', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%@media only screen and (max-width:480px)%');
+select expect_like('SA frame: fluid content card', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%class="sd-card"%');
+select expect_like('SA frame: card carries max-width:600px', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%max-width:600px%');
+select expect_like('SA frame: images capped to max-width 100%', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%.sd-body img{max-width:100%%');
+-- The fluid card is width:100% (not the old fixed width:600px); it carries max-width:600px.
+select expect_like('SA frame: fluid card is width 100%', (select html_body from render_notification('e8040000-0000-0000-0000-0000000000f1')), '%style="width:100%;max-width:600px;background:#FFFFFF%');
+
 -- ============================================================================
 -- 3. convert_after_class — plan card + EXACTLY one button, accent filled
 -- ============================================================================
@@ -184,7 +195,10 @@ begin
     values (v_nid,'e8040000-0000-0000-0000-000000000001','e8040000-0000-0000-0000-000000000a01','member','email',
             k, v_ctx || jsonb_build_object('to_email','mia@frame.example'), 'scheduled', now(), 'every:'||k);
     select * into r from render_notification(v_nid);
-    if position('{' in coalesce(r.subject,'')) > 0 or position('{' in coalesce(r.html_body,'')) > 0
+    -- The fluid frame carries a <style> media query, whose CSS braces are legit;
+    -- strip it before checking the BODY for a leftover {token}.
+    if position('{' in coalesce(r.subject,'')) > 0
+       or position('{' in regexp_replace(coalesce(r.html_body,''), '<style>[^<]*</style>', '', 'g')) > 0
        or position('{' in coalesce(r.text_body,'')) > 0 then
       raise exception 'FAIL  template % leaked a brace', k;
     end if;
@@ -223,7 +237,8 @@ select expect_like('strip: a missing required token is reported in stripped',
 select expect_notlike('strip: a known-optional token is NOT reported',
   (select array_to_string(stripped,',') from render_notification('e8040000-0000-0000-0000-0000000000f7')), '%free_first_html%');
 select expect_num('strip: no brace survives in the body',
-  (select case when position('{' in html_body)>0 then 1 else 0 end from render_notification('e8040000-0000-0000-0000-0000000000f7')), 0);
+  (select case when position('{' in regexp_replace(html_body, '<style>[^<]*</style>', '', 'g'))>0 then 1 else 0 end
+     from render_notification('e8040000-0000-0000-0000-0000000000f7')), 0);
 
 -- fmt_money + plan_card_detail
 select expect_text('fmt_money PHP whole → ₱1,500', fmt_money(150000, 'PHP'), '₱1,500');

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { shrinkImage } from "@/lib/image-shrink";
 import { uploadEmailImage, previewEmail } from "@/app/staff/email-image-actions";
+import EmailPreview from "@/components/staff/email-preview";
 
 /**
  * Decision 77 / 80d — the shared email composer, used by Campaigns, the closure
@@ -172,16 +173,14 @@ export default function EmailComposer({
             ))}
           </div>
         </div>
-        <div className="mt-1 overflow-x-auto rounded-lg bg-[#F5F5F4] p-4">
-          {previewHtml
-            ? <iframe title={`${studioName} email preview`} srcDoc={previewHtml} sandbox=""
-                style={{ width: mode === "mobile" ? 375 : 600, height: 640, border: 0, background: "#fff" }}
-                className="mx-auto block rounded" />
-            : <div className="mx-auto flex items-center justify-center rounded bg-white text-[13px] text-ink-3"
-                   style={{ width: mode === "mobile" ? 375 : 600, height: 640 }}>
+        {previewHtml
+          ? <EmailPreview html={previewHtml} mode={mode} />
+          : <div className="mt-1 rounded-lg bg-[#F5F5F4] p-4">
+              <div className="mx-auto flex items-center justify-center rounded bg-white text-[13px] text-ink-3"
+                   style={{ width: mode === "mobile" ? 375 : 600, maxWidth: "100%", height: 320 }}>
                 Your message appears here.
-              </div>}
-        </div>
+              </div>
+            </div>}
         {previewErr && <p className="mt-2 text-[12px] text-coral">{previewErr}</p>}
         {previewFooter && (
           <div className="mt-2 rounded border border-line bg-paper px-3 py-2 text-[12px] leading-[17px] text-ink-3">

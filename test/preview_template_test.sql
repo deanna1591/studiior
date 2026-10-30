@@ -43,8 +43,10 @@ create temporary table _p as
     '<p>Hi {first_name}, you tried {class_name}. {offer_price} to keep going.</p>') as r;
 
 -- 1. The REAL frame, not a hand-built look-alike.
-select expect((select r->>'html' from _p) like '%width="600"%', '1 html carries the 600px frame');
+select expect((select r->>'html' from _p) like '%width="600"%', '1 html carries the 600px MSO ghost width');
 select expect((select r->>'html' from _p) like '%[if mso]%', '1b html carries the MSO ghost table');
+select expect((select r->>'html' from _p) like '%@media only screen and (max-width:480px)%', '1c html carries the fluid media query');
+select expect((select r->>'html' from _p) like '%class="sd-card"%' and (select r->>'html' from _p) like '%max-width:600px%', '1d fluid content card, max-width 600');
 select expect((select r->>'html' from _p) like '%#B85C38%', '1c html carries the studio accent rule');
 select expect((select r->>'html' from _p) like '%Preview Studio%', '1d html carries the studio name (header/footer)');
 
