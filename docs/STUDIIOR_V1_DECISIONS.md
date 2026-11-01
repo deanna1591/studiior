@@ -545,6 +545,10 @@ Members can message the studio from the app. Every staff role — owner, admin, 
 
 **Where:** Permissions (Messages row, added in this step). **Status:** recorded — not built.
 
+### Amendment (a), 2 Nov 2026 — message UI polish + delete conversation
+
+Member header shows a speech-bubble icon top right next to the avatar on every member screen, including Home, when `messages_enabled` is on; it opens `/messages` and shows a small dot when there is a staff message newer than `last_member_read_at`. The Account row "Message the studio" stays. Message bubbles follow chat conventions on both member and staff sides: no sender name on each bubble; the member's bubbles sit left in grey, the studio's bubbles sit right in the studio accent; the time alone in small muted text at the bottom right inside the bubble via `fmtClock`; the date once as a small centred divider between days ("Today", "Yesterday", else "Monday 2 November"). A photo attachment shows as a thumbnail inside the bubble and opens full size; a PDF shows as a small file chip with its name. Staff thread keeps the member header card above the bubbles. Staff can delete a whole conversation from the thread page with the button "Delete conversation"; confirm text "Delete this conversation? This removes it for {first_name} too." with buttons "Delete" and "Keep". Deleting removes the thread, its messages and its attachments from storage, is audited, and the member's screen returns to the empty state. Single messages cannot be deleted.
+
 ---
 
 ## 83 — Journey and History rows say what happened and where the money went (2026-10-27)
