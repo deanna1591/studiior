@@ -20,27 +20,17 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
     ? safeNext(String(rawReturn)) : null;
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
-  const { live, all } = await membershipState(supabase, ctx.memberId);
-
-  // Decision 66: a recurring membership can be renewed by hand online in its
-  // last week, or while past-due inside Decision 4's grace (past_due IS the
-  // in-grace state — the existing handling cancels it at grace end).
-  const renewable =
-    !!live &&
-    live.membership_plans?.type === "recurring" &&
-    settings.xenditEnabled &&
-    (live.status === "past_due" ||
-      (!!live.renews_on &&
-        new Date(live.renews_on + "T00:00:00") <= new Date(Date.now() + 7 * 864e5)));
 
   const from = dayStart(new Date(), ctx.timeZone, 0);
   const to = addDays(from, 30);
   // guest_passes_enabled arrives with the member (bootstrap). This batch is the
-  // three reads that actually need a query: the ledger, the active-guest count
-  // (only when guest passes are on), and the peak slots.
+  // reads that actually need a query. Speed pass (1 Nov): membershipState joins
+  // the batch — it depended on nothing in it and was a needless extra wave,
+  // exactly as /account already folds it in.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }] =
+  const [{ live, all }, { data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }] =
     await Promise.all([
+      membershipState(supabase, ctx.memberId),
       supabase.from("credit_ledger")
         .select("id, delta, expires_at, created_at, membership_id")
         .eq("member_id", ctx.memberId).order("created_at", { ascending: false }).limit(30),
@@ -71,6 +61,18 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
     ]);
+  // Decision 66: a recurring membership can be renewed by hand online in its
+  // last week, or while past-due inside Decision 4's grace (past_due IS the
+  // in-grace state — the existing handling cancels it at grace end). Computed
+  // after the batch now that membershipState rides in it.
+  const renewable =
+    !!live &&
+    live.membership_plans?.type === "recurring" &&
+    settings.xenditEnabled &&
+    (live.status === "past_due" ||
+      (!!live.renews_on &&
+        new Date(live.renews_on + "T00:00:00") <= new Date(Date.now() + 7 * 864e5)));
+
   // Hide the exclusive intro plan from anyone not inside their intro window; the
   // DB (xendit_begin_purchase) refuses it too, so this is presentation only.
   const introActive = ((introWin as { active?: boolean } | null)?.active) === true;

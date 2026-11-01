@@ -39,54 +39,61 @@ export default async function Roster({ params, searchParams }: { params: { occur
   // list the cover board's way — qualified AND available first, the rest
   // labelled — only when there is actually a gap, so an assigned class pays for
   // none of it.
-  const unstaffed = isManagerUp(ctx.role) && occ.status === "scheduled" && !occ.instructor_id;
-  let candidates: Awaited<ReturnType<typeof computeAssignCandidates>> = [];
-  let pendingApplications = 0;
-  if (unstaffed) {
-    // The same candidate list the calendar's Assign popover uses — one helper,
-    // so the two places this control lives cannot disagree.
-    const [cands, { count }] = await Promise.all([
-      computeAssignCandidates(supabase, occ, ctx.timeZone),
-      supabase.from("shift_applications")
-        .select("id", { count: "exact", head: true })
-        .eq("occurrence_id", occ.id).eq("status", "pending"),
-    ]);
-    candidates = cands;
-    pendingApplications = count ?? 0;
-  }
+  const manager = isManagerUp(ctx.role);
+  const unstaffed = manager && occ.status === "scheduled" && !occ.instructor_id;
 
   // Decision 30 amendment (b) follow-up: the "Open to first-timers" control
   // moved to the Schedule calendar's class popup — the owner opens classes while
   // looking at the week. It is no longer on the roster page.
 
-  const [{ data: bookings }, { data: checkIns }] =
-    await Promise.all([
-      supabase
-        .from("bookings")
-        .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at)")
-        .eq("occurrence_id", params.occurrenceId)
-        .order("waitlist_position", { ascending: true, nullsFirst: true })
-        .order("booked_at"),
-      supabase.from("check_ins").select("booking_id, method, distance_m").eq("occurrence_id", params.occurrenceId),
-    ]);
+  // Speed pass (1 Nov): ONE wave for everything that needs only the occurrence,
+  // the params and the role — this was ~6 sequential awaits. The candidate list
+  // (only when the class is unstaffed) and the held-pay / settings reads (only
+  // for a manager) ride along as conditional promises.
+  const [assignBundle, { data: bookings }, { data: checkIns }, { data: guestRows },
+         { data: groupRows }, { data: heldPay }, { data: gs }] = await Promise.all([
+    unstaffed
+      // The same candidate list the calendar's Assign popover uses — one helper,
+      // so the two places this control lives cannot disagree.
+      ? Promise.all([
+          computeAssignCandidates(supabase, occ, ctx.timeZone),
+          supabase.from("shift_applications")
+            .select("id", { count: "exact", head: true })
+            .eq("occurrence_id", occ.id).eq("status", "pending"),
+        ]).then(([cands, { count }]) => ({ candidates: cands, pendingApplications: count ?? 0 }))
+      : Promise.resolve(null as { candidates: Awaited<ReturnType<typeof computeAssignCandidates>>; pendingApplications: number } | null),
+    supabase
+      .from("bookings")
+      .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at)")
+      .eq("occurrence_id", params.occurrenceId)
+      .order("waitlist_position", { ascending: true, nullsFirst: true })
+      .order("booked_at"),
+    supabase.from("check_ins").select("booking_id, method, distance_m").eq("occurrence_id", params.occurrenceId),
+    // Decision 26: who on this roster is a GUEST, and who brought them.
+    supabase.from("guest_passes")
+      .select("guest_member_id, host_member_id, status")
+      .eq("occurrence_id", params.occurrenceId)
+      .in("status", ["invited", "confirmed", "attended"]),
+    // Decision 76: who on this roster is on a GROUP (Barkada) booking.
+    supabase.from("group_bookings")
+      .select("member_id, is_host, group_purchases!inner(occurrence_id, membership_plans(name), members(first_name, last_name))")
+      .eq("group_purchases.occurrence_id", params.occurrenceId),
+    // Decision 28: is this class's pay held (instructor not checked in)?
+    manager
+      ? supabase.from("instructor_pay_records").select("id")
+          .eq("occurrence_id", params.occurrenceId).eq("type", "class").is("confirmed_at", null).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Guarantee switches, for Run-anyway and the force-committed line.
+    manager
+      ? supabase.from("studio_settings")
+          .select("guarantees_enabled, flex_enabled, core_min_bookings, flex_min_bookings")
+          .eq("studio_id", ctx.studioId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const candidates = assignBundle?.candidates ?? [];
+  const pendingApplications = assignBundle?.pendingApplications ?? 0;
 
-  // Decision 26: who on this roster is a GUEST, and who brought them — an
-  // instructor needs to know both (a guest is always a first-timer). Only when
-  // the studio runs guest passes will there be any rows.
-  const { data: guestRows } = await supabase
-    .from("guest_passes")
-    .select("guest_member_id, host_member_id, status")
-    .eq("occurrence_id", params.occurrenceId)
-    .in("status", ["invited", "confirmed", "attended"]);
   const guestOf = new Map((guestRows ?? []).map((g) => [g.guest_member_id, g.host_member_id]));
-
-  // Decision 76: who on this roster is on a GROUP (Barkada) booking — the plan
-  // name, the host, and whether this seat IS the host. Only when a group booked
-  // this class will there be rows.
-  const { data: groupRows } = await supabase
-    .from("group_bookings")
-    .select("member_id, is_host, group_purchases!inner(occurrence_id, membership_plans(name), members(first_name, last_name))")
-    .eq("group_purchases.occurrence_id", params.occurrenceId);
   const groupOf = new Map(
     (groupRows ?? []).map((g) => {
       const gpu = g.group_purchases as unknown as {
@@ -102,38 +109,9 @@ export default async function Roster({ params, searchParams }: { params: { occur
     }),
   );
 
-  // Decision 28: is this class's pay held (instructor not checked in)? Managers
-  // can release it. Only a class that ran has a held record.
-  const { data: heldPay } = isManagerUp(ctx.role)
-    ? await supabase.from("instructor_pay_records").select("id")
-        .eq("occurrence_id", params.occurrenceId).eq("type", "class").is("confirmed_at", null).maybeSingle()
-    : { data: null };
-  // Decision 22 "Run anyway" — can this manager force a below-minimum flex (or
-  // high-minimum core) class to run? The pure helper decides the label from the
-  // occurrence + the studio's guarantee switches; the RPC is the real boundary.
-  const manager = isManagerUp(ctx.role);
-
-  // Decision 30 (c): which booked drop-ins are UNPAID (no succeeded/partially-
-  // refunded payment) — managers can convert those into the member's free first
-  // class. Only fetch when there is a manager and a drop-in to consider.
-  const dropinIds = manager
-    ? (bookings ?? []).filter((b) => b.status === "booked" && b.payment_source === "drop_in").map((b) => b.id)
-    : [];
-  const paidBookings = new Set<string>();
-  if (dropinIds.length) {
-    const { data: paidRows } = await supabase
-      .from("payments")
-      .select("booking_id")
-      .in("booking_id", dropinIds)
-      .in("status", ["succeeded", "partially_refunded"]);
-    for (const p of paidRows ?? []) if (p.booking_id) paidBookings.add(p.booking_id as string);
-  }
-
-  const { data: gs } = manager
-    ? await supabase.from("studio_settings")
-        .select("guarantees_enabled, flex_enabled, core_min_bookings, flex_min_bookings")
-        .eq("studio_id", ctx.studioId).maybeSingle()
-    : { data: null };
+  // Decision 22 "Run anyway" + the force-committed line read the guarantee
+  // switches (gs, fetched above). The pure helper decides the label from the
+  // occurrence + the switches; the RPC is the real boundary.
   const fcSettings = {
     guaranteesEnabled: gs?.guarantees_enabled ?? false,
     flexEnabled: gs?.flex_enabled ?? false,
@@ -153,18 +131,45 @@ export default async function Roster({ params, searchParams }: { params: { occur
   const showRunAnyway = manager && canForceCommit(fcOcc, fcSettings) === "run_anyway";
   const runMinimum = showRunAnyway ? forceCommitMinimum(fcOcc, fcSettings) : 0;
 
-  // The committed-to-run after-state: who forced it and why. Read the newest
-  // force_committed audit row for this occurrence; the actor is identified by
-  // their studio_staff email (the app keys staff by email), or the viewer's own
-  // email when it was them. Shown only for a flex/core class that was forced,
-  // not for a class that committed naturally at the cutoff.
+  // Decision 30 (c): which booked drop-ins are UNPAID — managers can convert
+  // those into the member's free first class. Shown only for a flex/core class
+  // that was forced (needs gs, fetched above).
+  const dropinIds = manager
+    ? (bookings ?? []).filter((b) => b.status === "booked" && b.payment_source === "drop_in").map((b) => b.id)
+    : [];
+  const memberIds = (bookings ?? []).map((b) => b.member_id).filter(Boolean);
   const forced = manager && occ.committed_at && (occ.flex || (gs?.guarantees_enabled && (occ.guarantee_tier ?? "core") === "core"));
-  const { data: fcAudit } = forced
-    ? await supabase.from("audit_logs")
-        .select("actor_user_id, after, created_at")
-        .eq("entity_id", occ.id).eq("action", "occurrence.force_committed")
-        .order("created_at", { ascending: false }).limit(1).maybeSingle()
-    : { data: null };
+
+  // Speed pass (1 Nov): ONE wave for the reads that depend on the bookings and
+  // settings above — the unpaid-drop-in payments, the pinned notes, the signed
+  // avatars, and the force_committed audit row (one query for the whole roster,
+  // never one per row). The audit's ACTOR, when there is one, is the single
+  // genuine dependency left serial below.
+  const [{ data: paidRows }, { data: pinned }, avatars, { data: fcAudit }] = await Promise.all([
+    dropinIds.length
+      ? supabase.from("payments").select("booking_id")
+          .in("booking_id", dropinIds).in("status", ["succeeded", "partially_refunded"])
+      : Promise.resolve({ data: [] as { booking_id: string | null }[] }),
+    // notes_read withholds managers_only from front desk and instructors, so
+    // this receives only what the caller may see.
+    memberIds.length
+      ? supabase.from("member_notes").select("member_id, category, body")
+          .in("member_id", memberIds).eq("pinned", true).eq("active", true)
+      : Promise.resolve({ data: [] as { member_id: string; category: string; body: string }[] }),
+    signAvatars(supabase, (bookings ?? []).map((b) => b.members?.avatar_url)),
+    forced
+      ? supabase.from("audit_logs").select("actor_user_id, after, created_at")
+          .eq("entity_id", occ.id).eq("action", "occurrence.force_committed")
+          .order("created_at", { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const paidBookings = new Set<string>();
+  for (const p of paidRows ?? []) if (p.booking_id) paidBookings.add(p.booking_id as string);
+
+  // The committed-to-run after-state: who forced it and why. The actor is
+  // identified by their studio_staff email (the app keys staff by email), or the
+  // viewer's own when it was them.
   let forcedBy: string | null = null;
   if (fcAudit) {
     const actorId = fcAudit.actor_user_id;
@@ -180,25 +185,10 @@ export default async function Roster({ params, searchParams }: { params: { occur
   const nameOf = new Map((bookings ?? []).map((b) =>
     [b.member_id, `${b.members?.preferred_name || b.members?.first_name || ""} ${b.members?.last_name || ""}`.trim()]));
 
-  // PINNED NOTES, which is the whole reason pinning exists — and this screen
-  // has never read them. "Pin to the roster" was a checkbox that changed a
-  // boolean nothing looked at, so an instructor arriving at a class knew
-  // nothing about the shoulder. One query for the whole roster rather than one
-  // per row; notes_read already withholds managers_only from front desk and
-  // instructors, so this receives only what the caller may see.
-  const memberIds = (bookings ?? []).map((b) => b.member_id).filter(Boolean);
-  const { data: pinned } = memberIds.length
-    ? await supabase.from("member_notes")
-        .select("member_id, category, body")
-        .in("member_id", memberIds).eq("pinned", true).eq("active", true)
-    : { data: [] };
   const notesFor = new Map<string, { category: string; body: string }[]>();
   for (const n of pinned ?? []) {
     notesFor.set(n.member_id, [...(notesFor.get(n.member_id) ?? []), n]);
   }
-
-  // One round trip for the whole roster rather than one signed URL per row.
-  const avatars = await signAvatars(supabase, (bookings ?? []).map((b) => b.members?.avatar_url));
 
   const checkedIn = new Set((checkIns ?? []).map((c) => c.booking_id));
   // Decision 35: how each person got checked in — self (with the distance),

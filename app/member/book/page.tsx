@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Icon } from "@/components/member/icons";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
-import { MonthGrid, type MonthDay } from "@/components/member/week-strip";
+import { type MonthDay } from "@/components/member/week-strip";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
-import DateStrip from "@/components/member/date-strip";
-import DayView from "@/components/member/day-view";
-import DayClasses, { type Row } from "@/components/member/day-classes";
+import { type Row } from "@/components/member/day-classes";
+import BookWeek, { type DayBundle } from "@/components/member/book-week";
 import FreeClassList from "@/components/member/free-class-list";
 import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, fmtDeadlineShort, zonedDateKey } from "@/lib/time";
@@ -46,6 +44,17 @@ export default async function Book({
   const from = dayStart(new Date(), ctx.timeZone, offset);
   const to = addDays(from, 1);
   const now = Date.now();
+  const WEEKDAYS_ = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  // The visible WINDOW (1 Nov speed pass): the 7 days of the selected day's week
+  // (Mon-based), fetched in detail ONCE so switching days within it is an instant
+  // client swap rather than a server navigation. The strip still shows its full
+  // 84-day pip run; only these 7 switch without a refetch.
+  const selDow_ = Math.max(0, WEEKDAYS_.indexOf(
+    new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, weekday: "short" }).format(from)));
+  const windowStartOffset = offset - selDow_;
+  const windowOffsets = Array.from({ length: 7 }, (_, i) => windowStartOffset + i);
+  const winFrom = dayStart(new Date(), ctx.timeZone, windowStartOffset);
+  const winTo = addDays(winFrom, 7);
 
   // The visible week: Monday of whichever week the selected day falls in.
   // Derived from the selected day rather than from today, so paging forward
@@ -101,8 +110,8 @@ export default async function Book({
         // member who never booked it; this closes the own-read path for one who
         // did, so a not-running class leaves no trace in the bookable list.
         .eq("status", "scheduled")
-        .gte("starts_at", from.toISOString())
-        .lt("starts_at", to.toISOString())
+        .gte("starts_at", winFrom.toISOString())
+        .lt("starts_at", winTo.toISOString())
         .order("starts_at"),
       // Just enough to put a dot under a day. Ids and times only — the strip
       // shows presence, not counts, so nothing else is worth fetching.
@@ -135,8 +144,8 @@ export default async function Book({
       // deep and has to stay that way.
       supabase.rpc("member_peak_slots", {
         p_studio_id: ctx.studioId,
-        p_from: from.toISOString(),
-        p_to: to.toISOString(),
+        p_from: winFrom.toISOString(),
+        p_to: winTo.toISOString(),
       }),
       // Decision 25. How far the published timetable runs. {enabled:false} for
       // every studio that does not publish, so nothing below draws for them.
@@ -149,8 +158,8 @@ export default async function Book({
       // Same batch — this screen stays two hops deep.
       supabase.rpc("occurrence_holds", {
         p_studio_id: ctx.studioId,
-        p_from: from.toISOString(),
-        p_to: to.toISOString(),
+        p_from: winFrom.toISOString(),
+        p_to: winTo.toISOString(),
       }),
       // Decision 30. Is this member owed a free first class — so the list can
       // say so up top, where they decide. Same batch, no extra hop.
@@ -168,8 +177,8 @@ export default async function Book({
       supabase.from("check_ins")
         .select("occurrence_id")
         .eq("member_id", ctx.memberId)
-        .gte("checked_in_at", from.toISOString())
-        .lt("checked_in_at", to.toISOString()),
+        .gte("checked_in_at", winFrom.toISOString())
+        .lt("checked_in_at", winTo.toISOString()),
       // Decision 21: a booked flex class still awaiting its cutoff reads
       // "Waiting for confirmation", not "Reserved". Same batch, no extra hop.
       supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId }),
@@ -209,23 +218,8 @@ export default async function Book({
   // Seats held for the waitlist (§4.2). Subtracted from the visible spaces
   // below, so a held-full class reads as full rather than bookable.
   const holdsOf = new Map((holds ?? []).map((r) => [r.occurrence_id, r.held]));
-  // The persistent line is about the period the member is looking at, not about
-  // "today" — a member browsing next week wants next week's number.
-  const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
-
-  // `period_end` is a DATE and a date has no timezone, so it is parsed AS UTC
-  // and formatted IN UTC — it round-trips exactly. Handing it to a formatter in
-  // the studio's zone would render the day before for every studio west of
-  // Greenwich, which is this project's most repeated date bug.
-  const peakResetsOn = peakLine
-    ? (() => {
-        const d = new Date(`${peakLine.period_end}T00:00:00Z`);
-        d.setUTCDate(d.getUTCDate() + 1);          // the day the next period opens
-        return new Intl.DateTimeFormat("en-GB", {
-          weekday: "long", day: "numeric", month: "long", timeZone: "UTC",
-        }).format(d);
-      })()
-    : null;
+  // The peak line is per-day now and lives in each DayBundle (resetsOnFor);
+  // `period_end` is still parsed and formatted in UTC there so it round-trips.
 
   const byOcc = new Map((mine ?? []).map((b) => [b.occurrence_id, b]));
   // Decision 68: which of this day's classes the member has checked in to, and
@@ -242,12 +236,9 @@ export default async function Book({
     { occurrence_id: string; pending_until: string | null }[])
     .map((r) => [r.occurrence_id, r.pending_until]));
 
+  // Initial filter state; the client filters the fetched week in place now.
   const typeFilter = searchParams.type ?? "";
   const instFilter = searchParams.instructor ?? "";
-  const shown = (occurrences ?? []).filter(
-    (o) => (!typeFilter || o.class_type_id === typeFilter) &&
-           (!instFilter || o.instructor_id === instFilter),
-  );
 
   const qs = (over: Record<string, string | number | undefined>) => {
     const p = new URLSearchParams();
@@ -261,23 +252,34 @@ export default async function Book({
     return q ? `/book?${q}` : "/book";
   };
 
-  // Which days in the visible week have anything on.
+  // Which days in the visible strip have anything on (the 84-day pip query).
   const busy = new Set((week ?? []).map((o: { starts_at: string }) => zonedDateKey(o.starts_at, ctx.timeZone)));
   const todayKey = zonedDateKey(new Date().toISOString(), ctx.timeZone);
   const selectedKey = zonedDateKey(from.toISOString(), ctx.timeZone);
-  const closedToday = (closures ?? []).find(
-    (c) => c.starts_on <= selectedKey && c.ends_on >= selectedKey) ?? null;
 
-  // Decision 25: an empty day in a DRAFT month is not an empty day, and a
-  // member has to be able to tell — the same rule as a closure. The month is
-  // the studio-local one the selected day falls in; a month is a draft when
-  // publication is on, it is this month or later, and it is not in the list.
-  const selectedMonthKey = `${selectedKey.slice(0, 7)}-01`;
-  const draftMonth =
-    horizon?.enabled === true &&
-    horizon.next_unpublished != null &&
-    selectedMonthKey >= horizon.next_unpublished.slice(0, 10) &&
-    !(horizon.months ?? []).includes(selectedMonthKey);
+  // "We're closed" and "draft month" for ANY day key — per day now that the
+  // whole window is handed to the client. Decision 74 / Decision 25.
+  const closureFor = (key: string) => {
+    const c = (closures ?? []).find((c) => c.starts_on <= key && c.ends_on >= key);
+    if (!c) return null;
+    return {
+      timeRange: c.starts_at_time ? `Closed ${c.starts_at_time.slice(0, 5)}–${c.ends_at_time?.slice(0, 5)}` : null,
+      reason: c.reason,
+      untilText: c.ends_on !== c.starts_on ? c.ends_on : null,
+    };
+  };
+  const draftFor = (key: string) => {
+    const monthKey = `${key.slice(0, 7)}-01`;
+    const isDraft =
+      horizon?.enabled === true && horizon.next_unpublished != null &&
+      monthKey >= horizon.next_unpublished.slice(0, 10) &&
+      !(horizon.months ?? []).includes(monthKey);
+    if (!isDraft) return null;
+    return {
+      label: dateWord(monthKey, { month: "long" }),
+      through: horizon?.published_through ? dateWord(horizon.published_through, { day: "numeric", month: "long" }) : null,
+    };
+  };
 
   // Which month the selected day falls in, so a leading or trailing cell in
   // the grid can be dimmed rather than pretending to belong here.
@@ -314,18 +316,6 @@ export default async function Book({
     timeZone: ctx.timeZone, month: "long", year: "numeric",
   }).format(from);
 
-  const Pill = ({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) => (
-    <Link href={href}
-          aria-pressed={active}
-          className="m-tap inline-flex shrink-0 items-center rounded-full px-3.5 text-[13px] font-semibold"
-          style={active
-            ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
-            : { background: "var(--surface)", color: "var(--ink-2)",
-                boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-      {children}
-    </Link>
-  );
-
   const minutes = (a: string, b: string | null) =>
     b ? Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000) : null;
 
@@ -355,20 +345,23 @@ export default async function Book({
   // The rules stay here, in SQL and the reader; the client only flips the card.
   // Every state a row can be in is resolved on the server and handed over as a
   // plain descriptor — peak-blocked, holding a paid seat, the free-cancellation
-  // note, whether this is the last peak class of the period — so DayClasses
-  // never recomputes any of the peak/flex/publication logic.
-  const rows: Row[] = shown.map((o) => {
+  // note, whether this is the last peak class of the period — so the client
+  // never recomputes any of the peak/flex/publication logic. Built for the WHOLE
+  // window and grouped by day, so day switching is a client swap, not a refetch.
+  const keyByOffset = new Map<number, string>(
+    windowOffsets.map((o) => [o, zonedDateKey(dayStart(new Date(), ctx.timeZone, o).toISOString(), ctx.timeZone)]));
+  const offsetByKey = new Map<string, number>([...keyByOffset.entries()].map(([o, k]) => [k, o]));
+  const rowsByOffset = new Map<number, Row[]>();
+  for (const o of occurrences ?? []) {
+    const dayOffset = offsetByKey.get(zonedDateKey(o.starts_at, ctx.timeZone));
+    if (dayOffset === undefined) continue;
     const booking = byOcc.get(o.id);
     // 'attended' is a booked seat that has been checked in (Decision 68).
     const booked = booking?.status === "booked" || booking?.status === "attended";
     const waiting = booking?.status === "waitlisted";
     const holding = booking?.status === "pending_payment";
     const checkedIn = checkedInSet.has(o.id) || booking?.status === "attended";
-    const flexPending = pendingMap.has(o.id);
     const pendingUntil = pendingMap.get(o.id) ?? null;
-    const pendingLabel = pendingUntil
-      ? fmtDeadlineShort(pendingUntil, ctx.timeZone, ctx.timeFormat)
-      : null;
     const loc = (o as unknown as { locations?: { latitude: number | null;
       longitude: number | null; self_checkin_requires_location: boolean } | null }).locations ?? null;
     const selfCheckinAvailable = loc
@@ -379,45 +372,34 @@ export default async function Book({
     const full = spaces <= 0;
     const past = new Date(o.starts_at).getTime() < now;
     const mins = minutes(o.starts_at, o.ends_at);
-
     const pk = peakOf.get(o.id);
     const isPeak = pk?.is_peak ?? false;
     const remaining = pk?.remaining ?? null;
-    const peakBlocked =
-      isPeak && remaining !== null && remaining !== undefined
+    const peakBlocked = isPeak && remaining !== null && remaining !== undefined
       && remaining <= 0 && !booked && !waiting && !holding;
-
     const cutoffAt = new Date(new Date(o.starts_at).getTime() - settings.cancellationCutoff * 60_000);
     const insideFreeWindow = Date.now() < cutoffAt.getTime();
-    const peakCancelNote =
-      booked && isPeak && remaining !== null && remaining !== undefined
-        ? insideFreeWindow
-          ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone, ctx.timeFormat)} — your peak class comes back`
-          : "Cancelling now still uses your peak class"
-        : null;
-
+    const peakCancelNote = booked && isPeak && remaining !== null && remaining !== undefined
+      ? insideFreeWindow
+        ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone, ctx.timeFormat)} — your peak class comes back`
+        : "Cancelling now still uses your peak class"
+      : null;
     const outOfWindow = !past && !booked && !waiting && !holding
       && new Date(o.starts_at).getTime() > now + windowMs;
     const opensOn = outOfWindow
       ? dayLabel(new Date(new Date(o.starts_at).getTime() - windowMs).toISOString())
       : null;
-
-    const base: Row["base"] = past ? "past"
-      : holding ? "holding"
-      : booked ? "booked"
-      : waiting ? "waiting"
-      : outOfWindow ? "future"
-      : peakBlocked ? "peakBlocked"
-      : full ? "full"
-      : "none";
-
-    return {
+    const base: Row["base"] = past ? "past" : holding ? "holding" : booked ? "booked"
+      : waiting ? "waiting" : outOfWindow ? "future" : peakBlocked ? "peakBlocked" : full ? "full" : "none";
+    const row: Row = {
       id: o.id,
+      classTypeId: o.class_type_id ?? null,
+      instructorId: o.instructor_id ?? null,
       bookingId: booking?.id ?? null,
       bookingStatus: booking?.status ?? null,
       checkedIn,
-      flexPending,
-      pendingLabel,
+      flexPending: pendingMap.has(o.id),
+      pendingLabel: pendingUntil ? fmtDeadlineShort(pendingUntil, ctx.timeZone, ctx.timeFormat) : null,
       startsAt: o.starts_at,
       endsAt: o.ends_at ?? null,
       selfCheckinAvailable,
@@ -438,24 +420,72 @@ export default async function Book({
       peakCancelNote,
       opensOn,
     };
+    rowsByOffset.set(dayOffset, [...(rowsByOffset.get(dayOffset) ?? []), row]);
+  }
+
+  // The peak reset date (period_end + 1 day), parsed and formatted in UTC.
+  const resetsOnFor = (periodEnd: string | null | undefined) => {
+    if (!periodEnd) return null;
+    const d = new Date(`${periodEnd}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(d);
+  };
+
+  // Decision 30: an empty day points at where the timetable next has a class.
+  // One member_next_class_day per EMPTY (not closed/draft) window day, batched.
+  const emptyWindowDays = windowOffsets.filter((o) => {
+    const key = keyByOffset.get(o)!;
+    return !(rowsByOffset.get(o)?.length) && !closureFor(key) && !draftFor(key);
+  });
+  const nextByOffset = new Map<number, { dateText: string; count: number; offset: number }>();
+  const nextResults = await Promise.all(emptyWindowDays.map((o) =>
+    supabase.rpc("member_next_class_day", { p_studio_id: ctx.studioId, p_from: keyByOffset.get(o)! })
+      .then(({ data }) => ({ o, data: data as { date: string; count: number } | null }))));
+  for (const { o, data } of nextResults) {
+    if (!data) continue;
+    const ndOffset = Math.round(
+      (new Date(`${data.date}T00:00:00Z`).getTime() - new Date(`${todayKey}T00:00:00Z`).getTime()) / 86_400_000);
+    nextByOffset.set(o, {
+      dateText: dateWord(data.date, { weekday: "long", day: "numeric", month: "long" }),
+      count: data.count, offset: ndOffset,
+    });
+  }
+
+  const bundles: DayBundle[] = windowOffsets.map((o) => {
+    const dayRows = rowsByOffset.get(o) ?? [];
+    const key = keyByOffset.get(o)!;
+    const closed = closureFor(key);
+    const draft = draftFor(key);
+    const daySlot = dayRows.map((r) => peakOf.get(r.id)).find((r) => r?.is_peak && r?.remaining !== null);
+    const peakLine = daySlot
+      ? { remaining: daySlot.remaining, allowance: daySlot.allowance, resetsOn: resetsOnFor(daySlot.period_end) }
+      : null;
+    return {
+      offset: o,
+      rows: dayRows,
+      peakLine,
+      closed,
+      draftMonthLabel: draft?.label ?? null,
+      draftThroughText: draft?.through ?? null,
+      nextClass: (!dayRows.length && !closed && !draft) ? (nextByOffset.get(o) ?? null) : null,
+    };
   });
 
-  // Decision 30: an empty day before the timetable opens should point at where
-  // it starts, not offer "Try tomorrow" one day at a time. Only when the day is
-  // genuinely empty (not a closure or a draft month) and there is a next class.
-  const noRealClasses = shown.length === 0 && !closedToday && !draftMonth && !typeFilter && !instFilter;
-  const { data: nextDayRaw } = noRealClasses
-    ? await supabase.rpc("member_next_class_day", {
-        p_studio_id: ctx.studioId, p_from: selectedKey,
-      })
-    : { data: null };
-  const nextDay = nextDayRaw as { date: string; count: number } | null;
-  // The offset (days from today) of that date, so the empty state can link to it.
-  const nextDayOffset = nextDay
-    ? Math.round(
-        (new Date(`${nextDay.date}T00:00:00Z`).getTime() -
-          new Date(`${todayKey}T00:00:00Z`).getTime()) / 86_400_000)
-    : null;
+  // The 84-day strip with hrefs precomputed (for out-of-window days). Only the
+  // current view's day set is shown; the Week/Month toggle is a navigation.
+  const stripDaysOut = days.map((d) => ({ ...d, href: qs({ d: d.offset }) }));
+
+  // Decision 25: the published-horizon banner (global), rendered on the server
+  // and handed to the client so it never reformats a date.
+  const horizonNode = horizon?.enabled ? (
+    <p className="m-meta mb-3 rounded-xl bg-accent-chip px-3 py-2 text-ink">
+      {horizon.published_through
+        ? <>The timetable is published through{" "}
+            {dateWord(horizon.published_through, { day: "numeric", month: "long" })}.
+            {horizon.next_unpublished && <> {dateWord(horizon.next_unpublished, { month: "long" })} opens for booking when the studio publishes it.</>}</>
+        : <>This month&rsquo;s timetable has not been published yet. Classes appear here as soon as the studio publishes it.</>}
+    </p>
+  ) : null;
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
@@ -483,168 +513,29 @@ export default async function Book({
           ← Back to your free class
         </Link>
       )}
-      <section aria-label="Choose a day" className="mb-4">
-        <div className="mb-2.5 flex items-center gap-2">
-          <h2 className="m-head flex-1 truncate text-[17px] leading-6 text-ink">{monthLabel}</h2>
-
-          {/* Week / Month. Week is now a continuous strip you flick; Month draws
-              the calendar block with the same pips and answers "when is the
-              next Saturday class". Each half is a full 44px target — the old
-              control was 28px tall. */}
-          <div className="flex rounded-full p-0.5"
-               style={{ background: "var(--surface)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-            {([["week", "Week"], ["month", "Month"]] as const).map(([v, label]) => {
-              const on = monthView === (v === "month");
-              return (
-                <Link
-                  key={v}
-                  href={qs({ v: v === "week" ? undefined : v })}
-                  aria-pressed={on}
-                  className="m-press flex min-h-[44px] items-center rounded-full px-3.5 text-[12px] font-semibold leading-4"
-                  style={on
-                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
-                    : { color: "var(--ink-2)" }}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Month paging only. Week has no chevrons any more — the strip is the
-              navigation. 44px, up from the old 32. */}
-          {monthView && (
-            <div className="flex items-center gap-1">
-              <Link href={qs({ d: offset - 28 })} aria-label="Earlier"
-                    className="m-press flex h-11 w-11 items-center justify-center rounded-full bg-surface text-ink-2"
-                    style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-                <Icon name="chevron-left" size={18} />
-              </Link>
-              <Link href={qs({ d: offset + 28 })} aria-label="Later"
-                    className="m-press flex h-11 w-11 items-center justify-center rounded-full bg-surface text-ink-2"
-                    style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-                <Icon name="chevron-right" size={18} />
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {monthView
-          ? <MonthGrid days={days} hrefFor={(o) => qs({ d: o, v: undefined })} />
-          : <DateStrip days={days.map((d) => ({ ...d, href: qs({ d: d.offset }) }))} selectedOffset={offset} />}
-      </section>
-
-      <div className="m-hscroll -mx-4 mb-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
-        <Pill href={qs({ type: undefined, instructor: undefined })} active={!typeFilter && !instFilter}>All</Pill>
-        {(types ?? []).map((t) => (
-          <Pill key={t.id} href={qs({ type: typeFilter === t.id ? undefined : t.id })} active={typeFilter === t.id}>
-            {t.name}
-          </Pill>
-        ))}
-        {(instructors ?? []).length > 0 && (
-          <span className="m-micro flex shrink-0 items-center gap-2 pl-1 text-ink-2">
-            <span className="h-5 w-px bg-line-2" aria-hidden />
-            Taught by
-          </span>
-        )}
-        {(instructors ?? []).map((i) => (
-          <Pill key={i.id} href={qs({ instructor: instFilter === i.id ? undefined : i.id })} active={instFilter === i.id}>
-            {i.display_name}
-          </Pill>
-        ))}
-      </div>
-
-      {/* Decision 24: what is left, said once and always, rather than discovered
-          at the moment of refusal. Absent entirely for a studio with no peak
-          hours and for a member on a plan that has no allowance — there is
-          nothing true to say in either case. */}
-      {peakLine && (
-        <p className={`m-meta mb-3 rounded-xl px-3 py-2 ${
-          peakLine.remaining === 0
-            ? "bg-coral-tint text-ink"
-            : "bg-accent-chip text-ink"}`}>
-          {peakLine.remaining === 0 ? (
-            <>
-              You have used all <span className="num">{peakLine.allowance}</span> of
-              your peak classes for this period. Off-peak classes are unlimited, and
-              your peak classes come back on{" "}
-              {peakResetsOn}.
-            </>
-          ) : (
-            <>
-              <span className="num">{peakLine.remaining}</span> of{" "}
-              <span className="num">{peakLine.allowance}</span> peak classes left
-              this period. Off-peak classes are unlimited.
-            </>
-          )}
-        </p>
-      )}
-
-      {/* Decision 25: members can only book as far as the published month, and
-          that is said on the screen rather than discovered as an empty November.
-          Absent entirely for a studio that does not publish. */}
-      {horizon?.enabled && (
-        <p className="m-meta mb-3 rounded-xl bg-accent-chip px-3 py-2 text-ink">
-          {horizon.published_through
-            ? <>The timetable is published through{" "}
-                {dateWord(horizon.published_through, { day: "numeric", month: "long" })}.
-                {horizon.next_unpublished && <> {dateWord(horizon.next_unpublished, { month: "long" })} opens for booking when the studio publishes it.</>}</>
-            : <>This month&rsquo;s timetable has not been published yet. Classes appear here as soon as the studio publishes it.</>}
-        </p>
-      )}
-
-      {/* Swipe left/right anywhere on the day to move between days, and pull
-          down at the top to refresh. The arriving day slides in from the side
-          the gesture implied. */}
-      <DayView key={offset} prevHref={qs({ d: offset - 1 })} nextHref={qs({ d: offset + 1 })}>
-      {shown.length === 0 ? (
-        <div className="m-card p-6 text-center">
-          <p className="m-body text-ink">
-            {/* "We're closed for Christmas" is a different thing from an empty
-                day, and a member has to be able to tell which one they are
-                looking at. The reason is the studio's own words. */}
-            {closedToday
-              ? closedToday.starts_at_time
-                ? `Closed ${closedToday.starts_at_time.slice(0, 5)}–${closedToday.ends_at_time?.slice(0, 5)} — ${closedToday.reason}`
-                : closedToday.reason
-              : draftMonth
-              ? `${dateWord(selectedMonthKey, { month: "long" })}'s timetable is not published yet.`
-              : typeFilter || instFilter ? "Nothing matching on this day."
-              : nextDay ? `Classes start ${dateWord(nextDay.date, { weekday: "long", day: "numeric", month: "long" })}.`
-              : "No classes on this day."}
-          </p>
-          <p className="m-sub mt-1 text-ink-2">
-            {closedToday
-              ? <>The studio is closed{closedToday.ends_on !== closedToday.starts_on && <> until {closedToday.ends_on}</>}.{" "}
-                  <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">
-                    Look at another day
-                  </Link></>
-              : draftMonth
-              ? <>It opens for booking when the studio publishes it.{horizon?.published_through && <> You can book through {dateWord(horizon.published_through, { day: "numeric", month: "long" })}.</>}</>
-              : typeFilter || instFilter
-              ? <Link href={qs({ type: undefined, instructor: undefined })} className="text-lime-text underline underline-offset-4">Show everything</Link>
-              : nextDay && nextDayOffset !== null
-              ? <Link href={qs({ d: nextDayOffset })} className="text-lime-text underline underline-offset-4">
-                  See the {nextDay.count} {nextDay.count === 1 ? "class" : "classes"} on that day
-                </Link>
-              : <Link href={qs({ d: offset + 1 })} className="text-lime-text underline underline-offset-4">Try tomorrow</Link>}
-          </p>
-        </div>
-      ) : (
-        <DayClasses
-          rows={rows}
-          bookClass={bookClass}
-          bookFirstFree={bookFirstFree}
-          freeFirstEligible={freeFirstEligible}
-          freeEligibleIds={freeEligibleIds}
-          selfCheckIn={selfCheckIn}
-          startCheckout={startCheckout}
-          payAtDesk={payAtDesk}
-          opensBeforeMin={settings.checkinOpensBefore}
-          closesAfterMin={settings.checkinClosesAfter}
-        />
-      )}
-      </DayView>
+      <BookWeek
+        bundles={bundles}
+        initialOffset={offset}
+        stripDays={stripDaysOut}
+        monthDays={days}
+        monthView={monthView}
+        monthLabel={monthLabel}
+        showAll={showAll}
+        horizon={horizonNode}
+        types={(types ?? []).map((t) => ({ id: t.id, label: t.name }))}
+        instructors={(instructors ?? []).map((i) => ({ id: i.id, label: i.display_name }))}
+        initialType={typeFilter}
+        initialInstructor={instFilter}
+        bookClass={bookClass}
+        bookFirstFree={bookFirstFree}
+        freeFirstEligible={freeFirstEligible}
+        freeEligibleIds={[...freeEligibleIds]}
+        selfCheckIn={selfCheckIn}
+        startCheckout={startCheckout}
+        payAtDesk={payAtDesk}
+        opensBeforeMin={settings.checkinOpensBefore}
+        closesAfterMin={settings.checkinClosesAfter}
+      />
       </>
       )}
     </MemberShell>

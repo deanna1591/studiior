@@ -19,20 +19,21 @@ export const dynamic = "force-dynamic";
 export default async function Settings() {
   const { ctx, supabase, studioName, logoUrl, preset, accent , openOffers, memberName, avatarUrl} = await memberScreen();
 
-  const { data: prefs } = await supabase
-    .from("notification_preferences")
-    .select("booking_email, reminder_email, waitlist_email, credit_expiry_email, milestone_email")
-    .eq("member_id", ctx.memberId)
-    .maybeSingle();
+  // Two independent reads, in one wave (1 Nov speed pass) — they shared no
+  // dependency and were awaited on consecutive lines.
+  const [{ data: prefs }, { data: feed }] = await Promise.all([
+    supabase
+      .from("notification_preferences")
+      .select("booking_email, reminder_email, waitlist_email, credit_expiry_email, milestone_email")
+      .eq("member_id", ctx.memberId)
+      .maybeSingle(),
+    supabase.rpc("calendar_feed_state", { p_studio_id: ctx.studioId, p_kind: "member" }),
+  ]);
 
   // No row means defaults, and every default is on — the same reading
   // notification_wanted() takes in SQL. The screen must not show a member as
   // opted out of something they were never asked about.
   const on = (v: boolean | null | undefined) => v ?? true;
-
-  const { data: feed } = await supabase.rpc("calendar_feed_state", {
-    p_studio_id: ctx.studioId, p_kind: "member",
-  });
   const feedState = (feed ?? {}) as { active?: boolean; last_used_at?: string | null };
 
   return (

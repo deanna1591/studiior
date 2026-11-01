@@ -130,9 +130,13 @@ export default function ClassDetailBody({
     <>
       {type?.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
+        // Perf (1 Nov): the class hero is the above-the-fold LCP — eager + async
+        // decode; width/height are a hint (the h-52 box + object-cover decide the
+        // render, so no visual change).
         <img src={type.image_url} alt="" aria-hidden
+             loading="eager" decoding="async" width={1024} height={208}
              className="mb-4 h-52 w-full rounded-[22px] object-cover"
-             style={{ objectPosition: focalPoint(type.image_focus_x, type.image_focus_y) }} />
+             style={{ maxWidth: "100%", objectPosition: focalPoint(type.image_focus_x, type.image_focus_y) }} />
       )}
 
       <h1 className="m-title text-ink">{occ.name}</h1>

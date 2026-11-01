@@ -41,9 +41,16 @@ export type StripDay = {
 export default function DateStrip({
   days,
   selectedOffset,
+  onSelect,
+  windowOffsets,
 }: {
   days: StripDay[];
   selectedOffset: number;
+  /** 1 Nov speed pass: a day inside the fetched window switches in client state
+   *  (instant, no refetch) via this callback; days outside it still navigate via
+   *  their href. Omitted → every tap navigates, as before. */
+  onSelect?: (offset: number) => void;
+  windowOffsets?: Set<number>;
 }) {
   const router = useRouter();
   const scroller = useRef<HTMLOListElement>(null);
@@ -65,7 +72,9 @@ export default function DateStrip({
     if (d.offset === selectedOffset) return;
     haptic("tap");
     setNavDir(d.offset > selectedOffset ? "fwd" : "back");
-    router.push(d.href, { scroll: false });
+    // Inside the fetched window → instant client switch; otherwise navigate.
+    if (onSelect && windowOffsets?.has(d.offset)) onSelect(d.offset);
+    else router.push(d.href, { scroll: false });
   }
 
   return (

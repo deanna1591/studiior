@@ -24,10 +24,16 @@ import { Icon } from "./icons";
 export default function DayView({
   prevHref,
   nextHref,
+  onPrev,
+  onNext,
   children,
 }: {
   prevHref: string;
   nextHref: string;
+  /** 1 Nov speed pass: when the adjacent day is inside the fetched window, a
+   *  swipe switches in client state via these callbacks instead of navigating. */
+  onPrev?: () => void;
+  onNext?: () => void;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -72,14 +78,15 @@ export default function DayView({
     const dy = t.clientY - s.y;
 
     if (axis.current === "x" && Math.abs(dx) > SWIPE) {
-      // Swipe left → the next day; swipe right → the previous one.
+      // Swipe left → the next day; swipe right → the previous one. Inside the
+      // fetched window the switch is client-side (no navigation).
       haptic("tap");
       if (dx < 0) {
         setNavDir("fwd");
-        router.push(nextHref, { scroll: false });
+        if (onNext) onNext(); else router.push(nextHref, { scroll: false });
       } else {
         setNavDir("back");
-        router.push(prevHref, { scroll: false });
+        if (onPrev) onPrev(); else router.push(prevHref, { scroll: false });
       }
       return;
     }

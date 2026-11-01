@@ -84,7 +84,7 @@ export default async function MemberDetail({
       .select("id, category, body, pinned, managers_only, active, created_at")
       .eq("member_id", params.id).order("pinned", { ascending: false }).order("created_at", { ascending: false }),
     supabase.from("member_goals")
-      .select("id, title, target_type, target_value, current_value, target_date, status, completed_at")
+      .select("id, title, target_type, target_value, current_value, target_date, status, completed_at, created_at")
       .eq("member_id", params.id).order("status").order("target_date", { nullsFirst: false }),
     supabase.from("member_tag_assignments")
       .select("tag_id, member_tags(name)").eq("member_id", params.id),
@@ -145,11 +145,26 @@ export default async function MemberDetail({
 
   // Goal progress is computed, never read off member_goals.current_value —
   // that column has never been written and every goal read "0 of 12".
-  const goalRows = await Promise.all((goals ?? []).map(async (g) => {
-    const { data } = await supabase.rpc("member_goal_progress", { p_goal_id: g.id });
-    const p = (data ?? {}) as { done?: number; met?: boolean };
-    return { ...g, done: p.done ?? 0, met: p.met ?? false };
-  }));
+  //
+  // Speed pass (1 Nov): this was one member_goal_progress RPC PER GOAL (an N+1
+  // in its own serial wave). That function's class_count branch is just a
+  // date-bounded count of check_ins from when the goal was set — and this page
+  // already fetched `visits` (the member's check-ins). So mirror it in JS over
+  // the rows in hand: the same UTC ::date comparison the SQL uses, no RPC, no
+  // new query, no new wave. `visits` is the 600 most-recent check-ins, which
+  // covers any goal window (counted from the goal's recent created_at) by a
+  // wide margin.
+  const visitDateKeys = (visits ?? []).map((v) => new Date(v.checked_in_at).toISOString().slice(0, 10));
+  const goalRows = (goals ?? []).map((g) => {
+    if (g.target_type === "class_count") {
+      const fromKey = new Date(g.created_at as string).toISOString().slice(0, 10);
+      const done = visitDateKeys.filter((dk) =>
+        dk >= fromKey && (g.target_date == null || dk <= (g.target_date as string))).length;
+      return { ...g, done, met: g.target_value != null && done >= g.target_value };
+    }
+    // Any other target type keeps the RPC's non-count reading exactly.
+    return { ...g, done: g.current_value ?? 0, met: g.completed_at != null };
+  });
 
   // Signed on render and short-lived. A URL stored in the column would outlive
   // its signature; the column holds the object PATH.

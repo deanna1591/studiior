@@ -61,11 +61,16 @@ export default async function MemberLogin({
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image} alt="" aria-hidden
+             // Perf (pre-launch speed pass, 1 Nov): this is the above-the-fold
+             // LCP — decode off the main thread and don't let any wrapper lazy
+             // it; width/height are an intrinsic hint (object-cover + the
+             // full-bleed container decide the actual box, so no visual change).
+             loading="eager" decoding="async" width={1200} height={1600}
              className="absolute inset-0 h-full w-full object-cover"
              /* THE WORST CROP IN THE PRODUCT. Full bleed on a portrait phone
                 keeps about a sixth of a wide photograph, so which sixth is not
                 a detail — it is the whole picture the member sees. */
-             style={{ objectPosition: focalPoint(studio?.login_image_focus_x,
+             style={{ maxWidth: "100%", objectPosition: focalPoint(studio?.login_image_focus_x,
                                                  studio?.login_image_focus_y) }} />
       ) : (
         <div aria-hidden className="absolute inset-0"
@@ -98,6 +103,7 @@ export default async function MemberLogin({
             {studio?.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={studio.logo_url} alt={name}
+                   decoding="async" width={72} height={72}
                    className="h-full w-full object-contain" />
             ) : (
               <span className="text-[40px] font-semibold leading-none"

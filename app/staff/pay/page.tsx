@@ -11,10 +11,14 @@ export default async function Pay() {
   const { ctx, supabase, shell } = screen;
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Pay"><Denied what="Payroll" role={ctx.role} /></AppShell>;
 
-  const { data: periods } = await supabase.from("pay_periods")
-    .select("id, starts_on, ends_on, status").eq("studio_id", ctx.studioId)
-    .order("starts_on", { ascending: false }).limit(24);
-  const held = await supabase.rpc("studio_unconfirmed_pay_count", { p_studio_id: ctx.studioId });
+  // One wave (1 Nov speed pass): the period list and the unconfirmed count are
+  // independent and were awaited one after the other.
+  const [{ data: periods }, held] = await Promise.all([
+    supabase.from("pay_periods")
+      .select("id, starts_on, ends_on, status").eq("studio_id", ctx.studioId)
+      .order("starts_on", { ascending: false }).limit(24),
+    supabase.rpc("studio_unconfirmed_pay_count", { p_studio_id: ctx.studioId }),
+  ]);
   const d = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
   return (

@@ -29,6 +29,11 @@ import type { BookResult, ActionResult, CheckInResult } from "@/app/member/actio
  */
 export type Row = {
   id: string;
+  /** For client-side filter pills (1 Nov speed pass): the row carries its own
+   *  class-type and instructor ids so the Book tab can filter the already-
+   *  fetched week without a server round trip. Presentation only. */
+  classTypeId: string | null;
+  instructorId: string | null;
   bookingId: string | null;
   /** Raw booking status ('booked' | 'waitlisted' | 'attended' | …), for the
    *  Decision 68 four-state button. */

@@ -37,7 +37,10 @@ export default function MemberHeader({
         <Link href="/account" className="m-press flex min-h-[44px] min-w-0 flex-1 items-center gap-2.5">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
+            // Perf (1 Nov): async-decode the 32px logo (an un-shrunk upload can
+            // still be large); width/height prevent any CLS.
             <img src={logoUrl} alt="" aria-hidden
+                 decoding="async" width={32} height={32}
                  className="h-8 w-8 rounded-xl bg-white object-contain p-0.5" />
           ) : (
             <span style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}

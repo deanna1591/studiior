@@ -36,11 +36,16 @@ export default async function MemberHome() {
       timeZone: ctx.timeZone, year: "numeric", month: "2-digit",
     }).format(new Date()) + "-01T00:00:00Z",
   );
+  // Speed pass (1 Nov): one check_ins read serves BOTH "classes this month" and
+  // the recent "Checked in" set. Fetch from the earlier of the two lower bounds
+  // (month start, and 12h ago — which only reaches further back in the first 12h
+  // of the 1st), then derive each window below.
+  const twelveHAgoISO = new Date(now - 12 * 3600e3).toISOString();
+  const checkinsSinceISO = new Date(Math.min(monthStart.getTime(), now - 12 * 3600e3)).toISOString();
 
-  const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { count: thisMonth },
+  const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { data: monthCheckins },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
-         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems },
-         { data: checkinRows }] =
+         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -63,11 +68,14 @@ export default async function MemberHome() {
       .gt("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(3),
+    // One read for both windows (see checkinsSinceISO above): occurrence_id +
+    // checked_in_at from the earlier bound, split into "this month" and the
+    // recent "Checked in" set below.
     supabase
       .from("check_ins")
-      .select("id", { count: "exact", head: true })
+      .select("occurrence_id, checked_in_at")
       .eq("member_id", ctx.memberId)
-      .gte("checked_in_at", monthStart.toISOString()),
+      .gte("checked_in_at", checkinsSinceISO),
     // §9. Empty array for a studio with no challenges — no section, no trace.
     supabase.rpc("member_challenges", { p_studio_id: ctx.studioId }),
     // Decision 26: a guest must sign the waiver before their class. Their own row
@@ -93,15 +101,16 @@ export default async function MemberHome() {
     // Decision 63: whether the studio sells merchandise (the Shop card appears
     // only when at least one active product exists — inert otherwise).
     supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
-    // Decision 68: the member's recent check-ins, so a booked class checked in
-    // by any door (self, scan or desk) reads "Checked in". A check-in is at
-    // class time; a 12h look-back catches today's. Same batch.
-    supabase.from("check_ins").select("occurrence_id")
-      .eq("member_id", ctx.memberId)
-      .gte("checked_in_at", new Date(now - 12 * 3600e3).toISOString()),
   ]);
   const hasShop = Array.isArray(shopItems) && (shopItems as unknown[]).length > 0;
-  const checkedInSet = new Set(((checkinRows ?? []) as { occurrence_id: string }[])
+  // Decision 68: a booked class checked in by any door (self, scan or desk)
+  // reads "Checked in" — a 12h look-back catches today's. "Classes this month"
+  // is the same table from the month's start. Both derived from the one read.
+  const monthRows = (monthCheckins ?? []) as { occurrence_id: string; checked_in_at: string }[];
+  const monthStartISO = monthStart.toISOString();
+  const thisMonth = monthRows.filter((r) => r.checked_in_at >= monthStartISO).length;
+  const checkedInSet = new Set(monthRows
+    .filter((r) => r.checked_in_at >= twelveHAgoISO)
     .map((r) => r.occurrence_id));
 
   // pending_until is null for a free provisional seat (Decision 30 amendment):
@@ -255,9 +264,13 @@ export default async function MemberHome() {
         <section className="m-hero" style={!occ.class_types?.image_url ? { background: heroFallback } : undefined}>
           {occ.class_types?.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
+            // Perf (1 Nov): the above-the-fold hero is the LCP — eager + async
+            // decode; width/height are a hint (the 172px .m-hero box + object-
+            // cover decide the render, so no visual change).
             <img src={occ.class_types.image_url} alt="" aria-hidden
+                 loading="eager" decoding="async" width={1024} height={172}
                  className="absolute inset-0 h-full w-full object-cover"
-                 style={{ objectPosition: focalPoint(occ.class_types.image_focus_x,
+                 style={{ maxWidth: "100%", objectPosition: focalPoint(occ.class_types.image_focus_x,
                                                      occ.class_types.image_focus_y) }} />
           )}
           <span aria-hidden className="m-hero-scrim" />
@@ -345,8 +358,9 @@ export default async function MemberHome() {
             {o.class_types?.image_url && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={o.class_types.image_url} alt="" aria-hidden
+                   loading="eager" decoding="async" width={1024} height={172}
                    className="absolute inset-0 h-full w-full object-cover"
-                   style={{ objectPosition: focalPoint(o.class_types.image_focus_x,
+                   style={{ maxWidth: "100%", objectPosition: focalPoint(o.class_types.image_focus_x,
                                                        o.class_types.image_focus_y) }} />
             )}
             <span aria-hidden className="m-hero-scrim" />
@@ -397,9 +411,12 @@ export default async function MemberHome() {
                   >
                     {o.class_types?.image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
+                      // Below the fold (the Coming-up rail) — lazy, so it never
+                      // competes with the hero's first paint.
                       <img src={o.class_types.image_url} alt="" aria-hidden
+                           loading="lazy" decoding="async" width={124} height={88}
                            className="h-full w-full object-cover"
-                           style={{ objectPosition: focalPoint(o.class_types.image_focus_x,
+                           style={{ maxWidth: "100%", objectPosition: focalPoint(o.class_types.image_focus_x,
                                                                o.class_types.image_focus_y) }} />
                     )}
                   </span>
