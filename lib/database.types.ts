@@ -4721,6 +4721,65 @@ export type Database = {
           },
         ]
       }
+      message_threads: {
+        Row: {
+          created_at: string
+          id: string
+          last_member_read_at: string | null
+          last_message_at: string | null
+          last_staff_read_at: string | null
+          member_id: string
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_member_read_at?: string | null
+          last_message_at?: string | null
+          last_staff_read_at?: string | null
+          member_id: string
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_member_read_at?: string | null
+          last_message_at?: string | null
+          last_staff_read_at?: string | null
+          member_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_threads_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_threads_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_threads_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_threads_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           body: string
@@ -7027,6 +7086,7 @@ export type Database = {
           max_bookings_per_day: number | null
           max_future_bookings: number | null
           max_unpaid_bookings: number | null
+          messages_enabled: boolean
           morning_brief_send_at: string
           no_show_consumes_credit: boolean
           no_show_fee_cents: number
@@ -7142,6 +7202,7 @@ export type Database = {
           max_bookings_per_day?: number | null
           max_future_bookings?: number | null
           max_unpaid_bookings?: number | null
+          messages_enabled?: boolean
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
@@ -7257,6 +7318,7 @@ export type Database = {
           max_bookings_per_day?: number | null
           max_future_bookings?: number | null
           max_unpaid_bookings?: number | null
+          messages_enabled?: boolean
           morning_brief_send_at?: string
           no_show_consumes_credit?: boolean
           no_show_fee_cents?: number
@@ -7490,6 +7552,70 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      thread_messages: {
+        Row: {
+          attachment_bytes: number | null
+          attachment_mime: string | null
+          attachment_name: string | null
+          attachment_path: string | null
+          body: string
+          created_at: string
+          id: string
+          sender_kind: Database["public"]["Enums"]["message_sender_kind"]
+          sender_user_id: string | null
+          studio_id: string
+          thread_id: string
+        }
+        Insert: {
+          attachment_bytes?: number | null
+          attachment_mime?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          sender_kind: Database["public"]["Enums"]["message_sender_kind"]
+          sender_user_id?: string | null
+          studio_id: string
+          thread_id: string
+        }
+        Update: {
+          attachment_bytes?: number | null
+          attachment_mime?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          sender_kind?: Database["public"]["Enums"]["message_sender_kind"]
+          sender_user_id?: string | null
+          studio_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thread_messages_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_messages_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       timeline_events: {
         Row: {
@@ -9274,6 +9400,7 @@ export type Database = {
           lifetime_visits: number
           logo_url: string
           member_id: string
+          messages_enabled: boolean
           open_offers: number
           preferred_name: string
           status: Database["public"]["Enums"]["member_status"]
@@ -9341,6 +9468,7 @@ export type Database = {
           state: string
         }[]
       }
+      member_messages: { Args: { p_studio_id: string }; Returns: Json }
       member_milestones: { Args: { p_studio_id: string }; Returns: Json }
       member_next_class_day: {
         Args: { p_from?: string; p_studio_id: string }
@@ -9398,6 +9526,17 @@ export type Database = {
         Returns: string
       }
       member_sees_ai_drafts: { Args: never; Returns: boolean }
+      member_send_message: {
+        Args: {
+          p_attachment_bytes?: number
+          p_attachment_mime?: string
+          p_attachment_name?: string
+          p_attachment_path?: string
+          p_body: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       member_shop: { Args: { p_studio_id: string }; Returns: Json }
       member_snapshot: { Args: { p_member_id: string }; Returns: Json }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
@@ -10458,6 +10597,7 @@ export type Database = {
           email: string
           is_platform_admin: boolean
           location_name: string
+          messages_enabled: boolean
           onboarding_complete: boolean
           publication_enabled: boolean
           role: Database["public"]["Enums"]["staff_role"]
@@ -10469,10 +10609,25 @@ export type Database = {
           studio_timezone: string
           studio_week_starts_on: number
           time_format: string
+          unread_messages: number
           user_id: string
         }[]
       }
       staff_challenges: { Args: { p_studio_id: string }; Returns: Json }
+      staff_mark_thread_read: { Args: { p_thread_id: string }; Returns: Json }
+      staff_message_thread: { Args: { p_thread_id: string }; Returns: Json }
+      staff_message_threads: { Args: { p_studio_id: string }; Returns: Json }
+      staff_send_message: {
+        Args: {
+          p_attachment_bytes?: number
+          p_attachment_mime?: string
+          p_attachment_name?: string
+          p_attachment_path?: string
+          p_body: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
       stamp_open_shift: {
         Args: { p_occurrence_id: string }
         Returns: undefined
@@ -10911,6 +11066,7 @@ export type Database = {
         | "frozen"
         | "cancelled"
         | "expired"
+      message_sender_kind: "member" | "staff"
       message_status: "draft" | "queued" | "sent" | "failed"
       note_category: "general" | "injury" | "medical" | "preference" | "admin"
       notif_channel: "email" | "push" | "in_app"
@@ -11176,6 +11332,7 @@ export const Constants = {
         "cancelled",
         "expired",
       ],
+      message_sender_kind: ["member", "staff"],
       message_status: ["draft", "queued", "sent", "failed"],
       note_category: ["general", "injury", "medical", "preference", "admin"],
       notif_channel: ["email", "push", "in_app"],

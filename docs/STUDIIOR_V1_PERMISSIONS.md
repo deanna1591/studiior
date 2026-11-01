@@ -222,8 +222,11 @@ Instructors have no access to any of this. Enforced by RLS policy, not by hiding
 | Manage own notification prefs | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Send a message to a member | ✅ | ✅ | ❌ | ✅ | — |
 | Broadcast to a segment | ✅ | ✅ | ❌ | ❌ | — |
+| Member–studio messages (view & reply)²⁵ | ✅ | ✅ | ❌ | ✅ | ⚠️⁷ |
 
 ²¹ Class-level only: cancellations and substitutions affecting them. No payment or churn alerts.
+
+²⁵ Decision 89. A member messages the studio and any staff role may reply; one thread per member per studio. Instructors cannot send or see messages. Member reads and writes **their own thread only**; gated by `studio_settings.messages_enabled` (off until the studio turns it on).
 
 ---
 

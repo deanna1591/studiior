@@ -25,7 +25,7 @@ export default async function TemplatesScreen() {
     supabase.from("notification_templates_overrides").select("key").eq("studio_id", ctx.studioId),
     supabase.from("notification_templates").select("key"),
     supabase.from("studio_settings")
-      .select("disabled_templates, flex_enabled, free_first_class_enabled, guest_passes_enabled, challenges_enabled, guarantees_enabled")
+      .select("disabled_templates, flex_enabled, free_first_class_enabled, guest_passes_enabled, challenges_enabled, guarantees_enabled, messages_enabled")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("products").select("id", { count: "exact", head: true }).eq("studio_id", ctx.studioId),
   ]);
@@ -43,6 +43,7 @@ export default async function TemplatesScreen() {
     challenges: settings?.challenges_enabled ?? false,
     shop: (productCount ?? 0) > 0,
     guarantees: settings?.guarantees_enabled ?? false,
+    messages: settings?.messages_enabled ?? false,
   });
 
   const groups = TEMPLATE_GROUPS

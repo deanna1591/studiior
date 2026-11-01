@@ -6,6 +6,7 @@ import OpeningHoursPanel from "../opening-hours";
 import OpeningDatePanel from "../opening-date";
 import LocationPanel from "../location-panel";
 import StudioIdentityPanel from "../studio-identity";
+import MessagesSettingPanel from "../messages";
 import SettingsBack from "../back";
 import SettingsSection from "@/components/staff/settings-section";
 import SettingsSummaryRow from "@/components/staff/settings-summary";
@@ -25,7 +26,7 @@ export default async function StudioSettings() {
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: studio }, { data: settings }, { data: loc }, { count: closures }] = await Promise.all([
     supabase.from("studios").select("name, slug, timezone, currency, country").eq("id", ctx.studioId).maybeSingle(),
-    supabase.from("studio_settings").select("open_time, close_time, opened_on").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("open_time, close_time, opened_on, messages_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("locations")
       .select("name, address, latitude, longitude, self_checkin_radius_m, self_checkin_accuracy_cap_m, self_checkin_requires_location")
       .eq("studio_id", ctx.studioId).eq("is_primary", true).maybeSingle(),
@@ -65,6 +66,10 @@ export default async function StudioSettings() {
 
       <SettingsSection id="location" title="Location & self check-in">
         <LocationPanel loc={loc ?? null} />
+      </SettingsSection>
+
+      <SettingsSection id="messages" title="Member messages">
+        <MessagesSettingPanel enabled={settings?.messages_enabled ?? false} />
       </SettingsSection>
 
       <SettingsSection id="checkin-code" title="Check-in code">

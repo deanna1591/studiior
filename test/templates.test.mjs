@@ -9,7 +9,7 @@ import {
 } from "../lib/templates.mjs";
 
 const AUDIENCES = new Set(["Members", "Instructors", "Staff"]);
-const FEATURES = new Set(["flex", "free_first", "guest_passes", "challenges", "shop", "guarantees"]);
+const FEATURES = new Set(["flex", "free_first", "guest_passes", "challenges", "shop", "guarantees", "messages"]);
 const allKeys = TEMPLATE_GROUPS.flatMap((g) => g.keys);
 
 test("every listed key has a label, an audience, and a when line", () => {

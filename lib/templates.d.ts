@@ -1,5 +1,5 @@
 export type TemplateAudience = "Members" | "Instructors" | "Staff";
-export type TemplateFeature = "flex" | "free_first" | "guest_passes" | "challenges" | "shop" | "guarantees";
+export type TemplateFeature = "flex" | "free_first" | "guest_passes" | "challenges" | "shop" | "guarantees" | "messages";
 export type TemplateKey = {
   key: string;
   label: string;
@@ -16,7 +16,7 @@ export function templateFeature(key: string): TemplateFeature | null;
 export function isTemplateVisible(key: string, features: Set<string>): boolean;
 export function featureSet(flags: {
   flex?: boolean; freeFirst?: boolean; guest?: boolean;
-  challenges?: boolean; shop?: boolean; guarantees?: boolean;
+  challenges?: boolean; shop?: boolean; guarantees?: boolean; messages?: boolean;
 }): Set<string>;
 export function templateKeysForMaster(master: "convert" | "keep" | string): TemplateKey[];
 export function placeholdersFrom(...texts: (string | null | undefined)[]): string[];

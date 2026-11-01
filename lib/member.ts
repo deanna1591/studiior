@@ -71,6 +71,9 @@ export async function memberScreen() {
       // Decision 62: the member has already had the studio's intro offer, so a
       // trial plan shows the "first-timers" sentence in place of Buy.
       trialUsed: b?.trial_used ?? false,
+      // Decision 89: the studio lets members message it (the Account row and
+      // the /messages screen are hidden when off).
+      messagesEnabled: b?.messages_enabled ?? false,
     },
   };
 }

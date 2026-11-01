@@ -833,6 +833,25 @@ export async function saveLocationGeofence(_prev: PlainState, fd: FormData): Pro
   };
 }
 
+export async function saveMessages(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("messages_enabled") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ messages_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: on
+      ? "On. Members can message the studio, and you can reply from the Messages tab."
+      : "Off. The Message-the-studio option is hidden from members.",
+  };
+}
+
 export async function saveBookingAlerts(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

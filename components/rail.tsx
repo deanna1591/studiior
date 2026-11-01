@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type RailItem = { href: string; label: string };
+export type RailItem = { href: string; label: string; badge?: number };
 export type RailGroup = { heading: string | null; items: RailItem[] };
 export type RailUser = { email: string; role: string };
 
@@ -60,14 +60,21 @@ export default function Rail({
       <Link
         href={it.href}
         onClick={() => setOpen(false)}
-        className={`relative block px-4 py-2 text-[13px] leading-[18px] ${
+        className={`relative flex items-center justify-between gap-2 px-4 py-2 text-[13px] leading-[18px] ${
           active
             ? "bg-lime-tint font-medium text-lime-text"
             : "text-ink-2 hover:bg-paper hover:text-ink"
         }`}
       >
         {active && <span className="absolute inset-y-0 left-0 w-[2px] bg-lime-text" aria-hidden />}
-        {it.label}
+        <span>{it.label}</span>
+        {it.badge ? (
+          <span className="num shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+                style={{ background: "var(--coral-deep)", color: "#FFFFFF" }}
+                aria-label={`${it.badge} unread`}>
+            {it.badge > 99 ? "99+" : it.badge}
+          </span>
+        ) : null}
       </Link>
     );
   };

@@ -511,6 +511,42 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 89 — Studio messages (recorded 1 Nov 2026)
+
+Members can message the studio from the app. Every staff role — owner, admin, manager, front desk — sees a **Messages** tab on the staff app and can reply. **Instructors cannot send or see messages.** One thread per member per studio; messages never cross studios.
+
+**Setting.** `studio_settings.messages_enabled boolean default false` (register in `lib/settings-registry.mjs`; Settings → Studio switch "Members can message the studio"). When off: the member-app row is hidden and the message RPCs refuse with "Messages are off for this studio". Reform turns it on from Settings.
+
+**Schema (new migration).**
+- `message_threads`: id, studio_id, member_id, last_message_at, last_member_read_at, last_staff_read_at, created_at. Unique `(studio_id, member_id)`.
+- `messages`: id, thread_id, studio_id, `sender_kind` (`'member' | 'staff'`, an enum carried in its **own** migration — a new enum value cannot be used in the transaction that adds it), sender_user_id, body text (1–2000 chars), attachment_path, attachment_name, attachment_bytes, attachment_mime, created_at.
+- RLS: members read their own thread only; staff read their studio only; **no direct inserts — every write goes through an RPC.**
+- Storage bucket `message-attachments`, **private**, `file_size_limit 1048576` (1 MB), allowed mime: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`. Path `{studio_id}/{thread_id}/{message_id}/{filename}`. Signed URLs, 1 hour. **Size and type enforced in the RPC too** (never only at the bucket). Refusals returned as reasons.
+
+**RPCs (all authenticated and studio-scoped, none anon; the anon surface stays EXACTLY THIRTEEN):** `member_messages`, `member_send_message`, `staff_message_threads`, `staff_message_thread`, `staff_send_message`, `staff_mark_thread_read`. Member RPCs are guarded to the member's own thread; staff RPCs are guarded to staff of the studio with any role.
+
+**Member app.**
+- Account tab row "Message the studio" (hidden when the setting is off).
+- Screen title "Messages". Empty state: "No messages yet. Ask us anything about your bookings, plans or the studio."
+- Compose box placeholder "Write a message". Plain link under it: "Attach a photo or PDF (up to 1 MB)". Button "Send".
+- Over size: "That file is over 1 MB. Try a smaller photo or PDF." Wrong type: "Photos and PDFs only."
+- Each message shows sender name, date and time via `fmtClock`, body, and the attachment as a link with its name.
+
+**Staff app.**
+- New top-level tab "Messages" with an unread-count pill (threads with a member message newer than `last_staff_read_at`).
+- List: newest first; each row shows member name and photo, the first line of the latest message, date and time via `fmtClock`, and an "Unread" chip when applicable.
+- Thread: header with the member's name linking to their member page, their plan chip, the existing chips **Unpaid booking** / **No desk pay** when true, and a link "Next booking: {class_name}, {when}" when they have one. Full exchange below. Reply box with the same attachment rule and button "Send". **Opening a thread marks it read.**
+
+**Emails (two new templates on the Templates page, each on the per-email switch, sample context filled).**
+- `message_to_member`: sent when staff reply. Subject "New message from {studio_name}". Body: "Hi {first_name}, {staff_first_name} replied to your message:" then the reply as a quoted block, then a button "Open message" to the member Messages screen. Member sign-off from the studio's templates.
+- `message_to_studio`: sent to the studio's notification email when a member sends. Subject "New message from {member_name}". Body: "{member_name} sent a message:" then the message as a quoted block, then a button "Reply" to the staff thread. **Sent once per member message, not per staff user.**
+
+**Not in scope:** instructors messaging, group messages, read receipts for members, push notifications, more than one attachment per message.
+
+**Where:** Permissions (Messages row, added in this step). **Status:** recorded — not built.
+
+---
+
 ## 83 — Journey and History rows say what happened and where the money went (2026-10-27)
 
 One feed, `member_activity`, serves both the member History and the staff Journey. Every row names the class (or the plan) and the date. A booking row says what it drew from: "Drew 1 from {plan} — {n} left", or "Free first class", or for an unpaid drop-in "Unpaid — {amount} due". A cancellation row says "Credit returned to {plan}" or "Class used". Money rows show the amount. The running balance shows on both screens. Rows link to the real thing, never duplicate its controls: a class row opens the class page for a member and the roster (with that member highlighted) for staff; a money row opens the membership and payment panel on the member's profile. Cancel, book again and record payment stay where they live today. There is no Reschedule anywhere; the history line for a moved class reads "Class moved to {day} {time}". `member_activity` keeps its guard and grants — anon stays EXACTLY THIRTEEN.

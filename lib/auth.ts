@@ -29,6 +29,12 @@ export type StaffContext = {
   /** Both arrive with the context now rather than as their own requests. */
   isPlatformAdmin: boolean;
   billing: { status: string | null; locked: boolean; daysLeft: number };
+  /** Decision 89: threads with a member message newer than last_staff_read_at.
+   *  Drives the Messages tab's unread pill. 0 for an instructor. */
+  unreadMessages: number;
+  /** Decision 89: whether the studio lets members message it — the Messages tab
+   *  shows only when on. */
+  messagesEnabled: boolean;
 };
 
 /**
@@ -116,6 +122,8 @@ export async function getStaffContext(): Promise<StaffContext | null> {
       locked: row.billing_locked === true,
       daysLeft: row.billing_days_left ?? 0,
     },
+    unreadMessages: row.unread_messages ?? 0,
+    messagesEnabled: row.messages_enabled === true,
   };
 }
 
@@ -172,6 +180,7 @@ export type MemberBootstrap = {
   xendit_enabled: boolean;
   time_format: "24h" | "12h";
   trial_used: boolean;
+  messages_enabled: boolean;
 };
 
 /** Who is making this request, on the member PWA. */

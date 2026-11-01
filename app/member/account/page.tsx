@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * Making it a hub must not turn a one-tap "what are my credits" into two.
  */
 export default async function Account() {
-  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
+  const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl, settings } =
     await memberScreen();
   // Decision 82: membershipState joins the same wave (it depends on nothing in
   // it), so Account is one round trip after the context rather than two.
@@ -36,6 +36,8 @@ export default async function Account() {
     { href: "/account/plan", label: "Your plan", sub: "Membership, credits, guest passes and peak classes" },
     ...(hasProducts ? [{ href: "/shop", label: "Shop", sub: "Things the studio sells, picked up at the front desk" }] : []),
     ...(hasOrders ? [{ href: "/account/orders", label: "My orders", sub: "What you have bought, and whether it is ready" }] : []),
+    // Decision 89: only when the studio has turned messages on.
+    ...(settings.messagesEnabled ? [{ href: "/messages", label: "Message the studio", sub: "Ask about your bookings, plans or anything else" }] : []),
     { href: "/account/payments", label: "Payments", sub: "What you have paid, and for what" },
     { href: "/account/pay", label: "How you pay", sub: "Your cards, or how the studio takes payment" },
     { href: "/account/profile", label: "Your details", sub: "Name, photo, phone, emergency contact" },

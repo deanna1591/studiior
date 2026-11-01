@@ -51,6 +51,11 @@ export function railGroups(
       { href: "/shifts", label: "Open shifts" },
     );
   }
+  // Decision 89 — member↔studio messages. A top-level tab for any non-instructor
+  // role, only when the studio has turned messaging on, with an unread pill.
+  if (desk && ctx.messagesEnabled) {
+    top.push({ href: "/messages", label: "Messages", badge: ctx.unreadMessages || undefined });
+  }
 
   const groups: RailGroup[] = [
     { heading: null, items: top },
