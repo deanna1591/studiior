@@ -10,3 +10,10 @@ export function classSheetView(input?: ClassSheetInput): {
   actions: SheetAction[];
   hideCapacity: boolean;
 };
+export type BookRoute = "free" | "waitlist" | "full" | "book" | "checkout";
+export function bookRoute(input?: {
+  freeFirstEligible?: boolean;
+  full?: boolean;
+  waitlistEnabled?: boolean;
+  covered?: boolean;
+}): BookRoute;

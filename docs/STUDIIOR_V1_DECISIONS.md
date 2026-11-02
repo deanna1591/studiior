@@ -2082,3 +2082,7 @@ Slice B, wallet:
 Out of scope: cart, discounts and promo codes, partial refunds from the member side, changing the plan picker per studio (same rule for all tenants), instructors.
 
 Settings: none new. Opt-in: the checkout replaces the Pay now path for every studio with online payment on; studios without online payment keep today's behaviour.
+
+Free first class comes first. Before any coverage check, the app applies Decision 30 as today: a member eligible for a free first class who taps Book gets the free seat with no checkout. The checkout appears only when the member is not eligible or has already used the free class. The Decision 30(d) one-strike rule and the 81b unpaid cap are unchanged. The checkout never shows a free option.
+
+Shipped 2 Nov as slice A (migration 20260833140000, commit 42335e4) with two deviations: no 'Save this card' checkbox, because Xendit hosted sessions cannot charge a saved card (Decision 67); and no Card / GCash tabs in the app, because the Xendit hosted page presents both. The pay sheet names both methods in text instead.

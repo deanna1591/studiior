@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classSheetView } from "../lib/class-sheet.mjs";
+import { classSheetView, bookRoute } from "../lib/class-sheet.mjs";
 
 const START = Date.UTC(2026, 9, 10, 7, 0, 0);
 const END = START + 50 * 60000;
@@ -66,4 +66,49 @@ test("flex pending booked -> waiting_confirmation + cancel", () => {
   assert.equal(v.state, "waiting_confirmation");
   assert.deepEqual(v.actions, ["cancel"]);
   assert.equal(v.hideCapacity, true);
+});
+
+// -------------------------------------------------------------------------
+// Decision 88 addendum — bookRoute: free-first comes before the coverage
+// check, so an eligible member books free and NEVER hits /checkout.
+// -------------------------------------------------------------------------
+
+test("bookRoute: free-first eligible routes to 'free' even when uncovered", () => {
+  assert.equal(bookRoute({ freeFirstEligible: true, covered: false }), "free");
+});
+
+test("bookRoute: free-first eligible routes to 'free' when covered too", () => {
+  assert.equal(bookRoute({ freeFirstEligible: true, covered: true }), "free");
+});
+
+test("bookRoute: free-first eligible wins over full (shipped free-vs-full order)", () => {
+  assert.equal(bookRoute({ freeFirstEligible: true, full: true, waitlistEnabled: true }), "free");
+  assert.equal(bookRoute({ freeFirstEligible: true, full: true, waitlistEnabled: false }), "free");
+});
+
+test("bookRoute: an eligible member NEVER routes to checkout, any combination", () => {
+  for (const full of [true, false])
+    for (const waitlistEnabled of [true, false])
+      for (const covered of [true, false]) {
+        const r = bookRoute({ freeFirstEligible: true, full, waitlistEnabled, covered });
+        assert.equal(r, "free", `eligible → free (full=${full} wl=${waitlistEnabled} covered=${covered})`);
+        assert.notEqual(r, "checkout");
+      }
+});
+
+test("bookRoute: not eligible, not full, covered -> book (inline)", () => {
+  assert.equal(bookRoute({ freeFirstEligible: false, full: false, covered: true }), "book");
+});
+
+test("bookRoute: not eligible, not full, uncovered -> checkout", () => {
+  assert.equal(bookRoute({ freeFirstEligible: false, full: false, covered: false }), "checkout");
+});
+
+test("bookRoute: not eligible + full -> waitlist when on, else full", () => {
+  assert.equal(bookRoute({ full: true, waitlistEnabled: true }), "waitlist");
+  assert.equal(bookRoute({ full: true, waitlistEnabled: false }), "full");
+});
+
+test("bookRoute: a full uncovered class without waitlist is 'full', not 'checkout'", () => {
+  assert.equal(bookRoute({ full: true, waitlistEnabled: false, covered: false }), "full");
 });

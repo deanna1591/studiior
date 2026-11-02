@@ -6,7 +6,7 @@ import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/compon
 import Link from "next/link";
 import { bookClass, bookFirstFree, cancelBooking, selfCheckIn } from "@/app/member/actions";
 import ClassButton from "@/components/member/class-button";
-import { classSheetView } from "@/lib/class-sheet";
+import { classSheetView, bookRoute } from "@/lib/class-sheet";
 import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
@@ -108,6 +108,11 @@ export default function ClassDetailBody({
   // An actionable booking (not a completed check-in): checkin / reserved /
   // waiting_confirmation / waitlisted.
   const hasBooking = view.hideCapacity && !isCheckedIn;
+  // Decision 88 addendum: where "Book" goes for a member with no live booking —
+  // free-first first (Decision 30), then full, then covered-inline vs /checkout.
+  // The one precedence, in a tested helper so a reorder cannot silently send an
+  // eligible member to checkout.
+  const route = bookRoute({ freeFirstEligible: freeFirst?.eligible === true, full, waitlistEnabled, covered });
 
   // Decision 21 amendment (20 Oct 2026): the member-facing confirmation copy —
   // always about THEIR booking, in plain words, never a minimum or a headcount.
@@ -243,9 +248,10 @@ export default function ClassDetailBody({
               </>
             )}
           </>
-        ) : freeFirst?.eligible ? (
-          // Decision 30: this member's first class is free. Said plainly right
-          // where they decide, and the Book books it at zero — no plan, no card.
+        ) : route === "free" ? (
+          // Decision 30 (88 addendum: free-first comes first): this member's first
+          // class is free. Said plainly right where they decide, and the Book books
+          // it at zero — no plan, no card, never the checkout.
           <BookForm action={bookFirstFree}>
             <input type="hidden" name="occurrence_id" value={occ.id} />
             <p className="mb-2.5 rounded-xl px-3 py-2 text-[13px] leading-[18px] text-ink"
@@ -254,19 +260,17 @@ export default function ClassDetailBody({
             </p>
             <PrimaryButton>Book — first class free</PrimaryButton>
           </BookForm>
-        ) : full ? (
-          waitlistEnabled ? (
-            <BookForm action={bookClass}>
-              <input type="hidden" name="occurrence_id" value={occ.id} />
-              <PrimaryButton>Join the waitlist</PrimaryButton>
-              <p className="m-micro mt-1.5 text-center text-ink-3">
-                No class is used unless a place opens and you take it.
-              </p>
-            </BookForm>
-          ) : (
-            <p className="m-sub text-ink-3">This class is full and has no waitlist.</p>
-          )
-        ) : covered ? (
+        ) : route === "waitlist" ? (
+          <BookForm action={bookClass}>
+            <input type="hidden" name="occurrence_id" value={occ.id} />
+            <PrimaryButton>Join the waitlist</PrimaryButton>
+            <p className="m-micro mt-1.5 text-center text-ink-3">
+              No class is used unless a place opens and you take it.
+            </p>
+          </BookForm>
+        ) : route === "full" ? (
+          <p className="m-sub text-ink-3">This class is full and has no waitlist.</p>
+        ) : route === "book" ? (
           // Decision 88: a plan covers this class, so Book still books inline.
           <BookForm action={bookClass}>
             <input type="hidden" name="occurrence_id" value={occ.id} />
