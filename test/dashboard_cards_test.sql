@@ -107,12 +107,32 @@ insert into memberships (id, studio_id, member_id, plan_id, status, price_cents,
   ('86d586d5-0000-0000-0000-00000000d518','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-00000000a008','86d586d5-0000-0000-0000-00000000db02','expired',4000,'CZK',current_date - 100, current_date - 10, 0);
 
 -- Occurrences: ENDED today, UPCOMING today, OLD (10 days ago, occupancy).
-insert into class_occurrences
-  (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
-values
-  ('86d586d5-0000-0000-0000-0000000cc001','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Ended',10,3, now() - interval '3 hours', now() - interval '2 hours','scheduled'),
-  ('86d586d5-0000-0000-0000-0000000cc002','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Upcoming',10,5, now() + interval '2 hours', now() + interval '3 hours','scheduled'),
-  ('86d586d5-0000-0000-0000-0000000cc003','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Old',10,1, now() - interval '10 days', now() - interval '10 days' + interval '50 min','scheduled');
+-- The ENDED and UPCOMING classes are anchored to TODAY's Europe/Prague day — via
+-- date_trunc on Prague wall time cast back through the zone — not to a raw
+-- now()±hours offset, so both fall on the studio-local day the cards read at ANY
+-- run time, not only when now()-3h / now()+2h happen not to cross Prague midnight.
+-- ENDED is pinned early (00:01) with its end clamped to now() (never past it,
+-- floored one minute above its start so the check ends_at > starts_at holds), so
+-- it reads as "ended today" (starts today AND ends_at <= now()) the moment the
+-- clock is a couple of minutes into the Prague day. UPCOMING sits ahead of now()
+-- but inside today (ends_at > now(), starts today). A residual edge of ~2 min
+-- after and ~5 min before Prague midnight is accepted: a class cannot be both
+-- today and already-ended in the first minute of the day.
+do $$
+declare
+  d0 timestamptz := (date_trunc('day', now() at time zone 'Europe/Prague')) at time zone 'Europe/Prague';
+  d1 timestamptz := ((date_trunc('day', now() at time zone 'Europe/Prague')) + interval '1 day') at time zone 'Europe/Prague';
+  e_start timestamptz := d0 + interval '1 min';
+  e_end   timestamptz := least(d0 + interval '51 min', greatest(now(), d0 + interval '2 min'));
+  u_base  timestamptz := least(greatest(now() + interval '30 min', d0 + interval '3 min'), d1 - interval '25 min');
+begin
+  insert into class_occurrences
+    (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, booked_count, starts_at, ends_at, status)
+  values
+    ('86d586d5-0000-0000-0000-0000000cc001','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Ended',10,3, e_start, e_end,'scheduled'),
+    ('86d586d5-0000-0000-0000-0000000cc002','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Upcoming',10,5, u_base, u_base + interval '20 min','scheduled'),
+    ('86d586d5-0000-0000-0000-0000000cc003','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Old',10,1, now() - interval '10 days', now() - interval '10 days' + interval '50 min','scheduled');
+end $$;
 
 -- Ended-class bookings: attended / no_show / booked. booked_at in the PAST, so
 -- "bookings made today" is 0 — the card counts seats in classes, not made-today.
@@ -127,9 +147,16 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
   ('86d586d5-0000-0000-0000-00000000b0d1','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000cc002','86d586d5-0000-0000-0000-00000000a005','booked','drop_in',  false, now() - interval '1 day'),
   ('86d586d5-0000-0000-0000-00000000b0e1','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000cc002','86d586d5-0000-0000-0000-00000000a006','booked','drop_in',  false, now() - interval '1 day'),
   ('86d586d5-0000-0000-0000-00000000b0c1','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000cc002','86d586d5-0000-0000-0000-00000000a007','booked','comp',     false, now() - interval '1 day');
--- a check-in for the attended ended booking (seat_kind/checked_in)
+-- A check-in for the attended ended booking (seat_kind/checked_in). Anchored
+-- INSIDE the Ended class's own §8 window — Prague 00:20 today, which sits inside
+-- [start 00:01, end + 30 min] however the Ended class's clamped end lands —
+-- rather than now()-2h30m, which after the class moved to the early-morning
+-- Prague day falls hours past the window and the check-in trigger rejects it.
+-- Clamped to now() so the first couple of minutes after Prague midnight cannot
+-- place it in the future.
 insert into check_ins (studio_id, member_id, occurrence_id, booking_id, method, checked_in_at) values
-  ('86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-00000000a011','86d586d5-0000-0000-0000-0000000cc001','86d586d5-0000-0000-0000-00000000b011','self', now() - interval '2 hours 30 min');
+  ('86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-00000000a011','86d586d5-0000-0000-0000-0000000cc001','86d586d5-0000-0000-0000-00000000b011','self',
+   least((date_trunc('day', now() at time zone 'Europe/Prague') + interval '20 min') at time zone 'Europe/Prague', now()));
 
 -- Guest passes: MF free-first (not converted, booking UB), MG free-first
 -- (converted via the expired membership), MH host-brought (host = MA).

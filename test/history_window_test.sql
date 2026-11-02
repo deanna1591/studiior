@@ -27,16 +27,20 @@ insert into studio_settings (studio_id) values ('b082b082-0000-0000-0000-0000000
 insert into members (id, studio_id, first_name, last_name, email, waiver_signed_at) values
   ('b082b082-0000-0000-0000-0000000d0001','b082b082-0000-0000-0000-000000000001','Win','Dow','b082-m@example.com', now());
 
--- Ledger spanning four months. 120/70 days ago straddle "first of the month two
--- months back"; 10/2 days ago are firmly inside. Unclaimed (no payment), so they
--- surface as their own credit lines in member_activity's `adj` arm.
--- balance_after is the stored cumulative; member_activity recomputes the running
--- balance from delta over the all-time ledger and does not read it, but the
+-- Ledger spanning the window boundary. The two "pre-window" rows are anchored to
+-- (first of the month two months back) MINUS 5 days, and the "inside-old" row to
+-- that same boundary PLUS 5 days — the same date arithmetic member_activity's
+-- display filter uses — so the split is exactly two-out / three-in on ANY date,
+-- not only on the days when `now() - 70 days` happens to land after the boundary.
+-- 10/2 days ago are firmly inside (the window reaches back ~59-92 days). Unclaimed
+-- (no payment), so they surface as their own credit lines in member_activity's
+-- `adj` arm. balance_after is the stored cumulative; member_activity recomputes the
+-- running balance from delta over the all-time ledger and does not read it, but the
 -- column is NOT NULL, so the honest cumulative is stored here.
 insert into credit_ledger (studio_id, member_id, delta, balance_after, reason, created_at) values
-  ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', 10, 10,'manual',  now()-interval '120 days'),
-  ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', -1,  9,'booking', now()-interval '120 days' + interval '1 h'),
-  ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', -1,  8,'booking', now()-interval '70 days'),
+  ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', 10, 10,'manual',  (date_trunc('month', now()) - interval '2 months') - interval '5 days'),
+  ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', -1,  9,'booking', (date_trunc('month', now()) - interval '2 months') - interval '5 days' + interval '1 h'),
+  ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', -1,  8,'booking', (date_trunc('month', now()) - interval '2 months') + interval '5 days'),
   ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001', -1,  7,'booking', now()-interval '10 days'),
   ('b082b082-0000-0000-0000-000000000001','b082b082-0000-0000-0000-0000000d0001',  5, 12,'manual',  now()-interval '2 days');
 

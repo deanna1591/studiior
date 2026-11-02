@@ -79,6 +79,15 @@ select expect_num('and refreshing health covers all of them',
   refresh_studio_health(current_setting('h.sid')::uuid)::bigint, 26);
 reset role;
 
+-- generate_demo_data() inserts check_ins, and a demo member whose generated
+-- history crosses a milestone target (e.g. 50 visits) queues a `milestone`
+-- notification through the check-in trigger — a byproduct of the generated
+-- attendance, not of anything this suite tests. The seed clears the queue for
+-- exactly this reason; mirror it so §7's "no notifications were generated"
+-- measures only what THIS suite's own check-in fixtures queue. Run as the reset
+-- (superuser) role so it bypasses the notifications RLS, like the seed.
+delete from notifications where studio_id = current_setting('h.sid')::uuid;
+
 -- The generator writes check_ins and then recomputes the visit cache. Asserted
 -- on its own rather than left to the band assertions, because when the
 -- recompute silently did nothing the failure surfaced eleven assertions later

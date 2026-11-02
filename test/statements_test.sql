@@ -112,11 +112,17 @@ values ('57a70000-0000-0000-0000-0000000ec003','57a70000-0000-0000-0000-00000000
   now()-interval '1 day 2 hours', now()-interval '1 day 1 hour','scheduled');
 insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
   ('57a70000-0000-0000-0000-0000000bb301','57a70000-0000-0000-0000-00000000a002','57a70000-0000-0000-0000-0000000ec003','57a70000-0000-0000-0000-0000000c0001','booked','member','drop_in', now()-interval '2 days');
--- SA: a class that ended 30 min ago TODAY — before the midnight(day+1) boundary.
+-- SA: a class on TODAY's Europe/Prague day — before the midnight(day+1) finalise
+-- boundary, so the sweep leaves it booked. Anchored to studio-local noon (via
+-- date_trunc on Prague wall time, cast back through the zone) rather than a raw
+-- now()-90min offset, so its studio-local date is unambiguously today at ANY run
+-- time — not yesterday in the first ~90 min after Prague midnight, which flipped
+-- the finalise sweep into marking it a no-show.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, status)
 values ('57a70000-0000-0000-0000-0000000ec004','57a70000-0000-0000-0000-00000000a001',
   '57a70000-0000-0000-0000-00000000aa01','57a70000-0000-0000-0000-0000000c7a01','Reformer',10,
-  now()-interval '90 min', now()-interval '30 min','scheduled');
+  (date_trunc('day', now() at time zone 'Europe/Prague') + interval '12 h') at time zone 'Europe/Prague',
+  (date_trunc('day', now() at time zone 'Europe/Prague') + interval '12 h' + interval '50 min') at time zone 'Europe/Prague','scheduled');
 insert into bookings (id, studio_id, occurrence_id, member_id, status, source, payment_source, booked_at) values
   ('57a70000-0000-0000-0000-0000000bb401','57a70000-0000-0000-0000-00000000a001','57a70000-0000-0000-0000-0000000ec004','57a70000-0000-0000-0000-0000000b0002','booked','member','drop_in', now()-interval '2 days');
 
