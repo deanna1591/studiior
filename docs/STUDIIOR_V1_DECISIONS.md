@@ -765,6 +765,10 @@ The composer's preview is a hand-built React look-alike of the email frame at a 
 
 **Touches.** 73a: migration (`studio_settings.max_unpaid_bookings`; `book_class` + `join_waitlist` re-issues), member booking card / class-sheet messages, settings panel + registry, tests. 73b: migration (re-issue `activate_purchase` / `xendit_activate_success_internal` to apply a drop-in credit to the oldest unpaid booking — reusing the existing ledger + webhook path), the two-option unpaid-booking card, the `return` param on `/buy/[plan]`, tests.
 
+### Amendment (c) — pay at the desk is earned (Deanna, 2 Nov 2026)
+
+(c) Pay at the desk is earned. Recorded 2 Nov 2026. Pay at the desk is offered to a member only while they have no late cancellation and no no-show on a desk (unpaid drop-in) booking. After one, the option disappears for that member and they pay online when booking. The class page then says: "Pay online to book. Paying at the desk is not available on this account." Staff can restore it from the member's profile with the button "Allow pay at the desk again"; the restore is audited. A studio may instead set desk pay to "First visit only", meaning a member may ever hold one desk booking. Setting lives in Settings → Booking and cancellation rules as "Pay at the desk" with two options: "Earned" (default) and "First visit only". Members list shows a chip "No desk pay" for blocked members. The one-at-a-time unpaid cap (Decision 81b) stays. Instructor walk-ins are unaffected. Cancelling in time keeps the record clean.
+
 ---
 
 ## 75 — Statements and the checked-in pay basis

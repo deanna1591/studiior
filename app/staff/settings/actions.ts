@@ -1018,6 +1018,9 @@ export async function saveBookingRules(_prev: PlainState, fd: FormData): Promise
         return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
       })(),
       waitlist_enabled: fd.get("waitlist_enabled") === "on",
+      // Decision 73 (c): pay at the desk is 'earned' (default; lost on a no-show
+      // or late cancel) or 'first_visit_only' (one desk booking ever).
+      desk_pay_mode: fd.get("desk_pay_mode") === "first_visit_only" ? "first_visit_only" : "earned",
       // Decision 75a: mark any still-booked booking as a no-show at midnight
       // finalise_days_after (0..7) the class, independent of suspension.
       finalise_attendance: fd.get("finalise_attendance") === "on",

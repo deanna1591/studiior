@@ -75,6 +75,8 @@ const REASONS: Record<string, string> = {
   pay_first: "Pay for your booked class first, or pay at the desk when you come in.",
   // Decision 73: a provisional free first class blocks other bookings until it's confirmed.
   free_first_pending: "Your free first class isn't confirmed yet — you can book more once it is.",
+  // Decision 73 (c): pay at the desk has been turned off for this member.
+  desk_pay_blocked: "Pay online to book. Paying at the desk is not available on this account.",
 };
 
 export type BookResult = { ok: true; message: string } | { ok: false; message: string } | null;

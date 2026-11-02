@@ -26,6 +26,7 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   // A live unpaid drop-in on a future class (member_plan_overview). Muted like
   // the sale "unpaid" chip — informational on the list; the pay flow is elsewhere.
   unpaid_booking: { label: "Unpaid booking" },
+  no_desk_pay: { label: "No desk pay" },
   // sale_status (sales_history)
   active: { label: "Active" },
   refunded: { label: "Refunded" },

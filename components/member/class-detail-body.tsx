@@ -51,7 +51,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
-  unpaid = false, group = null,
+  unpaid = false, group = null, deskPayAvailable = true,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -78,6 +78,9 @@ export default function ClassDetailBody({
   /** Decision 76: this seat is part of a group (Barkada). A guest sees "Booked
    *  by {host}" and no cancel; the host gets a link to manage the group. */
   group?: { isHost: boolean; host: string; plan: string; groupId: string } | null;
+  /** Decision 73 (c): can this member still pay at the desk? When false, the
+   *  page hides the pay-at-the-desk option and tells them to pay online. */
+  deskPayAvailable?: boolean;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -265,6 +268,13 @@ export default function ClassDetailBody({
           <BookForm action={bookClass}>
             <input type="hidden" name="occurrence_id" value={occ.id} />
             <PrimaryButton>Book this class</PrimaryButton>
+            {/* Decision 73 (c): pay at the desk is off for this member — tell
+                them to pay online instead of being refused on tap. */}
+            {!deskPayAvailable && (
+              <p className="m-sub mt-2 text-center text-ink-3">
+                Pay online to book. Paying at the desk is not available on this account.
+              </p>
+            )}
           </BookForm>
         )}
       </div>
@@ -284,7 +294,13 @@ export default function ClassDetailBody({
                 className="m-action m-press mt-3 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
             Pay now
           </Link>
-          <p className="m-sub mt-2 text-ink-3">Or pay at the desk when you come in.</p>
+          {/* Decision 73 (c): the pay-at-the-desk option is hidden once desk pay
+              is off for this member. */}
+          <p className="m-sub mt-2 text-ink-3">
+            {deskPayAvailable
+              ? "Or pay at the desk when you come in."
+              : "Paying at the desk is not available on this account."}
+          </p>
         </div>
       )}
 

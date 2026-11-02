@@ -4208,6 +4208,10 @@ export type Database = {
           current_streak: number
           date_of_birth: string | null
           deleted_at: string | null
+          desk_pay_blocked_at: string | null
+          desk_pay_blocked_reason: string | null
+          desk_pay_restored_at: string | null
+          desk_pay_restored_by: string | null
           email: string
           emergency_contact: Json | null
           first_name: string
@@ -4244,6 +4248,10 @@ export type Database = {
           current_streak?: number
           date_of_birth?: string | null
           deleted_at?: string | null
+          desk_pay_blocked_at?: string | null
+          desk_pay_blocked_reason?: string | null
+          desk_pay_restored_at?: string | null
+          desk_pay_restored_by?: string | null
           email: string
           emergency_contact?: Json | null
           first_name: string
@@ -4280,6 +4288,10 @@ export type Database = {
           current_streak?: number
           date_of_birth?: string | null
           deleted_at?: string | null
+          desk_pay_blocked_at?: string | null
+          desk_pay_blocked_reason?: string | null
+          desk_pay_restored_at?: string | null
+          desk_pay_restored_by?: string | null
           email?: string
           emergency_contact?: Json | null
           first_name?: string
@@ -4309,6 +4321,13 @@ export type Database = {
           waiver_signed_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "members_desk_pay_restored_by_fkey"
+            columns: ["desk_pay_restored_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "members_studio_id_fkey"
             columns: ["studio_id"]
@@ -7055,6 +7074,7 @@ export type Database = {
           cover_auto_accept_enabled: boolean
           cover_escalation_hours: number
           created_at: string
+          desk_pay_mode: string
           disabled_templates: string[]
           dropin_payment_window_minutes: number
           finalise_attendance: boolean
@@ -7171,6 +7191,7 @@ export type Database = {
           cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
+          desk_pay_mode?: string
           disabled_templates?: string[]
           dropin_payment_window_minutes?: number
           finalise_attendance?: boolean
@@ -7287,6 +7308,7 @@ export type Database = {
           cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
+          desk_pay_mode?: string
           disabled_templates?: string[]
           dropin_payment_window_minutes?: number
           finalise_attendance?: boolean
@@ -9392,6 +9414,7 @@ export type Database = {
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
           current_streak: number
+          desk_pay_available: boolean
           first_name: string
           guest_passes_enabled: boolean
           has_payment_provider: boolean
@@ -9500,6 +9523,7 @@ export type Database = {
           complimentary: boolean
           credits_remaining: number
           current_plan_name: string
+          desk_pay_blocked: boolean
           email: string
           expires_on: string
           first_name: string
@@ -10162,6 +10186,7 @@ export type Database = {
         Args: { p_accept: boolean; p_offer_id: string }
         Returns: Json
       }
+      restore_desk_pay: { Args: { p_member_id: string }; Returns: Json }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
       restore_series: { Args: { p_series_id: string }; Returns: Json }
       retention_board: {

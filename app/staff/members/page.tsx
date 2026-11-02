@@ -57,6 +57,7 @@ type Row = {
   expires_on: string | null; credits_remaining: number | null;
   plan_state: string; complimentary: boolean; free_stage: string | null;
   has_unpaid_booking: boolean; joined_on: string | null;
+  desk_pay_blocked: boolean;
 };
 
 export default async function Members({
@@ -324,6 +325,7 @@ export default async function Members({
                     width while the visit meta stays on the right. */}
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-ink-3">
                   <PlanLine m={m} timeZone={ctx.timeZone} />
+                  {m.desk_pay_blocked && <StateChip state="no_desk_pay" />}
                 </div>
                 {loud && <HealthBand band={band} reason={m.health_reason} />}
               </div>

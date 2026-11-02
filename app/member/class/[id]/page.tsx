@@ -32,7 +32,8 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
                        timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending}
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
-                       unpaid={data.unpaid} group={data.group} />
+                       unpaid={data.unpaid} group={data.group}
+                       deskPayAvailable={ctx.bootstrap?.desk_pay_available ?? true} />
     </MemberShell>
   );
 }

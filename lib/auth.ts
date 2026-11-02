@@ -183,6 +183,7 @@ export type MemberBootstrap = {
   trial_used: boolean;
   messages_enabled: boolean;
   has_unread_studio_message: boolean;
+  desk_pay_available: boolean;
 };
 
 /** Who is making this request, on the member PWA. */

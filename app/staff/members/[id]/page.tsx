@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
 import Infractions from "./infractions";
+import DeskPay from "./desk-pay";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { InviteOne } from "../invites/panel";
@@ -52,7 +53,7 @@ export default async function MemberDetail({
 
   const { data: m } = await supabase
     .from("members")
-    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url")
+    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason")
     .eq("id", params.id)
     .maybeSingle();
   if (!m) notFound();
@@ -514,6 +515,10 @@ export default async function MemberDetail({
                           waiverSignedAt={m.waiver_signed_at} canDelete={manager} />
         </div>
       </div>
+      {manager && m.desk_pay_blocked_at && (
+        <DeskPay memberId={m.id} since={m.desk_pay_blocked_at}
+                 reason={m.desk_pay_blocked_reason as "no_show" | "late_cancel" | null} />
+      )}
       <Infractions
         standing={
           standing
