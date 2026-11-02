@@ -2086,3 +2086,23 @@ Settings: none new. Opt-in: the checkout replaces the Pay now path for every stu
 Free first class comes first. Before any coverage check, the app applies Decision 30 as today: a member eligible for a free first class who taps Book gets the free seat with no checkout. The checkout appears only when the member is not eligible or has already used the free class. The Decision 30(d) one-strike rule and the 81b unpaid cap are unchanged. The checkout never shows a free option.
 
 Shipped 2 Nov as slice A (migration 20260833140000, commit 42335e4) with two deviations: no 'Save this card' checkbox, because Xendit hosted sessions cannot charge a saved card (Decision 67); and no Card / GCash tabs in the app, because the Xendit hosted page presents both. The pay sheet names both methods in text instead.
+
+## Decision 90: Bring a friend for their free first class (recorded 3 Nov 2026)
+
+Flow follows Mariana Tek's guest booking: a member adds a friend while booking or after, enters the friend's name and email, and the friend gets a profile and an invite. Difference: the friend's seat is their own free first class under Decision 30, not the host's credits. Only someone who has never been to the studio can be brought this way, and each member may bring one friend, once. No payment, no guest pass. Existing members are still brought with a guest pass when the host's plan has one (Decision 26); that path is unchanged.
+
+Offered when all hold: the host holds an active membership or class pack (not the intro offer, not a drop-in, not a free first class); the studio's free first class is on; the class is under its free seats cap; at least two seats remain (the last seat is never given free); the booking cut-off has not passed; the host has never brought a friend before (a friend seat released unclaimed or cancelled by the host does not use it up).
+
+Entry points: "Add a guest" in the checkout and on the class page before booking (the friend's seat is created with the host's booking), and "Bring a friend" under "You're booked" after booking. One sheet: title "Add a guest", fields First name, Last name, Email, Mobile (optional), button "Book their free class".
+
+Identity check before accepting: email normalised (lower-case; for Gmail, dots and plus-tags removed) and compared with existing members and leads of this studio, and the mobile number compared when given. If the person is an existing member who is not a lead, or has already used or holds a free first class, refuse: "{first_name} has already had their free class at {studio_name}. They can book from their own account." If the host has a guest pass and the person is an existing member, offer "Use a guest pass for {first_name}" instead (existing flow).
+
+Accepted: a member record is created as a lead (source friend_of_member, referred_by = host), a free first class booking is created exactly as the existing free first path does (same provisional seat, same seats cap), and the friend receives the existing free first invite to set a password and sign the waiver. The seat is provisional until the waiver is signed; unclaimed at the booking cut-off, it is released and the host is told. Friend seats never count toward a flex class's minimum. Success line: "{first_name} is booked. We've emailed them a link to set up their account. Their seat is confirmed once they sign the waiver."
+
+Cancellations: if the host cancels in time, the friend's seat is cancelled and the friend is emailed: "{host_first_name} can't make {class_name} on {when}, so your free class is open again. Book it from your own account whenever you like." A host no-show is one strike for the host only. Decision 30(d) one strike applies to the friend as a member from their first class on.
+
+One free first class per person for life at that studio. One brought friend per host for life at that studio.
+
+Staff: roster shows the friend with the free first chip and "Brought by {host first name}". Member page facts line shows "Referred by {host}" and, on the host, "Brought a friend: {friend first name}". Settings: none new; limits above are platform rules.
+
+Not in scope: paid friend seats, rewards for the host, instructor side.

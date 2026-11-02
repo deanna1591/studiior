@@ -67,7 +67,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 |---|---|---|---|---|---|
 | List & search members | ✅ | ✅ | ⚠️⁵ | ✅ | ❌ |
 | View member profile | ✅ | ✅ | ⚠️⁵ | ⚠️⁶ | ⚠️⁷ |
-| Create member | ✅ | ✅ | ❌ | ✅ | — |
+| Create member | ✅ | ✅ | ❌ | ✅ | ⚠️⁹ |
 | Edit member details | ✅ | ✅ | ❌ | ✅ | ⚠️⁷ |
 | Archive member | ✅ | ✅ | ❌ | ❌ | ❌ |
 | View lifetime value / revenue fields | ✅ | ✅ | ❌ | ❌ | ❌ |
@@ -81,6 +81,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 ⁶ Front desk sees everything except revenue analytics and lifetime value.
 ⁷ Own record only.
 ⁸ Attendance, challenge and achievement events only. No payment or membership events.
+⁹ **Member → lead only (Decision 90).** A member may create a person only as a *lead*, only through "Bring a friend for their free first class", and always with a free first booking attached — never a bare member record and no other member-creation path.
 
 ---
 
