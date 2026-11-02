@@ -2058,3 +2058,27 @@ Definitions, targets and the list each opens:
 - **Average class occupancy.** Seats filled over capacity across classes that ran in the last 30 days. Opens Classes, last 30 days: booked / capacity per class, emptiest first.
 - **Challenge participation.** Members in the current challenge and how many finished. Opens that challenge's participants with progress — the href carries the challenge id (`/challenges/{id}`), not the challenge list.
 - **The conversion card (free first).** Of members who have taken a free first class, how many then bought a plan, shown as "n of m". This is the free-first conversion (Decision 30), and it is the eighth card; its existing label "First-timers converted" stands. Opens Members who took a free class: free class date, converted yes or no, plan bought; an unconverted row links to the retention reach-out. There are eight cards, not nine: the host-brought-guest conversion (Decision 26) is dropped from the dashboard. Its number survives as one line on the free-class members page — "n brought by a member" — and nothing more.
+
+## Decision 88: Member checkout and wallet (recorded 2 Nov 2026)
+
+Money is never a separate place for a member: they pick a class, see what it costs, buy what covers it on the same screen, and afterwards every payment has a home. No cart. Reference: a Prague studio app reviewed 1 Nov.
+
+Slice A, checkout:
+- When a member taps Book on a class their plan does not cover (no plan, no credits left, expired, or a plan that does not include this class), the app opens /checkout/{occurrence_id} instead of the plans page.
+- Screen title "Checkout". Sections top to bottom:
+  1. Card "Selected class": class name, {when} via fmtClock, instructor first name, and the cost line "1 credit" (or "Included" if a listed plan would cover it).
+  2. Link under the card "Add a guest" (existing guest pass flow; shown only when the member has a guest pass available). Added guest shows as a line "Guest: {name}" with a plain "Remove" link.
+  3. Section "Choose how to pay": radio list of plans buyable online for this studio, in this order: the drop-in first and preselected, then the intro offer when the member is eligible, then packs, then memberships. Each row: plan name, one line of help (classes and validity as already stored on the plan), price on the right. Prices come from the plan rows, never typed.
+  4. Section "Summary": chosen plan, price, and a total line. Discounts are out of scope.
+  5. Buttons: primary "Continue to pay" (opens the Xendit sheet). Secondary "Pay at the desk", shown only when the drop-in is selected and member_bootstrap.desk_pay_available is true; it creates the unpaid desk booking exactly as today. When desk pay is not available the line "Pay online to book. Paying at the desk is not available on this account." shows under the primary button (Decision 73c).
+- Xendit sheet: amount at the top, tabs "Card" and "GCash", the existing Xendit flow underneath, checkbox "Save this card for next time" on the Card tab only when Xendit supports it for the account; otherwise the checkbox is not shown. On success the booking is created with the seat held during payment exactly as today's Pay now path (no new hold logic), and the member lands on the class page with the existing confirmation. On failure the seat is released as today and the sheet shows "Payment did not go through. Nothing was charged. Try again or pay at the desk." (the desk clause only when desk pay is available).
+- The existing Pay now path on the class page is replaced by this screen. Nothing changes for members whose plan covers the class: Book still books.
+
+Slice B, wallet:
+- Member Account gets a row "Payments" → /payments with tabs "Unpaid", "Paid", "Refunded", "Pay at the desk". Each card: what it was for (plan or class name), date via fmtClock, amount, status chip, and for Paid and Refunded a plain link "Download receipt". Unpaid = an online payment started and not completed; Pay at the desk = unpaid desk bookings still owed; Refunded = payments with a refund recorded.
+- Receipt: a PDF generated on demand with studio name and logo, member name, date, item, amount, payment method (Card, GCash, Desk), and the payment id; no invoice numbers beyond the payment id. Same PDF is attached to the existing payment confirmation email when one is sent.
+- Member Account gets a row "Purchases" → /purchases with tabs "Subscriptions" and "Passes". Each card: plan name, chip "Active" or "Expired", valid until date, and for passes "{used} of {total} classes used". Current plan stays on /account/plan unchanged.
+
+Out of scope: cart, discounts and promo codes, partial refunds from the member side, changing the plan picker per studio (same rule for all tenants), instructors.
+
+Settings: none new. Opt-in: the checkout replaces the Pay now path for every studio with online payment on; studios without online payment keep today's behaviour.

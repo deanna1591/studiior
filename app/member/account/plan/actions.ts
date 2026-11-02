@@ -9,6 +9,8 @@ import { safeNext } from "@/lib/auth-redirect";
 
 export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 
+type MemberCtx = NonNullable<Awaited<ReturnType<typeof getMemberContext>>>;
+
 /**
  * Decision 40: buy a one-time plan (pack / drop-in) through Xendit.
  *
@@ -30,6 +32,20 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
 
+  return beginXenditCheckout(ctx, planId, returnTo);
+}
+
+/**
+ * Decision 88 slice A: the ONE Xendit-session creation, shared by buyPlan (the
+ * plans page) and the checkout screen's "Continue to pay". This is a pure
+ * extraction of what buyPlan already did — no new money logic — so a checkout
+ * purchase and a plans-page purchase open the identical hosted session, snapshot
+ * the amount from the plan the same way, and reuse the same Xendit customer.
+ * On activation the unchanged apply_plan_to_unpaid settles any held drop-in.
+ */
+export async function beginXenditCheckout(
+  ctx: MemberCtx, planId: string, returnTo: string,
+): Promise<BuyState> {
   const origin = currentMemberOrigin();
   if (!origin) return { ok: false, message: "Could not work out the studio address." };
 

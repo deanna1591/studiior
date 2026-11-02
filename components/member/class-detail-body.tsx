@@ -11,7 +11,6 @@ import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
-import { payNowHref } from "@/lib/member-urls";
 
 /**
  * One class, in full — the body shared by the full page (`/class/[id]`) and the
@@ -51,7 +50,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
-  unpaid = false, group = null, deskPayAvailable = true,
+  unpaid = false, group = null, deskPayAvailable = true, covered = true,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -81,6 +80,9 @@ export default function ClassDetailBody({
   /** Decision 73 (c): can this member still pay at the desk? When false, the
    *  page hides the pay-at-the-desk option and tells them to pay online. */
   deskPayAvailable?: boolean;
+  /** Decision 88: does this member's plan cover the class? When true, Book books
+   *  inline (unchanged); when false, Book opens /checkout to pick a plan and pay. */
+  covered?: boolean;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -264,32 +266,34 @@ export default function ClassDetailBody({
           ) : (
             <p className="m-sub text-ink-3">This class is full and has no waitlist.</p>
           )
-        ) : (
+        ) : covered ? (
+          // Decision 88: a plan covers this class, so Book still books inline.
           <BookForm action={bookClass}>
             <input type="hidden" name="occurrence_id" value={occ.id} />
             <PrimaryButton>Book this class</PrimaryButton>
-            {/* Decision 73 (c): pay at the desk is off for this member — tell
-                them to pay online instead of being refused on tap. */}
-            {!deskPayAvailable && (
-              <p className="m-sub mt-2 text-center text-ink-3">
-                Pay online to book. Paying at the desk is not available on this account.
-              </p>
-            )}
           </BookForm>
+        ) : (
+          // Decision 88: no plan covers this class — Book opens checkout, where
+          // they pick a plan, see the cost, and pay (or pay at the desk there).
+          <Link href={`/checkout/${occ.id}`}
+                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                className="m-action m-press flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
+            Book this class
+          </Link>
         )}
       </div>
 
-      {/* Decision 73b: an unpaid drop-in booking — two ways to pay. "Pay now"
-          opens the member's plans page (buying ANY plan settles this booking
-          through the Xendit rail) and returns here after; "pay at the desk" is
-          informational. */}
+      {/* Decision 88: an unpaid drop-in booking — "Pay now" opens checkout
+          (Decision 73b's /account/plan path is replaced by it), where buying any
+          plan settles this held booking through the Xendit rail on activation;
+          "pay at the desk" is informational. */}
       {unpaid && !past && (
         <div className="m-card mt-3 p-4">
           <p className="text-[15px] font-medium leading-5 text-ink">This booking isn&rsquo;t paid yet</p>
           <p className="m-sub mt-1 text-ink-2">
             Pay now to settle it, or pay at the desk when you come in.
           </p>
-          <Link href={payNowHref(`/class/${occ.id}`)}
+          <Link href={`/checkout/${occ.id}`}
                 style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
                 className="m-action m-press mt-3 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
             Pay now

@@ -9453,6 +9453,10 @@ export type Database = {
         }[]
       }
       member_class_ics: { Args: { p_occurrence_id: string }; Returns: string }
+      member_covers_occurrence: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
       member_first_class: {
         Args: { p_member_id: string }
         Returns: {

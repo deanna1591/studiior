@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function ClassSheet({ params, searchParams }: { params: { id: string }; searchParams: { t?: string } }) {
   const { ctx, supabase, settings, preset, accent } = await memberScreen();
   const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
+  const deskPayAvailable = ctx.bootstrap?.desk_pay_available ?? true;
   // Not found or not visible: show no sheet rather than an empty one. The
   // address bar still reads /class/[id]; a back step closes it.
   if (!data) return null;
@@ -27,7 +28,8 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
                        timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending}
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
-                       unpaid={data.unpaid} group={data.group} />
+                       unpaid={data.unpaid} group={data.group} covered={data.covered}
+                       deskPayAvailable={deskPayAvailable} />
     </Sheet>
   );
 }
