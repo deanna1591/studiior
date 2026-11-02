@@ -3,16 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { sendMemberMessage } from "./actions";
-
-export type MessageRow = {
-  id: string;
-  mine: boolean;
-  senderName: string | null;
-  when: string;
-  body: string;
-  attachmentUrl: string | null;
-  attachmentName: string | null;
-};
+import MessageThread, { type ThreadMessage } from "@/components/messages/bubble";
 
 const MIME = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX = 1048576;
@@ -29,9 +20,12 @@ function SendButton() {
 }
 
 export default function MessagesView({
-  studioId, threadId, messages,
+  studioId, threadId, messages, tz, timeFormat, accent, signedUrls,
 }: {
-  studioId: string; threadId: string; messages: MessageRow[];
+  studioId: string; threadId: string;
+  messages: ThreadMessage[];
+  tz: string; timeFormat: "12h" | "24h"; accent: string | null;
+  signedUrls: Record<string, string>;
 }) {
   const [state, action] = useFormState(sendMemberMessage, null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -69,27 +63,10 @@ export default function MessagesView({
           </p>
         </div>
       ) : (
-        <ul className="mb-4 space-y-3">
-          {messages.map((m) => (
-            <li key={m.id} className={m.mine ? "flex justify-end" : "flex justify-start"}>
-              <div className="max-w-[85%] rounded-2xl px-3.5 py-2.5"
-                   style={m.mine
-                     ? { background: "var(--accent-chip)", color: "var(--ink)" }
-                     : { background: "var(--surface)", border: "1px solid var(--line)" }}>
-                <p className="m-micro mb-0.5 text-ink-3">
-                  {m.mine ? "You" : (m.senderName ?? "The studio")} · {m.when}
-                </p>
-                <p className="m-body whitespace-pre-line text-ink">{m.body}</p>
-                {m.attachmentUrl && (
-                  <a href={m.attachmentUrl} target="_blank" rel="noopener noreferrer"
-                     className="m-sub mt-1.5 inline-block text-ink-2 underline underline-offset-4">
-                    {m.attachmentName ?? "Attachment"}
-                  </a>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="mb-4">
+          <MessageThread messages={messages} tz={tz} timeFormat={timeFormat}
+                         accent={accent} signedUrls={signedUrls} />
+        </div>
       )}
 
       <form ref={formRef} action={action} className="m-card p-3">

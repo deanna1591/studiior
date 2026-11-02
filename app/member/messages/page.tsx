@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
-import { fmtDayLong, fmtTime } from "@/lib/time";
-import MessagesView, { type MessageRow } from "./view";
+import MessagesView from "./view";
+import { type ThreadMessage } from "@/components/messages/bubble";
 
 export const dynamic = "force-dynamic";
 
@@ -23,33 +23,35 @@ export default async function Messages() {
   const threadId = res?.thread_id ?? "";
   const raw = res?.ok ? res.messages ?? [] : [];
 
-  // Sign each attachment for an hour. Signing is a Storage call, so do them in
-  // one wave rather than in series.
-  const signed = await Promise.all(raw.map(async (m) => {
-    if (!m.attachment_path) return null;
+  // Sign each attachment for an hour into a path→url map. Signing is a Storage
+  // call, so do them in one wave rather than in series.
+  const signedUrls: Record<string, string> = {};
+  await Promise.all(raw.map(async (m) => {
+    if (!m.attachment_path) return;
     const { data: s } = await supabase.storage.from("message-attachments")
       .createSignedUrl(m.attachment_path, 3600);
-    return s?.signedUrl ?? null;
+    if (s?.signedUrl) signedUrls[m.attachment_path] = s.signedUrl;
   }));
 
-  const messages: MessageRow[] = raw.map((m, i) => ({
+  const messages: ThreadMessage[] = raw.map((m) => ({
     id: m.id,
-    mine: m.sender_kind === "member",
-    senderName: m.sender_name,
-    when: `${fmtDayLong(m.created_at, ctx.timeZone)}, ${fmtTime(m.created_at, ctx.timeZone, ctx.timeFormat)}`,
+    sender_kind: m.sender_kind,
     body: m.body,
-    attachmentUrl: signed[i],
-    attachmentName: m.attachment_name,
+    created_at: m.created_at,
+    attachment_path: m.attachment_path,
+    attachment_name: m.attachment_name,
+    attachment_mime: m.attachment_mime,
   }));
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
-                 studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="Messages">
+                 studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       <Link href="/account" className="m-sub mb-3 inline-flex items-center gap-1 text-ink-2">
         <Icon name="chevron-left" size={16} /> Account
       </Link>
       <h1 className="m-title mb-4 text-ink">Messages</h1>
-      <MessagesView studioId={ctx.studioId} threadId={threadId} messages={messages} />
+      <MessagesView studioId={ctx.studioId} threadId={threadId} messages={messages}
+                    tz={ctx.timeZone} timeFormat={ctx.timeFormat} accent={accent} signedUrls={signedUrls} />
     </MemberShell>
   );
 }
@@ -62,4 +64,5 @@ type RawMessage = {
   created_at: string;
   attachment_path: string | null;
   attachment_name: string | null;
+  attachment_mime: string | null;
 };

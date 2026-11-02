@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 const MIME = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
@@ -55,4 +56,20 @@ export async function sendStaffReply(_prev: ReplyState, formData: FormData): Pro
   revalidatePath(`/messages/${threadId}`);
   revalidatePath("/messages");
   return { ok: true };
+}
+
+/**
+ * Decision 89 (a) — delete a whole conversation. staff_delete_thread removes the
+ * thread, its messages and its attachments (guarded to desk-up staff of the
+ * studio); the member's screen returns to the empty state. On success we leave
+ * the thread page for the list.
+ */
+export async function deleteConversation(formData: FormData): Promise<void> {
+  const supabase = createClient();
+  const threadId = String(formData.get("thread_id") ?? "");
+  const { data, error } = await supabase.rpc("staff_delete_thread", { p_thread_id: threadId });
+  const res = data as { ok?: boolean } | null;
+  if (error || !res?.ok) throw new Error("Could not delete the conversation.");
+  revalidatePath("/messages");
+  redirect("/messages");
 }

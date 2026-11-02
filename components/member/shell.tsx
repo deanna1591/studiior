@@ -1,5 +1,6 @@
 import TabBar from "./tab-bar";
 import MemberHeader from "./header";
+import { getMemberContext } from "@/lib/auth";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 
 /**
@@ -12,7 +13,7 @@ import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
  * ratio this palette was measured for. Identity is carried by the logo and the
  * name.
  */
-export default function MemberShell({
+export default async function MemberShell({
   studioName, logoUrl, title, children, bare = false,
   preset = "warm", accent, openOffers = 0,
   memberName = "", avatarUrl = null,
@@ -32,6 +33,10 @@ export default function MemberShell({
   // Scoped to this subtree, not :root — the staff app shares the same stylesheet
   // and must keep Studiior's lime. A studio brands what its members see.
   const vars = themeVars(preset, accent ?? neutralAccent(preset)) as React.CSSProperties;
+  // Decision 89 (a): the header's message icon. Read from the cached bootstrap
+  // the page already fetched (getMemberContext is React-cache()'d), so this adds
+  // no wave. Skipped entirely for a bare frame (signed-out /buy, /checkin).
+  const mctx = bare ? null : await getMemberContext();
   return (
     <div className="m-page" style={vars}>
       {!bare && (
@@ -40,6 +45,8 @@ export default function MemberShell({
           logoUrl={logoUrl}
           memberName={memberName}
           avatarUrl={avatarUrl}
+          messagesEnabled={mctx?.bootstrap?.messages_enabled ?? false}
+          hasUnreadMessage={mctx?.bootstrap?.has_unread_studio_message ?? false}
         />
       )}
       <main className={`m-scroll mx-auto max-w-lg px-4 pb-24 ${bare ? "pt-4" : "pt-1"}`}>

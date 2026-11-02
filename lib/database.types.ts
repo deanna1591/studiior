@@ -9395,6 +9395,7 @@ export type Database = {
           first_name: string
           guest_passes_enabled: boolean
           has_payment_provider: boolean
+          has_unread_studio_message: boolean
           how_to_buy: string
           last_name: string
           lifetime_visits: number
@@ -10614,6 +10615,7 @@ export type Database = {
         }[]
       }
       staff_challenges: { Args: { p_studio_id: string }; Returns: Json }
+      staff_delete_thread: { Args: { p_thread_id: string }; Returns: Json }
       staff_mark_thread_read: { Args: { p_thread_id: string }; Returns: Json }
       staff_message_thread: { Args: { p_thread_id: string }; Returns: Json }
       staff_message_threads: { Args: { p_studio_id: string }; Returns: Json }

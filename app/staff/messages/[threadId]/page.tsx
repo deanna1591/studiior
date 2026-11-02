@@ -3,7 +3,9 @@ import { isDeskUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
 import { fmtDayLong, fmtTime } from "@/lib/time";
+import MessageThread, { type ThreadMessage } from "@/components/messages/bubble";
 import StaffReply from "../reply";
+import DeleteConversation from "./delete";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +36,25 @@ export default async function Thread({ params }: { params: { threadId: string } 
   // Opening marks it read.
   await supabase.rpc("staff_mark_thread_read", { p_thread_id: params.threadId });
 
-  // Sign the attachments (the private message-attachments bucket), one wave.
-  const signed = await Promise.all((t.messages ?? []).map(async (m) => {
-    if (!m.attachment_path) return null;
+  // The studio accent — the staff app is otherwise unthemed, but the studio's
+  // own bubbles carry its accent (Decision 89 (a)), the same as the member side.
+  const { data: st } = await supabase.from("studios").select("accent_color").eq("id", ctx.studioId).maybeSingle();
+
+  // Sign the attachments (the private message-attachments bucket) into a
+  // path→url map, one wave.
+  const signedUrls: Record<string, string> = {};
+  await Promise.all((t.messages ?? []).map(async (m) => {
+    if (!m.attachment_path) return;
     const { data: s } = await supabase.storage.from("message-attachments").createSignedUrl(m.attachment_path, 3600);
-    return s?.signedUrl ?? null;
+    if (s?.signedUrl) signedUrls[m.attachment_path] = s.signedUrl;
   }));
 
+  const msgs: ThreadMessage[] = (t.messages ?? []).map((m) => ({
+    id: m.id, sender_kind: m.sender_kind, body: m.body, created_at: m.created_at,
+    attachment_path: m.attachment_path, attachment_name: m.attachment_name, attachment_mime: m.attachment_mime,
+  }));
   const next = t.next_booking;
+  const firstName = (t.member_name || "").trim().split(/\s+/)[0] || "this member";
 
   return (
     <AppShell {...shell} title="Messages">
@@ -68,32 +81,13 @@ export default async function Thread({ params }: { params: { threadId: string } 
             Next booking: {next.class_name}, {fmtDayLong(next.starts_at, ctx.timeZone)} · {fmtTime(next.starts_at, ctx.timeZone, ctx.timeFormat)}
           </p>
         )}
+        <DeleteConversation threadId={params.threadId} firstName={firstName} />
       </div>
 
-      <ul className="mt-4 max-w-2xl space-y-3">
-        {(t.messages ?? []).map((m, i) => {
-          const fromStudio = m.sender_kind === "staff";
-          return (
-            <li key={m.id} className={fromStudio ? "flex justify-end" : "flex justify-start"}>
-              <div className="max-w-[80%] rounded-2xl px-3.5 py-2.5"
-                   style={fromStudio
-                     ? { background: "var(--accent-chip)", color: "var(--ink)" }
-                     : { background: "var(--surface)", border: "1px solid var(--line)" }}>
-                <p className="mb-0.5 text-[11px] text-ink-3">
-                  {fromStudio ? (m.sender_name ?? "Studio") : t.member_name} · {fmtDayLong(m.created_at, ctx.timeZone)} · {fmtTime(m.created_at, ctx.timeZone, ctx.timeFormat)}
-                </p>
-                <p className="whitespace-pre-line text-[13px] leading-[19px] text-ink">{m.body}</p>
-                {signed[i] && (
-                  <a href={signed[i]!} target="_blank" rel="noopener noreferrer"
-                     className="mt-1.5 inline-block text-[12px] text-ink-2 underline underline-offset-4">
-                    {m.attachment_name ?? "Attachment"}
-                  </a>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="mt-4 max-w-2xl">
+        <MessageThread messages={msgs} tz={ctx.timeZone} timeFormat={ctx.timeFormat}
+                       accent={st?.accent_color ?? null} signedUrls={signedUrls} />
+      </div>
 
       <div className="mt-4 max-w-2xl">
         <StaffReply studioId={ctx.studioId} threadId={params.threadId} />
@@ -111,6 +105,7 @@ type ThreadDetail = {
   next_booking: { class_name: string; starts_at: string } | null;
   messages: {
     id: string; sender_kind: "member" | "staff"; sender_name: string | null;
-    body: string; created_at: string; attachment_path: string | null; attachment_name: string | null;
+    body: string; created_at: string; attachment_path: string | null;
+    attachment_name: string | null; attachment_mime: string | null;
   }[];
 };

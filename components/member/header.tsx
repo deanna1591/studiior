@@ -20,11 +20,16 @@ import { Icon } from "./icons";
  */
 export default function MemberHeader({
   studioName, logoUrl, memberName, avatarUrl,
+  messagesEnabled = false, hasUnreadMessage = false,
 }: {
   studioName: string;
   logoUrl: string | null;
   memberName: string;
   avatarUrl: string | null;
+  /** Decision 89 (a): the speech-bubble icon shows only when the studio lets
+   *  members message it; the dot marks an unread studio reply. */
+  messagesEnabled?: boolean;
+  hasUnreadMessage?: boolean;
 }) {
   return (
     // m-safe-top: the header owns the top safe area the way the tab bar owns
@@ -51,6 +56,20 @@ export default function MemberHeader({
           <span className="truncate text-[15px] font-semibold leading-5 text-ink">{studioName}</span>
           <Icon name="chevron-down" size={16} className="shrink-0 text-ink-3" />
         </Link>
+
+        {/* Decision 89 (a): message the studio. A 44×44 hit area; the dot (the
+            accent's own text step, a 3:1 mark not a fill) sits top-right. */}
+        {messagesEnabled && (
+          <Link href="/messages" aria-label="Messages"
+                className="m-press relative flex h-11 w-11 items-center justify-center text-ink-2">
+            <Icon name="message" size={22} />
+            {hasUnreadMessage && (
+              <span aria-hidden
+                    className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full ring-2 ring-paper"
+                    style={{ background: "var(--lime-text)" }} />
+            )}
+          </Link>
+        )}
 
         {/* A 44×44 hit area around the 36px avatar; -mr-1 keeps it visually on
             the edge. */}

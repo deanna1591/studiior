@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { currentSlug } from "@/lib/tenant";
@@ -181,6 +182,7 @@ export type MemberBootstrap = {
   time_format: "24h" | "12h";
   trial_used: boolean;
   messages_enabled: boolean;
+  has_unread_studio_message: boolean;
 };
 
 /** Who is making this request, on the member PWA. */
@@ -219,7 +221,11 @@ export async function currentUserId(): Promise<string | null> {
   return data?.claims?.sub ?? null;
 }
 
-export async function getMemberContext(): Promise<MemberContext | null> {
+// Wrapped in React cache(): a render that calls this more than once — a page
+// through memberScreen() AND MemberShell for the header's message icon — reuses
+// the one member_bootstrap row instead of paying a second wave. Per-request, so
+// it never leaks across members.
+export const getMemberContext = cache(async (): Promise<MemberContext | null> => {
   const supabase = createClient();
   const userId = await currentUserId();
   if (!userId) return null;
@@ -248,7 +254,7 @@ export async function getMemberContext(): Promise<MemberContext | null> {
     timeFormat: (row.time_format === "12h" ? "12h" : "24h"),
     bootstrap: { ...row, time_format: row.time_format === "12h" ? "12h" : "24h" },
   };
-}
+});
 
 export const isManagerUp = (r: StaffRole) => r === "owner" || r === "manager";
 export const isDeskUp = (r: StaffRole) =>
