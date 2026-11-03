@@ -1584,6 +1584,8 @@ This does **not** contradict Decision 65's rule that *the commitment never affec
 
 **Pricing note, recorded not enforced:** Reform Collective's Intro Offer (three classes for 1,999 PHP) is undercut by a free guest class — a pricing question for the studio, so the copy does not advertise both in the same breath.
 
+**(b) Recorded 3 Nov 2026.** On the staff member page, when the member came in through a guest pass or a friend invite and has not claimed their account, the App account panel reads: "{first_name} was invited by {host_first_name} on {date}. Their link to set a password and sign the waiver is open until {expiry}." with the button "Resend invite", which re-sends the same guest invite (new token, old one revoked). After expiry: "{first_name}'s link expired on {expiry}." with the button "Send a new invite". Members staff added by hand keep today's wording. Once claimed, the panel shows "Signed in since {date}" as today.
+
 ---
 
 ## 25 — A month is a draft until the studio publishes it, and instructors confirm their roster when it is

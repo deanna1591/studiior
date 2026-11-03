@@ -10169,6 +10169,7 @@ export type Database = {
         Args: { p_series_id: string }
         Returns: Json
       }
+      resend_guest_invite: { Args: { p_member_id: string }; Returns: Json }
       resend_month_roster: {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json

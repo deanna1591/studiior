@@ -101,6 +101,22 @@ export async function inviteMember(_prev: InviteState, fd: FormData): Promise<In
   return { ok: true, message: `Invite sent to ${r.email}. The link works for 14 days.` };
 }
 
+/**
+ * Decision 26(b): re-send a guest's claim+waiver invite from their member page.
+ * Mints a fresh token (revokes the old) and queues the guest_invite email.
+ */
+export async function resendGuestInvite(_prev: InviteState, fd: FormData): Promise<InviteState> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resend_guest_invite", {
+    p_member_id: String(fd.get("member_id") ?? ""),
+  });
+  if (error) return { ok: false, message: say(error.message) };
+  const r = data as unknown as { ok: boolean; email?: string };
+  revalidatePath("/members");
+  revalidatePath(`/members/${String(fd.get("member_id") ?? "")}`);
+  return { ok: true, message: `A fresh link was sent to ${r.email}. It works for 14 days.` };
+}
+
 /** Everyone without an account — the case after an import. */
 export async function inviteEveryone(_prev: InviteState, fd: FormData): Promise<InviteState> {
   const ctx = await getStaffContext();

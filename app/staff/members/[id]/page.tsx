@@ -20,6 +20,7 @@ import NotesPanel from "./records/notes";
 import GoalsPanel from "./records/goals";
 import DocumentsPanel, { PhotoUpload } from "./records/documents";
 import { AttendancePattern } from "./attendance";
+import { ResendGuestInvite } from "./resend-guest";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export default async function MemberDetail({
     { data: memberships }, { data: ledger }, { data: visits },
     { data: activity }, { data: notes }, { data: goals }, { data: tags },
     { data: docs }, { data: standing }, { data: infractions },
+    { data: guestPass }, { data: lastInvite },
   ] = await Promise.all([
     supabase.from("memberships")
       .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, freeze_end, complimentary, membership_plans(name, type)")
@@ -99,7 +101,18 @@ export default async function MemberDetail({
     supabase.rpc("member_suspension", { p_member_id: params.id }),
     supabase.from("member_infractions")
       .select("id, kind, occurred_at, status, voided_reason, class_occurrences(name)")
-      .eq("member_id", params.id).order("occurred_at", { ascending: false }).limit(20)
+      .eq("member_id", params.id).order("occurred_at", { ascending: false }).limit(20),
+    // Decision 26(b): if this member was brought in as a guest (host not null),
+    // the App account panel tells the story and offers "Resend invite". The
+    // host's first name comes from the guest pass; the invite date/expiry from
+    // the member's latest invite.
+    supabase.from("guest_passes")
+      .select("host_member_id, created_at, members!host_member_id(first_name)")
+      .eq("guest_member_id", params.id).not("host_member_id", "is", null)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("member_invites")
+      .select("expires_at, created_at, accepted_at")
+      .eq("member_id", params.id).order("created_at", { ascending: false }).limit(1).maybeSingle()
   ]);
 
   // Payments are the one thing on this screen decided here rather than by the
@@ -194,6 +207,16 @@ export default async function MemberDetail({
     return <><span className="num">{day}</span> {month}</>;
   };
 
+  // Decision 26(b): a guest/friend brought by a host (host not null), and their
+  // latest invite's dates — all in the studio time zone via d().
+  const host = (guestPass as { members?: { first_name: string | null } | null } | null)?.members?.first_name ?? null;
+  const invExpIso = (lastInvite as { expires_at?: string | null } | null)?.expires_at ?? null;
+  const invMadeIso = (lastInvite as { created_at?: string | null } | null)?.created_at
+    ?? (guestPass as { created_at?: string | null } | null)?.created_at ?? null;
+  const invAcceptedIso = (lastInvite as { accepted_at?: string | null } | null)?.accepted_at ?? null;
+  const isGuestBrought = !!host && !!invExpIso;
+  const inviteExpired = invExpIso ? new Date(invExpIso).getTime() <= Date.now() : false;
+
   return (
     <AppShell
       {...shell}
@@ -217,14 +240,32 @@ export default async function MemberDetail({
       {isDeskUp(ctx.role) && !m.user_id && (
         <section className="mb-6 rounded-xl border border-line bg-surface px-3.5 py-3">
           <SectionLabel>App account</SectionLabel>
-          <p className="mb-2.5 mt-1 max-w-[58ch] text-[13px] leading-[19px] text-ink-2">
-            {m.email
-              ? <>{m.first_name} cannot sign in yet. An invite emails them a link to set a
-                  password — from {ctx.studioName}, with nothing to download.</>
-              : <>{m.first_name} has no email address, so there is nowhere to send an
-                  invite. Add one to their record first.</>}
-          </p>
-          {m.email && <InviteOne memberId={params.id} />}
+          {isGuestBrought ? (
+            // Decision 26(b): brought in as a guest, not yet claimed — tell the
+            // story and offer the resend (the guest_invite email, not member_invite).
+            <>
+              <p className="mb-2.5 mt-1 max-w-[58ch] text-[13px] leading-[19px] text-ink-2">
+                {inviteExpired
+                  ? <>{m.first_name}&rsquo;s link expired on {d(invExpIso!)}.</>
+                  : <>{m.first_name} was invited by {host} on {d(invMadeIso!)}. Their link to set
+                      a password and sign the waiver is open until {d(invExpIso!)}.</>}
+              </p>
+              <ResendGuestInvite memberId={params.id}
+                label={inviteExpired ? "Send a new invite" : "Resend invite"} />
+            </>
+          ) : (
+            // Members staff added by hand keep today's wording.
+            <>
+              <p className="mb-2.5 mt-1 max-w-[58ch] text-[13px] leading-[19px] text-ink-2">
+                {m.email
+                  ? <>{m.first_name} cannot sign in yet. An invite emails them a link to set a
+                      password — from {ctx.studioName}, with nothing to download.</>
+                  : <>{m.first_name} has no email address, so there is nowhere to send an
+                      invite. Add one to their record first.</>}
+              </p>
+              {m.email && <InviteOne memberId={params.id} />}
+            </>
+          )}
         </section>
       )}
       {searchParams.recorded && (
@@ -262,8 +303,9 @@ export default async function MemberDetail({
       {/* Whether they can actually use the app they are being messaged about. */}
       <div className="mb-4 mt-2">
         {m.user_id ? (
+          // Decision 26(b): once claimed, the account's own line.
           <p className="text-[12px] leading-4 text-ink-3">
-            Has an account and can use the member app.
+            Signed in since {d(invAcceptedIso ?? m.joined_on)}.
           </p>
         ) : isDeskUp(ctx.role) ? (
           <InviteToApp memberId={m.id} />
