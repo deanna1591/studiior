@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, buttonQuietClass, inputClass } from "@/components/ui";
 import EmailComposer from "@/components/staff/email-composer";
 import { resumeDefault, beyondHorizon, previewSystemBlock } from "@/lib/closure-notice";
-import { previewClosure, applyClosure, reopen, closureTestSend, type ClosureState, type PlainState } from "./actions";
+import {
+  previewClosure, applyClosure, reopen, closureTestSend,
+  previewClosureEmails, closureInstructorTestSend,
+  type ClosureState, type PlainState, type EmailPreview,
+} from "./actions";
 
 function Go({ label, busy, quiet }: { label: string; busy: string; quiet?: boolean }) {
   const { pending } = useFormStatus();
@@ -150,9 +154,109 @@ export default function CloseForm({ today, studioName, horizonDays }:
 
       {shown && "result" in shown && (
         <Outcome result={shown.result} applied={done !== null} noticeOn={noticeOn}>
-          <form action={doApply}>{hidden}<Go label="Close the studio" busy="Closing…" /></form>
+          {noticeOn ? (
+            <>
+              {/* Decision 77 amendment: show both emails with real data before the
+                  final button — nothing is sent without the owner seeing it. */}
+              <EmailPreviewStep
+                starts={starts} ends={ends} resumes={resumes}
+                subject={subject} message={message}
+                onInstructorTest={async () =>
+                  closureInstructorTestSend(subject, message, starts, ends, resumes)}
+              />
+              <div className="mt-4 flex items-center gap-3">
+                <form action={doApply}>
+                  {hidden}<input type="hidden" name="send_emails" value="on" />
+                  <Go label="Close and send" busy="Closing…" />
+                </form>
+                <form action={doApply}>
+                  {hidden}<input type="hidden" name="send_emails" value="off" />
+                  <Go label="Close without emails" busy="Closing…" quiet />
+                </form>
+              </div>
+            </>
+          ) : (
+            <form action={doApply}>{hidden}<Go label="Close the studio" busy="Closing…" /></form>
+          )}
         </Outcome>
       )}
+    </div>
+  );
+}
+
+/**
+ * Decision 77 amendment (3): the member email and the instructor digest, rendered
+ * with the real cancelled + upcoming classes, with the counts and an instructor
+ * send-test. Each render is an iframe so the email's own table layout cannot leak
+ * into the page (and the page cannot leak into it).
+ */
+function EmailPreviewStep({
+  starts, ends, resumes, subject, message, onInstructorTest,
+}: {
+  starts: string; ends: string; resumes: string; subject: string; message: string;
+  onInstructorTest: () => Promise<{ sentence?: string; error?: string }>;
+}) {
+  const [p, setP] = useState<EmailPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [test, setTest] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    previewClosureEmails(starts, ends, resumes, subject, message).then((r) => {
+      if (alive) { setP(r); setLoading(false); }
+    });
+    return () => { alive = false; };
+  }, [starts, ends, resumes, subject, message]);
+
+  if (loading && !p) return <p className="mt-4 text-[13px] text-ink-2">Rendering the emails…</p>;
+  if (!p) return null;
+  if (p.error) return <div className="mt-4"><Notice kind="error">{p.error}</Notice></div>;
+
+  return (
+    <div className="mt-4 space-y-4">
+      <p className="text-[13px] leading-[19px] text-ink">
+        This will email <span className="num">{p.members}</span>{" "}
+        {p.members === 1 ? "member" : "members"} and{" "}
+        <span className="num">{p.instructors}</span>{" "}
+        {p.instructors === 1 ? "instructor" : "instructors"}.
+      </p>
+
+      {p.memberHtml && (
+        <div>
+          <p className="section-label text-ink-2">What members get</p>
+          <p className="mt-1 text-[12.5px] text-ink-2">Subject: {p.memberSubject}</p>
+          <iframe title="Member email" srcDoc={p.memberHtml}
+                  className="mt-1.5 h-96 w-full rounded border border-line bg-white" />
+        </div>
+      )}
+
+      <div>
+        <p className="section-label text-ink-2">What each instructor gets</p>
+        {p.instructorHtml ? (
+          <>
+            <p className="mt-1 text-[12.5px] text-ink-2">Subject: {p.instructorSubject}</p>
+            <iframe title="Instructor digest" srcDoc={p.instructorHtml}
+                    className="mt-1.5 h-96 w-full rounded border border-line bg-white" />
+            <button type="button" disabled={sending}
+                    className="mt-2 text-[12.5px] font-semibold text-lime-text disabled:opacity-60"
+                    onClick={async () => {
+                      setSending(true); setTest(null);
+                      const r = await onInstructorTest();
+                      setSending(false);
+                      setTest(r.error ?? r.sentence ?? "Test sent.");
+                    }}>
+              {sending ? "Sending…" : "Send me a test"}
+            </button>
+            {test && <span className="ml-2 text-[12.5px] text-ink-2">{test}</span>}
+          </>
+        ) : (
+          <p className="mt-1 text-[13px] text-ink-2">
+            No instructor with a login is assigned to these classes, so no digest goes out.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

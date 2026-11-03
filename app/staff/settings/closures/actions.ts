@@ -47,6 +47,8 @@ async function run(fd: FormData, confirm: boolean): Promise<ClosureState> {
     return { error: "The notice to members needs a subject and a message." };
   }
   const rendered = notice ? renderBody(message, { accent: "{accent}" }) : null;
+  // Decision 77 amendment: "Close without emails" cancels and sends nothing.
+  const sendEmails = t(fd, "send_emails") !== "off";
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("close_studio", {
@@ -61,6 +63,7 @@ async function run(fd: FormData, confirm: boolean): Promise<ClosureState> {
     p_message_html: rendered?.html,
     p_message_text: rendered?.text,
     p_resumes_on: notice && resumes_on ? resumes_on : undefined,
+    p_send_emails: sendEmails,
   });
   if (error) return { error: say(error.message) };
   if (confirm) {
@@ -101,6 +104,61 @@ export async function closureTestSend(
   const { data, error } = await supabase.rpc("closure_notice_test", {
     p_studio_id: ctx.studioId, p_subject: subject, p_body_html: r.html, p_body_text: r.text,
     p_resumes_on: resumesOn || undefined,
+  });
+  if (error) return { error: say(error.message) };
+  return { sentence: (data as { sentence?: string })?.sentence ?? "Test sent." };
+}
+
+export type EmailPreview = {
+  members: number; instructors: number;
+  memberSubject?: string; memberHtml?: string;
+  instructorSubject?: string; instructorHtml?: string;
+  error?: string;
+};
+
+/**
+ * Decision 77 amendment (3): render BOTH emails with real data — the member
+ * email for a sample affected member, the digest for the most-affected
+ * instructor — plus the counts, so the owner sees what will go before it does.
+ */
+export async function previewClosureEmails(
+  startsOn: string, endsOn: string, resumesOn: string,
+  subject: string, message: string,
+): Promise<EmailPreview> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { members: 0, instructors: 0, error: "You are not signed in." };
+  const r = renderBody(message, { accent: "{accent}" });
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("closure_preview", {
+    p_studio_id: ctx.studioId,
+    p_starts_on: startsOn, p_ends_on: endsOn, p_resumes_on: resumesOn,
+    p_subject: subject, p_body_html: r.html, p_body_text: r.text,
+  });
+  if (error) return { members: 0, instructors: 0, error: say(error.message) };
+  const d = data as {
+    members?: number; instructors?: number;
+    member?: { subject?: string; html?: string } | null;
+    instructor?: { subject?: string; html?: string } | null;
+  };
+  return {
+    members: d?.members ?? 0, instructors: d?.instructors ?? 0,
+    memberSubject: d?.member?.subject, memberHtml: d?.member?.html,
+    instructorSubject: d?.instructor?.subject, instructorHtml: d?.instructor?.html,
+  };
+}
+
+/** The instructor "send me a test" — one sample digest to the caller's email. */
+export async function closureInstructorTestSend(
+  subject: string, message: string, startsOn: string, endsOn: string, resumesOn: string,
+): Promise<{ sentence?: string; error?: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "You are not signed in." };
+  if (!message.trim()) return { error: "Add a message first." };
+  const r = renderBody(message, { accent: "{accent}" });
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("closure_instructor_test", {
+    p_studio_id: ctx.studioId, p_subject: subject, p_body_text: r.text,
+    p_starts_on: startsOn, p_ends_on: endsOn, p_resumes_on: resumesOn || undefined,
   });
   if (error) return { error: say(error.message) };
   return { sentence: (data as { sentence?: string })?.sentence ?? "Test sent." };

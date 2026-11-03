@@ -8561,6 +8561,7 @@ export type Database = {
           p_pays_instructors?: boolean
           p_reason: string
           p_resumes_on?: string
+          p_send_emails?: boolean
           p_starts_at_time?: string
           p_starts_on: string
           p_studio_id: string
@@ -8578,6 +8579,17 @@ export type Database = {
         }
         Returns: Json
       }
+      closure_instructor_test: {
+        Args: {
+          p_body_text: string
+          p_ends_on: string
+          p_resumes_on?: string
+          p_starts_on: string
+          p_studio_id: string
+          p_subject: string
+        }
+        Returns: Json
+      }
       closure_notice_test: {
         Args: {
           p_body_html: string
@@ -8587,6 +8599,25 @@ export type Database = {
           p_subject: string
         }
         Returns: Json
+      }
+      closure_preview: {
+        Args: {
+          p_body_html: string
+          p_body_text: string
+          p_ends_on: string
+          p_resumes_on: string
+          p_starts_on: string
+          p_studio_id: string
+          p_subject: string
+        }
+        Returns: Json
+      }
+      closure_upcoming_block: {
+        Args: { p_resume_date: string; p_studio_id: string }
+        Returns: {
+          html: string
+          txt: string
+        }[]
       }
       commitment_pending: {
         Args: { p_studio_id: string }
