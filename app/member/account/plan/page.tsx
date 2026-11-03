@@ -3,6 +3,7 @@ import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
+import { payeeNoticeLine } from "@/lib/payee-notice";
 import { sortPlans } from "@/lib/plan-order";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
 import { safeNext } from "@/lib/auth-redirect";
@@ -92,6 +93,9 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   const dateUTC = (iso: string) => new Intl.DateTimeFormat("en-GB",
     { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
+  // Decision 67(b): the Xendit payee notice, shown once under the title, above
+  // the plans (this page can send a member to Xendit to buy). Blank = no line.
+  const payeeLine = payeeNoticeLine(studioName, settings.payeeNoticeName);
   const nextExpiry = (ledger ?? [])
     .filter((c) => c.delta > 0 && c.expires_at && (!live || c.membership_id === live.id)
                 && new Date(c.expires_at) > new Date())
@@ -104,6 +108,8 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
         <Icon name="chevron-left" size={16} /> Account
       </Link>
       <h1 className="m-title mb-4 text-ink">Your plan</h1>
+
+      {payeeLine && <p className="m-sub mb-4 text-ink-3">{payeeLine}</p>}
 
       {/* Decision 73b: when sent here from an unpaid booking, say what any
           purchase does for it. */}

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
+import { payeeNoticeLine } from "@/lib/payee-notice";
 import { haptic } from "@/lib/haptics";
 import GuestInvite from "@/components/member/guest-invite";
 import { checkoutPay, payAtDesk, type DeskState } from "./actions";
@@ -39,13 +40,8 @@ export default function CheckoutBody({
   studioName: string;
 }) {
   // Decision 67(b): when online payments settle to an account under a different
-  // legal name, say so before the member leaves for Xendit. Blank = no line. A
-  // trailing period on the stored name is dropped so the sentence's own period
-  // does not double up ("Corp.. That's").
-  const payee = payeeNoticeName?.trim().replace(/\.+$/, "");
-  const payeeLine = payee
-    ? `Card and GCash payments for ${studioName} are processed by ${payee}. That's the name you'll see on the payment page and on your statement.`
-    : null;
+  // legal name, say so before the member leaves for Xendit. Blank = no line.
+  const payeeLine = payeeNoticeLine(studioName, payeeNoticeName);
   const [selectedId, setSelectedId] = useState(plans[0]?.id ?? "");
   const selected = plans.find((p) => p.id === selectedId) ?? plans[0] ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);

@@ -3,6 +3,7 @@ import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney } from "@/lib/plans";
+import { payeeNoticeLine } from "@/lib/payee-notice";
 import BuyProduct from "./buy";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ export default async function Shop() {
   // Decision 63b: when the studio takes online payments, members buy here and
   // collect at the desk; otherwise the shop is a listing ("ask at the desk").
   const canBuy = settings.xenditEnabled;
+  // Decision 67(b): this is a purchase step that sends a member to Xendit, so
+  // it carries the payee notice (only when online checkout is live; blank = no line).
+  const payeeLine = canBuy ? payeeNoticeLine(studioName, settings.payeeNoticeName) : null;
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
@@ -31,6 +35,8 @@ export default async function Shop() {
       <p className="m-sub mb-4 text-ink-2">
         {canBuy ? "Buy here, collect at the front desk." : "Pick up and pay at the front desk."}
       </p>
+
+      {payeeLine && <p className="m-sub mb-4 text-ink-3">{payeeLine}</p>}
 
       {items.length === 0 ? (
         <div className="m-card p-5 text-center">
