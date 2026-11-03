@@ -24,7 +24,7 @@ export type CheckoutPlanRow = {
  */
 export default function CheckoutBody({
   occId, className, whenLabel, instructorFirst, costLine, covered,
-  plans, guestAvailable, deskPayAvailable,
+  plans, guestAvailable, deskPayAvailable, payeeNoticeName, studioName,
 }: {
   occId: string;
   className: string;
@@ -35,7 +35,17 @@ export default function CheckoutBody({
   plans: CheckoutPlanRow[];
   guestAvailable: boolean;
   deskPayAvailable: boolean;
+  payeeNoticeName: string | null;
+  studioName: string;
 }) {
+  // Decision 67(b): when online payments settle to an account under a different
+  // legal name, say so before the member leaves for Xendit. Blank = no line. A
+  // trailing period on the stored name is dropped so the sentence's own period
+  // does not double up ("Corp.. That's").
+  const payee = payeeNoticeName?.trim().replace(/\.+$/, "");
+  const payeeLine = payee
+    ? `Card and GCash payments for ${studioName} are processed by ${payee}. That's the name you'll see on the payment page and on your statement.`
+    : null;
   const [selectedId, setSelectedId] = useState(plans[0]?.id ?? "");
   const selected = plans.find((p) => p.id === selectedId) ?? plans[0] ?? null;
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -133,6 +143,7 @@ export default function CheckoutBody({
 
           {/* 5. Buttons */}
           <div className="mt-5">
+            {payeeLine && <p className="m-sub mb-3 text-ink-3">{payeeLine}</p>}
             <button
               onClick={() => { haptic("tap"); setSheetOpen(true); }}
               disabled={!selected}
@@ -179,6 +190,7 @@ export default function CheckoutBody({
                   {formatMoney(selected.price_cents, selected.currency)}
                 </p>
                 <p className="m-sub mt-2 text-center text-ink-3">Card or GCash, on the next screen.</p>
+                {payeeLine && <p className="m-sub mt-2 text-center text-ink-3">{payeeLine}</p>}
 
                 <form action={pay} className="mt-5">
                   <input type="hidden" name="occurrence_id" value={occId} />

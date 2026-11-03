@@ -703,6 +703,24 @@ export async function saveHowToBuy(_prev: PlainState, fd: FormData): Promise<Pla
   return { ok: true, message: raw ? "Saved. Members see this under your plans." : "Saved. Members see the default." };
 }
 
+// Decision 67(b): the payee notice shown at the member checkout when online
+// payments settle to an account under a different legal name. Blank = no line.
+export async function savePayeeNotice(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+
+  const raw = String(fd.get("payee_notice_name") ?? "").trim().slice(0, 120);
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ payee_notice_name: raw || null })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+
+  revalidatePath("/settings");
+  return { ok: true, message: raw ? "Saved. Members see this at checkout." : "Saved. No processor line shows at checkout." };
+}
+
 // Decision 71: the booking window has ONE editor now — BookingRulesPanel on
 // /settings/booking (saveBookingRules). The standalone saveBookingWindow /
 // BookingWindowPanel was the duplicate on the old Timetable page and is removed.

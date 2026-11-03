@@ -7120,6 +7120,7 @@ export type Database = {
           pay_period_second_day: number
           pay_settle_dow: number | null
           pay_settle_offset_days: number | null
+          payee_notice_name: string | null
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
@@ -7237,6 +7238,7 @@ export type Database = {
           pay_period_second_day?: number
           pay_settle_dow?: number | null
           pay_settle_offset_days?: number | null
+          payee_notice_name?: string | null
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
@@ -7354,6 +7356,7 @@ export type Database = {
           pay_period_second_day?: number
           pay_settle_dow?: number | null
           pay_settle_offset_days?: number | null
+          payee_notice_name?: string | null
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
@@ -9457,6 +9460,7 @@ export type Database = {
           member_id: string
           messages_enabled: boolean
           open_offers: number
+          payee_notice_name: string
           preferred_name: string
           status: Database["public"]["Enums"]["member_status"]
           studio_contact_email: string

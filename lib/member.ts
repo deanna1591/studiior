@@ -74,6 +74,8 @@ export async function memberScreen() {
       // Decision 89: the studio lets members message it (the Account row and
       // the /messages screen are hidden when off).
       messagesEnabled: b?.messages_enabled ?? false,
+      // Decision 67(b): the payee notice shown at checkout (blank = no line).
+      payeeNoticeName: b?.payee_notice_name ?? null,
     },
   };
 }

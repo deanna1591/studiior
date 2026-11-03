@@ -5,6 +5,7 @@ import PayrollPanel from "../payroll";
 import ConversionPanel from "../conversion";
 import SeatCapsPanel from "../seat-caps";
 import HowToBuyPanel from "../how-to-buy";
+import PayeeNoticePanel from "../payee-notice";
 import ConvertKeepPanel from "../convert-keep";
 import FreeFirstPanel from "../free-first";
 import GuestPassesPanel from "../guest-passes";
@@ -27,7 +28,7 @@ export default async function MembershipSettings() {
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }, { data: tplOverrides }] = await Promise.all([
     supabase.from("studio_settings")
-      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, guest_passes_enabled, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates")
+      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, guest_passes_enabled, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates, payee_notice_name")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("studios").select("currency").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("pay_periods").select("starts_on, ends_on, status").lte("starts_on", today).gte("ends_on", today).maybeSingle(),
@@ -81,6 +82,10 @@ export default async function MembershipSettings() {
 
       <SettingsSection id="how-to-buy" title="How members buy">
         <HowToBuyPanel value={s?.how_to_buy ?? null} />
+      </SettingsSection>
+
+      <SettingsSection id="payee-notice" title="Checkout">
+        <PayeeNoticePanel value={s?.payee_notice_name ?? null} />
       </SettingsSection>
 
       <SettingsSection id="convert-keep" title="Convert and keep">

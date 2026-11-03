@@ -153,6 +153,12 @@ do $$ begin
         and dedupe_key = 'closure:' || (current_setting('t.r1')::jsonb ->> 'closure_id') || ':' || current_setting('t.ia')));
   perform expect_num('1.7d the result reports instructors_notified = 1',
     (current_setting('t.r1')::jsonb ->> 'instructors_notified')::bigint, 1);
+  -- STEP 0b: the cancelled class line reads "Mon 9 Nov, 7:00" — a comma before
+  -- the fmt_clock time (month word, comma, space, then a digit).
+  perform expect_true('1.7e the digest class line uses the "Mon 9 Nov, 7:00" format',
+    (select payload->>'class_list' ~ ' [A-Z][a-z]+, [0-9]'
+       from notifications where template_key = 'instructor_closure_notice'
+        and dedupe_key = 'closure:' || (current_setting('t.r1')::jsonb ->> 'closure_id') || ':' || current_setting('t.ia')));
   -- M1's credit came back.
   perform expect_num('1.8 M1 got their credit back',
     (select coalesce(sum(delta),0) from credit_ledger where member_id = 'c1070000-0000-0000-0000-00000000a001'
@@ -345,6 +351,9 @@ do $$ declare p jsonb := current_setting('t.p5')::jsonb; begin
     (p->'instructor'->>'html') like '%Check my schedule%' and (p->'instructor'->>'html') like '%Reformer%');
   perform expect_true('5.6 the accent token was filled, not left raw',
     (p->'member'->>'html') not like '%{accent}%' and (p->'instructor'->>'html') not like '%{accent}%');
+  -- STEP 0b: the cancelled class line in both emails reads "Mon 9 Nov, 7:00".
+  perform expect_true('5.6b member + instructor class lines use the comma format',
+    (p->'member'->>'html') ~ ' [A-Z][a-z]+, [0-9]' and (p->'instructor'->>'html') ~ ' [A-Z][a-z]+, [0-9]');
 end $$;
 
 set role authenticated;

@@ -863,6 +863,14 @@ The composer's preview is a hand-built React look-alike of the email frame at a 
 
 ---
 
+## 67 — Automatic renewal with a saved card
+
+**Decision.** (a) Deferred. Automatic renewal of a recurring membership with a saved card (Xendit Subscriptions) is a per-studio switch, to be built once a studio is on its own Xendit account — a saved card or subscription cannot move between Xendit accounts (Decision 66). Until then, online recurring plans renew by hand, one period at a time (Decision 66).
+
+(b) Recorded 3 Nov 2026. When a studio's online payments settle to an account under a different legal name, the checkout tells the member before they leave for Xendit. studio_settings.payee_notice_name text null, registered; set in Settings → Payments as 'Payment processor name shown at checkout' with the help line 'Leave blank if payments settle to the studio's own account.' When set, the checkout shows above the Continue to pay button, and the pay sheet repeats: 'Card and GCash payments for {studio_name} are processed by {payee_notice_name}. That's the name you'll see on the payment page and on your statement.' Blank means no line. Reform sets it to 'DSV Digital Management Corp.' until the keys move to RPC's own Xendit account.
+
+---
+
 ## 66 — Recurring plans online, one period at a time
 
 **Decision.** A member can buy a **recurring** plan (e.g. Unlimited Monthly) in the app or from its website link (Decision 57) as a **single period**: a one-time Xendit Payment Session for one period at the plan's price, exactly like a pack purchase (Decision 40 Part A). No card is saved, no Xendit subscription is created; `activate_purchase` creates the membership with `auto_renew = false` and the period ending on `current_period_end`. **Renewing is the member's action:** from seven days before the period ends, and while `past_due` inside Decision 4's grace, the plan screen shows *"Your {plan} ends {date} — Renew for another {month/period}"* → the same one-time checkout; a successful renewal **extends the existing membership by one period from its current end** (never a second membership, never a gap; credits reset per Decision 3). A `membership_expiring` email goes once, seven days before the end, with the Renew link; the existing past-due handling (grace, then expiry) is unchanged. Staff see *"Online · one period at a time · ends {date}"* on the member page and each renewal shows as a Sales row flagged Renewal. Desk-sold recurring memberships are unchanged. **Automatic renewal with a saved card (Xendit Subscriptions) is a later decision (67)** and will be a studio switch; until then this is the only online path for recurring plans. The buy page's "Online buying for recurring plans comes with subscriptions" sentence is retired; a recurring plan's website link works like a pack's.

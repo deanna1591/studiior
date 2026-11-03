@@ -184,6 +184,7 @@ export type MemberBootstrap = {
   messages_enabled: boolean;
   has_unread_studio_message: boolean;
   desk_pay_available: boolean;
+  payee_notice_name: string | null;
 };
 
 /** Who is making this request, on the member PWA. */
