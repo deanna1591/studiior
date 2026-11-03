@@ -123,3 +123,13 @@ export function dayMonthParts(iso: string, timeZone: string): { day: string; mon
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   return { day: get("day"), month: get("month") };
 }
+
+/** "3 November" — numeric day (no leading zero) + full month, split so only the
+ *  numeral is monospaced. The plain written date the rest of the app uses for a
+ *  single moment (Decision 26(b) panel, Decision 88 wallet). */
+export function dayMonthLongParts(iso: string, timeZone: string): { day: string; month: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, day: "numeric", month: "long" })
+    .formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return { day: get("day"), month: get("month") };
+}

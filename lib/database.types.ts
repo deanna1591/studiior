@@ -9573,6 +9573,7 @@ export type Database = {
         Args: { p_member_id: string; p_studio_id: string }
         Returns: boolean
       }
+      member_wallet: { Args: { p_studio_id: string }; Returns: Json }
       membership_frozen_now: {
         Args: { p_membership_id: string }
         Returns: boolean

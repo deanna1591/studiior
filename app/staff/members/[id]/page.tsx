@@ -10,7 +10,7 @@ import { HealthBand, bandOf } from "@/components/health-band";
 import { MessageLink } from "@/components/message-link";
 import InviteToApp from "@/components/invite-to-app";
 import { formatMoney } from "@/lib/plans";
-import { dayMonthParts, fmtTime } from "@/lib/time";
+import { dayMonthParts, dayMonthLongParts, fmtTime } from "@/lib/time";
 import { studioToday } from "@/lib/dashboard";
 import MembershipActions from "./membership-actions-panel";
 import GrantComplimentary from "./grant-complimentary";
@@ -206,6 +206,13 @@ export default async function MemberDetail({
     const { day, month } = dayMonthParts(iso, ctx.timeZone);
     return <><span className="num">{day}</span> {month}</>;
   };
+  // Decision 26(b): the App account panel writes the date out in full ("3
+  // November"), the plain written form the rest of the app uses for a single
+  // moment; the page's other meta stays the compact "3 Nov" via d().
+  const dLong = (iso: string) => {
+    const { day, month } = dayMonthLongParts(iso, ctx.timeZone);
+    return <><span className="num">{day}</span> {month}</>;
+  };
 
   // Decision 26(b): a guest/friend brought by a host (host not null), and their
   // latest invite's dates — all in the studio time zone via d().
@@ -246,9 +253,9 @@ export default async function MemberDetail({
             <>
               <p className="mb-2.5 mt-1 max-w-[58ch] text-[13px] leading-[19px] text-ink-2">
                 {inviteExpired
-                  ? <>{m.first_name}&rsquo;s link expired on {d(invExpIso!)}.</>
-                  : <>{m.first_name} was invited by {host} on {d(invMadeIso!)}. Their link to set
-                      a password and sign the waiver is open until {d(invExpIso!)}.</>}
+                  ? <>{m.first_name}&rsquo;s link expired on {dLong(invExpIso!)}.</>
+                  : <>{m.first_name} was invited by {host} on {dLong(invMadeIso!)}. Their link to set
+                      a password and sign the waiver is open until {dLong(invExpIso!)}.</>}
               </p>
               <ResendGuestInvite memberId={params.id}
                 label={inviteExpired ? "Send a new invite" : "Resend invite"} />
@@ -305,7 +312,7 @@ export default async function MemberDetail({
         {m.user_id ? (
           // Decision 26(b): once claimed, the account's own line.
           <p className="text-[12px] leading-4 text-ink-3">
-            Signed in since {d(invAcceptedIso ?? m.joined_on)}.
+            Signed in since {dLong(invAcceptedIso ?? m.joined_on)}.
           </p>
         ) : isDeskUp(ctx.role) ? (
           <InviteToApp memberId={m.id} />

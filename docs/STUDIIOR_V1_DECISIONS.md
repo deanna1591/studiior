@@ -2089,6 +2089,8 @@ Free first class comes first. Before any coverage check, the app applies Decisio
 
 Shipped 2 Nov as slice A (migration 20260833140000, commit 42335e4) with two deviations: no 'Save this card' checkbox, because Xendit hosted sessions cannot charge a saved card (Decision 67); and no Card / GCash tabs in the app, because the Xendit hosted page presents both. The pay sheet names both methods in text instead.
 
+Shipped 3 Nov as slice B (migration 20260833160000, member_wallet). Deviation: the receipt PDF is NOT attached to the payment confirmation email. The only member payment-confirmation email (product_order_paid) is sent entirely in SQL, where the attachment slot is an inline base64 built in SQL (used for .ics) and the payload carries no payment id — attaching a Next/pdf-lib PDF would mean re-issuing the money-path sender, outside this slice. Instead the "Download receipt" link lives on every Paid and Refunded card in /payments; the receipt is generated on demand at /receipts/{payment_id}.pdf (member session, own payments only, 403 otherwise).
+
 ## Decision 90: Bring a friend for their free first class (recorded 3 Nov 2026)
 
 Flow follows Mariana Tek's guest booking: a member adds a friend while booking or after, enters the friend's name and email, and the friend gets a profile and an invite. Difference: the friend's seat is their own free first class under Decision 30, not the host's credits. Only someone who has never been to the studio can be brought this way, and each member may bring one friend, once. No payment, no guest pass. Existing members are still brought with a guest pass when the host's plan has one (Decision 26); that path is unchanged.

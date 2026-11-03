@@ -45,6 +45,10 @@ insert into locations (id, studio_id, name, timezone, is_primary) values
   ('d73c0000-0000-0000-0000-00000000b0b0','d73c0000-0000-0000-0000-0000000000b0','Main','UTC',true);
 insert into rooms (id, studio_id, location_id, name, capacity) values
   ('d73c0000-0000-0000-0000-00000000aa01','d73c0000-0000-0000-0000-0000000000a0','d73c0000-0000-0000-0000-00000000a0a0','R',20),
+  -- c2 gets its OWN room: it is moved to now()+30min below, and sharing aa01 with
+  -- the fixed 09:00 cd would collide on occ_room_no_overlap at some hours of the
+  -- day (a wall-clock date-fragility, nothing to do with desk pay).
+  ('d73c0000-0000-0000-0000-00000000aa03','d73c0000-0000-0000-0000-0000000000a0','d73c0000-0000-0000-0000-00000000a0a0','R2',20),
   ('d73c0000-0000-0000-0000-00000000bb02','d73c0000-0000-0000-0000-0000000000b0','d73c0000-0000-0000-0000-00000000b0b0','R',20);
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
   ('d73c0000-0000-0000-0000-00000000c0a1','d73c0000-0000-0000-0000-0000000000a0','Flow',50,20),
@@ -89,7 +93,7 @@ insert into memberships (id, studio_id, member_id, plan_id, status, price_cents,
 -- cb on SB; cd today (add_walk_in).
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, starts_at, ends_at, capacity, status, staffing, name) values
   ('d73c0000-0000-0000-0000-0000000000c1','d73c0000-0000-0000-0000-0000000000a0','d73c0000-0000-0000-0000-00000000a0a0','d73c0000-0000-0000-0000-00000000c0a1','d73c0000-0000-0000-0000-00000000aa01',null, now()+interval '3 day', now()+interval '3 day'+interval '50 min', 20,'scheduled','open','Flow'),
-  ('d73c0000-0000-0000-0000-0000000000c2','d73c0000-0000-0000-0000-0000000000a0','d73c0000-0000-0000-0000-00000000a0a0','d73c0000-0000-0000-0000-00000000c0a1','d73c0000-0000-0000-0000-00000000aa01',null, now()+interval '5 day', now()+interval '5 day'+interval '50 min', 20,'scheduled','open','Flow'),
+  ('d73c0000-0000-0000-0000-0000000000c2','d73c0000-0000-0000-0000-0000000000a0','d73c0000-0000-0000-0000-00000000a0a0','d73c0000-0000-0000-0000-00000000c0a1','d73c0000-0000-0000-0000-00000000aa03',null, now()+interval '5 day', now()+interval '5 day'+interval '50 min', 20,'scheduled','open','Flow'),
   ('d73c0000-0000-0000-0000-0000000000c3','d73c0000-0000-0000-0000-0000000000a0','d73c0000-0000-0000-0000-00000000a0a0','d73c0000-0000-0000-0000-00000000c0a1','d73c0000-0000-0000-0000-00000000aa01',null, now()+interval '6 day', now()+interval '6 day'+interval '50 min', 20,'scheduled','open','Flow'),
   ('d73c0000-0000-0000-0000-0000000000cb','d73c0000-0000-0000-0000-0000000000b0','d73c0000-0000-0000-0000-00000000b0b0','d73c0000-0000-0000-0000-00000000c0b2','d73c0000-0000-0000-0000-00000000bb02',null, now()+interval '4 day', now()+interval '4 day'+interval '50 min', 20,'scheduled','open','Flow'),
   ('d73c0000-0000-0000-0000-0000000000cc','d73c0000-0000-0000-0000-0000000000b0','d73c0000-0000-0000-0000-00000000b0b0','d73c0000-0000-0000-0000-00000000c0b2','d73c0000-0000-0000-0000-00000000bb02',null, now()+interval '5 day', now()+interval '5 day'+interval '50 min', 20,'scheduled','open','Flow'),
