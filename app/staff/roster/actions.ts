@@ -339,6 +339,41 @@ export async function setFreeFirstOverride(_prev: FreeFirstState, fd: FormData):
   };
 }
 
+export type VisibilityState =
+  | { ok: true; hidden: boolean }
+  | { ok: false; message: string }
+  | null;
+
+/**
+ * Decision 91: hide or show THIS class to members. visible=false takes it off the
+ * member side (Book tab, public timetable, nudges, new bookings) without
+ * cancelling it; a member already booked keeps it. set_occurrence_visibility is
+ * the boundary — owners and managers only (front desk and instructors cannot).
+ * Audited; no email is sent.
+ */
+export async function setVisibility(_prev: VisibilityState, fd: FormData): Promise<VisibilityState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "Not signed in." };
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const visible = String(fd.get("visible") ?? "") === "1";
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_occurrence_visibility", {
+    p_occurrence_id: occurrenceId, p_visible: visible,
+  });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "Only owners and managers hide a class from members." };
+    return { ok: false, message: error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string; hidden_from_members?: boolean } | null;
+  if (!r?.ok) {
+    return { ok: false, message: r?.reason === "no_such_class" ? "That class no longer exists." : "That could not be set." };
+  }
+  revalidatePath("/schedule");
+  revalidatePath(`/roster/${occurrenceId}`);
+  return { ok: true, hidden: !!r.hidden_from_members };
+}
+
 export type ConvertFreeState = { ok: true; message: string } | { ok: false; message: string } | null;
 
 /**

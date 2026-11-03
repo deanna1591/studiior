@@ -29,7 +29,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
 
   const { data: occ } = await supabase
     .from("class_occurrences")
-    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, instructors!instructor_id(display_name), rooms(name)")
+    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, hidden_from_members, instructors!instructor_id(display_name), rooms(name)")
     .eq("id", params.occurrenceId)
     .maybeSingle();
   if (!occ) notFound();
@@ -224,6 +224,14 @@ export default async function Roster({ params, searchParams }: { params: { occur
         <span className="num text-ink">{occ.booked_count}/{occ.capacity}</span> booked
         {inCount > 0 && <>, <span className="num text-ink">{inCount}</span> checked in</>}
         {occ.status === "cancelled" && " · this class is cancelled"}
+        {/* Decision 91: hidden from the member side (set on the Schedule popup). */}
+        {occ.hidden_from_members && (
+          <span className="ml-1 inline-flex items-center rounded-full border px-1.5 text-[11px] font-medium leading-[16px] align-middle"
+                style={{ background: "var(--surface)", color: "var(--ink-2)", borderColor: "var(--line-2)" }}
+                title="Hidden from members — still on your calendar">
+            Hidden
+          </span>
+        )}
         {/* Decision 38: the assignment-confirmation state, when the class was asked. */}
         {occ.assignment_confirmed_at
           ? <span className="ml-1" style={{ color: "var(--lime-text)" }}> · confirmed ✓</span>

@@ -1367,6 +1367,7 @@ export type Database = {
           flex_reached_minimum_at: string | null
           free_first_override: string | null
           guarantee_tier: Database["public"]["Enums"]["guarantee_tier"] | null
+          hidden_from_members: boolean
           id: string
           instructor_checked_in_at: string | null
           instructor_checked_in_by: string | null
@@ -1418,6 +1419,7 @@ export type Database = {
           flex_reached_minimum_at?: string | null
           free_first_override?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
+          hidden_from_members?: boolean
           id?: string
           instructor_checked_in_at?: string | null
           instructor_checked_in_by?: string | null
@@ -1469,6 +1471,7 @@ export type Database = {
           flex_reached_minimum_at?: string | null
           free_first_override?: string | null
           guarantee_tier?: Database["public"]["Enums"]["guarantee_tier"] | null
+          hidden_from_members?: boolean
           id?: string
           instructor_checked_in_at?: string | null
           instructor_checked_in_by?: string | null
@@ -10344,6 +10347,7 @@ export type Database = {
           occ_confirmed: boolean
           occ_flex: boolean
           occ_free_first: Json
+          occ_hidden: boolean
           occ_id: string
           occ_instructor_id: string
           occ_minimum: number
@@ -10581,6 +10585,10 @@ export type Database = {
       }
       set_occurrence_horizon: {
         Args: { p_confirm?: boolean; p_days: number; p_studio_id: string }
+        Returns: Json
+      }
+      set_occurrence_visibility: {
+        Args: { p_occurrence_id: string; p_visible: boolean }
         Returns: Json
       }
       set_publication_enabled: {

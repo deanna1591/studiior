@@ -2120,3 +2120,7 @@ One free first class per person for life at that studio. One brought friend per 
 Staff: roster shows the friend with the free first chip and "Brought by {host first name}". Member page facts line shows "Referred by {host}" and, on the host, "Brought a friend: {friend first name}". Settings: none new; limits above are platform rules.
 
 Not in scope: paid friend seats, rewards for the host, instructor side.
+
+## Decision 91: Hide a class from members (recorded 3 Nov 2026)
+
+Staff can take a single class off the member side without cancelling it. On the Schedule, the class sheet gets a switch "Visible to members", on by default. Off means: the class does not appear on the member Book tab, the public timetable, the {upcoming_classes} and {next_three} tokens, the free-first nudge or any member-facing list, and members cannot book it by link. Members who already hold a booking keep it and still see it in their bookings and reminders. Instructors see no change: the class stays on their schedule, roster and pay exactly as before, and no email is sent when a class is hidden or shown again. Staff see a chip "Hidden" on the Schedule and the roster. Flex rules are unchanged: a hidden flex class with too few confirmed seats cancels at its cut-off through the normal path. Switching off a core class shows the line "This class is core. It will still run and pay the instructor even if nobody books." before confirming. Hidden classes do not count as available seats anywhere. Audited. Not a setting; per class only; series stay as they are.

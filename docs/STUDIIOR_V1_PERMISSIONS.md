@@ -95,6 +95,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 | Create / edit recurring series | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Move or reschedule a class | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Cancel a class | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Hide / show a class to members (Decision 91) | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Assign or change instructor | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Assign a substitute | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Change capacity | ✅ | ✅ | ❌ | ⚠️¹¹ | ❌ |

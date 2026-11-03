@@ -165,6 +165,7 @@ export default async function Schedule({
       override: "open" | "closed" | null; effective_open: boolean;
       rules_open: boolean; reason: string | null;
     } | null;
+    occ_hidden: boolean | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -200,6 +201,8 @@ export default async function Schedule({
     tier: o.occ_series_tier ?? null,
     effectiveTier: o.occ_tier ?? null,
     minimum: o.occ_minimum ?? null,
+    // Decision 91: off the member app, still on the staff calendar.
+    hidden: o.occ_hidden ?? false,
     // A flex slot with nothing else of that instructor's beside it: the one
     // that costs a trip for a class that may not run, and the one a studio
     // should look at twice before putting it there.

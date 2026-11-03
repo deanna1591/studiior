@@ -6,6 +6,7 @@ import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/act
 import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
 import FreeFirstCard, { type FreeFirstCardState } from "@/components/schedule/free-first";
+import VisibilityCard from "@/components/schedule/visibility";
 
 export type BlockFacts = {
   id: string;
@@ -28,6 +29,10 @@ export type BlockFacts = {
    *  schedule_range's effective_free_first), for the "Open to first-timers"
    *  card. Null when the studio does not use free first classes. */
   freeFirst?: FreeFirstCardState | null;
+  /** Decision 91: hidden from the member side (set_occurrence_visibility). */
+  hidden?: boolean;
+  /** Decision 91: whether this class is core, for the hide-confirm warning. */
+  isCore?: boolean;
 };
 
 /**
@@ -45,7 +50,7 @@ export type BlockFacts = {
  */
 export default function BlockPanel({
   facts, canManage, rosterHref, confirmationsOn = false, freeFirstEnabled = false,
-  onAssigned, onUnassigned, onFreeFirstChange, onClose,
+  onAssigned, onUnassigned, onFreeFirstChange, onVisibilityChange, onClose,
 }: {
   facts: BlockFacts;
   canManage: boolean;
@@ -59,6 +64,7 @@ export default function BlockPanel({
   onAssigned: (instructorId: string, instructorName: string) => void;
   onUnassigned: () => void;
   onFreeFirstChange?: (s: FreeFirstCardState) => void;
+  onVisibilityChange?: (hidden: boolean) => void;
   onClose: () => void;
 }) {
   const [candidates, setCandidates] = useState<AssignCandidate[] | null>(null);
@@ -191,6 +197,11 @@ export default function BlockPanel({
           <div className="min-w-0">
             <p className="truncate text-[15px] font-semibold leading-5 text-ink">{facts.title}</p>
             <p className="num mt-0.5 text-[12.5px] leading-[18px] text-ink-2">{facts.when}</p>
+            {facts.hidden && (
+              <span className="mt-1.5 inline-flex items-center rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] font-semibold leading-4 text-ink-2">
+                Hidden
+              </span>
+            )}
           </div>
           <button onClick={onClose} className="shrink-0 rounded-lg px-2 py-1 text-[12px] text-ink-3 hover:text-ink">
             Close
@@ -308,6 +319,12 @@ export default function BlockPanel({
             classes. The popup stays open across a change. */}
         {canManage && freeFirstEnabled && !facts.cancelled && facts.freeFirst && (
           <FreeFirstCard occurrenceId={facts.id} initial={facts.freeFirst} onChange={onFreeFirstChange} />
+        )}
+
+        {/* Decision 91: take this class off the member side without cancelling. */}
+        {canManage && !facts.cancelled && (
+          <VisibilityCard occurrenceId={facts.id} hidden={!!facts.hidden}
+                          isCore={!!facts.isCore} onChange={onVisibilityChange} />
         )}
 
         <div className="mt-3 border-t border-line pt-3">

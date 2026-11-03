@@ -119,6 +119,9 @@ export type CalEvent = {
   /** Decision 30 amendment (b) follow-up: the per-class free-first state, for the
    *  popup card and the "Trials" marker. Null when the studio does not use it. */
   freeFirst?: FreeFirstCardState | null;
+  /** Decision 91: hidden from the member side (set_occurrence_visibility). Staff
+   *  still see the class; a "Hidden" chip marks it. */
+  hidden?: boolean;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -556,6 +559,17 @@ export default function ScheduleCalendar({
         </span>
       ) : trialsPill;
 
+      // Decision 91: a muted "Hidden" pill when the class is off the member side.
+      // Staff still see the block; the pill says it is not on the member app or
+      // the public timetable. --ink-2 on --surface (well above the 4.5 floor).
+      const hiddenPill = event.hidden ? (
+        <span className="shrink-0 rounded-full border px-1 text-[10.5px] font-medium leading-[14px]"
+              style={{ background: "var(--surface)", color: "var(--ink-2)", borderColor: "var(--line-2)" }}
+              title="Hidden from members — still on your calendar">
+          Hidden
+        </span>
+      ) : null;
+
       const unstaffed = event.staffing !== "assigned";
       // The tier dot (● core · ○ flex · ◆ always) — SHAPE not colour, since
       // colour already carries staffing. Shared by both views' line 2.
@@ -595,6 +609,7 @@ export default function ScheduleCalendar({
               </span>
               <span className="wk-cls min-w-0 truncate text-ink-2">· {event.title}</span>
             </span>
+            {hiddenPill}
             {trials}
           </div>
         );
@@ -630,6 +645,7 @@ export default function ScheduleCalendar({
             <span className="min-w-0 flex-1 truncate text-ink-2">
               {bits.map((b, i) => <span key={i}>{i > 0 ? " · " : null}{b}</span>)}
             </span>
+            {hiddenPill}
             {trials}
           </div>
         );
@@ -802,6 +818,12 @@ export default function ScheduleCalendar({
             waitlistCount: selected.waitlistCount,
             staffing: selected.staffing,
             pendingApplications: selected.pendingApplications,
+            hidden: selected.hidden ?? false,
+            // The core warning fires for a class that runs regardless of bookings
+            // (core; a one-off carries its tier on effectiveTier when there is no
+            // series). A flex class does not warn — hiding it just means fewer
+            // confirmations and it cancels at its cut-off through the normal path.
+            isCore: (selected.tier ?? selected.effectiveTier ?? "core") === "core",
           }}
           onClose={() => setSelected(null)}
           onAssigned={(instructorId) => {
@@ -830,6 +852,13 @@ export default function ScheduleCalendar({
             // at once, and the server's fresh events land right after.
             setEvents((prev) => prev.map((e) => e.id === selected.id ? { ...e, freeFirst: s } : e));
             setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, freeFirst: s } : prev));
+            startTransition(() => router.refresh());
+          }}
+          onVisibilityChange={(hidden) => {
+            // Decision 91: the popup stays open; the block behind it gets the
+            // "Hidden" chip at once, then the server's fresh events land.
+            setEvents((prev) => prev.map((e) => e.id === selected.id ? { ...e, hidden } : e));
+            setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, hidden } : prev));
             startTransition(() => router.refresh());
           }}
         />
