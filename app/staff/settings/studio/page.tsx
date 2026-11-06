@@ -7,6 +7,7 @@ import OpeningDatePanel from "../opening-date";
 import LocationPanel from "../location-panel";
 import StudioIdentityPanel from "../studio-identity";
 import MessagesSettingPanel from "../messages";
+import InvoiceDetailsPanel from "../invoice-details";
 import SettingsBack from "../back";
 import SettingsSection from "@/components/staff/settings-section";
 import SettingsSummaryRow from "@/components/staff/settings-summary";
@@ -26,7 +27,9 @@ export default async function StudioSettings() {
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: studio }, { data: settings }, { data: loc }, { count: closures }] = await Promise.all([
     supabase.from("studios").select("name, slug, timezone, currency, country").eq("id", ctx.studioId).maybeSingle(),
-    supabase.from("studio_settings").select("open_time, close_time, opened_on, messages_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select(`open_time, close_time, opened_on, messages_enabled,
+      invoice_registered_name, invoice_proprietor, invoice_tin, invoice_address, invoice_email,
+      invoice_landline, invoice_mobile, invoice_atp_no, invoice_atp_date, invoice_series, invoice_vat_rate`).eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("locations")
       .select("name, address, latitude, longitude, self_checkin_radius_m, self_checkin_accuracy_cap_m, self_checkin_requires_location")
       .eq("studio_id", ctx.studioId).eq("is_primary", true).maybeSingle(),
@@ -70,6 +73,22 @@ export default async function StudioSettings() {
 
       <SettingsSection id="messages" title="Member messages">
         <MessagesSettingPanel enabled={settings?.messages_enabled ?? false} />
+      </SettingsSection>
+
+      <SettingsSection id="invoice" title="Invoice details">
+        <InvoiceDetailsPanel d={{
+          invoice_registered_name: settings?.invoice_registered_name ?? null,
+          invoice_proprietor: settings?.invoice_proprietor ?? null,
+          invoice_tin: settings?.invoice_tin ?? null,
+          invoice_address: settings?.invoice_address ?? null,
+          invoice_email: settings?.invoice_email ?? null,
+          invoice_landline: settings?.invoice_landline ?? null,
+          invoice_mobile: settings?.invoice_mobile ?? null,
+          invoice_atp_no: settings?.invoice_atp_no ?? null,
+          invoice_atp_date: settings?.invoice_atp_date ?? null,
+          invoice_series: settings?.invoice_series ?? null,
+          invoice_vat_rate: settings?.invoice_vat_rate ?? 12,
+        }} />
       </SettingsSection>
 
       <SettingsSection id="checkin-code" title="Check-in code">

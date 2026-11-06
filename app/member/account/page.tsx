@@ -38,9 +38,8 @@ export default async function Account() {
     ...(hasOrders ? [{ href: "/account/orders", label: "My orders", sub: "What you have bought, and whether it is ready" }] : []),
     // Decision 89: only when the studio has turned messages on.
     ...(settings.messagesEnabled ? [{ href: "/messages", label: "Message the studio", sub: "Ask about your bookings, plans or anything else" }] : []),
-    // Decision 88 slice B: the wallet — what you paid (with receipts) and what you hold.
-    { href: "/payments", label: "Payments", sub: "What you have paid, receipts, and anything owed" },
-    { href: "/purchases", label: "Purchases", sub: "Your subscriptions and class passes" },
+    // Decision 88(c): one home for everything bought — plans, payments, invoices.
+    { href: "/purchases", label: "My purchases", sub: "Your plans, payments and invoices" },
     { href: "/account/pay", label: "How you pay", sub: "Your cards, or how the studio takes payment" },
     { href: "/account/profile", label: "Your details", sub: "Name, photo, phone, emergency contact" },
     { href: "/settings", label: "Notifications", sub: "Which emails you get" },

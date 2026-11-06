@@ -27,3 +27,9 @@ test("api and _next are still excluded (unchanged)", () => {
   assert.equal(re.test("/api/xendit/callback"), false);
   assert.equal(re.test("/_next/static/chunk.js"), false);
 });
+test("static fonts bypass the rewrite (invoice route's CDN font fallback)", () => {
+  assert.equal(re.test("/fonts/invoice/SpaceMono-Regular.ttf"), false);
+  assert.equal(re.test("/fonts/invoice/x.woff2"), false);
+  // the PDF route itself still runs through the member rewrite
+  assert.equal(re.test("/receipts/abc.pdf"), true);
+});

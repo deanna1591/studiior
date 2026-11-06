@@ -10,6 +10,13 @@ const nextConfig = {
     // of server work. This is what "sometimes entries only appear after a
     // manual refresh" was.
     staleTimes: { dynamic: 0, static: 180 },
+    // The invoice/receipt route reads the vendored invoice fonts with
+    // fs.readFile; public/ is not bundled into a serverless function by
+    // default, so pin them into this route's trace (the route also falls back
+    // to fetching them from the CDN, but the bundled copy avoids a round trip).
+    outputFileTracingIncludes: {
+      "/member/receipts/[id]": ["./public/fonts/invoice/**/*"],
+    },
   },
 };
 export default nextConfig;

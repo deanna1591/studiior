@@ -5395,6 +5395,7 @@ export type Database = {
           gift_card_id: string | null
           group_purchase_id: string | null
           id: string
+          invoice_no: string | null
           is_demo: boolean
           member_id: string | null
           membership_id: string | null
@@ -5405,6 +5406,7 @@ export type Database = {
           product_order_id: string | null
           promo_code_id: string | null
           provider: Database["public"]["Enums"]["payment_provider"]
+          received_by: string | null
           recorded_by: string | null
           reference: string | null
           refund_reason: string | null
@@ -5431,6 +5433,7 @@ export type Database = {
           gift_card_id?: string | null
           group_purchase_id?: string | null
           id?: string
+          invoice_no?: string | null
           is_demo?: boolean
           member_id?: string | null
           membership_id?: string | null
@@ -5441,6 +5444,7 @@ export type Database = {
           product_order_id?: string | null
           promo_code_id?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
+          received_by?: string | null
           recorded_by?: string | null
           reference?: string | null
           refund_reason?: string | null
@@ -5467,6 +5471,7 @@ export type Database = {
           gift_card_id?: string | null
           group_purchase_id?: string | null
           id?: string
+          invoice_no?: string | null
           is_demo?: boolean
           member_id?: string | null
           membership_id?: string | null
@@ -5477,6 +5482,7 @@ export type Database = {
           product_order_id?: string | null
           promo_code_id?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
+          received_by?: string | null
           recorded_by?: string | null
           reference?: string | null
           refund_reason?: string | null
@@ -7103,6 +7109,18 @@ export type Database = {
           intro_offer_days: number
           intro_offer_exclusive: boolean
           intro_offer_plan_id: string | null
+          invoice_address: string | null
+          invoice_atp_date: string | null
+          invoice_atp_no: string | null
+          invoice_email: string | null
+          invoice_landline: string | null
+          invoice_mobile: string | null
+          invoice_next_no: number
+          invoice_proprietor: string | null
+          invoice_registered_name: string | null
+          invoice_series: string | null
+          invoice_tin: string | null
+          invoice_vat_rate: number
           keep_sequence_enabled: boolean
           late_cancel_consumes_credit: boolean
           late_cancel_fee_cents: number
@@ -7221,6 +7239,18 @@ export type Database = {
           intro_offer_days?: number
           intro_offer_exclusive?: boolean
           intro_offer_plan_id?: string | null
+          invoice_address?: string | null
+          invoice_atp_date?: string | null
+          invoice_atp_no?: string | null
+          invoice_email?: string | null
+          invoice_landline?: string | null
+          invoice_mobile?: string | null
+          invoice_next_no?: number
+          invoice_proprietor?: string | null
+          invoice_registered_name?: string | null
+          invoice_series?: string | null
+          invoice_tin?: string | null
+          invoice_vat_rate?: number
           keep_sequence_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
@@ -7339,6 +7369,18 @@ export type Database = {
           intro_offer_days?: number
           intro_offer_exclusive?: boolean
           intro_offer_plan_id?: string | null
+          invoice_address?: string | null
+          invoice_atp_date?: string | null
+          invoice_atp_no?: string | null
+          invoice_email?: string | null
+          invoice_landline?: string | null
+          invoice_mobile?: string | null
+          invoice_next_no?: number
+          invoice_proprietor?: string | null
+          invoice_registered_name?: string | null
+          invoice_series?: string | null
+          invoice_tin?: string | null
+          invoice_vat_rate?: number
           keep_sequence_enabled?: boolean
           late_cancel_consumes_credit?: boolean
           late_cancel_fee_cents?: number
@@ -8329,6 +8371,8 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_invoice_no: { Args: { p_payment_id: string }; Returns: string }
+      assign_invoice_no_run: { Args: { p_payment_id: string }; Returns: string }
       assign_occurrences_for_period: {
         Args: {
           p_confirmed?: boolean
@@ -10802,6 +10846,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      studio_invoice_details: { Args: { p_studio_id: string }; Returns: Json }
       studio_is_locked: { Args: { p_studio_id: string }; Returns: boolean }
       studio_member_settings: {
         Args: { p_studio_id: string }

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
-// Decision 88 slice B — the payments screen moved to /payments (the wallet, with
-// tabs and receipts). This old address redirects so any saved link still lands.
+// Decision 88(c): merged into "My purchases".
 export default function OldPayments() {
-  redirect("/payments");
+  redirect("/purchases?tab=payments");
 }

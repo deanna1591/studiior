@@ -69,5 +69,5 @@ export const config = {
   // Decision 82: `sw.js` is excluded for the same reason — the service-worker
   // script (app/sw.js/route.ts) must be served at /sw.js with scope "/", not
   // rewritten into /member.
-  matcher: ["/((?!api|\\.well-known|sw\\.js|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)"],
+  matcher: ["/((?!api|\\.well-known|sw\\.js|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp|ttf|otf|woff|woff2)$).*)"],
 };

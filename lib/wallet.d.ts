@@ -40,6 +40,22 @@ export function walletBuckets(wallet: Partial<Wallet>): {
   desk: WalletDesk[];
 };
 
+export type PaymentRow = {
+  key: string;
+  kind: "paid" | "refunded" | "desk" | "unpaid";
+  chip: string;
+  invoiceable: boolean;
+  paymentId: string | null;
+  item: string;
+  at: string;
+  amount_cents: number | null;
+  currency: string;
+  refunded_cents: number;
+};
+
+export function paymentRows(wallet: Partial<Wallet>): PaymentRow[];
+export const PAYMENT_FILTERS: { key: PaymentRow["kind"]; label: string }[];
+
 export function usedOfTotal(m: { plan_credits?: number | null; credits_remaining?: number | null }): string | null;
 export function membershipTab(planType: string): "subscriptions" | "passes";
 export function membershipChip(status: string): "Active" | "Expired";

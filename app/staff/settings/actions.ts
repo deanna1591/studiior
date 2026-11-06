@@ -1176,3 +1176,57 @@ export async function saveConvertKeep(_prev: PlainState, fd: FormData): Promise<
       : "Saved. The convert sequence is off — no sequence mail will go out.",
   };
 }
+
+// Decision 88(c) — the studio's BIR invoice details. Filled → members' payment
+// downloads are BIR Service Invoices; left blank → plain receipts. Manager-up
+// via the studio_settings RLS (an empty update = refused).
+export async function saveInvoiceDetails(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const supabase = createClient();
+  const t = (k: string) => String(fd.get(k) ?? "").trim();
+
+  if (String(fd.get("intent") ?? "") === "clear") {
+    const { data, error } = await supabase.from("studio_settings").update({
+      invoice_registered_name: null, invoice_proprietor: null, invoice_tin: null,
+      invoice_address: null, invoice_email: null, invoice_landline: null, invoice_mobile: null,
+      invoice_atp_no: null, invoice_atp_date: null, invoice_series: null,
+    }).eq("studio_id", ctx.studioId).select("studio_id");
+    if (error) return { ok: false, message: error.message };
+    if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+    revalidatePath("/settings/studio");
+    return { ok: true, message: "Invoice details cleared — members get plain receipts now." };
+  }
+
+  const rateRaw = t("invoice_vat_rate");
+  const rate = rateRaw === "" ? 12 : Number(rateRaw);
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+    return { ok: false, message: "The VAT rate has to be a number between 0 and 100." };
+  }
+  const name = t("invoice_registered_name");
+  const tin = t("invoice_tin");
+  if (name && !tin) return { ok: false, message: "Add the VAT TIN too — an invoice needs it." };
+
+  const { data, error } = await supabase.from("studio_settings").update({
+    invoice_registered_name: name || null,
+    invoice_proprietor: t("invoice_proprietor") || null,
+    invoice_tin: tin || null,
+    invoice_address: t("invoice_address") || null,
+    invoice_email: t("invoice_email") || null,
+    invoice_landline: t("invoice_landline") || null,
+    invoice_mobile: t("invoice_mobile") || null,
+    invoice_atp_no: t("invoice_atp_no") || null,
+    invoice_atp_date: t("invoice_atp_date") || null,
+    invoice_series: t("invoice_series") || null,
+    invoice_vat_rate: rate,
+  }).eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) {
+    return { ok: false, message: /invoice_vat_rate_ck/.test(error.message)
+      ? "The VAT rate has to be a number between 0 and 100." : error.message };
+  }
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings/studio");
+  return { ok: true, message: name
+    ? "Saved. Members now download a BIR service invoice."
+    : "Saved. Leave the registered name blank to keep plain receipts." };
+}

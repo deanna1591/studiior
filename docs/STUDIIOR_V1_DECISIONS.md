@@ -2101,6 +2101,20 @@ Shipped 2 Nov as slice A (migration 20260833140000, commit 42335e4) with two dev
 
 Shipped 3 Nov as slice B (migration 20260833160000, member_wallet). Deviation: the receipt PDF is NOT attached to the payment confirmation email. The only member payment-confirmation email (product_order_paid) is sent entirely in SQL, where the attachment slot is an inline base64 built in SQL (used for .ics) and the payload carries no payment id — attaching a Next/pdf-lib PDF would mean re-issuing the money-path sender, outside this slice. Instead the "Download receipt" link lives on every Paid and Refunded card in /payments; the receipt is generated on demand at /receipts/{payment_id}.pdf (member session, own payments only, 403 otherwise).
 
+### (c) My purchases, and a BIR invoice when the studio is set up for one (recorded 3 Nov 2026)
+
+One row, one list, and a real invoice where a Philippine studio needs one.
+
+- The two Account rows "Payments" and "Purchases" merge into ONE row "My purchases" → /purchases, with two tabs: "Plans" and "Payments". /payments redirects to /purchases?tab=payments.
+- Plans tab: the member's held plans exactly as slice B (subscriptions and passes). The buying screen (/account/plan) is unchanged.
+- Payments tab: ONE list, newest first — no sub-tabs. Each row shows what it was for (plan or class name), the date via fmtClock, the amount, and a chip: Paid / Refunded / Owed at the desk / Not completed. Filter chips for the four sit at the top, all shown by default. A plain "Download invoice" link sits on Paid and Refunded rows only.
+- The download is a BIR Service Invoice (A4, laid out per docs/invoice-reference — the seller block, the Sold-to box, a five-row items table, a VAT-inclusive 12% tax summary, the payment-method chips with the paid one selected, a PAID stamp when the payment succeeded, and the ATP / acknowledgment-certificate footer) WHEN the studio has filled Settings → Studio → Invoice details; a studio that leaves them blank issues the plain receipt as today. The panel's help line is "Leave blank to issue plain receipts."
+- Invoice numbers are per studio, sequential, assigned when a payment succeeds (online or desk) and stored on the payment (payments.invoice_no, unique per studio). Existing succeeded payments are numbered once, in order of payment date. The format is "No. {7 digits}" (e.g. No. 0000147).
+
+The blank-page fix (STEP 0 of this slice): the receipt/invoice download was a same-tab <a href> to a content-disposition: inline PDF, which the installed member PWA and iOS Safari render as a blank screen (no inline PDF viewer, no download fallback). It now serves content-disposition: attachment and opens in a new tab (target="_blank" rel="noopener"), and the studio-logo fetch carries an AbortController timeout with a clean name fallback.
+
+Out of scope, unchanged: cart, discounts and promo codes, member-side partial refunds, a per-studio picker. SC/PWD discount and withholding tax are per-sale, not captured, and default to 0 on the invoice; client TIN and business address are not stored on members and print blank (the template supports blank client fields).
+
 ## Decision 90: Bring a friend for their free first class (recorded 3 Nov 2026)
 
 Flow follows Mariana Tek's guest booking: a member adds a friend while booking or after, enters the friend's name and email, and the friend gets a profile and an invite. Difference: the friend's seat is their own free first class under Decision 30, not the host's credits. Only someone who has never been to the studio can be brought this way, and each member may bring one friend, once. No payment, no guest pass. Existing members are still brought with a guest pass when the host's plan has one (Decision 26); that path is unchanged.
