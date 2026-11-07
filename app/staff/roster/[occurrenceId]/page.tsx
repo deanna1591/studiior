@@ -13,6 +13,8 @@ import CheckInButton from "./check-in-button";
 import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
 import MakeFreeButton from "./make-free-button";
+import RebookButton from "./rebook-button";
+import ToastHost from "@/components/staff/toast-host";
 import ReleasePay from "./release-pay";
 import RunAnyway from "./run-anyway";
 import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
@@ -280,6 +282,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
           their phone is a picture nothing can read. */}
       <CodeCheckIn occurrenceId={occ.id} />
 
+      <ToastHost />
       <SectionLabel>Roster</SectionLabel>
       {booked.length === 0 ? (
         <Empty>Nobody has booked yet. They will appear here as they do.</Empty>
@@ -366,6 +369,10 @@ export default async function Roster({ params, searchParams }: { params: { occur
                 )}
                 {manager && b.status === "booked" && b.payment_source === "drop_in" && !paidBookings.has(b.id) && (
                   <MakeFreeButton bookingId={b.id} occurrenceId={occ.id} />
+                )}
+                {/* Decision 92: rebook this member into another class (all staff). */}
+                {occ.status === "scheduled" && (b.status === "booked" || b.status === "attended") && (
+                  <RebookButton bookingId={b.id} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
                 )}
                 {(notesFor.get(b.member_id) ?? []).map((n, i) => (
                   <p key={i} className="mt-1 pl-9 text-[12px] leading-[18px]"

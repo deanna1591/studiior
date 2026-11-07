@@ -118,6 +118,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 | Override the eligibility gate | ✅ | ✅ | ❌ | ✅ | ❌ |
 | Waive a late-cancel fee | ✅ | ✅ | ❌ | ✅ | ❌ |
 | Comp a booking | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Rebook from roster (move to another class) | ✅ | ✅ | ❌²⁴ | ✅ | ❌ |
 | Join / leave waitlist | ✅ | ✅ | ❌ | ✅ | ⚠️¹² |
 | View waitlist order | ✅ | ✅ | 👁 | ✅ | 👁 |
 | Reorder the waitlist | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -126,6 +127,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 Chapter 7 excludes the social layer, so "who's going" is a V2 question for members.
 ¹² Own bookings only.
 ²³ Instructor: only a class they teach, **today**, as a **walk-in** (or a same-day Move-here) checked in at once — not general on-behalf booking (Decision 81a). Scoped in SQL to a published occurrence that is theirs and is today.
+²⁴ Rebook from the roster (Decision 92) is all staff roles. An instructor keeps the existing same-day **"Move them here"** on a class they teach (Decision 81a, footnote ²³); they do not get the general rebook.
 
 Waitlist order is strictly FIFO and nobody can reorder it, including the Owner. Business Rules §4.1 — a queue people believe in is worth more than a queue that can be adjusted.
 

@@ -10048,6 +10048,10 @@ export type Database = {
         Args: { p_instructor_id: string; p_occurrence_id: string }
         Returns: Json
       }
+      rebook_member: {
+        Args: { p_booking: string; p_target: string }
+        Returns: Json
+      }
       rebuild_member_timeline: {
         Args: { p_member_id: string }
         Returns: number

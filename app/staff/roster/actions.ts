@@ -413,3 +413,100 @@ export async function convertToFreeFirst(_prev: ConvertFreeState, fd: FormData):
   revalidatePath(`/roster/${occurrenceId}`);
   return { ok: true, message: "Done — this is now their free first class." };
 }
+
+// ===========================================================================
+// Decision 92 — rebook a member from the roster.
+// ===========================================================================
+export type RebookClass = {
+  id: string; startsAt: string; name: string;
+  instructorFirst: string | null; seatsLeft: number; tier: string | null; hidden: boolean;
+};
+export type RebookOptions = {
+  firstName: string; sourceId: string; tz: string; timeFormat: string; classes: RebookClass[];
+};
+
+/** The classes a member can be rebooked into: the studio's scheduled, future
+ *  classes over the next ~60 days (the source class excluded). Reuses
+ *  schedule_range (staff) + the studio's instructor names. */
+export async function rebookOptions(bookingId: string): Promise<RebookOptions | { error: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { error: "You are not signed in." };
+  const supabase = createClient();
+
+  const { data: b } = await supabase
+    .from("bookings")
+    .select("id, occurrence_id, members(first_name, preferred_name)")
+    .eq("id", bookingId).maybeSingle();
+  if (!b) return { error: "That booking no longer exists." };
+  const bm = b as unknown as { occurrence_id: string; members: { first_name: string | null; preferred_name: string | null } | null };
+
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: ctx.timeZone });
+  const to = new Date(Date.now() + 60 * 864e5).toLocaleDateString("en-CA", { timeZone: ctx.timeZone });
+
+  const [{ data: rows }, { data: instr }] = await Promise.all([
+    supabase.rpc("schedule_range", { p_studio_id: ctx.studioId, p_from: today, p_to: to }),
+    supabase.from("instructors").select("id, display_name").eq("studio_id", ctx.studioId),
+  ]);
+  const first = new Map((instr ?? []).map((i) => [i.id, (i.display_name ?? "").trim().split(/\s+/)[0] || null]));
+  const now = Date.now();
+  const classes: RebookClass[] = ((rows ?? []) as any[])
+    .filter((r) => r.occ_status === "scheduled" && r.occ_id !== bm.occurrence_id && new Date(r.starts_at).getTime() > now)
+    .map((r) => ({
+      id: r.occ_id as string,
+      startsAt: r.starts_at as string,
+      name: (r.occ_name as string) || "Class",
+      instructorFirst: r.occ_instructor_id ? (first.get(r.occ_instructor_id) ?? null) : null,
+      seatsLeft: Math.max(0, (r.occ_capacity ?? 0) - (r.occ_booked ?? 0)),
+      tier: (r.occ_series_tier as string) ?? null,
+      hidden: !!r.occ_hidden,
+    }))
+    .sort((a, b2) => (a.startsAt < b2.startsAt ? -1 : 1));
+
+  return {
+    firstName: bm.members?.preferred_name || bm.members?.first_name || "this member",
+    sourceId: bm.occurrence_id, tz: ctx.timeZone, timeFormat: ctx.timeFormat, classes,
+  };
+}
+
+export type RebookResult =
+  | { ok: true; className: string; when: string }
+  | { ok: false; message: string }
+  | null;
+
+const REBOOK_REASON: Record<string, string> = {
+  plan_not_covering: "Their plan does not cover this class.",
+  already_in_class: "They are already in this class.",
+  class_full: "That class is full.",
+  class_in_past: "That class has already started.",
+  class_not_scheduled: "That class isn’t available.",
+  no_such_class: "That class no longer exists.",
+  no_such_booking: "That booking no longer exists.",
+  different_studio: "That class belongs to a different studio.",
+  booking_not_live: "That booking can’t be moved.",
+};
+
+/** rebook_member is the boundary (desk-up, re-checks everything). */
+export async function rebookMember(_prev: RebookResult, fd: FormData): Promise<RebookResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const bookingId = String(fd.get("booking_id") ?? "");
+  const targetId = String(fd.get("target_id") ?? "");
+  const className = String(fd.get("class_name") ?? "this class");
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("rebook_member", { p_booking: bookingId, p_target: targetId });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, message: "Only owners, managers and front desk can rebook a member." };
+    return { ok: false, message: error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string; class_name?: string; when?: string } | null;
+  if (!r?.ok) {
+    const msg = r?.reason === "plan_not_covering"
+      ? `Their plan does not cover ${className}.`
+      : (r?.reason && REBOOK_REASON[r.reason]) || "That couldn’t be done.";
+    return { ok: false, message: msg };
+  }
+  revalidatePath("/schedule");
+  revalidatePath("/roster");
+  return { ok: true, className: r.class_name ?? className, when: r.when ?? "" };
+}
