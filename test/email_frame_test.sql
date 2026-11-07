@@ -245,4 +245,31 @@ select expect_text('fmt_money PHP whole → ₱1,500', fmt_money(150000, 'PHP'),
 select expect_text('fmt_money CZK suffix', fmt_money(150000, 'CZK'), '1,500 Kč');
 select expect_text('fmt_money USD with cents', fmt_money(149950, 'USD'), '$1,499.50');
 
+-- Decision 80e — an accent card through render_email. The composer renders the
+-- card in TS (lib/email-body.mjs) with {accent}/{accent_on} as literal tokens;
+-- render_email fills them. These feed render_email the EXACT renderBody output
+-- for an accent card (style: accent) and a plain card, and prove the accent cell
+-- background is filled per-studio, while the plain card keeps its border and no
+-- accent-filled cell. (Regenerate the bodies if renderBody's card markup changes.)
+select expect_like('80e accent: cell filled with the studio accent',
+  (select html_body from render_email('e8040000-0000-0000-0000-000000000001','booking_confirmed','member','Subj','',
+     $ac$<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td style="background:{accent};border-radius:8px;padding:16px"><div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;color:#FFFFFF">Summer Unlimited</div><div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;color:#FFFFFF;margin-top:4px">3 classes a week</div><div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#FFFFFF;margin-top:8px">2,400 CZK</div><div style="margin-top:4px"><table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td align="center" style="border-radius:6px;background:#FFFFFF"><a href="{buy_url}" style="display:inline-block;padding:11px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:1;color:{accent};text-decoration:none;border-radius:6px">Buy Summer Unlimited</a></td></tr></table></div></td></tr></table>$ac$,
+     '{"buy_url":"https://ef-sa.studiior.app/buy/accent"}'::jsonb,'Ann')),
+  '%background:#B85C38;border-radius:8px;padding:16px%');
+select expect_like('80e accent: button inverted — white fill, accent-coloured text',
+  (select html_body from render_email('e8040000-0000-0000-0000-000000000001','booking_confirmed','member','Subj','',
+     $ac$<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td style="background:{accent};border-radius:8px;padding:16px"><div style="color:#FFFFFF">Summer Unlimited</div><div style="margin-top:4px"><table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td align="center" style="border-radius:6px;background:#FFFFFF"><a href="{buy_url}" style="color:{accent};text-decoration:none;border-radius:6px">Buy Summer Unlimited</a></td></tr></table></div></td></tr></table>$ac$,
+     '{"buy_url":"https://ef-sa.studiior.app/buy/accent"}'::jsonb,'Ann')),
+  '%background:#FFFFFF"><a href="https://ef-sa.studiior.app/buy/accent" style="color:#B85C38;text-decoration:none%');
+select expect_like('80e plain: a body WITHOUT the line keeps the bordered card',
+  (select html_body from render_email('e8040000-0000-0000-0000-000000000001','booking_confirmed','member','Subj','',
+     $pl$<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td style="border:1px solid #E7E5E4;border-radius:8px;padding:16px"><div style="color:#14170E">Summer Unlimited</div></td></tr></table>$pl$,
+     '{}'::jsonb,'Ann')),
+  '%border:1px solid #E7E5E4;border-radius:8px;padding:16px%');
+select expect_notlike('80e plain: no accent-filled cell',
+  (select html_body from render_email('e8040000-0000-0000-0000-000000000001','booking_confirmed','member','Subj','',
+     $pl$<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td style="border:1px solid #E7E5E4;border-radius:8px;padding:16px"><div style="color:#14170E">Summer Unlimited</div></td></tr></table>$pl$,
+     '{}'::jsonb,'Ann')),
+  '%background:#B85C38;border-radius:8px;padding:16px%');
+
 select 'email_frame_test OK' as result;

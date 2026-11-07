@@ -147,6 +147,8 @@ export default function EmailComposer({
           a card:
           <br />
           <code>::: card</code> / <code>name: …</code> / <code>detail: …</code> / <code>price: …</code> / <code>button: Label | https://…</code> / <code>:::</code>
+          <br />
+          Add <code>style: accent</code> to a card to fill it with your studio colour (white text).
         </p>
         {imgErr && <p className="mt-1 text-[12px] text-coral">{imgErr}</p>}
 

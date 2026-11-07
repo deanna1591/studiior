@@ -158,6 +158,41 @@ test("card: ::: plan <id> with NO resolver degrades to the literal text (never b
   assert.match(norm(html), /<p>::: plan p1<\/p>/);
 });
 
+// --- Decision 80e: the accent card ------------------------------------------
+
+test("card: style: accent → accent-filled cell, white text, inverted button", () => {
+  const body = "::: card\nstyle: accent\nname: Summer Unlimited\ndetail: 3 a week, any time\nprice: 2,400 CZK\nbutton: Buy it | {buy_url}\n:::";
+  const { html, text } = renderBody(body, { accent: "{accent}" });
+  // the cell is filled with the accent (token, for render_email to fill)
+  assert.match(html, /background:\{accent\};border-radius:8px;padding:16px/);
+  assert.ok(!/border:1px solid #E7E5E4/.test(html)); // no bordered cell
+  // name/detail/price are white
+  assert.match(html, />Summer Unlimited<\/div>/);
+  assert.equal((html.match(/color:#FFFFFF/g) ?? []).length, 3);
+  // the button is inverted: white fill, accent-coloured text
+  assert.match(html, /background:#FFFFFF"><a href="\{buy_url\}"/);
+  assert.match(html, /color:\{accent\};text-decoration:none/);
+  // the plain-text form is unchanged by the style line
+  assert.equal(text, "Summer Unlimited\n3 a week, any time\n2,400 CZK\nBuy it: {buy_url}");
+});
+
+test("card: no style line → today's bordered card (unchanged)", () => {
+  const body = "::: card\nname: Summer Unlimited\ndetail: 3 a week\nprice: 2,400 CZK\n:::";
+  const { html } = renderBody(body, { accent: "{accent}" });
+  assert.match(html, /border:1px solid #E7E5E4/);
+  assert.ok(!/background:\{accent\};border-radius:8px/.test(html)); // not accent-filled
+  assert.match(html, /color:#14170E/); // ink name/price, not white
+});
+
+test("card: a bad style value is ignored — plain card, the line is dropped", () => {
+  const body = "::: card\nstyle: neon\nname: Summer Unlimited\ndetail: 3 a week\n:::";
+  const { html, text } = renderBody(body, { accent: "{accent}" });
+  assert.match(html, /border:1px solid #E7E5E4/);            // plain
+  assert.ok(!/background:\{accent\};border-radius:8px/.test(html));
+  assert.ok(!/neon/i.test(html));                            // the line is not dumped into detail
+  assert.equal(text, "Summer Unlimited\n3 a week");          // and not in the text either
+});
+
 test("quote: > text — name → an indented quote with the attribution", () => {
   const { html, text } = renderBody("> It changed my week — Maya");
   assert.match(html, /border-left:3px solid #E7E5E4/);

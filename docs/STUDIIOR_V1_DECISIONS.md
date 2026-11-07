@@ -725,6 +725,12 @@ The Templates screen (Decision 78c) lists only the convert / keep / retention / 
 
 The composer's preview is a hand-built React look-alike of the email frame at a fixed ~380px, so it can disagree with what members receive. Replace it with the real thing. New read-only `preview_template(studio, key, subject, body)` — manager-up, SECURITY DEFINER — builds the same complete sample context `send_template_test` uses and returns `render_notification`'s HTML **without queueing a notification row**; not anon (the anon surface stays EXACTLY THIRTEEN). One preview component renders that HTML in an iframe with a **Mobile (375px) / Desktop (600px)** toggle and is used by Campaigns, every template screen and the closure composer; the hand-built React frame is deleted. The two specifics confirmed in STEP 0: the switch of 78(e) is checked in both `queue_notification` and `queue_shift_notice` (instructor mail does not pass the former), and this preview is a new RPC returning HTML, never a reuse of `send_template_test`, which queues.
 
+### Amendment (80e follow-on) — highlight card (Deanna, 7 Nov 2026)
+
+(e) Recorded 7 Nov 2026. The composer card block accepts an optional line 'style: accent'. An accent card renders with the studio accent as background, white text, the name line bold, the detail line regular, and a button if given rendered white on the accent with the accent text. Without the line the card renders as today. Plain-text version unchanged. Preview and Send me a test render it.
+
+STEP-0 note (build): the ONE card renderer is `renderBody()` in `lib/email-body.mjs`; `render_email` does not parse `::: card` markup (every caller pre-renders the body in TS and passes HTML, `render_email` only substitutes `{token}`s and frames). The accent card is therefore expressed with the `{accent}`/`{accent_on}` tokens `render_email` already fills — accent cell `background:{accent}`, white text literal, inverted button `background:#FFFFFF` + `color:{accent}` — so `render_email` needs no logic change; it is re-issued byte-for-byte to carry the contract and the anon assertion. THIRTEEN stays.
+
 ---
 
 ## 70 — Studio team access
