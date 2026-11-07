@@ -118,6 +118,19 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
   ('9eb00000-0000-0000-0000-0000000b0009','9eb00000-0000-0000-0000-0000000000a0','9eb00000-0000-0000-0000-00000005f011','9eb00000-0000-0000-0000-0000000000b9','booked','drop_in',null),
   ('9eb00000-0000-0000-0000-0000000b0007','9eb00000-0000-0000-0000-0000000000a0','9eb00000-0000-0000-0000-00000005f011','9eb00000-0000-0000-0000-0000000000b7','waitlisted','drop_in',1);
 
+-- ICS case: a dedicated SRC_ICS -> T_ICS pair in distinct room-d1 slots (+3d,
+-- +3d2h — no occ_room_no_overlap with any other fixture) + a comp booking, so
+-- the booking_rebooked .ics is proven in isolation (section 3b). SRC_ICS and the
+-- booking carry updated_at an hour ago (the original booking was made earlier),
+-- so the rebook's SEQUENCE epoch (now) is genuinely higher, not same-second.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, starts_at, ends_at, status, booked_count, updated_at) values
+  ('9eb00000-0000-0000-0000-00000000c5c0','9eb00000-0000-0000-0000-0000000000a0','9eb00000-0000-0000-0000-00000000010c','9eb00000-0000-0000-0000-0000000000c1','9eb00000-0000-0000-0000-0000000000d1','9eb00000-0000-0000-0000-0000000000e1','ICS Src',10, now()+interval '3 days', now()+interval '3 days 1 hour','scheduled',1, now()-interval '1 hour'),
+  ('9eb00000-0000-0000-0000-00000000c57a','9eb00000-0000-0000-0000-0000000000a0','9eb00000-0000-0000-0000-00000000010c','9eb00000-0000-0000-0000-0000000000c1','9eb00000-0000-0000-0000-0000000000d1','9eb00000-0000-0000-0000-0000000000e1','ICS Dst',10, now()+interval '3 days 2 hours', now()+interval '3 days 3 hours','scheduled',0, now()-interval '1 hour');
+insert into members (id, studio_id, first_name, last_name, email, status) values
+  ('9eb00000-0000-0000-0000-0000000000bc','9eb00000-0000-0000-0000-0000000000a0','Ics','Member','mics@e.com','active');
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source, updated_at) values
+  ('9eb00000-0000-0000-0000-0000000b00c5','9eb00000-0000-0000-0000-0000000000a0','9eb00000-0000-0000-0000-00000000c5c0','9eb00000-0000-0000-0000-0000000000bc','booked','comp', now()-interval '1 hour');
+
 \echo '--- 1. refusals (no state change): plan not covering, same class, past, full, instructor ---'
 -- M1 is on a Reformer-only plan; moving to Barre is not covered
 select expect_text('plan not covering', as_reason('9eb00000-0000-0000-0000-0000000000f1',
@@ -187,6 +200,41 @@ select expect_num('no infraction for M2',
 -- the booking_rebooked payload carries the new class + when + studio
 select expect_text('rebooked payload class_name',
   (select payload->>'class_name' from notifications where member_id='9eb00000-0000-0000-0000-0000000000b2' and template_key='booking_rebooked'), 'Reformer Burn');
+
+\echo '--- 3b. the booking_rebooked .ics updates the event IN PLACE (same UID, higher SEQUENCE, new DTSTART, REQUEST) ---'
+-- the UID + SEQUENCE the ORIGINAL booking_confirmed invite would carry for
+-- B_ICS on SRC_ICS (same builder, per-booking UID) — captured before the move.
+do $$
+declare v_ve text;
+begin
+  v_ve := ics_member_vevent('9eb00000-0000-0000-0000-00000000c5c0'::uuid,
+                            '9eb00000-0000-0000-0000-0000000000bc'::uuid, false, 'mics@e.com', 'org@e.com');
+  perform set_config('studiior.ics_uid0', (regexp_match(v_ve,'UID:([^\r\n]+)'))[1], false);
+  perform set_config('studiior.ics_seq0', (regexp_match(v_ve,'SEQUENCE:([0-9]+)'))[1], false);
+end $$;
+-- rebook B_ICS into T_ICS (front desk)
+select expect_text('ics case rebooks', as_reason('9eb00000-0000-0000-0000-0000000000f1',
+  'select rebook_member(''9eb00000-0000-0000-0000-0000000b00c5'',''9eb00000-0000-0000-0000-00000000c57a'')'), 'ok');
+reset role;
+-- the queued booking_rebooked .ics: same UID, higher SEQUENCE, new DTSTART, REQUEST
+do $$
+declare v_ics text; v_uid text; v_seq bigint; v_dt text; v_method text; v_want_dt text;
+begin
+  select notification_ics(id) into v_ics from notifications
+    where member_id='9eb00000-0000-0000-0000-0000000000bc' and template_key='booking_rebooked'
+    order by created_at desc limit 1;
+  perform expect_true('booking_rebooked carries an .ics attachment', v_ics is not null);
+  v_uid    := (regexp_match(v_ics,'UID:([^\r\n]+)'))[1];
+  v_seq    := (regexp_match(v_ics,'SEQUENCE:([0-9]+)'))[1]::bigint;
+  v_dt     := (regexp_match(v_ics,'DTSTART:([^\r\n]+)'))[1];
+  v_method := (regexp_match(v_ics,'METHOD:([^\r\n]+)'))[1];
+  select ics_dt(starts_at) into v_want_dt from class_occurrences where id='9eb00000-0000-0000-0000-00000000c57a';
+  perform expect_text('ics UID = the original invite UID (per booking)', v_uid, current_setting('studiior.ics_uid0'));
+  perform expect_text('ics UID = the booking id', v_uid, '9eb00000-0000-0000-0000-0000000b00c5');
+  perform expect_true('ics SEQUENCE higher than the original invite', v_seq > current_setting('studiior.ics_seq0')::bigint);
+  perform expect_text('ics DTSTART = the new class start', v_dt, v_want_dt);
+  perform expect_text('ics METHOD is REQUEST (update in place, not cancel)', v_method, 'REQUEST');
+end $$;
 
 \echo '--- 4. old seat released, waitlist promoted ---'
 select expect_text('move-out from a full class', as_reason('9eb00000-0000-0000-0000-0000000000f1',

@@ -2152,3 +2152,5 @@ Email: new member template booking_rebooked, on the per-email switch. Default su
 Instructor: no email; the two rosters update.
 
 Not in scope: rebooking into a different studio, rebooking several members at once, rebooking from the member page (later), member-side self-rebook (members cancel and rebook as today).
+
+Amendment, 7 Nov 2026. Rows carry the button "Rebook to this class"; the selected day uses the staff selection style. The booking_rebooked email carries a calendar file for the new class that updates the member's existing calendar event in place: same UID as the original booking's invite with SEQUENCE increased, so the old time disappears and the new one appears. If the original invite's UID is not per booking, the email carries two files: a CANCEL for the old class and a REQUEST for the new. The subscription feed already reflects the move.

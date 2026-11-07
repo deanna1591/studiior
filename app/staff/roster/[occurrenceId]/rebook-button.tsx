@@ -138,7 +138,7 @@ export default function RebookButton({
                       return (
                         <button key={d.key} onClick={() => setDay(d.key)}
                           className="flex shrink-0 flex-col items-center rounded-lg px-2.5 py-1.5"
-                          style={on ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" } : { background: "var(--paper)", color: "var(--ink-2)" }}>
+                          style={on ? { background: "var(--ink)", color: "var(--surface)" } : { background: "var(--paper)", color: "var(--ink-2)" }}>
                           <span className="text-[10px] uppercase leading-3">{new Date(d.iso).toLocaleDateString("en-GB", { timeZone, weekday: "short" })}</span>
                           <span className="num text-[15px] font-semibold leading-5">{new Date(d.iso).toLocaleDateString("en-GB", { timeZone, day: "numeric" })}</span>
                           <span className="text-[9px] leading-3">{new Date(d.iso).toLocaleDateString("en-GB", { timeZone, month: "short" })}</span>
@@ -157,18 +157,18 @@ export default function RebookButton({
                     <p className="py-4 text-[13px] text-ink-3">No classes this day.</p>
                   ) : (
                     <ul className="divide-y divide-line">
-                      {dayClasses.map((c) => (
-                        <li key={c.id}>
-                          <button onClick={() => setChosen(c)} className="flex w-full items-center justify-between gap-3 py-2.5 text-left">
-                            <span className="min-w-0">
-                              <span className="block text-[14px] text-ink">{c.name}</span>
-                              <span className="block text-[12px] text-ink-3">
+                      {dayClasses.map((c) => {
+                        const full = c.seatsLeft < 1;
+                        return (
+                        <li key={c.id} className="flex items-center justify-between gap-3 py-2.5">
+                          <span className="min-w-0">
+                            <span className="block text-[14px] text-ink">{c.name}</span>
+                            <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-3">
+                              <span>
                                 {fmtTime(c.startsAt, timeZone, timeFormat)}
                                 {c.instructorFirst ? ` · ${c.instructorFirst}` : ""}
                                 {` · `}<span className="num">{c.seatsLeft}</span> left
                               </span>
-                            </span>
-                            <span className="flex shrink-0 items-center gap-1.5">
                               {c.tier && (
                                 <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize"
                                       style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
@@ -182,9 +182,15 @@ export default function RebookButton({
                                 </span>
                               )}
                             </span>
+                          </span>
+                          <button onClick={() => !full && setChosen(c)} disabled={full}
+                            className="shrink-0 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold disabled:opacity-50"
+                            style={{ borderColor: "var(--ink)", color: "var(--ink)" }}>
+                            {full ? "Full" : "Rebook to this class"}
                           </button>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
@@ -225,10 +231,10 @@ function MonthGrid({
         {cells.map((c, i) => c === null ? <span key={i} /> : (
           <button key={i} disabled={!have.has(c.key)} onClick={() => onPick(c.key)}
             className="flex aspect-square flex-col items-center justify-center rounded-lg text-[13px] disabled:opacity-30"
-            style={c.key === selected ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+            style={c.key === selected ? { background: "var(--ink)", color: "var(--surface)" }
                    : have.has(c.key) ? { background: "var(--paper)", color: "var(--ink)" } : { color: "var(--ink-3)" }}>
             <span className="num">{c.n}</span>
-            {have.has(c.key) && c.key !== selected && <span className="mt-0.5 h-1 w-1 rounded-full" style={{ background: "var(--accent-solid)" }} />}
+            {have.has(c.key) && c.key !== selected && <span className="mt-0.5 h-1 w-1 rounded-full" style={{ background: "var(--ink-2)" }} />}
           </button>
         ))}
       </div>
