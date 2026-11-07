@@ -83,6 +83,11 @@ insert into locations (id, studio_id, name, is_primary) values
 insert into rooms (id, studio_id, location_id, name, capacity) values
   ('a543a543-0000-0000-0000-000000001a01','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','RA',10),
   ('a543a543-0000-0000-0000-000000001b01','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','RB',10),
+  -- RA5: a dedicated room for the rolling Decision43 series (starts_on
+  -- current_date+1, so its 60-day-horizon materialisation is now()-relative).
+  -- Keeping it out of RA means its MO/TH 07:00 occurrences can never share a
+  -- room with the fixed-month 07:00 scope inserts in RA (occ_room_no_overlap).
+  ('a543a543-0000-0000-0000-000000001a05','a543a543-0000-0000-0000-000000000001','a543a543-0000-0000-0000-0000000000aa','RA5',10),
   ('a543a543-0000-0000-0000-000000001b02','a543a543-0000-0000-0000-000000000002','a543a543-0000-0000-0000-0000000000bb','RB',10),
   ('a543a543-0000-0000-0000-000000001c01','a543a543-0000-0000-0000-000000000003','a543a543-0000-0000-0000-0000000000cc','RC',10);
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
@@ -130,7 +135,7 @@ insert into class_series (id, studio_id, location_id, class_type_id, name, room_
    capacity, duration_minutes, rrule, starts_on, time_of_day)
 values ('a543a543-0000-0000-0000-000000005e43','a543a543-0000-0000-0000-000000000001',
         'a543a543-0000-0000-0000-0000000000aa','a543a543-0000-0000-0000-00000007c7a1','Decision43',
-        'a543a543-0000-0000-0000-000000001a01', null,
+        'a543a543-0000-0000-0000-000000001a05', null,
         10,50,'FREQ=WEEKLY;BYDAY=MO,TH', current_date + 1, '07:00');
 select expect_true('switch off: the series materialised some occurrences',
   (select count(*) > 0 from class_occurrences where series_id='a543a543-0000-0000-0000-000000005e43'));
