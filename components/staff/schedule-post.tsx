@@ -5,7 +5,7 @@ import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthCells, totalClasses,
-  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex,
+  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase,
   pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
@@ -484,10 +484,16 @@ function EditorialPost({
     );
   }
 
+  // Lock screen owns its own background (photo or gradient), the logo watermark
+  // and the sparkle; it never passes through the generic photo/watermark wrappers.
+  if (style === "lock_screen") {
+    const photo = bgData && spec.background_image ? bgData : null;
+    return <LockScreen t={t} page={page} format={format} coachFirst={coachFirst} footer={footer} photo={photo} logoData={logoData} />;
+  }
+
   const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story };
   const styled = style === "guest_check" ? <GuestCheck {...p} />
     : style === "times" ? <Times {...p} />
-    : style === "lock_screen" ? <LockScreen {...p} />
     : <Invitation {...p} />;
 
   // A faint kit-logo watermark (watermark_opacity 0..0.4), centred at 70% of the
@@ -699,36 +705,71 @@ function Invitation(p: StyleProps) {
   );
 }
 
-// --- Lock screen (day only) -------------------------------------------------
-function LockScreen(p: StyleProps) {
-  const { t, page, studioShort, logoData, coachFirst, coachData, footer, scale, story } = p;
+// --- Lock screen (day only) — reads as a phone lock screen. The target look is
+// docs/post-design/reference-lock-screen-2.png. Background is the uploaded photo
+// (under an ink tint) when set, else a flat gradient of the kit background; a
+// faint white logo watermark and a white sparkle sit behind a serif clock and
+// frosted notification cards (one per class, lower 60%, ≤3 square / ≤5 story,
+// split into parts in time order). The record's px are a ~2000-wide design
+// space; mapped here ×0.54 to the 1080 export (card + margins = 1080, clock ≈13%
+// of height, matching the reference). Fonts are fixed (Manrope / Instrument
+// Serif / Nothing You Could Do), not the kit's — the lock screen is iOS chrome.
+function LockScreen({ t, page, format, coachFirst, footer, photo, logoData }: {
+  t: Tokens; page: FitPage; format: PostFormat; coachFirst: string | null;
+  footer: string; photo: string | null; logoData: string | null;
+}) {
+  const H = format === "story" ? 1920 : 1080;
+  const MARGIN = 70;
+  const CARD_W = 1080 - MARGIN * 2;                 // cards span the width minus margins
   const day0 = page.days[0];
-  const clock = (day0?.classes[0]?.time ?? "9:41").replace(/\s?(AM|PM)$/i, "");
-  const centre = mixHex(t.accent, t.surface, 0.35);
-  const edge = mixHex(t.ink, t.accent, 0.25);
-  const initial = (logoData ? "" : (studioShort[0] ?? "✦")).toUpperCase();
+  const classes = day0?.classes ?? [];
+  const weekday = (day0?.label ?? "").split(/\s+/)[0] || "Today";
+  const firstTime = ((classes[0]?.time ?? "7:00").replace(/\s?(AM|PM)$/i, "").trim()) || "7:00";
+  const coachMode = !!coachFirst;
+  const grey = "rgba(60,60,67,0.6)";
+  const bg = `linear-gradient(180deg, ${mixHex(t.background, "#000000", 0.35)}, ${mixHex(t.background, "#000000", 0.55)})`;
   return (
-    <div style={{ width: 1080, height: story ? 1920 : 1080, background: `radial-gradient(circle at 50% 35%, ${centre}, ${edge} 72%)`, color: "#fff", padding: "56px 70px", position: "relative", overflow: "hidden", boxSizing: "border-box" }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 26, opacity: 0.9 }}>{day0?.label ?? ""}{coachFirst ? ` · ${coachFirst}` : ""}</div>
-        <div style={{ fontFamily: t.df, fontSize: 150, lineHeight: 1, marginTop: 4 }}>{clock}</div>
+    <div style={{ width: 1080, height: H, position: "relative", overflow: "hidden", background: bg, boxSizing: "border-box" }}>
+      {/* Background photo under an ink tint (when a photo is set) */}
+      {photo && <img src={photo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+      {photo && <div style={{ position: "absolute", inset: 0, background: soft(t.ink, 0.55) }} />}
+      {/* Faint white logo watermark, behind the cards */}
+      {logoData && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <img src={logoData} alt="" style={{ width: "80%", height: "auto", objectFit: "contain", opacity: 0.1, filter: "brightness(0) invert(1)" }} />
+        </div>
+      )}
+      {/* Sparkle, top right */}
+      <div style={{ position: "absolute", top: 60, right: 72, fontSize: 38, lineHeight: 1, color: "#fff", opacity: 0.9 }}>✦</div>
+      {/* Clock block */}
+      <div style={{ position: "absolute", top: 80, left: 0, right: 0, textAlign: "center", color: "#fff" }}>
+        <div style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 500, fontSize: 16, opacity: 0.9 }}>{weekday}, {firstTime}</div>
+        <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 140, lineHeight: 1 }}>{firstTime}</div>
       </div>
-      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-        {(day0?.classes ?? []).map((c, i) => (
-          <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", background: "rgba(255,255,255,.82)", color: t.ink, borderRadius: 26, padding: `${Math.round(14 * scale)}px 20px` }}>
-            <div style={{ width: 60, height: 60, borderRadius: 16, overflow: "hidden", background: c.tier === "core" ? t.accent : t.surface, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.df, fontStyle: "italic", fontSize: c.tier === "core" ? 30 : 22, color: c.tier === "core" ? t.onAccent : t.accent, flex: "0 0 auto" }}>
-              {coachData ? <img src={coachData} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (c.tier === "core" ? "✦" : (initial || "✦"))}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: Math.round(24 * scale) }}>
-                <b style={{ fontWeight: 800 }}>{c.name}</b>
-                <span style={{ color: t.secondary, fontSize: Math.round(19 * scale) }}>{c.time}</span>
+      {/* Notification cards, centred in the lower 60% */}
+      <div style={{ position: "absolute", top: "40%", left: 0, right: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22 }}>
+        {classes.map((c, i) => {
+          const core = c.tier === "core";
+          const parts: string[] = [];
+          if (!coachMode && c.coach) parts.push(`with ${c.coach}`);
+          if (core) parts.push("always runs");
+          const body = parts.join(" · ");
+          return (
+            <div key={i} style={{ width: CARD_W, height: 108, borderRadius: 22, background: "rgba(255,255,255,0.8)", backdropFilter: "blur(11px)", WebkitBackdropFilter: "blur(11px)", display: "flex", alignItems: "center", gap: 20, padding: "0 26px", boxSizing: "border-box" }}>
+              <div style={{ width: 76, height: 76, borderRadius: 17, flex: "0 0 auto", background: core ? t.accent : t.surface, display: "flex", alignItems: "center", justifyContent: "center", color: core ? "#fff" : t.accent, fontSize: 38, lineHeight: 1 }}>{core ? "✦" : "○"}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 24, color: t.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titleCase(c.name)}</span>
+                  <span style={{ fontSize: 19, color: grey, flex: "0 0 auto" }}>{c.time}</span>
+                </div>
+                {body && <div style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 400, fontSize: 24, color: soft(t.ink, 0.9), marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{body}</div>}
               </div>
-              <div style={{ fontSize: Math.round(20 * scale), color: t.secondary }}>{c.coach ? `with ${c.coach}` : ""}{c.tier === "core" ? " · always runs" : ""}</div>
             </div>
-          </div>))}
+          );
+        })}
       </div>
-      <div style={{ textAlign: "center", marginTop: 20, fontFamily: t.hand, fontSize: 30, color: "#fff" }}>swipe up, {footer.toLowerCase()} ♡</div>
+      {/* Footer */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 48, textAlign: "center", fontFamily: "'Nothing You Could Do', cursive", fontSize: 22, color: "#fff", opacity: 0.85 }}>swipe up, {footer.toLowerCase()} ♡</div>
     </div>
   );
 }

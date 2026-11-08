@@ -2200,3 +2200,19 @@ An attached photo always applies: if the model reply cannot be read but a photo 
 New spec field watermark_opacity (0 to 0.4, default 0). Above 0 the renderer draws the kit logo centred at 70% of the post width at that opacity behind every element, in all four styles. The model may set it when asked for a subtle, faint, or background logo. Validation clamps to the range; missing means 0. Edit box help text: "Attach a photo to use it as the background. Ask for a faint logo to watermark it."
 
 Posts exclude classes hidden from members (Decision 91); hosted Reform had 52 hidden of 112 scheduled classes on 16–22 Nov 2026 at the time of this check. The local upload check uses docs/brand-reference/RPC Social Editorial v3-selection (10).png (9.0 MB) as the reference: upload, remove, upload again, and once as an edit photo.
+
+### Amendment, 8 Nov 2026 — story parts and lock screen
+
+Story 1080×1920 posts use the same fit-then-split rule as square, with a taller body budget (the square budget plus 840 px). Week splits by whole days, Day splits by classes, Month stays a single page. Part arrows and per-part Download work in both formats; the caption is the same for all parts.
+
+Lock screen (Day only, as before) is rebuilt to read as a phone lock screen (docs/post-design/reference-lock-screen-2.png is the target).
+
+Background: the uploaded photo when background_image is set; otherwise the kit logo is not used as the background — instead a flat gradient from the kit background colour darkened 35% to darkened 55%. Over the photo a tint of the kit ink colour at 0.55 opacity, so the photo reads at low opacity. The kit logo is a watermark centred at 80% of the width, white, 0.10 opacity, behind the cards. One white four-point sparkle sits top right, 70 px, 0.9 opacity.
+
+Clock block: line 1 reads "{Weekday}, {first class time}" (e.g. "Monday, 7:00") in Manrope 30 px white 0.9, centred, 150 px from the top; line 2 is the first class time on the page in Instrument Serif 260 px white, centred, no AM/PM.
+
+Cards: at most 3 per square page and 5 per story page; a day with more classes splits into parts in time order. Each card is 1740 px wide (130 px margins), 200 px tall, radius 40, white at 0.80 opacity with a 20 px backdrop blur, 40 px gap, the group vertically centred in the lower 60% of the canvas. Inside: an app icon 140×140 radius 32 at the left (core: kit accent fill with a white ✦; flex: kit surface fill with an accent ○); a title in Manrope 700 44 px kit ink — the class name in title case ("Reformer Sculpt", never all caps); a body in Manrope 400 44 px kit ink 0.9 reading "with {coach}" plus " · always runs" for core; and on the right in grey 36 px the class time with AM/PM as fmt_clock gives it.
+
+Footer: the existing handwritten line "swipe up, book on the app ♡" in Nothing You Could Do 40 px white 0.85, centred 90 px from the bottom.
+
+Coach mode drops "with {coach}" from the card body (the coach is in the caption). The caption is unchanged.

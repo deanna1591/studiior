@@ -160,7 +160,7 @@ test("slice 3: fitScale picks the first step that fits, else the floor", () => {
 
 // --- Editorial styles (amendment) -------------------------------------------
 import {
-  POST_STYLES, STYLE_LABELS, headlineParts, shortName, receiptNo, editorialPlan, STYLE_FIT,
+  POST_STYLES, STYLE_LABELS, headlineParts, shortName, receiptNo, editorialPlan, STYLE_FIT, titleCase,
 } from "../lib/schedule-post.mjs";
 
 test("editorial: four styles with labels", () => {
@@ -235,6 +235,73 @@ test("editorial: lock screen is day only and splits a dense day", () => {
   assert.ok(plan.pages.length >= 2);
   const total = plan.pages.reduce((n, p) => n + (p.days[0]?.classes.length ?? 0), 0);
   assert.equal(total, 14);
+});
+
+// --- Amendment: story parts + lock screen -----------------------------------
+
+// A week of exactly 60 classes across 7 days (9,9,9,9,8,8,8).
+function week60() {
+  const per = [9, 9, 9, 9, 8, 8, 8];
+  return per.map((n, i) => ({
+    date: `2026-11-${String(9 + i).padStart(2, "0")}`,
+    label: `Day ${i + 1}`,
+    count: n,
+    classes: Array.from({ length: n }, (_, j) => ({ time: `${7 + j}:00 AM`, name: `D${i}C${j}`, coach: "X", tier: "core" })),
+  }));
+}
+
+test("story parts: a 60-class Guest Check week story gives 2+ pages, every class once, no day split", () => {
+  const days = week60();
+  const plan = editorialPlan({ days, mode: "week", format: "story", style: "guest_check" });
+  assert.ok(plan.pages.length >= 2, `pages=${plan.pages.length}`);
+  // every class appears exactly once
+  const total = plan.pages.reduce((n, p) => n + p.days.reduce((m, d) => m + d.classes.length, 0), 0);
+  assert.equal(total, 60);
+  // each day is whole: it appears on exactly one page with its full class count
+  const inputByDate = new Map(days.map((d) => [d.date, d.classes.length]));
+  const seen = new Map();
+  plan.pages.forEach((p) => p.days.forEach((d) => {
+    assert.equal(seen.has(d.date), false, `day ${d.date} split across pages`);
+    seen.set(d.date, d.classes.length);
+    assert.equal(d.classes.length, inputByDate.get(d.date), `day ${d.date} torn`);
+  }));
+  assert.equal(seen.size, 7);
+  plan.pages.forEach((p, i) => { assert.equal(p.part, i + 1); assert.equal(p.parts, plan.pages.length); });
+});
+
+test("story parts: square gives more pages than story (story has the room)", () => {
+  const days = week60();
+  const story = editorialPlan({ days, mode: "week", format: "story", style: "guest_check" });
+  const square = editorialPlan({ days, mode: "week", format: "square", style: "guest_check" });
+  assert.ok(square.pages.length > story.pages.length, `square=${square.pages.length} story=${story.pages.length}`);
+});
+
+test("story parts: a month story is one page", () => {
+  const plan = editorialPlan({ days: denseWeek(20, 4), mode: "month", format: "story", style: "guest_check" });
+  assert.equal(plan.pages.length, 1);
+});
+
+test("lock screen: a 16-class day gives 6 square pages / 4 story pages in time order", () => {
+  const day = [{
+    date: "2026-11-10", label: "Tuesday 10 Nov", count: 16,
+    classes: Array.from({ length: 16 }, (_, j) => ({ time: `${7 + j}:00`, name: `C${j}`, coach: "X", tier: j % 2 ? "flex" : "core" })),
+  }];
+  const sq = editorialPlan({ days: day, mode: "day", format: "square", style: "lock_screen" });
+  const st = editorialPlan({ days: day, mode: "day", format: "story", style: "lock_screen" });
+  assert.equal(sq.pages.length, 6);   // ceil(16/3)
+  assert.equal(st.pages.length, 4);   // ceil(16/5)
+  // both carry all 16 classes in the original time order
+  for (const plan of [sq, st]) {
+    const names = plan.pages.flatMap((p) => p.days[0].classes.map((c) => c.name));
+    assert.deepEqual(names, Array.from({ length: 16 }, (_, j) => `C${j}`));
+    assert.equal(plan.pages.every((p) => p.scale === 1), true);  // no scaling
+  }
+});
+
+test("lock screen: titleCase makes an all-caps class name read as a title", () => {
+  assert.equal(titleCase("REFORMER SCULPT"), "Reformer Sculpt");
+  assert.equal(titleCase("reformer flow"), "Reformer Flow");
+  assert.equal(titleCase("Mat Pilates"), "Mat Pilates");
 });
 
 test("slice 3: the undo stack pushes and steps back, base kept", () => {

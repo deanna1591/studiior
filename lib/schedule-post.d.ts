@@ -49,6 +49,7 @@ export declare const STYLE_LABELS: Record<PostStyle, string>;
 export declare function headlineParts(args: { mode: PostMode; weekday?: string; monthName?: string; coachFirst?: string | null }): { lead: string; accent: string };
 export declare function shortName(name: string): string;
 export declare function receiptNo(isoDate: string): string;
+export declare function titleCase(s: string): string;
 export declare const STYLE_FIT: Record<PostStyle, {
   dayBudget: number; dayRow: number; floor: number; steps: number[];
   weekKind: "classes" | "grid" | "none"; weekBudget?: number; gridRow?: number;
