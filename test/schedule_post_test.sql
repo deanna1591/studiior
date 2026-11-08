@@ -1,0 +1,170 @@
+-- =============================================================================
+-- Decision 93 slice 2 — schedule_post_data. UUID space 93c0, checked free.
+--   supabase db reset
+--   psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/schedule_post_test.sql
+-- =============================================================================
+\set ON_ERROR_STOP on
+set client_min_messages = notice;
+
+create or replace function expect_num(label text, actual bigint, want bigint)
+returns void language plpgsql as $$
+begin
+  if actual is not distinct from want then raise notice 'PASS  %  (got %)', label, coalesce(actual::text,'null');
+  else raise exception 'FAIL  %  expected %, got %', label, want, coalesce(actual::text,'null'); end if;
+end $$;
+create or replace function expect_true(label text, actual boolean)
+returns void language plpgsql as $$
+begin
+  if actual then raise notice 'PASS  %', label;
+  else raise exception 'FAIL  %  (expected true)', label; end if;
+end $$;
+create or replace function expect_text(label text, actual text, want text)
+returns void language plpgsql as $$
+begin
+  if actual is not distinct from want then raise notice 'PASS  %  (got %)', label, coalesce(actual,'null');
+  else raise exception 'FAIL  %  expected %, got %', label, want, coalesce(actual,'null'); end if;
+end $$;
+create or replace function expect_raise(label text, uid uuid, sql text, want_sqlstate text)
+returns void language plpgsql as $$
+declare got text;
+begin
+  perform set_config('request.jwt.claim.sub', uid::text, true);
+  execute 'set local role authenticated';
+  begin execute sql; got := 'NO RAISE';
+  exception when others then got := sqlstate; end;
+  execute 'set local role postgres';
+  if got = want_sqlstate then raise notice 'PASS  %  (%)', label, got;
+  else raise exception 'FAIL  %  expected %, got %', label, want_sqlstate, got; end if;
+end $$;
+create or replace function call_jsonb(uid uuid, sql text) returns jsonb
+language plpgsql as $$
+declare r jsonb;
+begin
+  perform set_config('request.jwt.claim.sub', uid::text, true);
+  execute 'set local role authenticated';
+  execute sql into r;
+  execute 'set local role postgres';
+  return r;
+end $$;
+
+-- --- Fixtures ---------------------------------------------------------------
+insert into auth.users (id) values
+  ('93c00000-0000-0000-0000-0000000000a2'),   -- SA manager
+  ('93c00000-0000-0000-0000-0000000000a3'),   -- SA front desk
+  ('93c00000-0000-0000-0000-0000000000a4'),   -- SA instructor (login)
+  ('93c00000-0000-0000-0000-0000000000b1');   -- SB owner
+insert into profiles (id, email) values
+  ('93c00000-0000-0000-0000-0000000000a2','sp-mgr@example.com'),
+  ('93c00000-0000-0000-0000-0000000000a3','sp-fd@example.com'),
+  ('93c00000-0000-0000-0000-0000000000a4','sp-inst@example.com'),
+  ('93c00000-0000-0000-0000-0000000000b1','sp-sb@example.com');
+insert into studios (id, name, slug, timezone, currency, status, accent_color, theme_preset, logo_url) values
+  ('93c00000-0000-0000-0000-00000000a000','Post Studio A','post-a','Europe/Prague','CZK','active','#B85C38','warm','https://example.com/logo.png'),
+  ('93c00000-0000-0000-0000-00000000b000','Post Studio B','post-b','Europe/Prague','CZK','active','#1A2B4C','bold',null);
+insert into studio_settings (studio_id, flex_min_bookings, post_footer_line, post_hashtags) values
+  ('93c00000-0000-0000-0000-00000000a000', 2, 'See you on the reformer', '#poststudio #pilates'),
+  ('93c00000-0000-0000-0000-00000000b000', 1, 'Book on the app', null);
+insert into studio_staff (id, studio_id, user_id, email, role, status) values
+  ('93c00000-0000-0000-0000-00000000a0a2','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000a2','sp-mgr@example.com','manager','active'),
+  ('93c00000-0000-0000-0000-00000000a0a3','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000a3','sp-fd@example.com','front_desk','active'),
+  ('93c00000-0000-0000-0000-00000000a0a4','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000a4','sp-inst@example.com','instructor','active'),
+  ('93c00000-0000-0000-0000-00000000b0b1','93c00000-0000-0000-0000-00000000b000','93c00000-0000-0000-0000-0000000000b1','sp-sb@example.com','owner','active');
+insert into locations (id, studio_id, name, is_primary) values
+  ('93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-00000000a000','Main',true),
+  ('93c00000-0000-0000-0000-0000000000bb','93c00000-0000-0000-0000-00000000b000','Main',true);
+insert into rooms (id, studio_id, location_id, name, capacity) values
+  ('93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','RA',10),
+  ('93c00000-0000-0000-0000-0000000000b1','93c00000-0000-0000-0000-00000000b000','93c00000-0000-0000-0000-0000000000bb','RB',10);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-00000000a000','Reformer',50,10),
+  ('93c00000-0000-0000-0000-0000000000c2','93c00000-0000-0000-0000-00000000b000','Reformer',50,10);
+insert into instructors (id, studio_id, display_name, staff_id) values
+  ('93c00000-0000-0000-0000-0000000000f1','93c00000-0000-0000-0000-00000000a000','Ada Example','93c00000-0000-0000-0000-00000000a0a4'),
+  ('93c00000-0000-0000-0000-0000000000f2','93c00000-0000-0000-0000-00000000b000','Bo Fictitious',null);
+
+-- SA occurrences on 2027-03-15 (Prague, +01, before DST): a visible core at 07:00,
+-- a visible flex at 09:00, a HIDDEN at 08:00, a CANCELLED at 10:00. Distinct times
+-- in one room (no overlap). SB has one visible class the same day.
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, starts_at, ends_at, status, flex, hidden_from_members, guarantee_tier) values
+  ('93c00000-0000-0000-0000-00000000e001','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Reformer Flow',10,
+     (date '2027-03-15' + time '07:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '07:50') at time zone 'Europe/Prague','scheduled', false, false, 'core'),
+  ('93c00000-0000-0000-0000-00000000e002','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Reformer Flex',10,
+     (date '2027-03-15' + time '09:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '09:50') at time zone 'Europe/Prague','scheduled', true,  false, null),
+  ('93c00000-0000-0000-0000-00000000e003','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Private Hidden',10,
+     (date '2027-03-15' + time '08:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '08:50') at time zone 'Europe/Prague','scheduled', false, true,  'core'),
+  ('93c00000-0000-0000-0000-00000000e004','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Reformer Cancelled',10,
+     (date '2027-03-15' + time '10:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '10:50') at time zone 'Europe/Prague','cancelled', false, false, 'core'),
+  ('93c00000-0000-0000-0000-00000000e0b1','93c00000-0000-0000-0000-00000000b000','93c00000-0000-0000-0000-0000000000bb','93c00000-0000-0000-0000-0000000000c2','93c00000-0000-0000-0000-0000000000b1','93c00000-0000-0000-0000-0000000000f2','SB Reformer',10,
+     (date '2027-03-15' + time '07:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '07:50') at time zone 'Europe/Prague','scheduled', false, false, 'core');
+
+\set SA '93c00000-0000-0000-0000-00000000a000'
+\set SB '93c00000-0000-0000-0000-00000000b000'
+\set MGR '93c00000-0000-0000-0000-0000000000a2'
+\set FD  '93c00000-0000-0000-0000-0000000000a3'
+\set INST '93c00000-0000-0000-0000-0000000000a4'
+
+-- ===========================================================================
+-- 1. Excludes hidden and cancelled; carries the visible classes
+select expect_num('one day in range', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days'), 1);
+select expect_num('two visible classes (hidden + cancelled excluded)', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes'), 2);
+select expect_text('first class is the 07:00 core',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Reformer Flow');
+select expect_text('first class carries the instructor first name',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'coach', 'Ada');
+select expect_text('first class time via fmt_clock (24h default)',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'time', '07:00');
+-- the hidden "Private Hidden" and the cancelled one appear nowhere
+select expect_num('hidden class never appears', (
+  select count(*) from jsonb_array_elements(
+    call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes') c
+  where c ->> 'name' in ('Private Hidden','Reformer Cancelled')), 0);
+-- the studio chrome
+select expect_text('footer line carried', call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') ->> 'footer_line', 'See you on the reformer');
+select expect_text('hashtags carried', call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') ->> 'hashtags', '#poststudio #pilates');
+select expect_num('flex_min carried', (call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') ->> 'flex_min')::bigint, 2);
+
+-- 2. core_only respects the tier — the flex class drops out
+select expect_num('core_only: one class', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',true)') -> 'days' -> 0 -> 'classes'), 1);
+select expect_text('core_only: it is the core one',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',true)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Reformer Flow');
+
+-- 3. An empty range -> no days
+select expect_num('empty range -> zero days', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-16'',''2027-03-16'',false)') -> 'days'), 0);
+
+-- 4. Front desk may make posts
+select expect_num('front desk may read post data', jsonb_array_length(
+  call_jsonb(:'FD', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days'), 1);
+
+-- 5. Guards: instructor refused, cross-studio refused, bad range refused
+select expect_raise('instructor cannot read post data', :'INST'::uuid,
+  'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)', 'PT403');
+select expect_raise('SA manager cannot read SB''s post data', :'MGR'::uuid,
+  'select schedule_post_data('''|| :'SB' ||''',''2027-03-15'',''2027-03-15'',false)', 'PT403');
+select expect_raise('range ending before it starts is refused', :'MGR'::uuid,
+  'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-14'',false)', 'PT400');
+
+-- 6. anon refused, and the surface is EXACTLY THIRTEEN
+do $$
+declare got text;
+begin
+  set local role anon;
+  begin perform schedule_post_data('93c00000-0000-0000-0000-00000000a000','2027-03-15','2027-03-15',false); got := 'NO RAISE';
+  exception when others then got := 'refused'; end;
+  set local role postgres;
+  perform expect_true('anon cannot read post data', got = 'refused');
+end $$;
+do $$
+declare n int;
+begin
+  select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+   where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
+     and p.proname not like 'expect%' and p.proname <> 'call_jsonb';
+  perform expect_num('anon surface is exactly thirteen', n::bigint, 13);
+end $$;
+
+select 'schedule_post_test OK' as result;

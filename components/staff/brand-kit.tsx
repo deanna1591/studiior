@@ -9,22 +9,7 @@ import {
 import {
   uploadBrandReference, removeBrandReference, saveBrandKit, resetBrandKit, type BrandRef,
 } from "@/app/staff/settings/marketing/actions";
-
-// The vendored fonts (public/fonts/invoice + /brand). Family names match the spec.
-const FONT_FACES = `
-@font-face{font-family:'Space Grotesk';src:url('/fonts/invoice/SpaceGrotesk-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
-@font-face{font-family:'Space Grotesk';src:url('/fonts/invoice/SpaceGrotesk-Bold.ttf') format('truetype');font-weight:700;font-display:swap}
-@font-face{font-family:'Space Mono';src:url('/fonts/invoice/SpaceMono-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
-@font-face{font-family:'Space Mono';src:url('/fonts/invoice/SpaceMono-Bold.ttf') format('truetype');font-weight:700;font-display:swap}
-@font-face{font-family:'Bodoni Moda';src:url('/fonts/invoice/BodoniModa-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
-@font-face{font-family:'Instrument Serif';src:url('/fonts/brand/InstrumentSerif-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
-@font-face{font-family:'Playfair Display';src:url('/fonts/brand/PlayfairDisplay.ttf') format('truetype');font-weight:100 900;font-display:swap}
-@font-face{font-family:'Manrope';src:url('/fonts/brand/Manrope.ttf') format('truetype');font-weight:100 900;font-display:swap}
-@font-face{font-family:'Inter';src:url('/fonts/brand/Inter.ttf') format('truetype');font-weight:100 900;font-display:swap}
-@font-face{font-family:'DM Sans';src:url('/fonts/brand/DMSans.ttf') format('truetype');font-weight:100 900;font-display:swap}
-@font-face{font-family:'Fraunces';src:url('/fonts/brand/Fraunces.ttf') format('truetype');font-weight:100 900;font-display:swap}
-@font-face{font-family:'Cormorant';src:url('/fonts/brand/Cormorant.ttf') format('truetype');font-weight:100 900;font-display:swap}
-`;
+import { BRAND_FONT_FACES as FONT_FACES } from "@/components/staff/brand-fonts";
 
 const COLOR_LABELS: Record<keyof BrandSpec["colors"], string> = {
   background: "Background", surface: "Surface", ink: "Text", accent: "Accent", secondary: "Secondary",

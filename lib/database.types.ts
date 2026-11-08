@@ -7192,6 +7192,8 @@ export type Database = {
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
+          post_footer_line: string
+          post_hashtags: string | null
           public_instructor_name: string
           publication_enabled: boolean
           reminder_hours_before: number
@@ -7324,6 +7326,8 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          post_footer_line?: string
+          post_hashtags?: string | null
           public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
@@ -7456,6 +7460,8 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          post_footer_line?: string
+          post_hashtags?: string | null
           public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
@@ -10455,6 +10461,15 @@ export type Database = {
         Returns: Json
       }
       say_count: { Args: { n: number }; Returns: string }
+      schedule_post_data: {
+        Args: {
+          p_core_only?: boolean
+          p_from: string
+          p_studio_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       schedule_range: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: {
