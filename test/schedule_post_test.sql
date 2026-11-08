@@ -78,9 +78,10 @@ insert into rooms (id, studio_id, location_id, name, capacity) values
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
   ('93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-00000000a000','Reformer',50,10),
   ('93c00000-0000-0000-0000-0000000000c2','93c00000-0000-0000-0000-00000000b000','Reformer',50,10);
-insert into instructors (id, studio_id, display_name, staff_id) values
-  ('93c00000-0000-0000-0000-0000000000f1','93c00000-0000-0000-0000-00000000a000','Ada Example','93c00000-0000-0000-0000-00000000a0a4'),
-  ('93c00000-0000-0000-0000-0000000000f2','93c00000-0000-0000-0000-00000000b000','Bo Fictitious',null);
+insert into instructors (id, studio_id, display_name, staff_id, avatar_url) values
+  ('93c00000-0000-0000-0000-0000000000f1','93c00000-0000-0000-0000-00000000a000','Ada Example','93c00000-0000-0000-0000-00000000a0a4','https://example.com/ada.jpg'),
+  ('93c00000-0000-0000-0000-0000000000f3','93c00000-0000-0000-0000-00000000a000','Cleo Sampleton',null,'https://example.com/cleo.jpg'),
+  ('93c00000-0000-0000-0000-0000000000f2','93c00000-0000-0000-0000-00000000b000','Bo Fictitious',null,null);
 
 -- SA occurrences on 2027-03-15 (Prague, +01, before DST): a visible core at 07:00,
 -- a visible flex at 09:00, a HIDDEN at 08:00, a CANCELLED at 10:00. Distinct times
@@ -96,7 +97,10 @@ insert into class_occurrences
   ('93c00000-0000-0000-0000-00000000e004','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Reformer Cancelled',10,
      (date '2027-03-15' + time '10:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '10:50') at time zone 'Europe/Prague','cancelled', false, false, 'core'),
   ('93c00000-0000-0000-0000-00000000e0b1','93c00000-0000-0000-0000-00000000b000','93c00000-0000-0000-0000-0000000000bb','93c00000-0000-0000-0000-0000000000c2','93c00000-0000-0000-0000-0000000000b1','93c00000-0000-0000-0000-0000000000f2','SB Reformer',10,
-     (date '2027-03-15' + time '07:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '07:50') at time zone 'Europe/Prague','scheduled', false, false, 'core');
+     (date '2027-03-15' + time '07:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '07:50') at time zone 'Europe/Prague','scheduled', false, false, 'core'),
+  -- a SECOND SA coach's class (Cleo, 11:00) — distinct time in RA, no overlap
+  ('93c00000-0000-0000-0000-00000000e005','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f3','Reformer Sculpt',10,
+     (date '2027-03-15' + time '11:00') at time zone 'Europe/Prague', (date '2027-03-15' + time '11:50') at time zone 'Europe/Prague','scheduled', false, false, 'core');
 
 \set SA '93c00000-0000-0000-0000-00000000a000'
 \set SB '93c00000-0000-0000-0000-00000000b000'
@@ -108,8 +112,8 @@ insert into class_occurrences
 -- 1. Excludes hidden and cancelled; carries the visible classes
 select expect_num('one day in range', jsonb_array_length(
   call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days'), 1);
-select expect_num('two visible classes (hidden + cancelled excluded)', jsonb_array_length(
-  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes'), 2);
+select expect_num('three visible classes (hidden + cancelled excluded)', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes'), 3);
 select expect_text('first class is the 07:00 core',
   call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Reformer Flow');
 select expect_text('first class carries the instructor first name',
@@ -126,9 +130,9 @@ select expect_text('footer line carried', call_jsonb(:'MGR', 'select schedule_po
 select expect_text('hashtags carried', call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') ->> 'hashtags', '#poststudio #pilates');
 select expect_num('flex_min carried', (call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') ->> 'flex_min')::bigint, 2);
 
--- 2. core_only respects the tier — the flex class drops out
-select expect_num('core_only: one class', jsonb_array_length(
-  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',true)') -> 'days' -> 0 -> 'classes'), 1);
+-- 2. core_only respects the tier — the flex class drops out (2 core remain)
+select expect_num('core_only: two core classes', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',true)') -> 'days' -> 0 -> 'classes'), 2);
 select expect_text('core_only: it is the core one',
   call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',true)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Reformer Flow');
 
@@ -195,6 +199,42 @@ select expect_raise('edit gate: instructor refused', :'INST'::uuid,
   'select post_edit_run_allowed('''|| :'SA' ||''')', 'PT403');
 select expect_raise('edit gate: SA manager cannot run SB''s gate', :'MGR'::uuid,
   'select post_edit_run_allowed('''|| :'SB' ||''')', 'PT403');
+
+-- =============================================================================
+-- Decision 93 amendment — the coach filter (p_instructor_id)
+-- =============================================================================
+\set F1 '93c00000-0000-0000-0000-0000000000f1'
+\set F3 '93c00000-0000-0000-0000-0000000000f3'
+\set SBF2 '93c00000-0000-0000-0000-0000000000f2'
+
+-- 8a. Filtering to Ada returns ONLY her visible classes (07:00 core + 09:00 flex);
+--     Cleo's 11:00 and the hidden/cancelled are excluded.
+select expect_num('coach filter: Ada has two visible classes', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F1' ||''')') -> 'days' -> 0 -> 'classes'), 2);
+select expect_text('coach filter: every class is Ada''s (first)',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F1' ||''')') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Reformer Flow');
+select expect_num('coach filter: Cleo''s class is absent from Ada''s post', (
+  select count(*) from jsonb_array_elements(
+    call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F1' ||''')') -> 'days' -> 0 -> 'classes') c
+  where c ->> 'name' = 'Reformer Sculpt'), 0);
+select expect_text('coach filter: coach_first is the chosen coach',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F1' ||''')') ->> 'coach_first', 'Ada');
+select expect_text('coach filter: coach_photo is the chosen coach''s',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F1' ||''')') ->> 'coach_photo', 'https://example.com/ada.jpg');
+
+-- 8b. Filtering to Cleo returns only her one class; hidden stays excluded.
+select expect_num('coach filter: Cleo has one class', jsonb_array_length(
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F3' ||''')') -> 'days' -> 0 -> 'classes'), 1);
+select expect_text('coach filter: it is Cleo''s Sculpt',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'F3' ||''')') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Reformer Sculpt');
+
+-- 8c. No coach -> coach_first/photo are null (the "All classes" default).
+select expect_true('coach filter: null coach -> no coach_first',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false)') ->> 'coach_first' is null);
+
+-- 8d. A cross-studio instructor is refused (SB's Bo against SA).
+select expect_raise('coach filter: a cross-studio instructor is refused', :'MGR'::uuid,
+  'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'SBF2' ||''')', 'PT403');
 
 -- 6. anon refused, and the surface is EXACTLY THIRTEEN
 do $$

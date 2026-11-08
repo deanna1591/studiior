@@ -7196,6 +7196,7 @@ export type Database = {
           post_edit_runs_reset_on: string | null
           post_footer_line: string
           post_hashtags: string | null
+          post_style: string
           public_instructor_name: string
           publication_enabled: boolean
           reminder_hours_before: number
@@ -7332,6 +7333,7 @@ export type Database = {
           post_edit_runs_reset_on?: string | null
           post_footer_line?: string
           post_hashtags?: string | null
+          post_style?: string
           public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
@@ -7468,6 +7470,7 @@ export type Database = {
           post_edit_runs_reset_on?: string | null
           post_footer_line?: string
           post_hashtags?: string | null
+          post_style?: string
           public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
@@ -8550,6 +8553,7 @@ export type Database = {
         Args: { p_kind: string; p_studio_id: string }
         Returns: Json
       }
+      call_jsonb: { Args: { sql: string; uid: string }; Returns: Json }
       campaign_audience: {
         Args: { p_filter: Json; p_studio_id: string }
         Returns: {
@@ -9047,6 +9051,22 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raise: {
+        Args: { label: string; sql: string; uid: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -10455,6 +10475,7 @@ export type Database = {
         Args: {
           p_core_only?: boolean
           p_from: string
+          p_instructor_id?: string
           p_studio_id: string
           p_to: string
         }

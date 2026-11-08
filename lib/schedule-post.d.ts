@@ -8,8 +8,12 @@ export type PostData = {
   footer_line: string;
   hashtags: string | null;
   flex_min: number;
+  coach_id: string | null;
+  coach_first: string | null;
+  coach_photo: string | null;
   days: PostDay[];
 };
+export type PostStyle = "guest_check" | "times" | "invitation" | "lock_screen";
 export type PostMode = "day" | "week" | "month";
 export type PostFormat = "square" | "story";
 export type MonthCell = { date: string; label: string; count: number; first: string[]; more: number };
@@ -21,7 +25,7 @@ export declare function rangeFor(mode: PostMode, isoDate: string): { from: strin
 export declare function coreOnlyDefault(flexMin: number): boolean;
 export declare function filterDays(days: PostDay[], coreOnly: boolean): PostDay[];
 export declare function classLine(c: PostClass): string;
-export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null }): string;
+export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null; coachFirst?: string | null }): string;
 export declare function monthCells(days: PostDay[], limit?: number): MonthCell[];
 export declare function totalClasses(days: PostDay[]): number;
 
@@ -38,3 +42,16 @@ export declare function fitPlan(args: { days: PostDay[]; mode: PostMode; format:
 export declare function pushSpec<T>(stack: T[], spec: T): T[];
 export declare function undoStack<T>(stack: T[]): { stack: T[]; current: T | null };
 export declare function canUndo<T>(stack: T[]): boolean;
+
+// --- Editorial styles (amendment) -------------------------------------------
+export declare const POST_STYLES: PostStyle[];
+export declare const STYLE_LABELS: Record<PostStyle, string>;
+export declare function headlineParts(args: { mode: PostMode; weekday?: string; monthName?: string; coachFirst?: string | null }): { lead: string; accent: string };
+export declare function shortName(name: string): string;
+export declare function receiptNo(isoDate: string): string;
+export declare const STYLE_FIT: Record<PostStyle, {
+  dayBudget: number; dayRow: number; floor: number; steps: number[];
+  weekKind: "summary" | "grid" | "none"; weekRow?: number; weekBudget?: number; gridRow?: number;
+}>;
+export declare function stepFit(h: number, budget: number, steps: number[], floor: number): { scale: number; fits: boolean };
+export declare function editorialPlan(args: { days: PostDay[]; mode: PostMode; format: PostFormat; style: PostStyle }): FitPlan;

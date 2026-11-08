@@ -158,6 +158,75 @@ test("slice 3: fitScale picks the first step that fits, else the floor", () => {
   assert.equal(fitScale(FIT.budget * 10).scale, FIT.floor);
 });
 
+// --- Editorial styles (amendment) -------------------------------------------
+import {
+  POST_STYLES, STYLE_LABELS, headlineParts, shortName, receiptNo, editorialPlan, STYLE_FIT,
+} from "../lib/schedule-post.mjs";
+
+test("editorial: four styles with labels", () => {
+  assert.deepEqual(POST_STYLES, ["guest_check", "times", "invitation", "lock_screen"]);
+  assert.equal(STYLE_LABELS.guest_check, "Guest Check");
+  assert.equal(STYLE_LABELS.lock_screen, "Lock screen");
+});
+
+test("editorial: headline — all classes puts 'schedule' in the accent", () => {
+  assert.deepEqual(headlineParts({ mode: "week" }), { lead: "this week's ", accent: "schedule" });
+  assert.deepEqual(headlineParts({ mode: "day", weekday: "Monday" }), { lead: "Monday's ", accent: "schedule" });
+  assert.deepEqual(headlineParts({ mode: "month", monthName: "November" }), { lead: "November's ", accent: "schedule" });
+});
+
+test("editorial: headline — coach mode names the coach", () => {
+  assert.deepEqual(headlineParts({ mode: "week", coachFirst: "Ada" }), { lead: "Ada's ", accent: "week" });
+  assert.deepEqual(headlineParts({ mode: "day", weekday: "Monday", coachFirst: "Ada" }), { lead: "Ada on ", accent: "Monday" });
+  assert.deepEqual(headlineParts({ mode: "month", monthName: "November", coachFirst: "Ada" }), { lead: "Ada's ", accent: "November" });
+});
+
+test("editorial: shortName is the first word; receiptNo is month+day", () => {
+  assert.equal(shortName("Reform Collective"), "Reform");
+  assert.equal(shortName("  RPC  "), "RPC");
+  assert.equal(receiptNo("2026-11-09"), "N° 1109");
+});
+
+test("editorial: caption starts with the coach's name in coach mode", () => {
+  const cap = captionText({ days: DATA.days, hashtags: "#x", coachFirst: "Ada" });
+  assert.ok(cap.startsWith("Ada's classes\n\n"));
+  assert.ok(cap.includes("7:00 AM Reformer Flow with Ada"));
+  // no coach -> no prefix (unchanged)
+  assert.ok(!captionText({ days: DATA.days, hashtags: "#x" }).startsWith("Ada"));
+});
+
+test("editorial: a week is one page (summary/grid never splits), every style", () => {
+  for (const style of ["guest_check", "times", "invitation"]) {
+    const plan = editorialPlan({ days: denseWeek(7, 9), mode: "week", format: "square", style });
+    assert.equal(plan.pages.length, 1, style);
+    assert.equal(plan.pages[0].scale <= 1, true, style);
+    assert.equal(plan.pages[0].scale >= STYLE_FIT[style].floor, true, style);
+  }
+});
+
+test("editorial: a short day fits one page; a dense day splits, classes whole", () => {
+  const short = editorialPlan({ days: denseWeek(1, 4), mode: "day", format: "square", style: "invitation" });
+  assert.equal(short.pages.length, 1);
+  assert.equal(short.pages[0].scale, 1);
+  const dense = editorialPlan({ days: denseWeek(1, 30), mode: "day", format: "square", style: "invitation" });
+  assert.ok(dense.pages.length >= 2);
+  const total = dense.pages.reduce((n, p) => n + (p.days[0]?.classes.length ?? 0), 0);
+  assert.equal(total, 30);                                 // none lost
+  dense.pages.forEach((p, i) => { assert.equal(p.part, i + 1); assert.equal(p.parts, dense.pages.length); });
+});
+
+test("editorial: a story post never splits; the month grid never splits", () => {
+  assert.equal(editorialPlan({ days: denseWeek(1, 30), mode: "day", format: "story", style: "invitation" }).pages.length, 1);
+  assert.equal(editorialPlan({ days: denseWeek(20, 4), mode: "month", format: "square", style: "times" }).pages.length, 1);
+});
+
+test("editorial: lock screen is day only and splits a dense day", () => {
+  const plan = editorialPlan({ days: denseWeek(1, 14), mode: "day", format: "square", style: "lock_screen" });
+  assert.ok(plan.pages.length >= 2);
+  const total = plan.pages.reduce((n, p) => n + (p.days[0]?.classes.length ?? 0), 0);
+  assert.equal(total, 14);
+});
+
 test("slice 3: the undo stack pushes and steps back, base kept", () => {
   const base = { v: 0 };
   let s = [base];

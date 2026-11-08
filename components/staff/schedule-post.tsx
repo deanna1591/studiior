@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthCells, totalClasses,
-  fitPlan, pushSpec, undoStack, canUndo,
-  type PostData, type PostDay, type PostMode, type PostFormat, type FitPage,
+  editorialPlan, headlineParts, shortName, receiptNo,
+  pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
+  type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
-import { schedulePostData, uploadPostImage, saveBrandKit, signPostImage } from "@/app/staff/settings/marketing/actions";
+import {
+  schedulePostData, uploadPostImage, saveBrandKit, signPostImage, savePostStyle,
+} from "@/app/staff/settings/marketing/actions";
 
-const TITLE: Record<PostMode, string> = { day: "Today", week: "This week", month: "This month" };
+type Coach = { id: string; first: string };
 
 /** Fetch an image URL and return a data: URL (so both preview and the PNG export
  *  carry it inline — no cross-origin canvas taint). Best effort. */
@@ -36,7 +39,7 @@ function useInlineImage(url: string | null): string | null {
 }
 
 export default function SchedulePosts({
-  spec, studioName, todayIso, flexMin, canEdit, editUsed, editCap,
+  spec, studioName, todayIso, flexMin, canEdit, editUsed, editCap, initialStyle, coaches,
 }: {
   spec: BrandSpec;
   studioName: string;
@@ -45,11 +48,15 @@ export default function SchedulePosts({
   canEdit: boolean;            // manager-up: may "Save as my style"
   editUsed: number;
   editCap: number;
+  initialStyle: PostStyle;
+  coaches: Coach[];
 }) {
+  const [style, setStyle] = useState<PostStyle>(initialStyle);
   const [mode, setMode] = useState<PostMode>("week");
   const [dateStr, setDateStr] = useState<string>(() => defaultDate("week", todayIso));
   const [coreOnly, setCoreOnly] = useState<boolean>(() => coreOnlyDefault(flexMin));
   const [format, setFormat] = useState<PostFormat>("square");
+  const [coachId, setCoachId] = useState<string>("");          // "" = all classes
   const [raw, setRaw] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -69,24 +76,33 @@ export default function SchedulePosts({
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async (m: PostMode, d: string) => {
+  // Lock screen is day only.
+  const lockDayOnly = style === "lock_screen";
+  useEffect(() => {
+    if (lockDayOnly && mode !== "day") { setMode("day"); setDateStr(defaultDate("day", todayIso)); }
+  }, [lockDayOnly, mode, todayIso]);
+
+  const load = useCallback(async (m: PostMode, d: string, coach: string) => {
     setLoading(true); setErr(null);
     const { from, to } = rangeFor(m, d);
-    const r = await schedulePostData(from, to);
+    const r = await schedulePostData(from, to, coach || null);
     if (r.error) { setErr(r.error); setRaw(null); }
     else setRaw(r.data ?? null);
     setLoading(false);
   }, []);
 
-  useEffect(() => { void load(mode, dateStr); }, [mode, dateStr, load]);
-  useEffect(() => { setPartIdx(0); }, [mode, dateStr, format, coreOnly, stack]);
+  useEffect(() => { void load(mode, dateStr, coachId); }, [mode, dateStr, coachId, load]);
+  useEffect(() => { setPartIdx(0); }, [mode, dateStr, format, coreOnly, coachId, style, stack]);
 
-  function pickMode(m: PostMode) {
-    setMode(m);
-    setDateStr(defaultDate(m, todayIso));
+  function pickMode(m: PostMode) { setMode(m); setDateStr(defaultDate(m, todayIso)); }
+  function pickStyle(s: PostStyle) {
+    setStyle(s);
+    void savePostStyle(s);                         // best-effort persist (manager-up)
+    if (s === "lock_screen" && mode !== "day") { setMode("day"); setDateStr(defaultDate("day", todayIso)); }
   }
 
   const logoData = useInlineImage(raw?.logo_url ?? null);
+  const coachData = useInlineImage(raw?.coach_photo ?? null);
 
   // The Claude-edit background photo (post-images path -> signed URL -> inline).
   const [bgUrl, setBgUrl] = useState<string | null>(null);
@@ -95,19 +111,21 @@ export default function SchedulePosts({
     const path = activeSpec.background_image ?? null;
     setBgUrl(null);
     if (!path) return;
-    (async () => {
-      const r = await signPostImage(path);
-      if (live && r.url) setBgUrl(r.url);
-    })();
+    (async () => { const r = await signPostImage(path); if (live && r.url) setBgUrl(r.url); })();
     return () => { live = false; };
   }, [activeSpec.background_image]);
   const bgData = useInlineImage(bgUrl);
 
   const days: PostDay[] = filterDays(raw?.days ?? [], coreOnly);
   const empty = !loading && totalClasses(days) === 0;
-  const plan = useMemo(() => fitPlan({ days, mode, format }), [days, mode, format]);
+  const plan = useMemo(() => editorialPlan({ days, mode, format, style }), [days, mode, format, style]);
   const page: FitPage = plan.pages[Math.min(partIdx, plan.pages.length - 1)] ?? { days, part: 1, parts: 1, scale: 1 };
-  const rangeLabel = labelForRange(mode, dateStr, days, page);
+
+  const coachFirst = raw?.coach_first ?? null;
+  const { from, to } = rangeFor(mode, dateStr);
+  const weekday = labelWeekday(from);
+  const monthName = labelMonth(from);
+  const rangeLabel = labelForRange(mode, from, to, days);
 
   async function download() {
     const node = postRef.current;
@@ -116,16 +134,18 @@ export default function SchedulePosts({
     try {
       const { toPng } = await import("html-to-image");
       const W = 1080, H = format === "story" ? 1920 : 1080;
+      const t = tokens(activeSpec);
       const dataUrl = await toPng(node, {
         width: W, height: H, canvasWidth: W, canvasHeight: H, pixelRatio: 1,
-        backgroundColor: activeSpec.background_treatment === "full" ? activeSpec.colors.accent : activeSpec.colors.background,
+        backgroundColor: style === "lock_screen" ? t.ink : t.background,
         style: { transform: "none", transformOrigin: "top left", margin: "0" },
         cacheBust: true,
       });
       const partTag = page.parts > 1 ? `-part${page.part}` : "";
+      const coachTag = coachFirst ? `-${coachFirst.toLowerCase()}` : "";
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `${studioName.replace(/\s+/g, "-").toLowerCase()}-${mode}-${format}${partTag}.png`;
+      a.download = `${studioName.replace(/\s+/g, "-").toLowerCase()}-${style}-${mode}-${format}${coachTag}${partTag}.png`;
       a.click();
       const blob = await (await fetch(dataUrl)).blob();
       const fd = new FormData();
@@ -138,7 +158,7 @@ export default function SchedulePosts({
   }
 
   async function copyCaption() {
-    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null });
+    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst });
     try { await navigator.clipboard.writeText(text); setNote("Caption copied."); }
     catch { setNote("Could not copy. Select the caption below instead."); }
   }
@@ -168,11 +188,7 @@ export default function SchedulePosts({
     }
   }
 
-  function undo() {
-    setStack((s) => undoStack(s).stack);
-    setSavedNote(null);
-  }
-
+  function undo() { setStack((s) => undoStack(s).stack); setSavedNote(null); }
   async function saveStyle() {
     setSavedNote(null); setEditErr(null);
     const r = await saveBrandKit(activeSpec);
@@ -188,10 +204,31 @@ export default function SchedulePosts({
     <div className="space-y-5">
       <style dangerouslySetInnerHTML={{ __html: BRAND_FONT_FACES }} />
 
+      {/* Style control */}
+      <div>
+        <p className="mb-2 text-[11px] text-ink-3">Style</p>
+        <div className="flex flex-wrap gap-2">
+          {POST_STYLES.map((s) => (
+            <button key={s} onClick={() => pickStyle(s)}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] ${s === style ? "border-ink" : "border-line-2"}`}>
+              <StyleThumb style={s} spec={activeSpec} />
+              <span className={s === style ? "text-ink" : "text-ink-2"}>{STYLE_LABELS[s]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Controls */}
       <div className="flex flex-wrap items-end gap-4">
         <Tabs value={mode} onChange={(v) => pickMode(v as PostMode)}
-          options={[["day", "Day"], ["week", "Week"], ["month", "Month"]]} />
+          options={lockDayOnly ? [["day", "Day"]] : [["day", "Day"], ["week", "Week"], ["month", "Month"]]} />
+        <label className="block text-[11px] text-ink-3">Coach
+          <select value={coachId} onChange={(e) => setCoachId(e.target.value)}
+            className="mt-1 block rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink">
+            <option value="">All classes</option>
+            {coaches.map((c) => <option key={c.id} value={c.id}>{c.first}</option>)}
+          </select>
+        </label>
         <label className="block text-[11px] text-ink-3">Date
           <input type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)}
             className="mt-1 block rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink" />
@@ -225,10 +262,11 @@ export default function SchedulePosts({
         <div style={{ width: PREVIEW_W, height: H * k, overflow: "hidden", borderRadius: 8 }}
           className="border border-line">
           <div ref={postRef} style={{ width: 1080, height: H, transform: `scale(${k})`, transformOrigin: "top left" }}>
-            <PostInner spec={activeSpec} page={page} mode={mode} format={format}
-              rangeLabel={rangeLabel} studioName={studioName}
-              logoData={logoData} bgData={bgData} footer={raw?.footer_line ?? "Book on the app"}
-              empty={empty} loading={loading} />
+            <EditorialPost
+              style={style} spec={activeSpec} page={page} mode={mode} format={format}
+              studioName={studioName} logoData={logoData} coachFirst={coachFirst} coachData={coachData}
+              bgData={bgData} rangeLabel={rangeLabel} weekday={weekday} monthName={monthName}
+              footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading} />
           </div>
         </div>
 
@@ -289,7 +327,7 @@ export default function SchedulePosts({
           <div>
             <p className="text-[11px] text-ink-3">Caption</p>
             <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-paper p-3 text-[12px] text-ink-2">
-{empty ? "No classes to post for these dates." : captionText({ days: page.days, hashtags: raw?.hashtags ?? null })}
+{empty ? "No classes to post for these dates." : captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst })}
             </pre>
           </div>
         </div>
@@ -313,188 +351,340 @@ function Tabs({ value, onChange, options }: {
   );
 }
 
-/** A month name for a range, with the part suffix when split. */
-function labelForRange(mode: PostMode, dateStr: string, days: PostDay[], page: FitPage): string {
-  const { from, to } = rangeFor(mode, dateStr);
-  const d = (s: string) => new Date(`${s}T12:00:00Z`);
-  let base: string;
+// ---------------------------------------------------------------------------
+// Date labels
+// ---------------------------------------------------------------------------
+function utc(s: string): Date { return new Date(`${s}T12:00:00Z`); }
+function labelWeekday(iso: string): string {
+  return utc(iso).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+}
+function labelMonth(iso: string): string {
+  return utc(iso).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+}
+function labelForRange(mode: PostMode, from: string, to: string, days: PostDay[]): string {
   if (mode === "day") {
-    base = days[0]?.label ?? d(from).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
-  } else if (mode === "month") {
-    base = d(from).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-  } else {
-    const a = d(from), b = d(to);
-    const mn = (x: Date) => x.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
-    base = a.getUTCMonth() === b.getUTCMonth()
-      ? `${a.getUTCDate()}–${b.getUTCDate()} ${mn(b)}`
-      : `${a.getUTCDate()} ${mn(a)} – ${b.getUTCDate()} ${mn(b)}`;
+    return days[0]?.label ?? utc(from).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
   }
-  return page.parts > 1 ? `${base} · part ${page.part} of ${page.parts}` : base;
+  if (mode === "month") return utc(from).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+  const a = utc(from), b = utc(to);
+  const mn = (x: Date) => x.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+  return a.getUTCMonth() === b.getUTCMonth()
+    ? `${a.getUTCDate()} to ${b.getUTCDate()} ${mn(b)}`
+    : `${a.getUTCDate()} ${mn(a)} to ${b.getUTCDate()} ${mn(b)}`;
 }
 
-/** The post itself, drawn at the full 1080 base. `page.scale` is the auto-fit
- *  density (font + gaps); the optional layout fields (background photo, text
- *  alignment, per-element size scale, element order) are applied here. */
-function PostInner({
-  spec, page, mode, format, rangeLabel, studioName, logoData, bgData, footer, empty, loading,
+// ---------------------------------------------------------------------------
+// Brand tokens + colour helpers
+// ---------------------------------------------------------------------------
+type Tokens = {
+  background: string; surface: string; ink: string; accent: string; secondary: string;
+  df: string; bf: string; mono: string; hand: string; onAccent: string;
+};
+function tokens(spec: BrandSpec): Tokens {
+  const c = spec.colors;
+  return {
+    background: c.background, surface: c.surface, ink: c.ink, accent: c.accent, secondary: c.secondary,
+    df: `'${spec.display_font}', serif`, bf: `'${spec.body_font}', sans-serif`,
+    mono: "'Space Mono', monospace", hand: "'Nothing You Could Do', cursive",
+    onAccent: textOn(c.accent, c.ink),
+  };
+}
+function hex(h: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(h || "").trim());
+  if (!m) return [128, 128, 128];
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function toHex([r, g, b]: [number, number, number]): string {
+  return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+}
+function mixHex(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = hex(a), [br, bg, bb] = hex(b);
+  return toHex([ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t]);
+}
+/** Readable text on an accent fill: dark ink when the accent is light, else white. */
+function textOn(accent: string, ink: string): string {
+  const [r, g, b] = hex(accent);
+  const y = (r * 299 + g * 587 + b * 114) / 1000;
+  return y >= 150 ? ink : "#FFFFFF";
+}
+function soft(hexColor: string, alpha: number): string {
+  const [r, g, b] = hex(hexColor);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ---------------------------------------------------------------------------
+// Small presentational helpers
+// ---------------------------------------------------------------------------
+function Logo({ data, name, df, color, size }: { data: string | null; name: string; df: string; color: string; size: number }) {
+  return data
+    ? <img src={data} alt="" style={{ height: size, width: "auto", objectFit: "contain", maxWidth: size * 4 }} />
+    : <span style={{ fontFamily: df, fontStyle: "italic", fontSize: size, color }}>{name}</span>;
+}
+function shortDay(label: string): string { return (label.split(/\s+/)[0] || label).slice(0, 3); }
+function dayNum(date: string): string { return String(Number(date.split("-")[2] ?? "")); }
+function coachNames(day: PostDay): string[] {
+  return [...new Set((day.classes || []).map((c) => c.coach).filter(Boolean) as string[])].sort();
+}
+
+// ---------------------------------------------------------------------------
+// The editorial post — dispatches to one of four styles
+// ---------------------------------------------------------------------------
+type StyleProps = {
+  t: Tokens; page: FitPage; mode: PostMode; format: PostFormat;
+  headline: { lead: string; accent: string }; rangeLabel: string;
+  studioShort: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
+  footer: string; scale: number; story: boolean;
+};
+
+function EditorialPost({
+  style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
+  rangeLabel, weekday, monthName, footer, empty, loading,
 }: {
-  spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
-  rangeLabel: string; studioName: string; logoData: string | null; bgData: string | null;
+  style: PostStyle; spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
+  studioName: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
+  bgData: string | null; rangeLabel: string; weekday: string; monthName: string;
   footer: string; empty: boolean; loading: boolean;
 }) {
+  const t = tokens(spec);
   const story = format === "story";
-  const W = 1080, H = story ? 1920 : 1080;
-  const c = spec.colors;
-  const hasPhoto = !!(spec.background_image && bgData);
-  const placement = spec.image_placement ?? "full";
-  const overlay = typeof spec.overlay_strength === "number" ? spec.overlay_strength : 0.45;
-  const fullPhoto = hasPhoto && placement === "full";
-  const full = spec.background_treatment === "full";
-  const lightText = full || fullPhoto;
-  const bg = full ? c.accent : c.background;
-  const fg = lightText ? c.surface : c.ink;
-  const muted = lightText ? c.surface : c.secondary;
-  const cardBg = lightText ? "rgba(255,255,255,0.12)" : c.surface;
-  const radius = spec.radius === "large" ? 40 : 14;
-  const pad = 72;
-  const df = `'${spec.display_font}'`, bf = `'${spec.body_font}'`;
-  const align = spec.text_align ?? "left";
-  const ss = spec.size_scale ?? {};
-  const s = page.scale;
-  const sz = (base: number, key?: "time" | "name" | "header") =>
-    Math.round(base * s * (key && typeof ss[key] === "number" ? (ss[key] as number) : 1));
+  const H = story ? 1920 : 1080;
+  const studioShort = shortName(studioName);
+  const headline = headlineParts({ mode, weekday, monthName, coachFirst });
+  const scale = page.scale;
 
-  const logoNode = logoData
-    ? <img key="logo" src={logoData} alt="" style={{ height: 72, width: "auto", objectFit: "contain" }} />
-    : <div key="logo" style={{ fontFamily: df, fontWeight: 700, fontSize: 44, color: fg }}>{studioName}</div>;
-  const logoRow = (
-    <div key="logo-row" style={{ display: "flex", marginBottom: 28, justifyContent: align === "center" || spec.logo_placement === "top-centre" ? "center" : "flex-start" }}>{logoNode}</div>
-  );
-  const titleNode = (
-    <div key="title">
-      <div style={{ fontFamily: df, fontWeight: 700, fontSize: sz(story ? 84 : 72, "header"), lineHeight: 1.05 }}>{TITLE[mode]}</div>
-      <div style={{ fontFamily: bf, fontSize: sz(34), color: muted, marginTop: 8, marginBottom: 36 }}>{rangeLabel}</div>
-    </div>
-  );
-  const classesNode = (
-    <div key="classes" style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-      {loading ? null : empty ? (
-        <div style={{ fontFamily: bf, fontSize: 34, color: muted }}>No classes to post for these dates.</div>
-      ) : mode === "day" ? (
-        <DayBody days={page.days} df={df} bf={bf} c={c} fg={fg} muted={muted} cardBg={cardBg} radius={radius} story={story} sz={sz} s={s} />
-      ) : mode === "week" ? (
-        <WeekBody days={page.days} df={df} bf={bf} c={c} fg={fg} muted={muted} sz={sz} s={s} />
-      ) : (
-        <MonthBody days={page.days} df={df} bf={bf} c={c} fg={fg} muted={muted} cardBg={cardBg} radius={radius} />
-      )}
-    </div>
-  );
-  const footerNode = spec.logo_placement === "bottom"
-    ? <div key="footer" style={{ marginTop: 24 }}>{logoNode}</div>
-    : <div key="footer" style={{ fontFamily: bf, fontSize: 30, color: muted, marginTop: 24 }}>{footer}</div>;
+  if (loading) {
+    return <div style={{ width: 1080, height: H, background: t.background }} />;
+  }
+  if (empty) {
+    return (
+      <div style={{ width: 1080, height: H, background: t.background, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: t.df, fontSize: 48, color: t.ink, textAlign: "center", maxWidth: 700 }}>No classes to post for these dates.</div>
+      </div>
+    );
+  }
 
-  // element_order controls the vertical order; default = logo(top) · title · classes · footer.
-  const blocks: Record<string, ReactNode> = {
-    logo: spec.logo_placement !== "bottom" ? logoRow : null,
-    title: titleNode,
-    classes: classesNode,
-    footer: footerNode,
-  };
-  const order = spec.element_order && spec.element_order.length
-    ? spec.element_order
-    : (["logo", "title", "classes", "footer"] as const);
-  const ordered = order.map((t) => blocks[t]).filter(Boolean);
+  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story };
+  const styled = style === "guest_check" ? <GuestCheck {...p} />
+    : style === "times" ? <Times {...p} />
+    : style === "lock_screen" ? <LockScreen {...p} />
+    : <Invitation {...p} />;
 
-  // Background photo layers (placement). The content column sits above them.
-  const photoLayer = hasPhoto ? (
-    placement === "full" ? (
-      <>
-        <img src={bgData!} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+  // An uploaded background photo (Claude edit) sits behind, dimmed.
+  if (bgData && spec.background_image) {
+    const overlay = typeof spec.overlay_strength === "number" ? spec.overlay_strength : 0.35;
+    return (
+      <div style={{ width: 1080, height: H, position: "relative", overflow: "hidden" }}>
+        <img src={bgData} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${overlay})` }} />
-      </>
-    ) : placement === "top" ? (
-      <img src={bgData!} alt="" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: Math.round(H * 0.42), objectFit: "cover" }} />
-    ) : (
-      <img src={bgData!} alt="" style={{ position: "absolute", top: 0, [placement]: 0, width: Math.round(W * 0.42), height: "100%", objectFit: "cover" } as CSSProperties} />
-    )
-  ) : null;
+        <div style={{ position: "absolute", inset: 0 }}>{styled}</div>
+      </div>
+    );
+  }
+  return styled;
+}
 
-  // content padding shifts away from a side/top photo so text does not sit on it
-  const contentPad: CSSProperties = {
-    paddingTop: hasPhoto && placement === "top" ? Math.round(H * 0.42) + pad : pad,
-    paddingBottom: pad,
-    paddingLeft: hasPhoto && placement === "left" ? Math.round(W * 0.42) + pad : pad,
-    paddingRight: hasPhoto && placement === "right" ? Math.round(W * 0.42) + pad : pad,
-  };
-
+function Field({ bg, children, light }: { bg: string; children: React.ReactNode; light?: boolean }) {
+  const spark = light ? "rgba(255,255,255,.85)" : undefined;
   return (
-    <div style={{ width: W, height: H, background: bg, color: fg, position: "relative", overflow: "hidden" }}>
-      {spec.background_treatment === "soft" && !hasPhoto && (
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg, ${c.accent}22, transparent 70%)`, pointerEvents: "none" }} />
-      )}
-      {photoLayer}
-      <div style={{ position: "relative", zIndex: 1, width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", textAlign: align, ...contentPad }}>
-        {ordered}
+    <div style={{ width: 1080, height: 1080, background: bg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, lineHeight: 1, color: spark ?? "var(--spark)" }}>✦</div>
+      <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, lineHeight: 1, color: spark ?? "var(--spark)" }}>✦</div>
+      {children}
+    </div>
+  );
+}
+
+// --- Guest Check ------------------------------------------------------------
+function GuestCheck(p: StyleProps) {
+  const { t, page, mode, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story } = p;
+  const day0 = page.days[0];
+  const total = page.days.reduce((n, d) => n + d.classes.length, 0);
+  const cardW = story ? 840 : 700;
+  const line = soft(t.secondary, 0.35);
+  const metaCols = (coachFirst ? 3 : 2);
+  const meta = (label: string, value: string, last?: boolean) => (
+    <div style={{ fontFamily: t.mono, fontSize: 11, letterSpacing: ".15em", padding: "8px 6px", borderRight: last ? "0" : `1px solid ${t.ink}` }}>
+      {label}<b style={{ display: "block", fontSize: 14, letterSpacing: 0, marginTop: 2, color: t.ink }}>{value}</b>
+    </div>
+  );
+  return (
+    <div style={{ ["--spark" as string]: t.accent, width: 1080, height: story ? 1920 : 1080, background: t.background, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" } as CSSProperties}>
+      <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
+      <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
+      <div style={{ width: cardW, background: t.surface, padding: "44px 44px 36px", boxShadow: "0 30px 60px rgba(0,0,0,.18)", transform: story ? "rotate(-1deg)" : "rotate(-2deg)", color: t.ink }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `2px solid ${t.ink}`, paddingBottom: 10 }}>
+          <h1 style={{ fontFamily: t.df, fontWeight: 400, fontSize: 60, margin: 0, lineHeight: 1, color: t.ink }}>Guest Check</h1>
+          <span style={{ fontFamily: t.mono, color: t.accent, fontWeight: 700, fontSize: 18 }}>{receiptNo(day0?.date ?? "")}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${metaCols},1fr)`, borderBottom: `2px solid ${t.ink}` }}>
+          {meta(mode === "day" ? "DATE" : "WEEK", mode === "day" ? (day0?.label ?? rangeLabel) : rangeLabel)}
+          {meta("CLASSES", String(total))}
+          {coachFirst ? meta("COACH", coachFirst, true) : null}
+        </div>
+        {mode === "day"
+          ? (day0?.classes ?? []).map((c, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 ${Math.round(4 * scale)}px` }}>
+              <span style={{ fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
+              <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}{c.coach ? `, ${c.coach}` : ""}</span>
+            </div>))
+          : page.days.map((d) => (
+            <div key={d.date} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(15 * scale)}px 0 4px` }}>
+              <span style={{ fontFamily: t.hand, fontSize: Math.round(30 * scale), color: t.ink }}>{shortDay(d.label)}</span>
+              <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.secondary, textAlign: "right" }}>{d.count} {d.count === 1 ? "class" : "classes"}{coachNames(d).length ? ` · ${coachNames(d).join(", ")}` : ""}</span>
+            </div>))}
+        <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `2px solid ${line}`, padding: "16px 0 6px", fontSize: 32, color: t.accent }}>
+          <span style={{ fontFamily: t.hand }}>total:</span>
+          <span style={{ fontFamily: t.hand }}>{total} {total === 1 ? "class" : "classes"}{mode === "week" ? " this week" : ""}</span>
+        </div>
+        <div style={{ fontFamily: t.hand, fontSize: 26, color: t.secondary, padding: "14px 0 0" }}>thank you, come again ♡</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 24, borderTop: `2px solid ${t.ink}`, paddingTop: 14 }}>
+          <Logo data={logoData} name={studioShort} df={t.df} color={t.ink} size={40} />
+          <span style={{ fontFamily: t.mono, fontSize: 12, letterSpacing: ".12em", color: t.ink }}>{footer.toUpperCase()}</span>
+        </div>
       </div>
     </div>
   );
 }
 
-type C = BrandSpec["colors"];
-type SZ = (base: number, key?: "time" | "name" | "header") => number;
-
-function DayBody({ days, df, bf, c, fg, muted, cardBg, radius, story, sz, s }: {
-  days: PostDay[]; df: string; bf: string; c: C; fg: string; muted: string; cardBg: string; radius: number; story: boolean; sz: SZ; s: number;
-}) {
-  const classes = days[0]?.classes ?? [];
+// --- The Times --------------------------------------------------------------
+function Times(p: StyleProps) {
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, footer, scale, story } = p;
+  const cardW = story ? 980 : 900;
+  const line = soft(t.secondary, 0.3);
+  const rule = soft(t.secondary, 0.28);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: Math.round((story ? 20 : 14) * s) }}>
-      {classes.map((cl, i) => (
-        <div key={i} style={{ background: cardBg, borderRadius: Math.max(8, radius - 10), padding: `${Math.round(20 * s)}px ${Math.round(26 * s)}px` }}>
-          <div style={{ fontFamily: bf, fontSize: sz(34, "time"), fontWeight: 700, color: c.accent }}>{cl.time}</div>
-          <div style={{ fontFamily: df, fontSize: sz(44, "name"), color: fg, lineHeight: 1.1 }}>{cl.name}</div>
-          {cl.coach && <div style={{ fontFamily: bf, fontSize: sz(28), color: muted }}>{cl.coach}</div>}
+    <div style={{ width: 1080, height: story ? 1920 : 1080, background: t.background, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
+      <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
+      <div style={{ width: cardW, background: t.surface, padding: "34px 44px", transform: story ? "rotate(0.5deg)" : "rotate(-1.2deg)", boxShadow: "0 30px 60px rgba(0,0,0,.18)", color: t.ink }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: t.mono, fontSize: 13, letterSpacing: ".1em", borderBottom: `1.5px solid ${t.ink}`, paddingBottom: 8 }}>
+          <span>EST. {new Date().getFullYear()}</span><span>{footer.toUpperCase()}</span><span>FREE</span>
         </div>
-      ))}
+        <div style={{ fontFamily: t.df, fontSize: mode === "week" ? 92 : 108, textAlign: "center", lineHeight: 1, margin: "14px 0 8px" }}>The {studioShort} Times</div>
+        <div style={{ textAlign: "center", fontFamily: t.mono, fontSize: 12, letterSpacing: ".3em", borderTop: `3px double ${t.ink}`, borderBottom: `1.5px solid ${t.ink}`, padding: "8px 0" }}>ALL THE CLASSES THAT ARE FIT TO PRINT</div>
+        <h2 style={{ fontFamily: t.df, fontWeight: 400, fontSize: mode === "week" ? 42 : 54, lineHeight: 1.05, margin: "20px 0 14px" }}>
+          {headline.lead}<em style={{ fontStyle: "italic", color: t.accent }}>{headline.accent}</em> at {studioShort}, {rangeLabel}
+        </h2>
+        {mode === "week" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
+            {page.days.map((d, idx) => (
+              <div key={d.date} style={{ borderLeft: idx === 0 ? "0" : `1px solid ${t.ink}`, padding: idx === 0 ? "0 8px 0 0" : "0 8px" }}>
+                <div style={{ fontFamily: t.df, fontSize: Math.round(24 * scale), borderBottom: `1px solid ${t.ink}`, paddingBottom: 4, marginBottom: 6 }}>{shortDay(d.label)} {dayNum(d.date)}</div>
+                {d.classes.map((c, i) => (
+                  <div key={i} style={{ fontSize: Math.round(12 * scale), lineHeight: 1.2, padding: "4px 0", borderBottom: `1px dotted ${line}`, color: c.tier === "core" ? t.accent : t.ink }}>
+                    <b style={{ fontFamily: t.mono, fontSize: Math.round(11 * scale), display: "block", color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}</b>
+                    {c.name}
+                    <i style={{ display: "block", fontStyle: "normal", color: t.secondary, fontSize: Math.round(11 * scale) }}>{c.coach ?? ""}</i>
+                  </div>))}
+              </div>))}
+          </div>
+        ) : mode === "month" ? (
+          page.days.map((d) => (
+            <div key={d.date} style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 14, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${rule}` }}>
+              <span style={{ fontFamily: t.df, fontSize: 28 }}>{shortDay(d.label)} {dayNum(d.date)}</span>
+              <span style={{ fontSize: 18, color: t.secondary }}>{d.count} {d.count === 1 ? "class" : "classes"}{coachNames(d).length ? ` · ${coachNames(d).join(", ")}` : ""}</span>
+            </div>))
+        ) : (
+          (page.days[0]?.classes ?? []).map((c, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 14, alignItems: "baseline", padding: `${Math.round(9 * scale)}px 0`, borderBottom: `1px solid ${rule}` }}>
+              <span style={{ fontFamily: t.mono, fontSize: Math.round(16 * scale), fontWeight: 700 }}>{c.time}</span>
+              <span style={{ fontFamily: t.df, fontSize: Math.round(30 * scale) }}>{c.name}</span>
+              <span style={{ fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : ""}</span>
+            </div>))
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 18 }}>
+          <span style={{ fontFamily: t.hand, color: t.accent, fontSize: 40, transform: "rotate(-6deg)", display: "inline-block" }}>book now ♡</span>
+          <Logo data={logoData} name={studioShort} df={t.df} color={t.ink} size={42} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function WeekBody({ days, df, bf, c, fg, muted, sz, s }: {
-  days: PostDay[]; df: string; bf: string; c: C; fg: string; muted: string; sz: SZ; s: number;
-}) {
+// --- Invitation -------------------------------------------------------------
+function Invitation(p: StyleProps) {
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story } = p;
+  const cardW = story ? 900 : 860;
+  type Row = { icon: string; time: string; text: string; sub: string };
+  const rows: Row[] = mode === "day"
+    ? (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "" }))
+    : mode === "week"
+      ? page.days.map((d) => ({ icon: "✦", time: `${shortDay(d.label)} ${dayNum(d.date)}`, text: `${d.count} ${d.count === 1 ? "class" : "classes"}`, sub: coachNames(d).length ? `· ${coachNames(d).join(", ")}` : "" }))
+      : monthCells(page.days, 3).map((cell) => ({ icon: "✦", time: shortDay(cell.label), text: `${cell.count} ${cell.count === 1 ? "class" : "classes"}`, sub: cell.first.join(", ") }));
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: Math.round(22 * s) }}>
-      {days.map((d) => (
-        <div key={d.date}>
-          <div style={{ fontFamily: df, fontWeight: 700, fontSize: sz(32, "header"), color: c.accent, marginBottom: Math.round(6 * s) }}>{d.label}</div>
-          {d.classes.map((cl, i) => (
-            <div key={i} style={{ fontFamily: bf, fontSize: sz(30), color: fg, lineHeight: 1.35 }}>
-              <span style={{ color: muted }}>{cl.time}</span>{"  "}{cl.name}{cl.coach ? ` with ${cl.coach}` : ""}
+    <div style={{ width: 1080, height: story ? 1920 : 1080, background: `linear-gradient(160deg, ${t.background}, ${mixHex(t.background, t.surface, 0.5)})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
+      <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
+      <div style={{ width: cardW, background: t.surface, borderRadius: 34, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,.18)" }}>
+        <div style={{ background: t.accent, color: t.onAccent, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px 40px", fontSize: 22 }}>
+          <span style={{ fontFamily: t.mono, fontSize: 20 }}>{mode === "day" ? (page.days[0]?.label ?? rangeLabel) : rangeLabel}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {coachData && <img src={coachData} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />}
+            {coachFirst ?? studioShort}
+          </span>
+        </div>
+        <div style={{ padding: "34px 44px 40px" }}>
+          <h1 style={{ fontFamily: t.df, fontWeight: 400, fontSize: story ? 84 : 92, lineHeight: 0.95, margin: "0 0 24px", color: t.ink }}>
+            {headline.lead}<em style={{ color: t.accent, fontStyle: "italic" }}>{headline.accent}</em>
+          </h1>
+          {rows.map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", fontSize: Math.round(25 * scale), padding: `${Math.round(9 * scale)}px 0`, color: t.ink }}>
+              <span style={{ color: t.accent, fontSize: Math.round(22 * scale), width: 28, textAlign: "center" }}>{r.icon}</span>
+              <span><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
+            </div>))}
+          <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>✦ = always runs ♡</div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <span style={{ borderRadius: 999, padding: "18px 40px", fontSize: 24, fontWeight: 800, background: t.accent, color: t.onAccent }}>{footer}</span>
+            <span style={{ borderRadius: 999, padding: "18px 40px", fontSize: 24, fontWeight: 600, border: `1.5px solid ${soft(t.secondary, 0.4)}`, color: t.secondary }}>Maybe later</span>
+          </div>
+        </div>
+      </div>
+      <div style={{ position: "absolute", right: 60, bottom: 40 }}><Logo data={logoData} name={studioShort} df={t.df} color={t.ink} size={56} /></div>
+    </div>
+  );
+}
+
+// --- Lock screen (day only) -------------------------------------------------
+function LockScreen(p: StyleProps) {
+  const { t, page, studioShort, logoData, coachFirst, coachData, footer, scale, story } = p;
+  const day0 = page.days[0];
+  const clock = (day0?.classes[0]?.time ?? "9:41").replace(/\s?(AM|PM)$/i, "");
+  const centre = mixHex(t.accent, t.surface, 0.35);
+  const edge = mixHex(t.ink, t.accent, 0.25);
+  const initial = (logoData ? "" : (studioShort[0] ?? "✦")).toUpperCase();
+  return (
+    <div style={{ width: 1080, height: story ? 1920 : 1080, background: `radial-gradient(circle at 50% 35%, ${centre}, ${edge} 72%)`, color: "#fff", padding: "56px 70px", position: "relative", overflow: "hidden", boxSizing: "border-box" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 26, opacity: 0.9 }}>{day0?.label ?? ""}{coachFirst ? ` · ${coachFirst}` : ""}</div>
+        <div style={{ fontFamily: t.df, fontSize: 150, lineHeight: 1, marginTop: 4 }}>{clock}</div>
+      </div>
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+        {(day0?.classes ?? []).map((c, i) => (
+          <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", background: "rgba(255,255,255,.82)", color: t.ink, borderRadius: 26, padding: `${Math.round(14 * scale)}px 20px` }}>
+            <div style={{ width: 60, height: 60, borderRadius: 16, overflow: "hidden", background: c.tier === "core" ? t.accent : t.surface, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: t.df, fontStyle: "italic", fontSize: c.tier === "core" ? 30 : 22, color: c.tier === "core" ? t.onAccent : t.accent, flex: "0 0 auto" }}>
+              {coachData ? <img src={coachData} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (c.tier === "core" ? "✦" : (initial || "✦"))}
             </div>
-          ))}
-        </div>
-      ))}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: Math.round(24 * scale) }}>
+                <b style={{ fontWeight: 800 }}>{c.name}</b>
+                <span style={{ color: t.secondary, fontSize: Math.round(19 * scale) }}>{c.time}</span>
+              </div>
+              <div style={{ fontSize: Math.round(20 * scale), color: t.secondary }}>{c.coach ? `with ${c.coach}` : ""}{c.tier === "core" ? " · always runs" : ""}</div>
+            </div>
+          </div>))}
+      </div>
+      <div style={{ textAlign: "center", marginTop: 20, fontFamily: t.hand, fontSize: 30, color: "#fff" }}>swipe up, {footer.toLowerCase()} ♡</div>
     </div>
   );
 }
 
-function MonthBody({ days, df, bf, c, fg, muted, cardBg, radius }: {
-  days: PostDay[]; df: string; bf: string; c: C; fg: string; muted: string; cardBg: string; radius: number;
-}) {
-  const cells = monthCells(days, 3);
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-      {cells.map((cell) => (
-        <div key={cell.date} style={{ background: cardBg, borderRadius: Math.max(8, radius - 12), padding: "16px 18px" }}>
-          <div style={{ fontFamily: df, fontWeight: 700, fontSize: 26, color: fg }}>{cell.label}</div>
-          <div style={{ fontFamily: bf, fontSize: 22, color: c.accent, marginBottom: 6 }}>{cell.count} {cell.count === 1 ? "class" : "classes"}</div>
-          {cell.first.map((n, i) => (
-            <div key={i} style={{ fontFamily: bf, fontSize: 20, color: muted, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n}</div>
-          ))}
-          {cell.more > 0 && <div style={{ fontFamily: bf, fontSize: 20, color: muted }}>+{cell.more} more</div>}
-        </div>
-      ))}
-    </div>
-  );
+// --- Style thumbnail (a tiny swatch for the Style control) ------------------
+function StyleThumb({ style, spec }: { style: PostStyle; spec: BrandSpec }) {
+  const c = spec.colors;
+  const base: CSSProperties = { width: 26, height: 26, borderRadius: 5, flex: "0 0 auto", overflow: "hidden", border: `1px solid ${soft(c.ink, 0.15)}` };
+  if (style === "guest_check") return <div style={{ ...base, background: c.background, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 16, height: 20, background: c.surface }} /></div>;
+  if (style === "times") return <div style={{ ...base, background: c.surface, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, padding: 3 }}><div style={{ height: 3, background: c.ink }} /><div style={{ height: 2, background: soft(c.ink, 0.5) }} /><div style={{ height: 2, background: soft(c.ink, 0.5) }} /></div>;
+  if (style === "lock_screen") return <div style={{ ...base, background: `radial-gradient(circle at 50% 35%, ${mixHex(c.accent, c.surface, 0.35)}, ${mixHex(c.ink, c.accent, 0.25)} 72%)`, display: "flex", alignItems: "flex-end", padding: 3 }}><div style={{ width: "100%", height: 7, background: "rgba(255,255,255,.82)", borderRadius: 3 }} /></div>;
+  return <div style={{ ...base, background: c.surface, display: "flex", flexDirection: "column" }}><div style={{ height: 8, background: c.accent }} /><div style={{ flex: 1 }} /></div>;
 }

@@ -119,13 +119,14 @@ const POST_BUCKET = "post-images";
 /** The visible scheduled classes in a range, grouped by day, in the studio's
  *  look — one desk-up call. core_only=false: every class comes back with its
  *  tier so the UI toggles core-only instantly client-side. */
-export async function schedulePostData(from: string, to: string): Promise<{ data?: PostData; error?: string }> {
+export async function schedulePostData(from: string, to: string, instructorId?: string | null): Promise<{ data?: PostData; error?: string }> {
   const ctx = await getStaffContext();
   if (!ctx || !isDeskUp(ctx.role)) return { error: "Only the studio team can make posts." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return { error: "Bad dates." };
   const supabase = createClient();
   const { data, error } = await supabase.rpc("schedule_post_data", {
     p_studio_id: ctx.studioId, p_from: from, p_to: to, p_core_only: false,
+    p_instructor_id: instructorId ?? undefined,
   });
   if (error) {
     return /PT403|team|owner|manager/i.test(error.message)
@@ -133,6 +134,21 @@ export async function schedulePostData(from: string, to: string): Promise<{ data
       : { error: error.message };
   }
   return { data: data as unknown as PostData };
+}
+
+/** Remember the editorial style the studio last chose (post_style). Written via
+ *  the studio_settings RLS — manager-up; a front-desk pick renders in-session but
+ *  does not persist, which is fine (the style still applies for the post). */
+export async function savePostStyle(style: string): Promise<{ ok?: true; persisted?: boolean; error?: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx || !isDeskUp(ctx.role)) return { error: "Only the studio team can make posts." };
+  if (!["guest_check", "times", "invitation", "lock_screen"].includes(style)) return { error: "Unknown style." };
+  const supabase = createClient();
+  const { error, count } = await supabase.from("studio_settings")
+    .update({ post_style: style }, { count: "exact" })
+    .eq("studio_id", ctx.studioId);
+  if (error) return { error: error.message };
+  return { ok: true, persisted: !!count };
 }
 
 /** Save the footer line + hashtags that go on posts (manager-up, via the
