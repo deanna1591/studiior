@@ -24,13 +24,19 @@ export default async function SchedulePostsPage() {
   const [{ data: cur }, { data: studio }, { data: settings }] = await Promise.all([
     supabase.rpc("brand_kit_current", { p_studio_id: ctx.studioId }),
     supabase.from("studios").select("timezone, accent_color, theme_preset").eq("id", ctx.studioId).maybeSingle(),
-    supabase.from("studio_settings").select("flex_min_bookings").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings")
+      .select("flex_min_bookings, post_edit_runs_month, post_edit_runs_reset_on")
+      .eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
   const row = (cur ?? {}) as { spec?: BrandSpec };
   const spec = row.spec ?? defaultSpec({ accent: studio?.accent_color ?? undefined, themePreset: studio?.theme_preset ?? undefined });
   const tz = studio?.timezone ?? "UTC";
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD, studio-local
   const flexMin = settings?.flex_min_bookings ?? 1;
+  // The month's post-edit count (resets on the first of the studio-local month).
+  const resetOn = settings?.post_edit_runs_reset_on ?? null;
+  const editUsed = resetOn && todayIso < resetOn ? (settings?.post_edit_runs_month ?? 0) : 0;
+  const editCap = 60;
 
   return (
     <AppShell {...shell} title="Schedule posts">
@@ -47,6 +53,8 @@ export default async function SchedulePostsPage() {
           todayIso={todayIso}
           flexMin={flexMin}
           canEdit={isManagerUp(ctx.role)}
+          editUsed={editUsed}
+          editCap={editCap}
         />
       </div>
     </AppShell>

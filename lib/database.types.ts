@@ -7192,6 +7192,8 @@ export type Database = {
           payment_grace_days: number
           peak_allowance_enabled: boolean
           peak_cutoff_reminder_minutes: number
+          post_edit_runs_month: number
+          post_edit_runs_reset_on: string | null
           post_footer_line: string
           post_hashtags: string | null
           public_instructor_name: string
@@ -7326,6 +7328,8 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          post_edit_runs_month?: number
+          post_edit_runs_reset_on?: string | null
           post_footer_line?: string
           post_hashtags?: string | null
           public_instructor_name?: string
@@ -7460,6 +7464,8 @@ export type Database = {
           payment_grace_days?: number
           peak_allowance_enabled?: boolean
           peak_cutoff_reminder_minutes?: number
+          post_edit_runs_month?: number
+          post_edit_runs_reset_on?: string | null
           post_footer_line?: string
           post_hashtags?: string | null
           public_instructor_name?: string
@@ -8544,7 +8550,6 @@ export type Database = {
         Args: { p_kind: string; p_studio_id: string }
         Returns: Json
       }
-      call_jsonb: { Args: { sql: string; uid: string }; Returns: Json }
       campaign_audience: {
         Args: { p_filter: Json; p_studio_id: string }
         Returns: {
@@ -9042,22 +9047,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raise: {
-        Args: { label: string; sql: string; uid: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -9953,6 +9942,7 @@ export type Database = {
         }[]
       }
       plan_seats_taken: { Args: { p_plan_id: string }; Returns: number }
+      post_edit_run_allowed: { Args: { p_studio_id: string }; Returns: Json }
       preview_template: {
         Args: {
           p_body: string

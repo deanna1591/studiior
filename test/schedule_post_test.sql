@@ -148,6 +148,54 @@ select expect_raise('SA manager cannot read SB''s post data', :'MGR'::uuid,
 select expect_raise('range ending before it starts is refused', :'MGR'::uuid,
   'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-14'',false)', 'PT400');
 
+-- =============================================================================
+-- Decision 93 slice 3 — post editing: the extended validator + the edit run gate
+-- =============================================================================
+
+-- 7a. brand_kit_valid still accepts an old spec, accepts valid layout fields,
+--     and rejects out-of-range ones (mirrors lib/brand-kit.mjs isValidSpec).
+do $$
+declare base jsonb := jsonb_build_object(
+  'colors', jsonb_build_object('background','#FAFAF7','surface','#FFFFFF','ink','#14170E','accent','#B85C38','secondary','#57534E'),
+  'display_font','Space Grotesk','body_font','Space Grotesk','layout','list','radius','small',
+  'tone','Clean.','logo_placement','top-left','background_treatment','none');
+begin
+  perform expect_true('validator: an old spec (no layout fields) is valid', brand_kit_valid(base));
+  perform expect_true('validator: valid layout fields pass', brand_kit_valid(
+    base || jsonb_build_object('background_image','studio/2027-03/edit-1.jpg','image_placement','full',
+      'overlay_strength',0.4,'text_align','center','size_scale',jsonb_build_object('time',1.5,'name',0.8),
+      'element_order', jsonb_build_array('title','classes','footer','logo'))));
+  perform expect_true('validator: a bad image_placement is rejected',
+    not brand_kit_valid(base || jsonb_build_object('image_placement','diagonal')));
+  perform expect_true('validator: overlay_strength out of 0..1 is rejected',
+    not brand_kit_valid(base || jsonb_build_object('overlay_strength',1.5)));
+  perform expect_true('validator: a size_scale out of 0.5..2 is rejected',
+    not brand_kit_valid(base || jsonb_build_object('size_scale', jsonb_build_object('time',5))));
+  perform expect_true('validator: an unknown element_order token is rejected',
+    not brand_kit_valid(base || jsonb_build_object('element_order', jsonb_build_array('title','banner'))));
+end $$;
+
+-- 7b. post_edit_run_allowed: front desk (desk-up) runs it and the count climbs.
+select expect_true('edit gate: front desk may run, ok=true',
+  (call_jsonb(:'FD', 'select post_edit_run_allowed('''|| :'SA' ||''')') ->> 'ok')::boolean);
+select expect_num('edit gate: used climbed to 2 on a second run',
+  (call_jsonb(:'FD', 'select post_edit_run_allowed('''|| :'SA' ||''')') ->> 'used')::bigint, 2);
+
+-- 7c. The sixty-first is refused with reason post_edit_limit (pin the counter at
+--     the cap with a far-future reset so it does not roll over).
+update studio_settings set post_edit_runs_month = 60, post_edit_runs_reset_on = '2099-01-01'
+  where studio_id = :'SA';
+select expect_text('edit gate: the 61st is refused post_edit_limit',
+  call_jsonb(:'MGR', 'select post_edit_run_allowed('''|| :'SA' ||''')') ->> 'reason', 'post_edit_limit');
+select expect_true('edit gate: a refused run is ok=false',
+  not (call_jsonb(:'MGR', 'select post_edit_run_allowed('''|| :'SA' ||''')') ->> 'ok')::boolean);
+
+-- 7d. An instructor and a cross-studio manager are refused (PT403).
+select expect_raise('edit gate: instructor refused', :'INST'::uuid,
+  'select post_edit_run_allowed('''|| :'SA' ||''')', 'PT403');
+select expect_raise('edit gate: SA manager cannot run SB''s gate', :'MGR'::uuid,
+  'select post_edit_run_allowed('''|| :'SB' ||''')', 'PT403');
+
 -- 6. anon refused, and the surface is EXACTLY THIRTEEN
 do $$
 declare got text;

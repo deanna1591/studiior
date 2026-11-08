@@ -24,3 +24,17 @@ export declare function classLine(c: PostClass): string;
 export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null }): string;
 export declare function monthCells(days: PostDay[], limit?: number): MonthCell[];
 export declare function totalClasses(days: PostDay[]): number;
+
+export type FitPage = { days: PostDay[]; part: number; parts: number; scale: number };
+export type FitPlan = { pages: FitPage[] };
+export declare const FIT: {
+  budget: number; floor: number; steps: number[];
+  dayRow: number; weekHeader: number; weekClass: number; weekGap: number;
+};
+export declare function bodyHeight(days: PostDay[], mode: PostMode): number;
+export declare function fitScale(h1: number): { scale: number; fits: boolean };
+export declare function splitForSquare(days: PostDay[], mode: PostMode): PostDay[][];
+export declare function fitPlan(args: { days: PostDay[]; mode: PostMode; format: PostFormat }): FitPlan;
+export declare function pushSpec<T>(stack: T[], spec: T): T[];
+export declare function undoStack<T>(stack: T[]): { stack: T[]; current: T | null };
+export declare function canUndo<T>(stack: T[]): boolean;

@@ -58,11 +58,11 @@ test("grouping: caption keeps classes under their day label, in order", () => {
   const cap = captionText(DATA);
   const lines = cap.split("\n");
   assert.equal(lines[0], "Monday 09 Nov");
-  assert.equal(lines[1], "7:00 AM Reformer Flow — Ada");
-  assert.equal(lines[2], "6:00 PM Mat Pilates");            // no coach -> no dash
+  assert.equal(lines[1], "7:00 AM Reformer Flow with Ada");
+  assert.equal(lines[2], "6:00 PM Mat Pilates");            // no coach -> no "with"
   assert.equal(lines[3], "");                                // blank line between days
   assert.equal(lines[4], "Wednesday 11 Nov");
-  assert.equal(lines[5], "7:00 AM Reformer Burn — Mia");
+  assert.equal(lines[5], "7:00 AM Reformer Burn with Mia");
   assert.equal(lines[lines.length - 1], "#reform #pilates"); // hashtags last
 });
 
@@ -89,4 +89,90 @@ test("month summary: a cell per day, count + first three + more", () => {
   assert.equal(cells[0].more, 1);
   // a day with no classes is not a cell
   assert.equal(monthCells([{ date: "x", label: "X", count: 0, classes: [] }]).length, 0);
+});
+
+// --- Decision 93 slice 3 — caption " with ", auto-fit, undo -------------------
+import { fitPlan, bodyHeight, fitScale, FIT, pushSpec, undoStack, canUndo } from "../lib/schedule-post.mjs";
+
+test("slice 3: caption uses ' with ' between class and coach, never an em dash", () => {
+  assert.equal(classLine({ time: "7:00 AM", name: "Reformer Flow", coach: "Ada" }), "7:00 AM Reformer Flow with Ada");
+  assert.equal(classLine({ time: "6:00 PM", name: "Mat Pilates", coach: null }), "6:00 PM Mat Pilates");
+  const cap = captionText(DATA);
+  assert.equal(cap.includes("—"), false);                 // no em dash anywhere
+  assert.ok(cap.includes("7:00 AM Reformer Flow with Ada"));
+});
+
+// A dense week: 6 days, 2 classes each (the Reform seed shape).
+function denseWeek(nDays, perDay) {
+  return Array.from({ length: nDays }, (_, i) => ({
+    date: `2026-11-${String(9 + i).padStart(2, "0")}`,
+    label: `Day ${i + 1}`,
+    count: perDay,
+    classes: Array.from({ length: perDay }, (_, j) => ({ time: `${7 + j}:00 AM`, name: `Class ${j}`, coach: "X", tier: "core" })),
+  }));
+}
+
+test("slice 3: a short square week fits on one page at full scale", () => {
+  const plan = fitPlan({ days: denseWeek(3, 1), mode: "week", format: "square" });
+  assert.equal(plan.pages.length, 1);
+  assert.equal(plan.pages[0].scale, 1);
+  assert.equal(plan.pages[0].parts, 1);
+});
+
+test("slice 3: a medium square week auto-fits to a smaller scale, one page", () => {
+  const plan = fitPlan({ days: denseWeek(5, 2), mode: "week", format: "square" });
+  assert.equal(plan.pages.length, 1);
+  assert.ok(plan.pages[0].scale < 1);                     // a step down
+  assert.ok(plan.pages[0].scale >= FIT.floor);
+});
+
+test("slice 3: a dense square week past the floor splits into parts, days whole", () => {
+  const days = denseWeek(6, 2);
+  const plan = fitPlan({ days, mode: "week", format: "square" });
+  assert.ok(plan.pages.length >= 2);
+  plan.pages.forEach((p, i) => { assert.equal(p.part, i + 1); assert.equal(p.parts, plan.pages.length); });
+  // every day appears on exactly one page, no day split
+  const seen = plan.pages.flatMap((p) => p.days.map((d) => d.date));
+  assert.deepEqual([...seen].sort(), days.map((d) => d.date).sort());
+  // each page actually fits at its scale
+  plan.pages.forEach((p) => assert.ok(bodyHeight(p.days, "week") * p.scale <= FIT.budget));
+});
+
+test("slice 3: a dense square DAY splits its classes across parts", () => {
+  const day = [{ date: "2026-11-09", label: "Mon", count: 8, classes: Array.from({ length: 8 }, (_, j) => ({ time: `${7 + j}:00`, name: `C${j}`, coach: null, tier: "core" })) }];
+  const plan = fitPlan({ days: day, mode: "day", format: "square" });
+  assert.ok(plan.pages.length >= 2);
+  const total = plan.pages.reduce((n, p) => n + (p.days[0]?.classes.length ?? 0), 0);
+  assert.equal(total, 8);                                 // all classes kept, none lost
+});
+
+test("slice 3: a story post never splits (it has the room)", () => {
+  const plan = fitPlan({ days: denseWeek(6, 3), mode: "week", format: "story" });
+  assert.equal(plan.pages.length, 1);
+  assert.equal(plan.pages[0].scale, 1);
+});
+
+test("slice 3: fitScale picks the first step that fits, else the floor", () => {
+  assert.deepEqual(fitScale(100), { scale: 1, fits: true });
+  assert.equal(fitScale(FIT.budget * 10).fits, false);
+  assert.equal(fitScale(FIT.budget * 10).scale, FIT.floor);
+});
+
+test("slice 3: the undo stack pushes and steps back, base kept", () => {
+  const base = { v: 0 };
+  let s = [base];
+  assert.equal(canUndo(s), false);
+  s = pushSpec(s, { v: 1 });
+  s = pushSpec(s, { v: 2 });
+  assert.equal(canUndo(s), true);
+  let r = undoStack(s);
+  assert.deepEqual(r.current, { v: 1 });
+  assert.equal(r.stack.length, 2);
+  r = undoStack(r.stack);
+  assert.deepEqual(r.current, base);                      // back to the base
+  assert.equal(canUndo(r.stack), false);
+  // undoing at the base is a no-op (never pops the base away)
+  const r2 = undoStack(r.stack);
+  assert.deepEqual(r2.current, base);
+  assert.equal(r2.stack.length, 1);
 });

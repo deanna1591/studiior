@@ -175,3 +175,16 @@ export async function uploadPostImage(fd: FormData): Promise<{ ok?: true; path?:
   }
   return { ok: true, path };
 }
+
+/** A short-lived signed URL for a post-images object in the caller's own studio
+ *  (the bucket is private), so the renderer can inline a Claude-edit background
+ *  photo for the preview and the PNG export. Desk-up. */
+export async function signPostImage(path: string): Promise<{ url?: string; error?: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx || !isDeskUp(ctx.role)) return { error: "Only the studio team can make posts." };
+  if (!path.startsWith(`${ctx.studioId}/`)) return { error: "That image isn't yours." };
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from(POST_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) return { error: "Could not load the photo." };
+  return { url: data.signedUrl };
+}
