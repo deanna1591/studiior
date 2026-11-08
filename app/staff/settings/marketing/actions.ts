@@ -8,8 +8,6 @@ import type { PostData } from "@/lib/schedule-post";
 import type { Json } from "@/lib/database.types";
 
 const BUCKET = "brand-references";
-const OK_MIME = ["image/png", "image/jpeg", "image/jpg", "application/pdf"];
-const MAX = 10_485_760;
 
 export type BrandRef = { name: string; url: string };
 
@@ -35,31 +33,10 @@ export async function listBrandReferences(): Promise<BrandRef[]> {
   return out;
 }
 
-export async function uploadBrandReference(fd: FormData): Promise<{ ok?: true; error?: string; refs?: BrandRef[] }> {
-  const ctx = await getStaffContext();
-  if (!ctx) return { error: "You are not signed in." };
-  if (!managerUp(ctx.role)) return { error: "Only owners and managers manage the brand kit." };
-
-  const file = fd.get("file") as File | null;
-  if (!file || file.size === 0) return { error: "Choose a file first." };
-  if (file.size > MAX) return { error: "That file is over 10 MB." };
-  if (!OK_MIME.includes(file.type)) return { error: "PNG, JPG or PDF." };
-
-  const supabase = createClient();
-  const existing = await listBrandReferences();
-  if (existing.length >= 5) return { error: "Up to five references. Remove one first." };
-
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-  const path = `${ctx.studioId}/ref-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
-  if (error) {
-    return /row-level security|Unauthorized/i.test(error.message)
-      ? { error: "Your role cannot upload references." }
-      : { error: error.message };
-  }
-  revalidatePath("/settings/marketing/brand-kit");
-  return { ok: true, refs: await listBrandReferences() };
-}
+// Uploading a reference is a BROWSER upload straight to the brand-references
+// bucket with the signed-in session (components/staff/brand-kit.tsx), so the
+// 1 MB Server Action body limit never applies. The server actions only list and
+// remove; there is no uploadBrandReference.
 
 export async function removeBrandReference(name: string): Promise<{ ok?: true; error?: string; refs?: BrandRef[] }> {
   const ctx = await getStaffContext();

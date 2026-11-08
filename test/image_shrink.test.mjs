@@ -48,3 +48,14 @@ test("avatars use the square crop capped at 512", () => {
   assert.equal(squareCrop(2000, 1500, 512).target, 512);
   assert.equal(squareCrop(400, 400, 512).target, 400); // small avatar not upscaled
 });
+
+// Decision 93 amendment — lib/browser-image.ts presets (REFERENCE_MAX_PX 2000,
+// EDIT_PHOTO_MAX_PX 1600). The canvas downscale (createImageBitmap/canvas) is
+// browser-only; fitBox is its pure maths, so a 4000px source caps at 2000 on its
+// long side for a reference and 1600 for an edit photo.
+test("browser-image presets: a 4000px source caps at the reference/edit long side", () => {
+  const REFERENCE_MAX_PX = 2000, EDIT_PHOTO_MAX_PX = 1600;
+  assert.deepEqual(fitBox(4000, 3000, REFERENCE_MAX_PX), { tw: 2000, th: 1500 }); // reference ≤2000
+  assert.deepEqual(fitBox(4000, 2250, EDIT_PHOTO_MAX_PX), { tw: 1600, th: 900 }); // edit photo ≤1600
+  assert.ok(fitBox(4000, 3000, REFERENCE_MAX_PX).tw <= 2000);
+});

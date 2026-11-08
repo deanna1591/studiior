@@ -7,9 +7,13 @@ import {
   type BrandSpec,
 } from "@/lib/brand-kit";
 import {
-  uploadBrandReference, removeBrandReference, saveBrandKit, resetBrandKit, type BrandRef,
+  listBrandReferences, removeBrandReference, saveBrandKit, resetBrandKit, type BrandRef,
 } from "@/app/staff/settings/marketing/actions";
+import { createClient } from "@/lib/supabase/client";
+import { prepareUpload, uploadExt, REFERENCE_MAX_PX } from "@/lib/browser-image";
 import { BRAND_FONT_FACES as FONT_FACES } from "@/components/staff/brand-fonts";
+
+const REF_MIME = ["image/png", "image/jpeg", "image/jpg", "application/pdf"];
 
 const COLOR_LABELS: Record<keyof BrandSpec["colors"], string> = {
   background: "Background", surface: "Surface", ink: "Text", accent: "Accent", secondary: "Secondary",
@@ -39,12 +43,13 @@ const SAMPLE_WEEK = {
 };
 
 export default function BrandKit({
-  initial, refs: initialRefs, canEdit, studioName, logoUrl,
+  initial, refs: initialRefs, canEdit, studioName, studioId, logoUrl,
 }: {
   initial: { spec: BrandSpec; source: string; runsUsed: number; runsCap: number };
   refs: BrandRef[];
   canEdit: boolean;
   studioName: string;
+  studioId: string;
   logoUrl: string | null;
 }) {
   const router = useRouter();
@@ -64,12 +69,27 @@ export default function BrandKit({
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData(); fd.set("file", file);
     setMsg(null);
+    const badFile = !REF_MIME.includes(file.type) || file.size > 10_485_760 || refs.length >= 5;
+    if (badFile) {
+      setMsg({ text: refs.length >= 5 ? "Up to five references. Remove one first." : "Could not upload that file. Try a PNG or JPG under 10 MB." });
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    // Upload straight to the bucket from the browser with the signed-in session,
+    // shrunk to 2000px first (PDFs pass through). The request never hits a server
+    // action, so the 1 MB body limit is not in play.
     start(async () => {
-      const r = await uploadBrandReference(fd);
-      if (r.error) setMsg({ text: r.error });
-      else if (r.refs) setRefs(r.refs);
+      try {
+        const prepared = await prepareUpload(file, REFERENCE_MAX_PX);
+        const path = `${studioId}/ref-${Date.now()}.${uploadExt(prepared)}`;
+        const up = await createClient().storage.from("brand-references")
+          .upload(path, prepared, { upsert: false, contentType: prepared.type });
+        if (up.error) setMsg({ text: "Could not upload that file. Try a PNG or JPG under 10 MB." });
+        else setRefs(await listBrandReferences());
+      } catch {
+        setMsg({ text: "Could not upload that file. Try a PNG or JPG under 10 MB." });
+      }
       if (fileRef.current) fileRef.current.value = "";
     });
   }

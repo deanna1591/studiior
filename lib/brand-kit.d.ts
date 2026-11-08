@@ -15,6 +15,8 @@ export interface BrandSpec {
   text_align?: "left" | "center" | "right";
   size_scale?: { time?: number; name?: number; header?: number };
   element_order?: Array<"logo" | "title" | "classes" | "footer">;
+  // amendment: faint kit-logo watermark, 0..0.4 (0 / missing = none)
+  watermark_opacity?: number;
 }
 export const BRAND_FONTS: string[];
 export const LAYOUTS: Array<"list" | "grid" | "poster">;

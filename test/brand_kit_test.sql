@@ -89,6 +89,13 @@ insert into studio_staff (id, studio_id, user_id, email, role, status) values
 -- 1. Validation
 select expect_true('brand_kit_valid accepts a good spec', brand_kit_valid(:'GOOD'::jsonb));
 select expect_true('brand_kit_valid rejects a bad font',  not brand_kit_valid(:'BAD'::jsonb));
+-- amendment: watermark_opacity optional, 0..0.4
+select expect_true('brand_kit_valid accepts watermark_opacity 0.3',
+  brand_kit_valid((:'GOOD'::jsonb) || '{"watermark_opacity":0.3}'::jsonb));
+select expect_true('brand_kit_valid rejects watermark_opacity 0.5',
+  not brand_kit_valid((:'GOOD'::jsonb) || '{"watermark_opacity":0.5}'::jsonb));
+select expect_true('brand_kit_valid rejects a non-numeric watermark_opacity',
+  not brand_kit_valid((:'GOOD'::jsonb) || '{"watermark_opacity":"0.2"}'::jsonb));
 
 -- 2. Defaults (no kit yet) — built from the studio accent + preset
 select expect_text('defaults: source is default',

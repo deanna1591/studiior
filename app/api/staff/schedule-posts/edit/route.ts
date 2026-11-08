@@ -3,23 +3,29 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffContext, isDeskUp } from "@/lib/auth";
 import { parseBrandSpec, isValidSpec, BRAND_FONTS, type BrandSpec } from "@/lib/brand-kit";
 import { parseApiResponse } from "@/lib/ai-draft";
+import { editResult } from "@/lib/post-edit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Decision 93 slice 3 — "Tell Claude what to change". Desk-up, SERVER-SIDE ONLY.
- * Takes the current post spec, a plain-language instruction and an optional photo
- * (uploaded to the private post-images bucket). Calls the Claude API through the
+ * Decision 93 slice 3 + amendment — "Tell Claude what to change". Desk-up,
+ * SERVER-SIDE ONLY. Takes the current post spec, a plain-language instruction and
+ * an optional photo PATH (the browser uploads the photo straight to post-images
+ * with the signed-in session, so the request body never carries a file and the
+ * Vercel 4.5 MB ceiling is not in play). The route reads the object from the
+ * bucket server-side for the vision block. Calls the Claude API through the
  * existing x-api-key path and asks for an updated spec in the SAME shape — Claude
  * fills the spec, never an image. The reply is validated with parseBrandSpec;
- * anything off-shape is refused with the recorded sentence. The run gate caps at
- * sixty edits a month (post_edit_run_allowed). No image is ever returned.
+ * a photo always applies even when the worded change can't be read. Each failure
+ * returns a specific reason and logs the status + first 300 chars of the API body
+ * (never the key). The run gate caps at sixty edits a month.
  */
 
 const MODEL = "claude-sonnet-5-5";
-const PHOTO_MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 const MAX_PHOTO = 5_242_880;
+const PATH_MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+const TAG = "[schedule-post/edit]";
 
 function sys(studioName: string): string {
   return [
@@ -39,7 +45,8 @@ function sys(studioName: string): string {
     `  "overlay_strength": <0..1, how dark the colour over the photo>,`,
     `  "text_align": "left"|"center"|"right",`,
     `  "size_scale": { "time": <0.5..2>, "name": <0.5..2>, "header": <0.5..2> },`,
-    `  "element_order": array of "logo","title","classes","footer"`,
+    `  "element_order": array of "logo","title","classes","footer",`,
+    `  "watermark_opacity": <0..0.4, a faint centred kit logo behind everything; set a small value like 0.12 when asked for a subtle, faint or background logo; 0 or omit for none>`,
     `}`,
     `Every colour is a 6-digit hex. The two fonts MUST be from this list exactly: ${BRAND_FONTS.join(", ")}.`,
     `When a photo is attached, set "background_treatment" to "full" (or "soft" if the user wants the colour to show through), set "background_image" to the path you are told, and pick an "overlay_strength" that keeps the text readable.`,
@@ -79,25 +86,25 @@ export async function POST(req: Request): Promise<NextResponse> {
       { status: 429 });
   }
 
-  // Optional photo -> post-images (desk-up policy), then a vision block + a path
-  // the model must reference as background_image.
+  // Optional photo: the BROWSER uploaded it to post-images (desk-up policy) and
+  // POSTs only the path — the request body never carries a file. Read the object
+  // server-side for the vision block; the path becomes background_image.
   let photoPath: string | null = null;
   const visionBlocks: Array<Record<string, unknown>> = [];
-  const photo = form.get("photo") as File | null;
-  if (photo && photo.size > 0) {
-    const ext = photo.name.split(".").pop()?.toLowerCase() ?? "";
-    const media = PHOTO_MIME[ext];
+  const rawPath = String(form.get("photo_path") ?? "").trim();
+  if (rawPath) {
+    if (!rawPath.startsWith(`${ctx.studioId}/`)) return NextResponse.json({ error: "That photo isn't yours." }, { status: 403 });
+    const ext = rawPath.split(".").pop()?.toLowerCase() ?? "";
+    const media = PATH_MIME[ext];
     if (!media) return NextResponse.json({ error: "Photos must be PNG, JPG or WEBP." }, { status: 400 });
-    if (photo.size > MAX_PHOTO) return NextResponse.json({ error: "That photo is over 5 MB." }, { status: 400 });
-    const yyyymm = new Date().toISOString().slice(0, 7);
-    photoPath = `${ctx.studioId}/${yyyymm}/edit-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("post-images").upload(photoPath, photo, { upsert: false, contentType: media });
-    if (upErr) {
-      return /row-level security|Unauthorized/i.test(upErr.message)
-        ? NextResponse.json({ error: "Your role cannot upload photos." }, { status: 403 })
-        : NextResponse.json({ error: "Could not save the photo. Try again." }, { status: 400 });
+    const { data: blob, error: dlErr } = await supabase.storage.from("post-images").download(rawPath);
+    if (dlErr || !blob) {
+      console.error(TAG, "photo download failed", dlErr?.message);
+      return NextResponse.json({ error: "Could not read that photo. Try again." }, { status: 400 });
     }
-    const b64 = Buffer.from(await photo.arrayBuffer()).toString("base64");
+    if (blob.size > MAX_PHOTO) return NextResponse.json({ error: "That photo is over 5 MB." }, { status: 400 });
+    photoPath = rawPath;
+    const b64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
     visionBlocks.push({ type: "image", source: { type: "base64", media_type: media, data: b64 } });
   }
 
@@ -114,29 +121,47 @@ export async function POST(req: Request): Promise<NextResponse> {
     ].join("\n"),
   }];
 
-  let json: unknown;
+  let res: Response;
+  let body = "";
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model: MODEL, max_tokens: 800, system: sys(ctx.studioName), messages: [{ role: "user", content }] }),
       signal: AbortSignal.timeout(45_000),
     });
-    if (!res.ok) return NextResponse.json({ error: "Couldn't apply that. Try saying it another way." }, { status: 422 });
-    json = await res.json();
-  } catch {
+    body = await res.text();
+  } catch (e) {
+    const err = e as { name?: string };
+    const timeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    console.error(TAG, "fetch failed", err?.name ?? "unknown");
+    return timeout
+      ? NextResponse.json({ error: "That took too long. Try again." }, { status: 504 })
+      : NextResponse.json({ error: "Couldn't apply that. Try saying it another way." }, { status: 422 });
+  }
+
+  if (!res.ok) {
+    console.error(TAG, "api non-ok", res.status, body.slice(0, 300));
+    if (res.status === 401 || res.status === 403) {
+      return NextResponse.json({ error: "AI isn't set up on this platform yet." }, { status: 503 });
+    }
+    if (res.status === 400 && /image|dimension|pixels|too large|too many/i.test(body)) {
+      return NextResponse.json({ error: "That photo is too large for the editor." }, { status: 400 });
+    }
     return NextResponse.json({ error: "Couldn't apply that. Try saying it another way." }, { status: 422 });
   }
 
-  const { text } = parseApiResponse(json);
-  const spec = parseBrandSpec(text);
-  if (!spec) return NextResponse.json({ error: "Couldn't apply that. Try saying it another way." }, { status: 422 });
-
-  // The uploaded photo wins — the model cannot drop or rename it.
-  if (photoPath) {
-    spec.background_image = photoPath;
-    if (spec.background_treatment === "none") spec.background_treatment = "full";
+  let json: unknown;
+  try { json = JSON.parse(body); }
+  catch {
+    console.error(TAG, "unreadable JSON", res.status, body.slice(0, 300));
+    json = null;
   }
-
-  return NextResponse.json({ ok: true, spec, used: g.used, cap: g.cap });
+  const { text } = parseApiResponse(json);
+  const result = editResult(parseBrandSpec(text), { photoPath, current });
+  if (!result.ok) {
+    console.error(TAG, "unreadable reply", res.status, String(text ?? "").slice(0, 300));
+    return NextResponse.json({ error: "Couldn't apply that. Try saying it another way." }, { status: 422 });
+  }
+  return NextResponse.json({ ok: true, spec: result.spec, note: result.note, used: g.used, cap: g.cap });
 }

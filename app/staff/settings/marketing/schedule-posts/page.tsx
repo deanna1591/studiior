@@ -57,6 +57,7 @@ export default async function SchedulePostsPage() {
         <SchedulePosts
           spec={spec}
           studioName={ctx.studioName}
+          studioId={ctx.studioId}
           todayIso={todayIso}
           flexMin={flexMin}
           canEdit={isManagerUp(ctx.role)}

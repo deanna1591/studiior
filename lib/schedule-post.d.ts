@@ -51,7 +51,12 @@ export declare function shortName(name: string): string;
 export declare function receiptNo(isoDate: string): string;
 export declare const STYLE_FIT: Record<PostStyle, {
   dayBudget: number; dayRow: number; floor: number; steps: number[];
-  weekKind: "summary" | "grid" | "none"; weekRow?: number; weekBudget?: number; gridRow?: number;
+  weekKind: "classes" | "grid" | "none"; weekBudget?: number; gridRow?: number;
+  weekHeadingRow?: number; weekClassRow?: number;
 }>;
 export declare function stepFit(h: number, budget: number, steps: number[], floor: number): { scale: number; fits: boolean };
 export declare function editorialPlan(args: { days: PostDay[]; mode: PostMode; format: PostFormat; style: PostStyle }): FitPlan;
+export type WeekRow = { icon: string; time: string; name: string; coach: string };
+export type WeekGroup = { label: string; classes: WeekRow[] };
+export declare function weekRows(days: PostDay[], opts?: { coachMode?: boolean }): WeekGroup[];
+export declare function anyFlex(days: PostDay[]): boolean;

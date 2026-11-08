@@ -52,6 +52,7 @@ export default async function BrandKitSettings() {
           refs={refs}
           canEdit={canEdit}
           studioName={ctx.studioName}
+          studioId={ctx.studioId}
           logoUrl={studio?.logo_url ?? null}
         />
       </div>

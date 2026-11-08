@@ -141,3 +141,24 @@ test("slice 3: parseBrandSpec keeps good layout fields and drops unknown keys", 
   assert.deepEqual(s.element_order, ["classes", "logo"]); // "nope" filtered
   assert.equal("invented_field" in s, false);             // unknown key stripped
 });
+
+test("amendment: watermark_opacity — parseBrandSpec clamps 0.9 to 0.4", () => {
+  const s = parseBrandSpec(JSON.stringify({ ...GOOD, watermark_opacity: 0.9 }));
+  assert.ok(s);
+  assert.equal(s.watermark_opacity, 0.4);
+});
+
+test("amendment: watermark_opacity — a string is dropped (missing => 0 at render)", () => {
+  const s = parseBrandSpec(JSON.stringify({ ...GOOD, watermark_opacity: "0.3" }));
+  assert.ok(s);
+  assert.equal("watermark_opacity" in s, false);
+});
+
+test("amendment: watermark_opacity — missing is valid; in range valid; out of range invalid", () => {
+  assert.equal(isValidSpec(GOOD), true);                                   // missing
+  assert.equal(isValidSpec({ ...GOOD, watermark_opacity: 0 }), true);
+  assert.equal(isValidSpec({ ...GOOD, watermark_opacity: 0.4 }), true);
+  assert.equal(isValidSpec({ ...GOOD, watermark_opacity: 0.5 }), false);   // > 0.4
+  assert.equal(isValidSpec({ ...GOOD, watermark_opacity: -0.1 }), false);  // < 0
+  assert.equal(isValidSpec({ ...GOOD, watermark_opacity: "0.2" }), false); // not a number
+});

@@ -195,12 +195,22 @@ test("editorial: caption starts with the coach's name in coach mode", () => {
   assert.ok(!captionText({ days: DATA.days, hashtags: "#x" }).startsWith("Ada"));
 });
 
-test("editorial: a week is one page (summary/grid never splits), every style", () => {
-  for (const style of ["guest_check", "times", "invitation"]) {
-    const plan = editorialPlan({ days: denseWeek(7, 9), mode: "week", format: "square", style });
-    assert.equal(plan.pages.length, 1, style);
-    assert.equal(plan.pages[0].scale <= 1, true, style);
-    assert.equal(plan.pages[0].scale >= STYLE_FIT[style].floor, true, style);
+test("editorial: The Times week is one page (the grid never splits)", () => {
+  const plan = editorialPlan({ days: denseWeek(7, 9), mode: "week", format: "square", style: "times" });
+  assert.equal(plan.pages.length, 1);
+  assert.equal(plan.pages[0].scale >= STYLE_FIT.times.floor, true);
+});
+
+test("editorial: a light per-class week fits one page; a dense one splits by whole days", () => {
+  for (const style of ["guest_check", "invitation"]) {
+    const light = editorialPlan({ days: denseWeek(5, 1), mode: "week", format: "square", style });
+    assert.equal(light.pages.length, 1, style);
+    const dense = editorialPlan({ days: denseWeek(7, 9), mode: "week", format: "square", style });
+    assert.ok(dense.pages.length >= 2, style);                               // dense week splits
+    dense.pages.forEach((p, i) => { assert.equal(p.part, i + 1); assert.equal(p.parts, dense.pages.length); });
+    // every day appears on exactly one page, no day torn across parts
+    const seen = dense.pages.flatMap((p) => p.days.map((d) => d.date));
+    assert.deepEqual([...seen].sort(), denseWeek(7, 9).map((d) => d.date).sort(), style);
   }
 });
 
@@ -244,4 +254,50 @@ test("slice 3: the undo stack pushes and steps back, base kept", () => {
   const r2 = undoStack(r.stack);
   assert.deepEqual(r2.current, base);
   assert.equal(r2.stack.length, 1);
+});
+
+// --- Amendment: week rows, watermark fallback -------------------------------
+import { weekRows, anyFlex } from "../lib/schedule-post.mjs";
+import { editResult } from "../lib/post-edit.mjs";
+
+test("amendment: week rows list every class time from a two-day fixture", () => {
+  const days = [
+    { date: "2026-11-09", label: "Monday 09 Nov", count: 2, classes: [
+      { time: "7:00 AM", name: "Reformer Flow", coach: "Ada", tier: "core" },
+      { time: "6:00 PM", name: "Mat Pilates", coach: "Bea", tier: "flex" },
+    ] },
+    { date: "2026-11-10", label: "Tuesday 10 Nov", count: 1, classes: [
+      { time: "9:30 AM", name: "Barre", coach: null, tier: "core" },
+    ] },
+  ];
+  const groups = weekRows(days);
+  assert.equal(groups.length, 2);
+  const times = groups.flatMap((g) => g.classes.map((c) => c.time));
+  for (const t of ["7:00 AM", "6:00 PM", "9:30 AM"]) assert.ok(times.includes(t), t);
+  // tier icon: core ✦, flex ○; coach carried, "with " prefix; coach mode drops it
+  assert.equal(groups[0].classes[0].icon, "✦");
+  assert.equal(groups[0].classes[1].icon, "○");
+  assert.equal(groups[0].classes[0].coach, "with Ada");
+  assert.equal(weekRows(days, { coachMode: true })[0].classes[0].coach, "");
+  assert.equal(anyFlex(days), true);
+  assert.equal(anyFlex([days[1]]), false);
+});
+
+test("amendment: photo fallback returns ok with background_image when the reply is not JSON", () => {
+  const current = { colors: {}, display_font: "Inter", body_font: "Inter", layout: "list", radius: "small", tone: "", logo_placement: "top-left", background_treatment: "none" };
+  const path = "studio/2026-11/edit-1.jpg";
+  const r = editResult(null, { photoPath: path, current });
+  assert.equal(r.ok, true);
+  assert.equal(r.spec.background_image, path);
+  assert.equal(r.spec.background_treatment, "full");
+  assert.equal(r.spec.overlay_strength, 0.85);
+  assert.ok(/Photo applied/.test(r.note));
+  // no photo + unreadable reply -> not ok
+  assert.equal(editResult(null, { current }).ok, false);
+  // a valid spec + a photo -> the photo is forced onto it
+  const spec = { ...current, background_treatment: "none" };
+  const r2 = editResult(spec, { photoPath: path, current });
+  assert.equal(r2.ok, true);
+  assert.equal(r2.spec.background_image, path);
+  assert.equal(r2.spec.background_treatment, "full");
 });

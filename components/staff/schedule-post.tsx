@@ -5,13 +5,15 @@ import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthCells, totalClasses,
-  editorialPlan, headlineParts, shortName, receiptNo,
+  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex,
   pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
 import {
   schedulePostData, uploadPostImage, saveBrandKit, signPostImage, savePostStyle,
 } from "@/app/staff/settings/marketing/actions";
+import { createClient } from "@/lib/supabase/client";
+import { prepareUpload, uploadExt, EDIT_PHOTO_MAX_PX } from "@/lib/browser-image";
 
 type Coach = { id: string; first: string };
 
@@ -39,10 +41,11 @@ function useInlineImage(url: string | null): string | null {
 }
 
 export default function SchedulePosts({
-  spec, studioName, todayIso, flexMin, canEdit, editUsed, editCap, initialStyle, coaches,
+  spec, studioName, studioId, todayIso, flexMin, canEdit, editUsed, editCap, initialStyle, coaches,
 }: {
   spec: BrandSpec;
   studioName: string;
+  studioId: string;
   todayIso: string;
   flexMin: number;
   canEdit: boolean;            // manager-up: may "Save as my style"
@@ -165,12 +168,27 @@ export default function SchedulePosts({
 
   async function sendEdit() {
     if (!instruction.trim() || editing) return;
-    setEditing(true); setEditErr(null); setSavedNote(null);
+    setEditing(true); setEditErr(null); setSavedNote(null); setNote(null);
     try {
+      // An edit photo uploads from the browser straight to post-images with the
+      // signed-in session (shrunk to 1600px first), then only its path is posted
+      // — the request body never carries a file.
+      let photoPath: string | null = null;
+      if (photo) {
+        if (photo.size > 10_485_760) { setEditErr("Could not upload that file. Try a PNG or JPG under 10 MB."); setEditing(false); return; }
+        const prepared = await prepareUpload(photo, EDIT_PHOTO_MAX_PX);
+        const ext = uploadExt(prepared);
+        const yyyymm = new Date().toISOString().slice(0, 7);
+        const path = `${studioId}/${yyyymm}/edit-${Date.now()}.${ext}`;
+        const up = await createClient().storage.from("post-images")
+          .upload(path, prepared, { upsert: false, contentType: prepared.type });
+        if (up.error) { setEditErr("Could not upload that file. Try a PNG or JPG under 10 MB."); setEditing(false); return; }
+        photoPath = path;
+      }
       const fd = new FormData();
       fd.set("spec", JSON.stringify(activeSpec));
       fd.set("instruction", instruction.trim());
-      if (photo) fd.set("photo", photo);
+      if (photoPath) fd.set("photo_path", photoPath);
       const res = await fetch("/api/staff/schedule-posts/edit", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -178,6 +196,7 @@ export default function SchedulePosts({
       } else {
         setStack((s) => pushSpec(s, data.spec as BrandSpec));
         if (typeof data.used === "number") setUsed(data.used);
+        if (typeof data.note === "string") setEditErr(data.note);   // e.g. "Photo applied…"
         setInstruction(""); setPhoto(null);
         if (fileRef.current) fileRef.current.value = "";
       }
@@ -287,6 +306,7 @@ export default function SchedulePosts({
           {/* Tell Claude what to change */}
           <div className="rounded-xl border border-line bg-surface p-3">
             <p className="text-[13px] font-medium text-ink">Tell Claude what to change</p>
+            <p className="mt-0.5 text-[12px] text-ink-3">Attach a photo to use it as the background. Ask for a faint logo to watermark it.</p>
             <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)}
               rows={2} maxLength={500} disabled={empty}
               placeholder="e.g. make it darker · bigger class times · put this photo behind the classes"
@@ -470,6 +490,15 @@ function EditorialPost({
     : style === "lock_screen" ? <LockScreen {...p} />
     : <Invitation {...p} />;
 
+  // A faint kit-logo watermark (watermark_opacity 0..0.4), centred at 70% of the
+  // post width, over the composition — subtle, in every style.
+  const wm = typeof spec.watermark_opacity === "number" ? spec.watermark_opacity : 0;
+  const watermark = wm > 0 && logoData
+    ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: wm }}>
+        <img src={logoData} alt="" style={{ width: "70%", height: "auto", maxHeight: H * 0.7, objectFit: "contain" }} />
+      </div>
+    : null;
+
   // An uploaded background photo (Claude edit) sits behind, dimmed.
   if (bgData && spec.background_image) {
     const overlay = typeof spec.overlay_strength === "number" ? spec.overlay_strength : 0.35;
@@ -478,8 +507,12 @@ function EditorialPost({
         <img src={bgData} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${overlay})` }} />
         <div style={{ position: "absolute", inset: 0 }}>{styled}</div>
+        {watermark}
       </div>
     );
+  }
+  if (watermark) {
+    return <div style={{ width: 1080, height: H, position: "relative", overflow: "hidden" }}>{styled}{watermark}</div>;
   }
   return styled;
 }
@@ -528,15 +561,23 @@ function GuestCheck(p: StyleProps) {
               <span style={{ fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
               <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}{c.coach ? `, ${c.coach}` : ""}</span>
             </div>))
-          : page.days.map((d) => (
-            <div key={d.date} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(15 * scale)}px 0 4px` }}>
-              <span style={{ fontFamily: t.hand, fontSize: Math.round(30 * scale), color: t.ink }}>{shortDay(d.label)}</span>
-              <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.secondary, textAlign: "right" }}>{d.count} {d.count === 1 ? "class" : "classes"}{coachNames(d).length ? ` · ${coachNames(d).join(", ")}` : ""}</span>
+          : weekRows(page.days, { coachMode: !!coachFirst }).map((g) => (
+            <div key={g.label}>
+              <div style={{ fontFamily: t.hand, fontSize: Math.round(26 * scale), color: t.accent, borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 2px` }}>{g.label}</div>
+              {g.classes.map((c, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "26px 96px 1fr", gap: 8, alignItems: "baseline", borderBottom: `1px solid ${line}`, padding: `${Math.round(6 * scale)}px 0` }}>
+                  <span style={{ fontFamily: t.hand, fontSize: Math.round(22 * scale), color: t.accent }}>{c.icon}</span>
+                  <span style={{ fontFamily: t.mono, fontSize: Math.round(15 * scale), color: t.ink }}>{c.time}</span>
+                  <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}</span>
+                </div>))}
             </div>))}
         <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `2px solid ${line}`, padding: "16px 0 6px", fontSize: 32, color: t.accent }}>
           <span style={{ fontFamily: t.hand }}>total:</span>
           <span style={{ fontFamily: t.hand }}>{total} {total === 1 ? "class" : "classes"}{mode === "week" ? " this week" : ""}</span>
         </div>
+        {mode === "week" && anyFlex(page.days) && (
+          <div style={{ fontFamily: t.hand, fontSize: 24, color: t.secondary, padding: "10px 0 0" }}>✦ = always runs</div>
+        )}
         <div style={{ fontFamily: t.hand, fontSize: 26, color: t.secondary, padding: "14px 0 0" }}>thank you, come again ♡</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 24, borderTop: `2px solid ${t.ink}`, paddingTop: 14 }}>
           <Logo data={logoData} name={studioShort} df={t.df} color={t.ink} size={40} />
@@ -607,11 +648,12 @@ function Invitation(p: StyleProps) {
   const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story } = p;
   const cardW = story ? 900 : 860;
   type Row = { icon: string; time: string; text: string; sub: string };
+  // Day and month stay a flat list; week lists every class under a day heading.
   const rows: Row[] = mode === "day"
     ? (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "" }))
-    : mode === "week"
-      ? page.days.map((d) => ({ icon: "✦", time: `${shortDay(d.label)} ${dayNum(d.date)}`, text: `${d.count} ${d.count === 1 ? "class" : "classes"}`, sub: coachNames(d).length ? `· ${coachNames(d).join(", ")}` : "" }))
-      : monthCells(page.days, 3).map((cell) => ({ icon: "✦", time: shortDay(cell.label), text: `${cell.count} ${cell.count === 1 ? "class" : "classes"}`, sub: cell.first.join(", ") }));
+    : monthCells(page.days, 3).map((cell) => ({ icon: "✦", time: shortDay(cell.label), text: `${cell.count} ${cell.count === 1 ? "class" : "classes"}`, sub: cell.first.join(", ") }));
+  const groups = mode === "week" ? weekRows(page.days, { coachMode: !!coachFirst }) : null;
+  const showLegend = anyFlex(page.days);
   return (
     <div style={{ width: 1080, height: story ? 1920 : 1080, background: `linear-gradient(160deg, ${t.background}, ${mixHex(t.background, t.surface, 0.5)})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
@@ -628,12 +670,24 @@ function Invitation(p: StyleProps) {
           <h1 style={{ fontFamily: t.df, fontWeight: 400, fontSize: story ? 84 : 92, lineHeight: 0.95, margin: "0 0 24px", color: t.ink }}>
             {headline.lead}<em style={{ color: t.accent, fontStyle: "italic" }}>{headline.accent}</em>
           </h1>
-          {rows.map((r, i) => (
-            <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", fontSize: Math.round(25 * scale), padding: `${Math.round(9 * scale)}px 0`, color: t.ink }}>
-              <span style={{ color: t.accent, fontSize: Math.round(22 * scale), width: 28, textAlign: "center" }}>{r.icon}</span>
-              <span><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
-            </div>))}
-          <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>✦ = always runs ♡</div>
+          {groups
+            ? groups.map((g) => (
+                <div key={g.label} style={{ marginBottom: Math.round(8 * scale) }}>
+                  <div style={{ fontFamily: t.df, fontSize: Math.round(24 * scale), color: t.accent, borderBottom: `1px solid ${soft(t.secondary, 0.3)}`, paddingBottom: 3, marginBottom: 4 }}>{g.label}</div>
+                  {g.classes.map((c, i) => (
+                    <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", fontSize: Math.round(22 * scale), padding: `${Math.round(5 * scale)}px 0`, color: t.ink }}>
+                      <span style={{ color: t.accent, fontSize: Math.round(20 * scale), width: 24, textAlign: "center" }}>{c.icon}</span>
+                      <b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(18 * scale), color: t.ink, minWidth: 92 }}>{c.time}</b>
+                      <span>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}</i></span>
+                    </div>))}
+                </div>))
+            : rows.map((r, i) => (
+                <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", fontSize: Math.round(25 * scale), padding: `${Math.round(9 * scale)}px 0`, color: t.ink }}>
+                  <span style={{ color: t.accent, fontSize: Math.round(22 * scale), width: 28, textAlign: "center" }}>{r.icon}</span>
+                  <span><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
+                </div>))}
+          {showLegend && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>✦ = always runs ♡</div>}
+          {!showLegend && <div style={{ height: 22 }} />}
           <div style={{ display: "flex", gap: 16 }}>
             <span style={{ borderRadius: 999, padding: "18px 40px", fontSize: 24, fontWeight: 800, background: t.accent, color: t.onAccent }}>{footer}</span>
             <span style={{ borderRadius: 999, padding: "18px 40px", fontSize: 24, fontWeight: 600, border: `1.5px solid ${soft(t.secondary, 0.4)}`, color: t.secondary }}>Maybe later</span>
