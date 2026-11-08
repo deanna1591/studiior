@@ -6841,6 +6841,51 @@ export type Database = {
           },
         ]
       }
+      studio_brand_kits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_current: boolean
+          source: string
+          spec: Json
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_current?: boolean
+          source: string
+          spec: Json
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_current?: boolean
+          source?: string
+          spec?: Json
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_brand_kits_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "studio_brand_kits_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       studio_closures: {
         Row: {
           created_at: string
@@ -7059,6 +7104,8 @@ export type Database = {
           availability_reminders_enabled: boolean
           booking_cutoff_minutes: number
           booking_window_days: number
+          brand_kit_runs_month: number
+          brand_kit_runs_reset_on: string | null
           cancellation_cutoff_minutes: number
           carry_forward_enabled: boolean
           challenges_enabled: boolean
@@ -7189,6 +7236,8 @@ export type Database = {
           availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
           booking_window_days?: number
+          brand_kit_runs_month?: number
+          brand_kit_runs_reset_on?: string | null
           cancellation_cutoff_minutes?: number
           carry_forward_enabled?: boolean
           challenges_enabled?: boolean
@@ -7319,6 +7368,8 @@ export type Database = {
           availability_reminders_enabled?: boolean
           booking_cutoff_minutes?: number
           booking_window_days?: number
+          brand_kit_runs_month?: number
+          brand_kit_runs_reset_on?: string | null
           cancellation_cutoff_minutes?: number
           carry_forward_enabled?: boolean
           challenges_enabled?: boolean
@@ -8462,6 +8513,14 @@ export type Database = {
         }
         Returns: Json
       }
+      brand_kit_current: { Args: { p_studio_id: string }; Returns: Json }
+      brand_kit_defaults: { Args: { p_studio_id: string }; Returns: Json }
+      brand_kit_run_allowed: { Args: { p_studio_id: string }; Returns: Json }
+      brand_kit_save: {
+        Args: { p_source: string; p_spec: Json; p_studio_id: string }
+        Returns: Json
+      }
+      brand_kit_valid: { Args: { p_spec: Json }; Returns: boolean }
       brief_summary: {
         Args: { p_date: string; p_studio_id: string }
         Returns: string
@@ -8479,6 +8538,7 @@ export type Database = {
         Args: { p_kind: string; p_studio_id: string }
         Returns: Json
       }
+      call_jsonb: { Args: { sql: string; uid: string }; Returns: Json }
       campaign_audience: {
         Args: { p_filter: Json; p_studio_id: string }
         Returns: {
@@ -8976,6 +9036,22 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raise: {
+        Args: { label: string; sql: string; uid: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {

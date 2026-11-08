@@ -9,7 +9,7 @@
 
 ## 1. Scope notes
 
-**Manager marketing scope.** V1 excludes the email builder, SMS builder, landing pages and the affiliate system. A Manager's marketing scope in V1 means: create and run challenges, and approve AI-drafted member messages. Nothing more, because nothing more exists yet.
+**Manager marketing scope.** V1 excludes the email builder, SMS builder, landing pages and the affiliate system. A Manager's marketing scope in V1 means: create and run challenges, approve AI-drafted member messages, and (Decision 93) manage the brand kit and generate/edit/download schedule posts. Nothing more, because nothing more exists yet.
 
 **Front Desk "Payments."** Read as *taking* payment — selling a membership, a pack, a drop-in. Not refunding. Business Rules §13 puts refunds with Owner and Manager, and money leaving the studio should need a second pair of hands.
 
@@ -294,3 +294,16 @@ Some fields must be denied inside tables a role can otherwise read. Implemented 
 2. **Front-desk refunds.** Currently denied. Revisit if design partners find it too restrictive in practice.
 3. **Archived-member retention.** How long before GDPR hard delete, and who can trigger it.
 4. **Instructor substitution requests.** Not in V1. If added, needs a sixth screen and an approval queue for Owner and Manager.
+
+---
+
+## 17. Marketing — brand kit & schedule posts (Decision 93)
+
+| Action | O | M | I | FD | Mem |
+|---|---|---|---|---|---|
+| Manage the brand kit (upload references, Learn, overrides, reset) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| View the brand kit (read-only) | ✅ | ✅ | ❌ | 👁 | ❌ |
+| Manage connected accounts (Instagram/Facebook — part b) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Generate / edit / download schedule posts | ✅ | ✅ | ❌ | ✅ | ❌ |
+
+Managing the brand kit (and, in part b, connected accounts) is manager-up. Front desk may generate, edit and download posts but not the brand kit — they see the Brand kit page read-only. Instructors and members: nothing. Enforced in RLS and RPC, not only in the UI: `brand_kit_save` / `brand_kit_run_allowed` are `is_manager_up`, `brand_kit_current` is `is_desk_up` (read), and the `brand-references` storage bucket's write/read policies are manager-up.

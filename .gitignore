@@ -19,3 +19,6 @@ tsconfig.tsbuildinfo
 
 # Generated per-studio schedule embed output (built artifact, not source)
 embed/out/
+
+# Decision 93 brand references — large local PNGs, never committed
+docs/brand-reference/
