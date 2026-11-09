@@ -230,11 +230,13 @@ const SELF_CHECKIN_REASONS: Record<string, string> = {
   class_not_scheduled: "That class isn't running.",
   month_not_published: "That class isn't open for check-in yet.",
   window_closed: "Check-in isn't open for this class right now.",
-  // Decision 68 — the exact reason sentences under the button.
-  no_location: "Turn on location to check in, or ask at the desk.",
+  // Decision 68 — the exact reason sentences under the button. Decision 35
+  // amendment (10 Nov 2026): the instructor is the staff in the room now
+  // (Decision 81), so the fallback is "check in with your instructor", not the desk.
+  no_location: "Turn on location to check in, or check in with your instructor.",
   too_far: "You're too far from the studio to check in.",
-  low_accuracy: "Your phone can't place you closely enough — try again outside.",
-  studio_has_no_location: "Self check-in isn't set up here — show your code at the desk.",
+  low_accuracy: "Your phone can't place you closely enough. Try again outside.",
+  studio_has_no_location: "Self check-in isn't set up here. Check in with your instructor.",
 };
 
 export type CheckInResult = { ok: boolean; message: string } | null;

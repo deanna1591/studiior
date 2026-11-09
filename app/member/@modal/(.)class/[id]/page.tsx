@@ -22,6 +22,11 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
   // address bar still reads /class/[id]; a back step closes it.
   if (!data) return null;
 
+  // Decision 35 amendment: waiver at the door (mirrors the page, no drift).
+  const { data: cw } = await supabase.rpc("current_waiver", { p_studio_id: ctx.studioId });
+  const w = cw as { exists?: boolean; require_waiver?: boolean; signed?: boolean } | null;
+  const waiverBlocked = !!(w?.require_waiver && w.exists && !w.signed);
+
   return (
     <Sheet preset={preset} accent={accent}>
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
@@ -29,6 +34,7 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
                        unpaid={data.unpaid} group={data.group} covered={data.covered}
+                       waiverBlocked={waiverBlocked}
                        deskPayAvailable={deskPayAvailable} />
     </Sheet>
   );

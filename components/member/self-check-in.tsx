@@ -11,7 +11,7 @@ import { selfCheckIn } from "@/app/member/actions";
  * be at the studio" when the studio requires one — the button never blocks
  * itself. The reason comes back as a sentence and shows as a bottom toast.
  */
-export default function SelfCheckIn({ bookingId }: { bookingId: string }) {
+export default function SelfCheckIn({ bookingId, blocked = false }: { bookingId: string; blocked?: boolean }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, start] = useTransition();
@@ -36,9 +36,12 @@ export default function SelfCheckIn({ bookingId }: { bookingId: string }) {
 
   return (
     <>
-      <button type="button" onClick={go} disabled={pending || done}
-              className="m-tap flex shrink-0 items-center rounded-full px-4 text-[13px] font-bold disabled:opacity-90"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+      {/* Decision 35 amendment: the waiver notice sits above this button; the
+          button stays visible but disabled until the waiver is signed. */}
+      <button type="button" onClick={go} disabled={pending || done || blocked}
+              className="m-tap flex shrink-0 items-center rounded-full px-4 text-[13px] font-bold"
+              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)",
+                       opacity: blocked && !done ? 0.5 : 1 }}>
         {done ? "Checked in ✓" : pending ? "Checking in…" : "Check in"}
       </button>
       {msg && (

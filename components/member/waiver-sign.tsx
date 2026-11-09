@@ -23,9 +23,12 @@ function SignButton({ enabled }: { enabled: boolean }) {
 }
 
 export default function WaiverSign({
-  versionId, format, body, pdfUrl, memberName,
+  versionId, format, body, pdfUrl, memberName, nextPath = null,
 }: {
   versionId: string; format: string; body: string | null; pdfUrl: string | null; memberName: string;
+  /** Decision 35 amendment: where to return after signing (e.g. the QR page).
+   *  A full-document load keeps the member subdomain. */
+  nextPath?: string | null;
 }) {
   const [state, action] = useFormState<SignResult, FormData>(signWaiver, null);
   const [reachedEnd, setReachedEnd] = useState(false);
@@ -33,6 +36,15 @@ export default function WaiverSign({
   const [sig, setSig] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
+
+  // Decision 35 amendment: after signing, return to where they came from (the
+  // QR page). A full load, not router.push, so the member subdomain is kept.
+  useEffect(() => {
+    if (state?.ok && nextPath) {
+      const t = setTimeout(() => window.location.assign(nextPath), 700);
+      return () => clearTimeout(t);
+    }
+  }, [state?.ok, nextPath]);
 
   // Prepare the canvas at device resolution so the stroke is crisp.
   useEffect(() => {
@@ -90,7 +102,15 @@ export default function WaiverSign({
     return (
       <div className="m-card p-4" role="status">
         <p className="m-name text-ink">Signed — thank you.</p>
-        <p className="m-sub mt-1 text-ink-2">Your place is confirmed and your signed waiver is on file.</p>
+        <p className="m-sub mt-1 text-ink-2">
+          {nextPath ? "Your signed waiver is on file. Taking you back to check in…"
+                    : "Your place is confirmed and your signed waiver is on file."}
+        </p>
+        {nextPath && (
+          <a href={nextPath} className="m-press mt-2 inline-block text-[13px] text-ink underline underline-offset-4">
+            Back to check in
+          </a>
+        )}
       </div>
     );
   }

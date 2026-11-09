@@ -5,6 +5,7 @@ import { anonStudio } from "@/lib/anon-studio";
 import MemberShell from "@/components/member/shell";
 import SelfCheckIn from "@/components/member/self-check-in";
 import { fmtTime } from "@/lib/time";
+import { checkinNotice } from "@/lib/checkin-notice";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,15 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
     return card(<p className="m-body text-ink">This code belongs to a different studio.</p>);
   }
 
+  // Waiver at the door (Decision 34/35). The member-callable current_waiver
+  // gives require_waiver, whether a version exists, and whether THIS member has
+  // signed it; "blocked" is require_waiver AND a version AND not signed, which
+  // mirrors the service-only member_waiver_current. The self_check_in PT422
+  // stays the backstop for a stale page.
+  const { data: cw } = await supabase.rpc("current_waiver", { p_studio_id: ctx.studioId });
+  const w = cw as { exists?: boolean; require_waiver?: boolean; signed?: boolean } | null;
+  const waiverBlocked = !!(w?.require_waiver && w.exists && !w.signed);
+
   // The member's own live bookings at this studio, with the occurrence + its
   // location, so the window and the geofence availability are computed here —
   // the same shape as the Home card.
@@ -86,14 +96,24 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
     .eq("member_id", ctx.memberId).in("status", ["booked", "attended"]);
 
   const now = Date.now();
+  const opensBefore = settings.checkinOpensBefore;
+  const closesAfter = settings.checkinClosesAfter;
+  const fmt = (ms: number) => fmtTime(new Date(ms).toISOString(), ctx.timeZone, ctx.timeFormat);
+  const dayKey = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const todayKey = dayKey(new Date(now));
+
   const bookings = ((data ?? []) as unknown as Booking[])
     .filter((b) => b.class_occurrences)
     .sort((a, b) =>
       new Date(a.class_occurrences!.starts_at).getTime() - new Date(b.class_occurrences!.starts_at).getTime());
 
+  const startMs = (b: Booking) => new Date(b.class_occurrences!.starts_at).getTime();
+  const closeMs = (b: Booking) =>
+    new Date(b.class_occurrences!.ends_at ?? b.class_occurrences!.starts_at).getTime() + closesAfter * 60e3;
   const windowOpen = (o: Occ) => {
-    const opens = new Date(o.starts_at).getTime() - settings.checkinOpensBefore * 60e3;
-    const closes = new Date(o.ends_at ?? o.starts_at).getTime() + settings.checkinClosesAfter * 60e3;
+    const opens = new Date(o.starts_at).getTime() - opensBefore * 60e3;
+    const closes = new Date(o.ends_at ?? o.starts_at).getTime() + closesAfter * 60e3;
     return now >= opens && now <= closes;
   };
   const available = (o: Occ) => {
@@ -104,12 +124,37 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
 
   const open = bookings.filter((b) => windowOpen(b.class_occurrences!));
 
+  // Decision 35 amendment: the waiver notice card, above the check-in button.
+  const waiverCard = (
+    <div className="m-card mb-3 p-4 text-left"
+         style={{ borderLeft: "3px solid var(--coral)", background: "var(--coral-tint)" }}>
+      <p className="m-body text-ink">Please sign the waiver first before checking in.</p>
+      <Link href={`/waiver?next=${encodeURIComponent(next)}`}
+            className="m-press mt-2 inline-block rounded-lg px-3 py-1.5 text-[13px] font-semibold"
+            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+        Sign the waiver
+      </Link>
+    </div>
+  );
+
+  // No open window — say WHY rather than a bare "no class". Pick today's most
+  // relevant booking: the next one whose window is still ahead, else the last
+  // one whose window has closed; the pure helper chooses the sentence.
   if (open.length === 0) {
-    const nextUp = bookings.find((b) => new Date(b.class_occurrences!.starts_at).getTime() > now);
+    const todays = bookings.filter((b) => dayKey(new Date(b.class_occurrences!.starts_at)) === todayKey);
+    const laterToday = todays.filter((b) => now < startMs(b) - opensBefore * 60e3)[0];
+    const closedToday = [...todays].reverse().find((b) => now > closeMs(b));
+    const rel = laterToday ?? closedToday ?? null;
+    const o = rel?.class_occurrences ?? null;
+    const notice = checkinNotice({
+      booking: o ? { name: o.name, startsAt: new Date(o.starts_at).getTime(), endsAt: o.ends_at ? new Date(o.ends_at).getTime() : null } : null,
+      now, opensBefore, closesAfter, waiverOk: true, fmt,
+    });
+    const nextUp = bookings.find((b) => startMs(b) > now);
     return card(
       <>
-        <p className="m-body text-ink">No class to check in to right now.</p>
-        {nextUp && (
+        <p className="m-body text-ink">{notice.text}</p>
+        {notice.kind === "none" && nextUp && (
           <p className="m-sub mt-1 text-ink-2">
             Your next class is {new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: ctx.timeZone }).format(new Date(nextUp.class_occurrences!.starts_at))}{" "}
             at <span className="num">{fmtTime(nextUp.class_occurrences!.starts_at, ctx.timeZone, ctx.timeFormat)}</span>.
@@ -120,14 +165,15 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
   }
 
   // A location that requires coordinates but has none → the door QR can't place
-  // anyone; tell them to use the desk (Decision 35 §7, absence not a switch).
+  // anyone; the instructor checks them in (Decision 35 §7, absence not a switch).
   const noGeofence = open.every((b) => !available(b.class_occurrences!));
   if (noGeofence) {
-    return card(<p className="m-body text-ink">Check in at the desk.</p>);
+    return card(<p className="m-body text-ink">Check in with your instructor.</p>);
   }
 
   return (
     <Frame>
+      {waiverBlocked && waiverCard}
       <p className="m-sub mb-3 text-ink-2">
         {open.length === 1 ? "You're booked into this class." : "Pick the class you're here for."}
       </p>
@@ -143,8 +189,8 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
                 </span>
               </span>
               {available(o)
-                ? <SelfCheckIn bookingId={b.id} />
-                : <span className="m-sub shrink-0 text-ink-3">At the desk</span>}
+                ? <SelfCheckIn bookingId={b.id} blocked={waiverBlocked} />
+                : <span className="m-sub shrink-0 text-ink-3">With your instructor</span>}
             </li>
           );
         })}

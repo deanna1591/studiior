@@ -50,7 +50,7 @@ export type DetailBooking = { id: string; status: string; waitlist_position: num
 export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
-  unpaid = false, group = null, deskPayAvailable = true, covered = true,
+  unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -83,6 +83,9 @@ export default function ClassDetailBody({
   /** Decision 88: does this member's plan cover the class? When true, Book books
    *  inline (unchanged); when false, Book opens /checkout to pick a plan and pay. */
   covered?: boolean;
+  /** Decision 35 amendment: the studio waiver is unsigned, so the "Sign the
+   *  waiver" notice shows above the check-in button, which is disabled. */
+  waiverBlocked?: boolean;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -195,6 +198,19 @@ export default function ClassDetailBody({
                 line and Cancel, so here it adds only the new affordance:
                 Check in now (in the window). Nothing for the plain reserved /
                 waiting states the line above already expresses. */}
+            {/* Decision 35 amendment: waiver unsigned → the "Sign the waiver"
+                notice above the check-in button, which stays visible but disabled. */}
+            {waiverBlocked && (
+              <div className="m-card mb-3 p-4 text-left"
+                   style={{ borderLeft: "3px solid var(--coral)", background: "var(--coral-tint)" }}>
+                <p className="m-body text-ink">Please sign the waiver first before checking in.</p>
+                <Link href={`/waiver?next=${encodeURIComponent(`/class/${occ.id}`)}`}
+                      className="m-press mt-2 inline-block rounded-lg px-3 py-1.5 text-[13px] font-semibold"
+                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  Sign the waiver
+                </Link>
+              </div>
+            )}
             <div className="mb-3 flex justify-start empty:hidden">
               <ClassButton
                 occurrenceId={occ.id}
@@ -209,6 +225,7 @@ export default function ClassDetailBody({
                 closesAfterMin={closesAfterMin}
                 selfCheckinAvailable={selfCheckinAvailable}
                 checkinOnly
+                checkinBlocked={waiverBlocked}
                 bookClass={bookClass}
                 bookFirstFree={bookFirstFree}
                 selfCheckIn={selfCheckIn}

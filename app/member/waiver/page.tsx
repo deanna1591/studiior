@@ -2,16 +2,19 @@ import Link from "next/link";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import WaiverSign from "@/components/member/waiver-sign";
+import { safeNext } from "@/lib/auth-redirect";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Decision 34 — the member signs the studio's current waiver here. The Home
- * banner and the booking gate both send them to this screen.
+ * banner and the booking gate both send them to this screen. Decision 35
+ * amendment: the QR / class page can pass ?next to return there after signing.
  */
-export default async function WaiverPage() {
+export default async function WaiverPage({ searchParams }: { searchParams: { next?: string } }) {
   const { ctx, supabase, studioName, logoUrl, preset, accent, openOffers, memberName, memberFullName, avatarUrl } =
     await memberScreen();
+  const nextPath = searchParams?.next ? safeNext(searchParams.next) : null;
 
   const { data } = await supabase.rpc("current_waiver", { p_studio_id: ctx.studioId });
   const w = data as {
@@ -40,7 +43,9 @@ export default async function WaiverPage() {
         <div className="m-card p-5 text-center">
           <p className="m-body text-ink">You&rsquo;ve signed the current waiver.</p>
           <p className="m-sub mt-1 text-ink-2">It&rsquo;s on file with {studioName}.</p>
-          <Link href="/" className="m-sub mt-3 inline-block text-ink-2 underline">Back to home</Link>
+          <Link href={nextPath ?? "/"} className="m-sub mt-3 inline-block text-ink-2 underline">
+            {nextPath ? "Back to check in" : "Back to home"}
+          </Link>
         </div>
       ) : (
         <>
@@ -53,6 +58,7 @@ export default async function WaiverPage() {
             body={w.body ?? null}
             pdfUrl={pdfUrl}
             memberName={memberFullName || memberName}
+            nextPath={nextPath}
           />
         </>
       )}

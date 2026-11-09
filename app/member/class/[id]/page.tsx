@@ -21,6 +21,12 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
   const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
   if (!data) notFound();
 
+  // Decision 35 amendment: waiver at the door. current_waiver is member-callable
+  // and mirrors the service-only member_waiver_current.
+  const { data: cw } = await supabase.rpc("current_waiver", { p_studio_id: ctx.studioId });
+  const w = cw as { exists?: boolean; require_waiver?: boolean; signed?: boolean } | null;
+  const waiverBlocked = !!(w?.require_waiver && w.exists && !w.signed);
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
                  studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
@@ -33,6 +39,7 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
                        unpaid={data.unpaid} group={data.group} covered={data.covered}
+                       waiverBlocked={waiverBlocked}
                        deskPayAvailable={ctx.bootstrap?.desk_pay_available ?? true} />
     </MemberShell>
   );

@@ -31,7 +31,7 @@ export default function ClassButton({
   waitlistPosition = null,
   full = false, waitlistEnabled = false, freeFirstEligible = false, confirmLast = false,
   selfCheckinAvailable = true, deskCodeHref = "/check-in",
-  tone = "tint", checkinOnly = false,
+  tone = "tint", checkinOnly = false, checkinBlocked = false,
   bookClass, bookFirstFree, selfCheckIn, onChange,
 }: {
   occurrenceId: string;
@@ -62,6 +62,10 @@ export default function ClassButton({
    *  affordance — Check in now / Checked in — and renders nothing for the
    *  reserved / waiting / waitlisted states the page already expresses. */
   checkinOnly?: boolean;
+  /** Decision 35 amendment: the studio waiver is unsigned, so the in-window
+   *  "Check in now" button stays visible but disabled; the page shows the
+   *  "Sign the waiver" notice above it. */
+  checkinBlocked?: boolean;
   bookClass: (p: BookResult, f: FormData) => Promise<BookResult>;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
@@ -210,6 +214,13 @@ export default function ClassButton({
     return wrap(<span className={chip} style={grey}>Checked in</span>);
   }
   if (state === "checkin") {
+    // Decision 35 amendment: waiver unsigned → the button stays visible but
+    // disabled; the page's "Sign the waiver" notice sits above it.
+    if (checkinBlocked) {
+      return wrap(
+        <button type="button" disabled className={pill} style={{ ...solid, opacity: 0.5 }}>Check in now</button>,
+      );
+    }
     // Where the geofence can't place the phone, fall back to the rotating code.
     if (!selfCheckinAvailable) {
       return wrap(<Link href={deskCodeHref} className={pill} style={solid}>Check in now</Link>);
