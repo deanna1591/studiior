@@ -16,7 +16,7 @@ export type PostData = {
 export type PostStyle = "guest_check" | "times" | "invitation" | "lock_screen";
 export type PostMode = "day" | "week" | "month";
 export type PostFormat = "square" | "story";
-export type MonthCell = { date: string; label: string; count: number; first: string[]; more: number };
+export type MonthGridCell = { date: string | null; day: number | null; count: number; core: boolean; blank: boolean };
 
 export declare const MODES: PostMode[];
 export declare const FORMATS: PostFormat[];
@@ -25,8 +25,8 @@ export declare function rangeFor(mode: PostMode, isoDate: string): { from: strin
 export declare function coreOnlyDefault(flexMin: number): boolean;
 export declare function filterDays(days: PostDay[], coreOnly: boolean): PostDay[];
 export declare function classLine(c: PostClass): string;
-export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null; coachFirst?: string | null }): string;
-export declare function monthCells(days: PostDay[], limit?: number): MonthCell[];
+export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null; coachFirst?: string | null; mode?: PostMode }): string;
+export declare function monthGrid(days: PostDay[], monthStart: string): MonthGridCell[][];
 export declare function totalClasses(days: PostDay[]): number;
 
 export type FitPage = { days: PostDay[]; part: number; parts: number; scale: number };

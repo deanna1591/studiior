@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthCells, totalClasses, classLine,
+  rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses, classLine,
 } from "../lib/schedule-post.mjs";
 
 // A fixed grouped sample, the shape schedule_post_data returns.
@@ -73,22 +73,63 @@ test("caption text: empty days -> just the hashtags, or empty", () => {
   assert.equal(classLine({ time: "7:00 AM", name: "Flow", coach: null }), "7:00 AM Flow");
 });
 
-test("month summary: a cell per day, count + first three + more", () => {
-  const many = {
-    days: [{ date: "2026-11-09", label: "Monday 09 Nov", count: 4, classes: [
-      { time: "7", name: "A", coach: null, tier: "core" },
-      { time: "8", name: "B", coach: null, tier: "core" },
-      { time: "9", name: "C", coach: null, tier: "core" },
-      { time: "10", name: "D", coach: null, tier: "core" },
-    ] }],
-  };
-  const cells = monthCells(many.days, 3);
-  assert.equal(cells.length, 1);
-  assert.deepEqual(cells[0].first, ["A", "B", "C"]);
-  assert.equal(cells[0].count, 4);
-  assert.equal(cells[0].more, 1);
-  // a day with no classes is not a cell
-  assert.equal(monthCells([{ date: "x", label: "X", count: 0, classes: [] }]).length, 0);
+// --- Decision 93 amendment — month calendar grid ----------------------------
+
+test("month grid: Dec 2026 is 5 rows, Tue 1 on column 2, Thu 31 last", () => {
+  const days = [
+    { date: "2026-12-01", label: "Tuesday 1 Dec", count: 16, classes: Array.from({ length: 16 }, () => ({ time: "7", name: "A", coach: null, tier: "core" })) },
+    { date: "2026-12-03", label: "Thursday 3 Dec", count: 1, classes: [{ time: "9", name: "B", coach: null, tier: "flex" }] },
+  ];
+  const rows = monthGrid(days, "2026-12-01");
+  assert.equal(rows.length, 5);                               // 5 rows
+  assert.equal(rows.every((r) => r.length === 7), true);      // 7 cells each
+  assert.equal(rows[0][0].blank, true);                       // column 1 (Mon) blank
+  assert.equal(rows[0][1].blank, false);                      // column 2 (Tue)...
+  assert.equal(rows[0][1].day, 1);                            // ...is day 1
+  assert.equal(rows[0][1].date, "2026-12-01");
+  assert.equal(rows[0][1].count, 16);                         // its count
+  assert.equal(rows[0][1].core, true);                        // a core day -> ✦
+  // Thu 31 is the last real cell: row 5 (index 4), column 4 (index 3, Thursday)
+  const last = rows[4][3];
+  assert.equal(last.day, 31);
+  assert.equal(last.blank, false);
+  assert.equal(rows[4].slice(4).every((c) => c.blank), true); // nothing after Thu 31
+});
+
+test("month grid: an in-month day with no classes has count 0", () => {
+  const days = [{ date: "2026-12-01", label: "Tuesday 1 Dec", count: 1, classes: [{ time: "7", name: "A", coach: null, tier: "core" }] }];
+  const rows = monthGrid(days, "2026-12-01");
+  const dec2 = rows.flat().find((c) => c.day === 2);
+  assert.equal(dec2.blank, false);
+  assert.equal(dec2.count, 0);                                // no classes -> count 0
+  assert.equal(dec2.core, false);                            // ...and no ✦
+});
+
+test("month grid: a 31-day month starting Saturday is 6 rows", () => {
+  // 2026-08-01 is a Saturday -> 5 leading blanks + 31 days = 36 -> 6 rows
+  const rows = monthGrid([], "2026-08-01");
+  assert.equal(rows.length, 6);
+  assert.equal(rows[0].slice(0, 5).every((c) => c.blank), true); // Mon..Fri blank
+  assert.equal(rows[0][5].day, 1);                               // Sat = day 1
+});
+
+test("month caption: one line per day with classes, then the closing line", () => {
+  const days = [
+    { date: "2026-12-01", label: "Tuesday 1 Dec", count: 16, classes: Array.from({ length: 16 }, () => ({ time: "7", name: "A", coach: null, tier: "core" })) },
+    { date: "2026-12-02", label: "Wednesday 2 Dec", count: 1, classes: [{ time: "8", name: "B", coach: null, tier: "core" }] },
+  ];
+  const cap = captionText({ days, hashtags: "#reform #pilates", mode: "month" });
+  const lines = cap.split("\n");
+  assert.equal(lines[0], "Tue 1 Dec · 16 classes");            // one line per day
+  assert.equal(lines[1], "Wed 2 Dec · 1 class");               // singular "class"
+  assert.equal(lines[2], "");                                  // blank line
+  assert.equal(lines[3], "Full schedule on the app");          // the closing line
+  assert.equal(lines[4], "#reform #pilates");                  // then the hashtags
+  // exactly one line per day-with-classes, plus the blank, closing and tags
+  assert.equal(lines.filter((l) => / · \d+ class/.test(l)).length, 2);
+  // no hashtags -> closing line is the last line
+  const noTags = captionText({ days, mode: "month" });
+  assert.equal(noTags.split("\n").pop(), "Full schedule on the app");
 });
 
 // --- Decision 93 slice 3 — caption " with ", auto-fit, undo -------------------

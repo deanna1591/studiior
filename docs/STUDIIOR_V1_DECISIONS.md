@@ -2220,3 +2220,7 @@ Coach mode drops "with {coach}" from the card body (the coach is in the caption)
 ### Amendment, 9 Nov 2026 — clock and part totals
 
 The lock screen clock never shows a leading zero (6:00, not 06:00), in both line 1 and the big clock. On a split Guest Check or Invitation week, the header and total count every class in the whole week, and the part is shown as "Part {n} of {parts}" in the same mono style next to the date range.
+
+### Amendment, 9 Nov 2026 — month grid
+
+Month mode renders a calendar grid in every style instead of a day list: 7 columns Mon to Sun, as many rows as the month needs (5 or 6), always one page in both formats. Each cell shows the day number (Instrument Serif) and the class count in small mono ("16 classes", or "1 class"); a day with no classes shows the number only in the muted colour; a day outside the month is blank. A ✦ in the kit accent marks a day with at least one core class. The month headline keeps the existing form ("December's schedule"). Guest Check puts the grid inside the receipt, The Times under the masthead, Invitation inside the card, Lock screen stays Day only. The Month caption is one line per day ("Tue 1 Dec · 16 classes"), then a blank line, then "Full schedule on the app" and the hashtags. Coach mode counts only that coach's classes.

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
-  rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthCells, totalClasses,
+  rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses,
   editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero,
   pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
@@ -161,7 +161,7 @@ export default function SchedulePosts({
   }
 
   async function copyCaption() {
-    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst });
+    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode });
     try { await navigator.clipboard.writeText(text); setNote("Caption copied."); }
     catch { setNote("Could not copy. Select the caption below instead."); }
   }
@@ -286,7 +286,7 @@ export default function SchedulePosts({
               studioName={studioName} logoData={logoData} coachFirst={coachFirst} coachData={coachData}
               bgData={bgData} rangeLabel={rangeLabel} weekday={weekday} monthName={monthName}
               footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading}
-              weekTotal={totalClasses(days)} />
+              weekTotal={totalClasses(days)} monthStart={from} />
           </div>
         </div>
 
@@ -348,7 +348,7 @@ export default function SchedulePosts({
           <div>
             <p className="text-[11px] text-ink-3">Caption</p>
             <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-paper p-3 text-[12px] text-ink-2">
-{empty ? "No classes to post for these dates." : captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst })}
+{empty ? "No classes to post for these dates." : captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode })}
             </pre>
           </div>
         </div>
@@ -444,9 +444,6 @@ function Logo({ data, name, df, color, size }: { data: string | null; name: stri
 }
 function shortDay(label: string): string { return (label.split(/\s+/)[0] || label).slice(0, 3); }
 function dayNum(date: string): string { return String(Number(date.split("-")[2] ?? "")); }
-function coachNames(day: PostDay): string[] {
-  return [...new Set((day.classes || []).map((c) => c.coach).filter(Boolean) as string[])].sort();
-}
 
 // ---------------------------------------------------------------------------
 // The editorial post — dispatches to one of four styles
@@ -455,17 +452,17 @@ type StyleProps = {
   t: Tokens; page: FitPage; mode: PostMode; format: PostFormat;
   headline: { lead: string; accent: string }; rangeLabel: string;
   studioShort: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
-  footer: string; scale: number; story: boolean; weekTotal: number;
+  footer: string; scale: number; story: boolean; weekTotal: number; monthStart: string;
 };
 
 function EditorialPost({
   style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
-  rangeLabel, weekday, monthName, footer, empty, loading, weekTotal,
+  rangeLabel, weekday, monthName, footer, empty, loading, weekTotal, monthStart,
 }: {
   style: PostStyle; spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
   studioName: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
   bgData: string | null; rangeLabel: string; weekday: string; monthName: string;
-  footer: string; empty: boolean; loading: boolean; weekTotal: number;
+  footer: string; empty: boolean; loading: boolean; weekTotal: number; monthStart: string;
 }) {
   const t = tokens(spec);
   const story = format === "story";
@@ -492,7 +489,7 @@ function EditorialPost({
     return <LockScreen t={t} page={page} format={format} coachFirst={coachFirst} footer={footer} photo={photo} logoData={logoData} />;
   }
 
-  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal };
+  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal, monthStart };
   const styled = style === "guest_check" ? <GuestCheck {...p} />
     : style === "times" ? <Times {...p} />
     : <Invitation {...p} />;
@@ -535,9 +532,47 @@ function Field({ bg, children, light }: { bg: string; children: React.ReactNode;
   );
 }
 
+// --- Month calendar grid (shared by Guest Check, The Times, Invitation) ------
+// 7 columns Mon..Sun, as many rows as the month needs, always one page. Each
+// cell: the day number (kit display font — a serif number that sits in the
+// style's own typography, where a hardcoded Instrument Serif would clash with a
+// non-serif kit), the class count in small mono, and a ✦ in the kit accent on a
+// day with at least one core class. An empty day shows the muted number only; an
+// out-of-month cell is blank. Fills its container width; story makes taller cells.
+function MonthGrid({ t, days, monthStart, story }: {
+  t: Tokens; days: PostDay[]; monthStart: string; story: boolean;
+}) {
+  const rows = monthGrid(days, monthStart);
+  const line = soft(t.secondary, 0.25);
+  const head = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const cellH = story ? 150 : 96;
+  const flat = rows.flat();
+  return (
+    <div style={{ width: "100%" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 6 }}>
+        {head.map((h) => (
+          <div key={h} style={{ fontFamily: t.mono, fontSize: 13, letterSpacing: ".12em", color: t.secondary, textAlign: "center", paddingBottom: 6, borderBottom: `2px solid ${t.ink}` }}>{h.toUpperCase()}</div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
+        {flat.map((c, i) => (
+          <div key={i} style={{ position: "relative", minHeight: cellH, padding: "9px 11px", boxSizing: "border-box", borderRight: i % 7 === 6 ? "0" : `1px solid ${line}`, borderBottom: i >= flat.length - 7 ? "0" : `1px solid ${line}` }}>
+            {!c.blank && (
+              <>
+                <div style={{ fontFamily: t.df, fontSize: story ? 40 : 32, lineHeight: 1, color: c.count > 0 ? t.ink : t.secondary }}>{c.day}</div>
+                {c.count > 0 && <div style={{ fontFamily: t.mono, fontSize: story ? 16 : 13, color: t.secondary, marginTop: 7 }}>{c.count} {c.count === 1 ? "class" : "classes"}</div>}
+                {c.core && <div style={{ position: "absolute", top: 9, right: 11, fontSize: story ? 24 : 19, lineHeight: 1, color: t.accent }}>✦</div>}
+              </>
+            )}
+          </div>))}
+      </div>
+    </div>
+  );
+}
+
 // --- Guest Check ------------------------------------------------------------
 function GuestCheck(p: StyleProps) {
-  const { t, page, mode, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story, weekTotal } = p;
+  const { t, page, mode, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story, weekTotal, monthStart } = p;
   const day0 = page.days[0];
   const partTag = page.parts > 1 ? `Part ${page.part} of ${page.parts}` : null;
   const cardW = story ? 840 : 700;
@@ -559,14 +594,16 @@ function GuestCheck(p: StyleProps) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${metaCols},1fr)`, borderBottom: `2px solid ${t.ink}` }}>
           <div style={{ fontFamily: t.mono, fontSize: 11, letterSpacing: ".15em", padding: "8px 6px", borderRight: `1px solid ${t.ink}` }}>
-            {mode === "day" ? "DATE" : "WEEK"}
+            {mode === "day" ? "DATE" : mode === "week" ? "WEEK" : "MONTH"}
             <b style={{ display: "block", fontSize: 14, letterSpacing: 0, marginTop: 2, color: t.ink }}>{mode === "day" ? (day0?.label ?? rangeLabel) : rangeLabel}</b>
             {partTag && <span style={{ display: "block", fontFamily: t.mono, fontSize: 11, letterSpacing: ".1em", marginTop: 3, color: t.accent }}>{partTag}</span>}
           </div>
           {meta("CLASSES", String(weekTotal))}
           {coachFirst ? meta("COACH", coachFirst, true) : null}
         </div>
-        {mode === "day"
+        {mode === "month" ? (
+          <div style={{ padding: "16px 0 4px" }}><MonthGrid t={t} days={page.days} monthStart={monthStart} story={story} /></div>
+        ) : mode === "day"
           ? (day0?.classes ?? []).map((c, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 ${Math.round(4 * scale)}px` }}>
               <span style={{ fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
@@ -584,9 +621,9 @@ function GuestCheck(p: StyleProps) {
             </div>))}
         <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `2px solid ${line}`, padding: "16px 0 6px", fontSize: 32, color: t.accent }}>
           <span style={{ fontFamily: t.hand }}>total:</span>
-          <span style={{ fontFamily: t.hand }}>{weekTotal} {weekTotal === 1 ? "class" : "classes"}{mode === "week" ? " this week" : ""}</span>
+          <span style={{ fontFamily: t.hand }}>{weekTotal} {weekTotal === 1 ? "class" : "classes"}{mode === "week" ? " this week" : mode === "month" ? " this month" : ""}</span>
         </div>
-        {mode === "week" && anyFlex(page.days) && (
+        {(mode === "week" || mode === "month") && anyFlex(page.days) && (
           <div style={{ fontFamily: t.hand, fontSize: 24, color: t.secondary, padding: "10px 0 0" }}>✦ = always runs</div>
         )}
         <div style={{ fontFamily: t.hand, fontSize: 26, color: t.secondary, padding: "14px 0 0" }}>thank you, come again ♡</div>
@@ -601,7 +638,7 @@ function GuestCheck(p: StyleProps) {
 
 // --- The Times --------------------------------------------------------------
 function Times(p: StyleProps) {
-  const { t, page, mode, headline, rangeLabel, studioShort, logoData, footer, scale, story } = p;
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, footer, scale, story, monthStart } = p;
   const cardW = story ? 980 : 900;
   const line = soft(t.secondary, 0.3);
   const rule = soft(t.secondary, 0.28);
@@ -632,11 +669,7 @@ function Times(p: StyleProps) {
               </div>))}
           </div>
         ) : mode === "month" ? (
-          page.days.map((d) => (
-            <div key={d.date} style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 14, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${rule}` }}>
-              <span style={{ fontFamily: t.df, fontSize: 28 }}>{shortDay(d.label)} {dayNum(d.date)}</span>
-              <span style={{ fontSize: 18, color: t.secondary }}>{d.count} {d.count === 1 ? "class" : "classes"}{coachNames(d).length ? ` · ${coachNames(d).join(", ")}` : ""}</span>
-            </div>))
+          <div style={{ marginTop: 4 }}><MonthGrid t={t} days={page.days} monthStart={monthStart} story={story} /></div>
         ) : (
           (page.days[0]?.classes ?? []).map((c, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 14, alignItems: "baseline", padding: `${Math.round(9 * scale)}px 0`, borderBottom: `1px solid ${rule}` }}>
@@ -656,14 +689,13 @@ function Times(p: StyleProps) {
 
 // --- Invitation -------------------------------------------------------------
 function Invitation(p: StyleProps) {
-  const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story } = p;
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, monthStart } = p;
   const partTag = page.parts > 1 ? `Part ${page.part} of ${page.parts}` : null;
   const cardW = story ? 900 : 860;
   type Row = { icon: string; time: string; text: string; sub: string };
-  // Day and month stay a flat list; week lists every class under a day heading.
-  const rows: Row[] = mode === "day"
-    ? (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "" }))
-    : monthCells(page.days, 3).map((cell) => ({ icon: "✦", time: shortDay(cell.label), text: `${cell.count} ${cell.count === 1 ? "class" : "classes"}`, sub: cell.first.join(", ") }));
+  // Day is a flat list; week lists every class under a day heading; month is the
+  // calendar grid.
+  const rows: Row[] = (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "" }));
   const groups = mode === "week" ? weekRows(page.days, { coachMode: !!coachFirst }) : null;
   const showLegend = anyFlex(page.days);
   return (
@@ -685,7 +717,9 @@ function Invitation(p: StyleProps) {
           <h1 style={{ fontFamily: t.df, fontWeight: 400, fontSize: story ? 84 : 92, lineHeight: 0.95, margin: "0 0 24px", color: t.ink }}>
             {headline.lead}<em style={{ color: t.accent, fontStyle: "italic" }}>{headline.accent}</em>
           </h1>
-          {groups
+          {mode === "month"
+            ? <MonthGrid t={t} days={page.days} monthStart={monthStart} story={story} />
+            : groups
             ? groups.map((g) => (
                 <div key={g.label} style={{ marginBottom: Math.round(8 * scale) }}>
                   <div style={{ fontFamily: t.df, fontSize: Math.round(24 * scale), color: t.accent, borderBottom: `1px solid ${soft(t.secondary, 0.3)}`, paddingBottom: 3, marginBottom: 4 }}>{g.label}</div>
