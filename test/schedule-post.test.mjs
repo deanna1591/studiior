@@ -160,7 +160,7 @@ test("slice 3: fitScale picks the first step that fits, else the floor", () => {
 
 // --- Editorial styles (amendment) -------------------------------------------
 import {
-  POST_STYLES, STYLE_LABELS, headlineParts, shortName, receiptNo, editorialPlan, STYLE_FIT, titleCase,
+  POST_STYLES, STYLE_LABELS, headlineParts, shortName, receiptNo, editorialPlan, STYLE_FIT, titleCase, stripLeadingZero,
 } from "../lib/schedule-post.mjs";
 
 test("editorial: four styles with labels", () => {
@@ -302,6 +302,22 @@ test("lock screen: titleCase makes an all-caps class name read as a title", () =
   assert.equal(titleCase("REFORMER SCULPT"), "Reformer Sculpt");
   assert.equal(titleCase("reformer flow"), "Reformer Flow");
   assert.equal(titleCase("Mat Pilates"), "Mat Pilates");
+});
+
+test("amendment: the lock-screen clock drops a leading zero but keeps a two-digit hour", () => {
+  assert.equal(stripLeadingZero("06:00"), "6:00");
+  assert.equal(stripLeadingZero("12:00"), "12:00");
+  assert.equal(stripLeadingZero("7:00"), "7:00");
+});
+
+test("amendment: a split week's total counts every class in the whole week, the same on every part", () => {
+  const days = week60();
+  const plan = editorialPlan({ days, mode: "week", format: "story", style: "guest_check" });
+  assert.ok(plan.pages.length >= 2);            // the week splits into parts
+  assert.equal(totalClasses(days), 60);         // the whole-week total handed to every part
+  // the parts together still cover all 60 classes exactly once
+  const covered = plan.pages.reduce((n, pg) => n + totalClasses(pg.days), 0);
+  assert.equal(covered, 60);
 });
 
 test("slice 3: the undo stack pushes and steps back, base kept", () => {

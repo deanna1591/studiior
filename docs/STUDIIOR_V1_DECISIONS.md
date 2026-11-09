@@ -2216,3 +2216,7 @@ Cards: at most 3 per square page and 5 per story page; a day with more classes s
 Footer: the existing handwritten line "swipe up, book on the app ♡" in Nothing You Could Do 40 px white 0.85, centred 90 px from the bottom.
 
 Coach mode drops "with {coach}" from the card body (the coach is in the caption). The caption is unchanged.
+
+### Amendment, 9 Nov 2026 — clock and part totals
+
+The lock screen clock never shows a leading zero (6:00, not 06:00), in both line 1 and the big clock. On a split Guest Check or Invitation week, the header and total count every class in the whole week, and the part is shown as "Part {n} of {parts}" in the same mono style next to the date range.

@@ -5,7 +5,7 @@ import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthCells, totalClasses,
-  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase,
+  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero,
   pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
@@ -285,7 +285,8 @@ export default function SchedulePosts({
               style={style} spec={activeSpec} page={page} mode={mode} format={format}
               studioName={studioName} logoData={logoData} coachFirst={coachFirst} coachData={coachData}
               bgData={bgData} rangeLabel={rangeLabel} weekday={weekday} monthName={monthName}
-              footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading} />
+              footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading}
+              weekTotal={totalClasses(days)} />
           </div>
         </div>
 
@@ -454,17 +455,17 @@ type StyleProps = {
   t: Tokens; page: FitPage; mode: PostMode; format: PostFormat;
   headline: { lead: string; accent: string }; rangeLabel: string;
   studioShort: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
-  footer: string; scale: number; story: boolean;
+  footer: string; scale: number; story: boolean; weekTotal: number;
 };
 
 function EditorialPost({
   style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
-  rangeLabel, weekday, monthName, footer, empty, loading,
+  rangeLabel, weekday, monthName, footer, empty, loading, weekTotal,
 }: {
   style: PostStyle; spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
   studioName: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
   bgData: string | null; rangeLabel: string; weekday: string; monthName: string;
-  footer: string; empty: boolean; loading: boolean;
+  footer: string; empty: boolean; loading: boolean; weekTotal: number;
 }) {
   const t = tokens(spec);
   const story = format === "story";
@@ -491,7 +492,7 @@ function EditorialPost({
     return <LockScreen t={t} page={page} format={format} coachFirst={coachFirst} footer={footer} photo={photo} logoData={logoData} />;
   }
 
-  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story };
+  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal };
   const styled = style === "guest_check" ? <GuestCheck {...p} />
     : style === "times" ? <Times {...p} />
     : <Invitation {...p} />;
@@ -536,9 +537,9 @@ function Field({ bg, children, light }: { bg: string; children: React.ReactNode;
 
 // --- Guest Check ------------------------------------------------------------
 function GuestCheck(p: StyleProps) {
-  const { t, page, mode, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story } = p;
+  const { t, page, mode, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story, weekTotal } = p;
   const day0 = page.days[0];
-  const total = page.days.reduce((n, d) => n + d.classes.length, 0);
+  const partTag = page.parts > 1 ? `Part ${page.part} of ${page.parts}` : null;
   const cardW = story ? 840 : 700;
   const line = soft(t.secondary, 0.35);
   const metaCols = (coachFirst ? 3 : 2);
@@ -557,8 +558,12 @@ function GuestCheck(p: StyleProps) {
           <span style={{ fontFamily: t.mono, color: t.accent, fontWeight: 700, fontSize: 18 }}>{receiptNo(day0?.date ?? "")}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${metaCols},1fr)`, borderBottom: `2px solid ${t.ink}` }}>
-          {meta(mode === "day" ? "DATE" : "WEEK", mode === "day" ? (day0?.label ?? rangeLabel) : rangeLabel)}
-          {meta("CLASSES", String(total))}
+          <div style={{ fontFamily: t.mono, fontSize: 11, letterSpacing: ".15em", padding: "8px 6px", borderRight: `1px solid ${t.ink}` }}>
+            {mode === "day" ? "DATE" : "WEEK"}
+            <b style={{ display: "block", fontSize: 14, letterSpacing: 0, marginTop: 2, color: t.ink }}>{mode === "day" ? (day0?.label ?? rangeLabel) : rangeLabel}</b>
+            {partTag && <span style={{ display: "block", fontFamily: t.mono, fontSize: 11, letterSpacing: ".1em", marginTop: 3, color: t.accent }}>{partTag}</span>}
+          </div>
+          {meta("CLASSES", String(weekTotal))}
           {coachFirst ? meta("COACH", coachFirst, true) : null}
         </div>
         {mode === "day"
@@ -579,7 +584,7 @@ function GuestCheck(p: StyleProps) {
             </div>))}
         <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `2px solid ${line}`, padding: "16px 0 6px", fontSize: 32, color: t.accent }}>
           <span style={{ fontFamily: t.hand }}>total:</span>
-          <span style={{ fontFamily: t.hand }}>{total} {total === 1 ? "class" : "classes"}{mode === "week" ? " this week" : ""}</span>
+          <span style={{ fontFamily: t.hand }}>{weekTotal} {weekTotal === 1 ? "class" : "classes"}{mode === "week" ? " this week" : ""}</span>
         </div>
         {mode === "week" && anyFlex(page.days) && (
           <div style={{ fontFamily: t.hand, fontSize: 24, color: t.secondary, padding: "10px 0 0" }}>✦ = always runs</div>
@@ -652,6 +657,7 @@ function Times(p: StyleProps) {
 // --- Invitation -------------------------------------------------------------
 function Invitation(p: StyleProps) {
   const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story } = p;
+  const partTag = page.parts > 1 ? `Part ${page.part} of ${page.parts}` : null;
   const cardW = story ? 900 : 860;
   type Row = { icon: string; time: string; text: string; sub: string };
   // Day and month stay a flat list; week lists every class under a day heading.
@@ -666,7 +672,10 @@ function Invitation(p: StyleProps) {
       <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
       <div style={{ width: cardW, background: t.surface, borderRadius: 34, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,.18)" }}>
         <div style={{ background: t.accent, color: t.onAccent, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px 40px", fontSize: 22 }}>
-          <span style={{ fontFamily: t.mono, fontSize: 20 }}>{mode === "day" ? (page.days[0]?.label ?? rangeLabel) : rangeLabel}</span>
+          <span style={{ fontFamily: t.mono, fontSize: 20 }}>
+            {mode === "day" ? (page.days[0]?.label ?? rangeLabel) : rangeLabel}
+            {partTag && <span style={{ fontSize: 16, marginLeft: 10 }}>· {partTag}</span>}
+          </span>
           <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {coachData && <img src={coachData} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />}
             {coachFirst ?? studioShort}
@@ -724,7 +733,7 @@ function LockScreen({ t, page, format, coachFirst, footer, photo, logoData }: {
   const day0 = page.days[0];
   const classes = day0?.classes ?? [];
   const weekday = (day0?.label ?? "").split(/\s+/)[0] || "Today";
-  const firstTime = ((classes[0]?.time ?? "7:00").replace(/\s?(AM|PM)$/i, "").trim()) || "7:00";
+  const firstTime = stripLeadingZero(((classes[0]?.time ?? "7:00").replace(/\s?(AM|PM)$/i, "").trim()) || "7:00");
   const coachMode = !!coachFirst;
   const grey = "rgba(60,60,67,0.6)";
   const bg = `linear-gradient(180deg, ${mixHex(t.background, "#000000", 0.35)}, ${mixHex(t.background, "#000000", 0.55)})`;
