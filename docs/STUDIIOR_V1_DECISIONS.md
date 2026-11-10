@@ -1328,6 +1328,33 @@ Business rule **§2.1.2** has always said the booking window is the member's **h
 
 **Recorded before code, per this project's rule.** Migration `20260831760000`; teeth in `series`/`book_class`/`member_app` scope — the standing assertion is that `member_bootstrap.booking_window_days` equals what `book_class` used for the same member, and it fails if either side is changed to read the studio value directly.
 
+### Amendment — the cancellation rule is shown before the tap (Deanna, 9 Nov 2026)
+
+Decision 36 made the member app show the **booking-window** truth before the member taps Book. This is the symmetric rule for Cancel: show the **cancellation-cutoff** truth before the member taps Cancel, so a free class or a credit is never silently spent. The cutoff and the member's seat type decide the wording; the numbers come from settings (`cancellation_cutoff_minutes`), never typed; the times are in the studio clock; no em dashes.
+
+**Before the cutoff**, under the Cancel button:
+- Credit or free class: *"Free to cancel until {cutoff_time} on {cutoff_day}. After that your {credit | free class} is used."*
+- Unlimited membership: *"Free to cancel until {cutoff_time} on {cutoff_day}. After that it counts as a late cancel."*
+- Drop-in (paid or unpaid): *"Free to cancel until {cutoff_time} on {cutoff_day}."*
+
+**After the cutoff, before the class starts**, the button stays and the line becomes:
+- Credit or free class: *"It's less than {N} hours before class. Cancelling now uses your {credit | free class}."*
+- Unlimited: *"It's less than {N} hours before class. Cancelling now counts as a late cancel."*
+- Drop-in: *"It's less than {N} hours before class."*
+The confirm sheet repeats the same sentence, with the buttons *"Cancel anyway"* / *"Keep my spot"*.
+
+**Results** (the sentence the member sees after cancelling):
+- Late, with a credit or free class used: *"Cancelled. Your {credit | free class} was used."*
+- On time, credit returned: *"Cancelled. Your credit is back on your account."*
+- On time, free class kept: *"Cancelled. Your free class is still yours."*
+- Everything else: *"Cancelled."*
+
+**Class already started**: the button is gone and the line reads *"This class has started."*
+
+**Retired from the member app**: *"Cancelled, inside the notice period."* and the SQL `reason` sentence — the member now reads the seat-specific result above instead.
+
+Build: a pure helper `lib/cancel-notice.mjs` picks the sentences from `{startsAt, cutoffMinutes, now, seatKind}`; the class page (full and modal), the Home card and `cancelBooking` in `app/member/actions.ts` all read it through the same helper, so the before-tap line, the confirm sheet and the result cannot drift. `member_bootstrap` carries `cancellation_cutoff_minutes` (confirm; add to the existing bootstrap reader if absent, no new RPC). Depends on Decision 30(d)'s "late cancel uses the free class" amendment (recorded alongside) so the free-class wording is true. Recorded 2026-11-09, before code.
+
 ---
 
 ## 35 — Check-in at the door: member self check-in with a geofence, a printed studio QR, and instructor scanning
@@ -1510,6 +1537,12 @@ A free first class (Decision 30) must never be the only person in a room, becaus
 ### Amendment (d) — a no-show on the free first class uses it (Deanna, 27 Oct 2026)
 
 (d) A no-show on the free first class uses it. Cancelling before the cut-off keeps it (unchanged). free_first_eligibility returns 'missed' after one no-show (replaces missed_twice). The missed-you email offers the intro plan rather than a second free class. Rationale: the studio and the instructor are paid for the seat whether or not the member comes. Recorded 2026-10-27.
+
+### Amendment (d, continued) — a late cancel uses the free class too (Deanna, 9 Nov 2026)
+
+A free first class is kept when the member cancels before the studio's cancellation cutoff. A cancel inside the cutoff (late_cancelled) uses the free class, the same as a no-show, with reason 'late_cancel'. Applies to cancels from the time this ships; earlier late cancels are not reassessed. The free-first pass is not reused after a late cancel. Staff can still grant another free class by hand with "Make this their free class".
+
+**Why this is a behaviour change, not only display.** Today `free_first_eligibility_run` counts only a `comp + no_show` seat (plus an attended free seat, a live booking, or a membership) as a disqualifier, so a `late_cancelled` comp seat matches none and the member stays eligible — a late cancel of the free class leaves it usable again, which contradicts the studio and the instructor being paid for the seat. The build (own migration, re-issued from the newest definitions) makes `free_first_eligibility_run` treat a `late_cancelled` comp booking as a disqualifier with reason 'late_cancel' **only when the cancel is on or after a recorded cut-over timestamp** (a studio-independent constant in the function body), so earlier late cancels are not reassessed; `tg_guest_pass_sync` does not reuse the pass on `late_cancelled`. Staff-facing free-first readers (the `member_plan_overview` chip, the member profile line, Journey rows) read "Free class used (late cancel)". The suite proves: an on-time cancel keeps eligibility; a late cancel after the cut-over removes it with reason late_cancel; a late cancel dated before the cut-over keeps it; a no-show is unchanged; and "Make this their free class" still works after a late cancel. Recorded 2026-11-09, before code.
 
 ---
 

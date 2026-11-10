@@ -44,6 +44,7 @@ const PLAN_FILTERS: { key: string; label: string; match: (m: Row) => boolean }[]
   { key: "free_booked", label: "Free class booked", match: (m) => m.plan_state === "free_only" && m.free_stage === "booked" },
   { key: "free_taken", label: "Free class taken", match: (m) => m.plan_state === "free_only" && m.free_stage === "taken" },
   { key: "free_missed", label: "Free class missed", match: (m) => m.plan_state === "free_only" && m.free_stage === "missed" },
+  { key: "free_late_cancel", label: "Free class used (late cancel)", match: (m) => m.plan_state === "free_only" && m.free_stage === "late_cancel" },
   { key: "unpaid", label: "Unpaid booking", match: (m) => m.has_unpaid_booking },
   // A member with an unpaid booking is excluded here — they DID book.
   { key: "none", label: "Signed up, nothing booked", match: (m) => m.plan_state === "none" && !m.has_unpaid_booking },
@@ -353,6 +354,7 @@ function PlanLine({ m, timeZone }: { m: Row; timeZone: string }) {
     const stage = m.free_stage === "booked" ? "free_booked"
       : m.free_stage === "taken" ? "free_taken"
       : m.free_stage === "missed" ? "free_missed"
+      : m.free_stage === "late_cancel" ? "free_late_cancel"
       : "free_only";
     return <StateChip state={stage} />;
   }

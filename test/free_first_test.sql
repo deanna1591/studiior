@@ -425,4 +425,89 @@ select expect_num('cancel30: one of them live (booked)',
   (select count(*) from bookings where member_id='f9eef9ee-0000-0000-0000-00000000ad30'
      and payment_source='comp' and status='booked'), 1);
 
+-- =============================================================================
+-- Decision 30 amendment (d, continued) — a LATE cancel uses the free class.
+-- A cancel inside the cutoff (late_cancelled) on/after the cut-over disqualifies
+-- with reason 'late_cancel'; before the cut-over it keeps eligibility; a no-show
+-- is unchanged ('missed'); and "Make this their free class" still works after a
+-- late cancel (the by-hand grant overrides 'late_cancel'). RED-provable: without
+-- the new arm, the late_cancelled comp seat counts in nothing and the member
+-- stays eligible.
+-- =============================================================================
+insert into auth.users (id) values
+  ('f9eef9ee-0000-0000-0000-000000000e40'),
+  ('f9eef9ee-0000-0000-0000-000000000e41'),
+  ('f9eef9ee-0000-0000-0000-000000000e42');
+insert into profiles (id, email) values
+  ('f9eef9ee-0000-0000-0000-000000000e40','e40@example.com'),
+  ('f9eef9ee-0000-0000-0000-000000000e41','e41@example.com'),
+  ('f9eef9ee-0000-0000-0000-000000000e42','e42@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, joined_on, source, waiver_signed_at) values
+  ('f9eef9ee-0000-0000-0000-00000000ad40','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e40','Latec','Lead','latec40@example.com','lead',current_date,'self_signup', now()),
+  ('f9eef9ee-0000-0000-0000-00000000ad41','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e41','Noshow','Lead','noshow41@example.com','lead',current_date,'self_signup', now()),
+  ('f9eef9ee-0000-0000-0000-00000000ad42','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-000000000e42','Convc','Lead','convc42@example.com','lead',current_date,'self_signup', now());
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
+    starts_at, ends_at, capacity, booked_count, status, staffing) values
+  ('f9eef9ee-0000-0000-0000-00000000c040','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '14 days', now()+interval '14 days'+interval '50 min', 10, 0, 'scheduled','assigned'),
+  ('f9eef9ee-0000-0000-0000-00000000c041','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '15 days', now()+interval '15 days'+interval '50 min', 10, 0, 'scheduled','assigned'),
+  ('f9eef9ee-0000-0000-0000-00000000c042','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '16 days', now()+interval '16 days'+interval '50 min', 10, 0, 'scheduled','assigned'),
+  ('f9eef9ee-0000-0000-0000-00000000c043','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000000a','f9eef9ee-0000-0000-0000-0000000cc001','f9eef9ee-0000-0000-0000-0000000ee001',null,'Reformer',
+    now()+interval '17 days', now()+interval '17 days'+interval '50 min', 10, 0, 'scheduled','assigned');
+
+-- (1) ON-TIME cancel keeps eligibility is proven above (cancel30). Here: a LATE
+-- cancel. Book free, then make the seat a late cancel on/after the cut-over.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e40',false);
+select set_config('t.l1', book_first_free('f9eef9ee-0000-0000-0000-00000000c040')::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+update bookings set status='late_cancelled', is_late_cancel=true, cancelled_at=now()
+ where id=(current_setting('t.l1')::jsonb->>'booking_id')::uuid;
+
+select expect_text('late-cancel after cut-over => reason late_cancel',
+  free_first_eligibility_run('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad40') ->> 'reason',
+  'late_cancel');
+select expect_true('late-cancel after cut-over => NOT eligible',
+  not (free_first_eligibility_run('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad40') ->> 'ok')::boolean);
+
+-- (2) The SAME seat dated BEFORE the cut-over keeps eligibility (not reassessed).
+update bookings set cancelled_at='2026-11-01 00:00:00+00'
+ where id=(current_setting('t.l1')::jsonb->>'booking_id')::uuid;
+select expect_true('late-cancel before cut-over => STILL eligible',
+  (free_first_eligibility_run('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad40') ->> 'ok')::boolean);
+
+-- (3) A no-show is unchanged: 'missed'.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e41',false);
+select set_config('t.l2', book_first_free('f9eef9ee-0000-0000-0000-00000000c041')::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+update bookings set status='no_show'
+ where id=(current_setting('t.l2')::jsonb->>'booking_id')::uuid;
+select expect_text('no-show still => missed',
+  free_first_eligibility_run('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad41') ->> 'reason',
+  'missed');
+
+-- (4) "Make this their free class" still works after a late cancel: the by-hand
+-- grant overrides 'late_cancel'. Use their free class late, then book an unpaid
+-- drop-in, then convert it.
+set role authenticated; select set_config('request.jwt.claim.sub','f9eef9ee-0000-0000-0000-000000000e42',false);
+select set_config('t.l3', book_first_free('f9eef9ee-0000-0000-0000-00000000c042')::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+update bookings set status='late_cancelled', is_late_cancel=true, cancelled_at=now()
+ where id=(current_setting('t.l3')::jsonb->>'booking_id')::uuid;
+-- They are now ineligible via the normal path.
+select expect_text('convc: ineligible after the late cancel',
+  free_first_eligibility_run('f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad42') ->> 'reason',
+  'late_cancel');
+-- An unpaid drop-in on a first-timer-open class.
+insert into bookings (id, studio_id, member_id, occurrence_id, status, payment_source) values
+  ('f9eef9ee-0000-0000-0000-00000000b043','f9eef9ee-0000-0000-0000-000000000001','f9eef9ee-0000-0000-0000-00000000ad42','f9eef9ee-0000-0000-0000-00000000c043','booked','drop_in');
+-- Convert (as service — is_service_context passes the guard).
+select set_config('t.cv', convert_booking_to_free_first('f9eef9ee-0000-0000-0000-00000000b043')::text, false);
+select expect_true('Make this their free class WORKS after a late cancel',
+  (current_setting('t.cv')::jsonb->>'ok')::boolean);
+select expect_text('convert turned the drop-in into a comp free seat',
+  (select payment_source::text from bookings where id='f9eef9ee-0000-0000-0000-00000000b043'),
+  'comp');
+
 select 'ALL FREE-FIRST TESTS PASSED' as done;

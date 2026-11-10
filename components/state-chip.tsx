@@ -22,6 +22,8 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   free_booked: { label: "Free class booked" },
   free_taken: { label: "Free class taken" },
   free_missed: { label: "Free class missed" },
+  // Decision 30(d, continued): a late cancel uses the free class.
+  free_late_cancel: { label: "Free class used (late cancel)" },
   none: { label: "Signed up, nothing booked" },
   // A live unpaid drop-in on a future class (member_plan_overview). Muted like
   // the sale "unpaid" chip — informational on the list; the pay flow is elsewhere.

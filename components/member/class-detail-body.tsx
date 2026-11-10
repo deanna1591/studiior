@@ -6,6 +6,8 @@ import { BookForm, ActionForm, PrimaryButton, CardActionOutline } from "@/compon
 import Link from "next/link";
 import { bookClass, bookFirstFree, cancelBooking, selfCheckIn } from "@/app/member/actions";
 import ClassButton from "@/components/member/class-button";
+import CancelButton from "@/components/member/cancel-button";
+import type { SeatKind } from "@/lib/cancel-notice";
 import { classSheetView, bookRoute } from "@/lib/class-sheet";
 import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
@@ -51,6 +53,7 @@ export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
+  seatKind = "unlimited", cutoffMinutes = 720,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -86,6 +89,11 @@ export default function ClassDetailBody({
   /** Decision 35 amendment: the studio waiver is unsigned, so the "Sign the
    *  waiver" notice shows above the check-in button, which is disabled. */
   waiverBlocked?: boolean;
+  /** Decision 36 amendment: this booked seat's cancel-wording bucket, and the
+   *  studio's cancellation cutoff (minutes) — the before-the-tap line reads from
+   *  both. Computed server-side in load.ts / from member_bootstrap. */
+  seatKind?: SeatKind;
+  cutoffMinutes?: number;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -250,18 +258,30 @@ export default function ClassDetailBody({
                   <p className="m-sub mt-0.5 text-ink-3">Ask {group.host} if you can&rsquo;t make it.</p>
                 </div>
               )
+            ) : isWaitlisted ? (
+              // Leaving a waitlist is free and unconditional (§4.1) — no notice.
+              <ActionForm action={cancelBooking}>
+                <input type="hidden" name="booking_id" value={booking!.id} />
+                <CardActionOutline>Leave the list</CardActionOutline>
+              </ActionForm>
             ) : (
               <>
-                <ActionForm action={cancelBooking}>
-                  <input type="hidden" name="booking_id" value={booking!.id} />
-                  <CardActionOutline>{isWaitlisted ? "Leave the list" : "Cancel booking"}</CardActionOutline>
-                </ActionForm>
-                {!isWaitlisted && (
-                  <a href={`/class/${occ.id}/ics`}
-                     className="m-press mt-2 block text-center text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
-                    Add to calendar
-                  </a>
-                )}
+                {/* Decision 36 amendment: the cancel rule is shown before the tap —
+                    the seat-specific line under the button, a confirm sheet once
+                    inside the cutoff, and the seat-specific result after. */}
+                <CancelButton
+                  bookingId={booking!.id}
+                  seatKind={seatKind}
+                  startsAt={occ.starts_at}
+                  cutoffMinutes={cutoffMinutes}
+                  timeZone={timeZone}
+                  timeFormat={timeFormat}
+                  cancel={cancelBooking}
+                />
+                <a href={`/class/${occ.id}/ics`}
+                   className="m-press mt-2 block text-center text-[13px] leading-[18px] text-ink-2 underline underline-offset-4">
+                  Add to calendar
+                </a>
               </>
             )}
           </>

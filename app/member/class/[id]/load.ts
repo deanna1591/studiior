@@ -1,4 +1,6 @@
 import type { memberScreen } from "@/lib/member";
+import { seatKindOf } from "@/lib/cancel-notice";
+import type { SeatKind } from "@/lib/cancel-notice";
 import type {
   DetailOccurrence, DetailType, DetailBooking,
 } from "@/components/member/class-detail-body";
@@ -34,7 +36,7 @@ export async function loadClassDetail(
 ): Promise<{ occ: DetailOccurrence; type: DetailType; booking: DetailBooking;
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
   checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean;
-  unpaid: boolean; covered: boolean;
+  unpaid: boolean; covered: boolean; seatKind: SeatKind;
   group: { isHost: boolean; host: string; plan: string; groupId: string } | null } | null> {
 
   const occQuery = supabase
@@ -45,7 +47,8 @@ export async function loadClassDetail(
     .select("name, description, image_url, image_focus_x, image_focus_y").eq("id", ctid).maybeSingle();
   const bookingQuery = supabase.from("bookings")
     // Decision 73b: payment_source tells an unpaid drop-in from a pack seat.
-    .select("id, status, waitlist_position, provisional, payment_source")
+    // Decision 36 amendment: credit_entry_id tells a credit seat from unlimited.
+    .select("id, status, waitlist_position, provisional, payment_source, credit_entry_id")
     .eq("member_id", memberId).eq("occurrence_id", id)
     // Decision 68: 'attended' keeps the row so the page reads "Checked in".
     // Decision 75a: 'no_show' keeps it so the page can read "Did not attend".
@@ -106,6 +109,14 @@ export async function loadClassDetail(
     const p = (pend as { deadline_at: string | null; mode: string }[] | null)?.[0];
     const bk = (booking ?? null) as DetailBooking;
     const bps = (booking as { payment_source?: string | null } | null)?.payment_source ?? null;
+    // Decision 36 amendment: which cancel wording this seat gets — free class /
+    // credit / unlimited / drop-in — computed once, server-side, from the fields
+    // the booking already carries.
+    const seatKind = seatKindOf({
+      paymentSource: bps,
+      creditEntryId: (booking as { credit_entry_id?: string | null } | null)?.credit_entry_id ?? null,
+      isFreeBooking: (freeCount ?? 0) > 0,
+    });
     // Decision 73b: a booked (not waitlisted/attended, not pending_payment) drop_in
     // seat with no succeeded payment is unpaid — the Pay-now surface.
     const unpaid = bk?.status === "booked" && bps === "drop_in" && (paidCount ?? 0) === 0;
@@ -131,6 +142,8 @@ export async function loadClassDetail(
         ? { until: p.deadline_at, mode: p.mode }
         : ((bk as { provisional?: boolean } | null)?.provisional ? { until: null, mode: "free" } : null),
       unpaid,
+      // Decision 36 amendment: the seat's cancel-wording bucket.
+      seatKind,
       // Decision 88: does a plan cover this class (routes Book inline vs /checkout).
       covered: (cover as boolean) === true,
       // Decision 76: the group (Barkada) this seat belongs to, if any.

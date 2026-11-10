@@ -9,6 +9,8 @@ import { memberOrigin, currentMemberOrigin } from "@/lib/tenant";
 import { buildAuthCallback } from "@/lib/auth-redirect";
 import { requestOutcome, resetNext, validateNewPassword } from "@/lib/password-reset";
 import { fmtDeadlineShort } from "@/lib/time";
+import { cancelResult } from "@/lib/cancel-notice";
+import type { SeatKind } from "@/lib/cancel-notice";
 
 export type SignInResult = { error: string } | { ok: true } | null;
 
@@ -329,13 +331,16 @@ export async function cancelBooking(_prev: ActionResult, formData: FormData): Pr
 
   revalidateMember();
 
+  // Decision 36 amendment: the seat-specific result, through the SAME helper the
+  // class page reads for the before-the-tap line, so the two cannot drift. The
+  // SQL `reason` and "Cancelled, inside the notice period." are retired from the
+  // member app. seat_kind is posted by the Cancel button (defaults neutral for
+  // the waitlist "Leave the list" form, which carries none).
   const late = r.status === "late_cancelled";
-  const head = late ? "Cancelled, inside the notice period." : "Cancelled.";
-  const credit = r.credit_returned
-    ? " Your credit is back on your account."
-    : r.reason ? ` ${r.reason}`
-    : "";
-  return { ok: true, message: head + credit };
+  const kinds = ["free", "credit", "unlimited", "drop_in"] as const;
+  const sk = String(formData.get("seat_kind") ?? "");
+  const seatKind: SeatKind = (kinds as readonly string[]).includes(sk) ? (sk as SeatKind) : "drop_in";
+  return { ok: true, message: cancelResult({ seatKind, late, creditReturned: r.credit_returned }) };
 }
 
 /**
