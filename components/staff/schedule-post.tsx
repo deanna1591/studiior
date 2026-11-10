@@ -523,6 +523,23 @@ function CoachBg({ photo, ink }: { photo: string; ink: string }) {
   );
 }
 
+/** The "spots left" pill at the right end of a class row (Decision 93 part c
+ *  polish): a soft accent fill (accent at 0.12) with accent text for "N spots
+ *  left" / "1 spot left", a solid accent fill with the on-accent colour for
+ *  "Full". Mono, 0.8 of the row text, rounded full, never shrinks. */
+function SpotsPill({ n, t, fontSize }: { n: number | undefined; t: Tokens; fontSize: number }) {
+  const full = !(Number(n) > 0);
+  const fs = Math.max(10, Math.round(fontSize * 0.8));
+  return (
+    <span style={{
+      flex: "0 0 auto", fontFamily: t.mono, fontSize: fs, lineHeight: 1, whiteSpace: "nowrap",
+      padding: `${Math.round(fs * 0.34)}px ${Math.round(fs * 0.62)}px`, borderRadius: 999,
+      background: full ? t.accent : soft(t.accent, 0.12),
+      color: full ? t.onAccent : t.accent,
+    }}>{spotsLabel(n)}</span>
+  );
+}
+
 function EditorialPost({
   style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
   rangeLabel, weekday, monthName, isToday, isCurrentMonth, showSpots, footer, empty, loading, weekTotal, monthStart,
@@ -685,21 +702,20 @@ function GuestCheck(p: StyleProps) {
           <div style={{ padding: "16px 0 4px" }}><MonthGrid t={t} days={page.days} monthStart={monthStart} story={story} /></div>
         ) : mode === "day"
           ? (day0?.classes ?? []).map((c, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 ${Math.round(4 * scale)}px` }}>
-              <span style={{ fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
-              <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>
-                {c.time}{c.coach ? `, ${c.coach}` : ""}
-                {showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(c.spots_left)}</span>}
-              </span>
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 ${Math.round(4 * scale)}px` }}>
+              <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
+              <span style={{ flex: "0 0 auto", fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}{c.coach ? `, ${c.coach}` : ""}</span>
+              {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(24 * scale)} />}
             </div>))
           : weekRows(page.days, { coachMode: !!coachFirst }).map((g) => (
             <div key={g.label}>
               <div style={{ fontFamily: t.hand, fontSize: Math.round(26 * scale), color: t.accent, borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 2px` }}>{g.label}</div>
               {g.classes.map((c, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "26px 96px 1fr", gap: 8, alignItems: "baseline", borderBottom: `1px solid ${line}`, padding: `${Math.round(6 * scale)}px 0` }}>
-                  <span style={{ fontFamily: t.hand, fontSize: Math.round(22 * scale), color: t.accent }}>{c.icon}</span>
-                  <span style={{ fontFamily: t.mono, fontSize: Math.round(15 * scale), color: t.ink }}>{c.time}</span>
-                  <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}{showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(c.spots_left)}</span>}</span>
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "baseline", borderBottom: `1px solid ${line}`, padding: `${Math.round(6 * scale)}px 0` }}>
+                  <span style={{ flex: "0 0 26px", fontFamily: t.hand, fontSize: Math.round(22 * scale), color: t.accent }}>{c.icon}</span>
+                  <span style={{ flex: "0 0 auto", minWidth: 72, fontFamily: t.mono, fontSize: Math.round(15 * scale), color: t.ink }}>{c.time}</span>
+                  <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}</span>
+                  {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(18 * scale)} />}
                 </div>))}
             </div>))}
         <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `2px solid ${line}`, padding: "16px 0 6px", fontSize: 32, color: t.accent }}>
@@ -749,7 +765,7 @@ function Times(p: StyleProps) {
                     <b style={{ fontFamily: t.mono, fontSize: Math.round(11 * scale), display: "block", color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}</b>
                     {c.name}
                     <i style={{ display: "block", fontStyle: "normal", color: t.secondary, fontSize: Math.round(11 * scale) }}>{c.coach ?? ""}</i>
-                    {showSpots && <i style={{ display: "block", fontStyle: "normal", color: t.secondary, fontSize: Math.round(11 * scale) }}>{spotsLabel(c.spots_left)}</i>}
+                    {showSpots && <div style={{ marginTop: Math.round(3 * scale) }}><SpotsPill n={c.spots_left} t={t} fontSize={Math.round(12 * scale)} /></div>}
                   </div>))}
               </div>))}
           </div>
@@ -757,10 +773,11 @@ function Times(p: StyleProps) {
           <div style={{ marginTop: 4 }}><MonthGrid t={t} days={page.days} monthStart={monthStart} story={story} /></div>
         ) : (
           (page.days[0]?.classes ?? []).map((c, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 14, alignItems: "baseline", padding: `${Math.round(9 * scale)}px 0`, borderBottom: `1px solid ${rule}` }}>
-              <span style={{ fontFamily: t.mono, fontSize: Math.round(16 * scale), fontWeight: 700 }}>{c.time}</span>
-              <span style={{ fontFamily: t.df, fontSize: Math.round(30 * scale) }}>{c.name}</span>
-              <span style={{ fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : ""}{showSpots ? ` · ${spotsLabel(c.spots_left)}` : ""}</span>
+            <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", padding: `${Math.round(9 * scale)}px 0`, borderBottom: `1px solid ${rule}` }}>
+              <span style={{ flex: "0 0 140px", fontFamily: t.mono, fontSize: Math.round(16 * scale), fontWeight: 700 }}>{c.time}</span>
+              <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.df, fontSize: Math.round(30 * scale) }}>{c.name}</span>
+              <span style={{ flex: "0 0 auto", fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : ""}</span>
+              {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(16 * scale)} />}
             </div>))
         )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 18 }}>
@@ -812,14 +829,16 @@ function Invitation(p: StyleProps) {
                   {g.classes.map((c, i) => (
                     <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", fontSize: Math.round(22 * scale), padding: `${Math.round(5 * scale)}px 0`, color: t.ink }}>
                       <span style={{ color: t.accent, fontSize: Math.round(20 * scale), width: 24, textAlign: "center" }}>{c.icon}</span>
-                      <b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(18 * scale), color: t.ink, minWidth: 92 }}>{c.time}</b>
-                      <span>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}</i>{showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(c.spots_left)}</span>}</span>
+                      <b style={{ flex: "0 0 auto", fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(18 * scale), color: t.ink, minWidth: 92 }}>{c.time}</b>
+                      <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}</i></span>
+                      {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(18 * scale)} />}
                     </div>))}
                 </div>))
             : rows.map((r, i) => (
                 <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", fontSize: Math.round(25 * scale), padding: `${Math.round(9 * scale)}px 0`, color: t.ink }}>
-                  <span style={{ color: t.accent, fontSize: Math.round(22 * scale), width: 28, textAlign: "center" }}>{r.icon}</span>
-                  <span><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i>{showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(r.spots)}</span>}</span>
+                  <span style={{ flex: "0 0 auto", color: t.accent, fontSize: Math.round(22 * scale), width: 28, textAlign: "center" }}>{r.icon}</span>
+                  <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
+                  {showSpots && <SpotsPill n={r.spots} t={t} fontSize={Math.round(20 * scale)} />}
                 </div>))}
           {showLegend && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>✦ = always runs ♡</div>}
           {!showLegend && <div style={{ height: 22 }} />}
@@ -882,15 +901,17 @@ function LockScreen({ t, page, format, coachFirst, footer, photo, logoData, show
           const parts: string[] = [];
           if (!coachMode && c.coach) parts.push(`with ${c.coach}`);
           if (core) parts.push("always runs");
-          if (showSpots) parts.push(spotsLabel(c.spots_left));
           const body = parts.join(" · ");
           return (
             <div key={i} style={{ width: CARD_W, height: 108, borderRadius: 22, background: "rgba(255,255,255,0.8)", backdropFilter: "blur(11px)", WebkitBackdropFilter: "blur(11px)", display: "flex", alignItems: "center", gap: 20, padding: "0 26px", boxSizing: "border-box" }}>
               <div style={{ width: 76, height: 76, borderRadius: 17, flex: "0 0 auto", background: core ? t.accent : t.surface, display: "flex", alignItems: "center", justifyContent: "center", color: core ? "#fff" : t.accent, fontSize: 38, lineHeight: 1 }}>{core ? "✦" : "○"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 24, color: t.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titleCase(c.name)}</span>
-                  <span style={{ fontSize: 19, color: grey, flex: "0 0 auto" }}>{c.time}</span>
+                  <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <span style={{ fontSize: 19, color: grey }}>{c.time}</span>
+                    {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={19} />}
+                  </div>
                 </div>
                 {body && <div style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 400, fontSize: 24, color: soft(t.ink, 0.9), marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{body}</div>}
               </div>

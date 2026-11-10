@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import SchedulePosts from "@/components/staff/schedule-post";
@@ -33,7 +34,8 @@ export default async function InstructorPostsPage() {
   const first = (ctx.display_name ?? "").trim().split(/\s+/)[0] || (ctx.display_name ?? "");
 
   return (
-    <InstructorShell ctx={ctx} title="Posts">
+    <InstructorShell ctx={ctx} title="Marketing">
+      <Link href="/instructor" className="m-sub mb-3 inline-flex items-center gap-1 text-ink-3">← Home</Link>
       <p className="m-sub mb-4 text-ink-2">
         Make a post of your own classes in your studio&rsquo;s look, then share it. Hidden classes never appear.
       </p>
