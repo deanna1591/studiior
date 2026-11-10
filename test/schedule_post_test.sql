@@ -236,6 +236,49 @@ select expect_true('coach filter: null coach -> no coach_first',
 select expect_raise('coach filter: a cross-studio instructor is refused', :'MGR'::uuid,
   'select schedule_post_data('''|| :'SA' ||''',''2027-03-15'',''2027-03-15'',false,'''|| :'SBF2' ||''')', 'PT403');
 
+-- ===========================================================================
+-- 9. spots_left (Decision 93 amendment): capacity minus live seats, floored at 0.
+-- occurrence_seats_taken is the live count (cancelled / late_cancelled / waitlisted
+-- never count). s001 on 2027-03-16 is capacity 6 with 4 live seats (booked,
+-- attended, no_show, pending_payment) + 1 cancelled + 1 late_cancelled + 1
+-- waitlisted -> spots_left 2. s002 is capacity 2 fully booked -> 0.
+insert into members (id, studio_id, first_name, last_name, email) values
+  ('93c00000-0000-0000-0000-00000000d001','93c00000-0000-0000-0000-00000000a000','M','One','spm1@example.com'),
+  ('93c00000-0000-0000-0000-00000000d002','93c00000-0000-0000-0000-00000000a000','M','Two','spm2@example.com'),
+  ('93c00000-0000-0000-0000-00000000d003','93c00000-0000-0000-0000-00000000a000','M','Three','spm3@example.com'),
+  ('93c00000-0000-0000-0000-00000000d004','93c00000-0000-0000-0000-00000000a000','M','Four','spm4@example.com'),
+  ('93c00000-0000-0000-0000-00000000d005','93c00000-0000-0000-0000-00000000a000','M','Five','spm5@example.com'),
+  ('93c00000-0000-0000-0000-00000000d006','93c00000-0000-0000-0000-00000000a000','M','Six','spm6@example.com'),
+  ('93c00000-0000-0000-0000-00000000d007','93c00000-0000-0000-0000-00000000a000','M','Seven','spm7@example.com'),
+  ('93c00000-0000-0000-0000-00000000d008','93c00000-0000-0000-0000-00000000a000','M','Eight','spm8@example.com'),
+  ('93c00000-0000-0000-0000-00000000d009','93c00000-0000-0000-0000-00000000a000','M','Nine','spm9@example.com');
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, starts_at, ends_at, status, flex, hidden_from_members, guarantee_tier) values
+  ('93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Spots Two',6,
+     '2027-03-16 06:00:00+00','2027-03-16 06:50:00+00','scheduled',false,false,'core'),
+  ('93c00000-0000-0000-0000-00000000e102','93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-0000000000aa','93c00000-0000-0000-0000-0000000000c1','93c00000-0000-0000-0000-0000000000a1','93c00000-0000-0000-0000-0000000000f1','Spots Full',2,
+     '2027-03-16 08:00:00+00','2027-03-16 08:50:00+00','scheduled',false,false,'core');
+insert into bookings (studio_id, occurrence_id, member_id, status) values
+  -- s001 (e101): 4 live seats
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d001','booked'),
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d002','attended'),
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d003','no_show'),
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d004','pending_payment'),
+  -- s001: not-counted seats
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d005','cancelled'),
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d006','late_cancelled'),
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e101','93c00000-0000-0000-0000-00000000d007','waitlisted'),
+  -- s002 (e102): full
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e102','93c00000-0000-0000-0000-00000000d008','booked'),
+  ('93c00000-0000-0000-0000-00000000a000','93c00000-0000-0000-0000-00000000e102','93c00000-0000-0000-0000-00000000d009','attended');
+
+select expect_num('spots_left: capacity 6, 4 live seats -> 2',
+  (call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-16'',''2027-03-16'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'spots_left')::bigint, 2);
+select expect_num('spots_left: full class (capacity 2, 2 live) -> 0',
+  (call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-16'',''2027-03-16'',false)') -> 'days' -> 0 -> 'classes' -> 1 ->> 'spots_left')::bigint, 0);
+select expect_text('spots_left: the counted class is the 06:00 "Spots Two"',
+  call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-16'',''2027-03-16'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Spots Two');
+
 -- 6. anon refused, and the surface is EXACTLY THIRTEEN
 do $$
 declare got text;

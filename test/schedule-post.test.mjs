@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses, classLine,
+  rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses, classLine, spotsLabel,
 } from "../lib/schedule-post.mjs";
 
 // A fixed grouped sample, the shape schedule_post_data returns.
@@ -210,16 +210,58 @@ test("editorial: four styles with labels", () => {
   assert.equal(STYLE_LABELS.lock_screen, "Lock screen");
 });
 
-test("editorial: headline — all classes puts 'schedule' in the accent", () => {
-  assert.deepEqual(headlineParts({ mode: "week" }), { lead: "this week's ", accent: "schedule" });
-  assert.deepEqual(headlineParts({ mode: "day", weekday: "Monday" }), { lead: "Monday's ", accent: "schedule" });
-  assert.deepEqual(headlineParts({ mode: "month", monthName: "November" }), { lead: "November's ", accent: "schedule" });
+test("amendment: headline — all classes, period as the title, capital first letter", () => {
+  // Week capitalises ("this" -> "This"); day/month lead with the already-capital period word.
+  assert.deepEqual(headlineParts({ mode: "week" }), { lead: "This week's ", accent: "schedule" });
+  assert.deepEqual(headlineParts({ mode: "day", weekday: "Wednesday" }), { lead: "Wednesday's ", accent: "schedule" });
+  assert.deepEqual(headlineParts({ mode: "month", monthName: "December" }), { lead: "December's ", accent: "schedule" });
 });
 
-test("editorial: headline — coach mode names the coach", () => {
-  assert.deepEqual(headlineParts({ mode: "week", coachFirst: "Ada" }), { lead: "Ada's ", accent: "week" });
-  assert.deepEqual(headlineParts({ mode: "day", weekday: "Monday", coachFirst: "Ada" }), { lead: "Ada on ", accent: "Monday" });
-  assert.deepEqual(headlineParts({ mode: "month", monthName: "November", coachFirst: "Ada" }), { lead: "Ada's ", accent: "November" });
+test("amendment: headline — coach day, today vs on {Weekday}", () => {
+  assert.deepEqual(headlineParts({ mode: "day", weekday: "Wednesday", coachFirst: "Ada", isToday: true }),
+    { lead: "Coach Ada ", accent: "today" });
+  assert.deepEqual(headlineParts({ mode: "day", weekday: "Wednesday", coachFirst: "Ada", isToday: false }),
+    { lead: "Coach Ada ", accent: "on Wednesday" });
+});
+
+test("amendment: headline — coach week is 'this week'", () => {
+  assert.deepEqual(headlineParts({ mode: "week", coachFirst: "Ada" }), { lead: "Coach Ada ", accent: "this week" });
+});
+
+test("amendment: headline — coach month, this month vs in {Month}", () => {
+  assert.deepEqual(headlineParts({ mode: "month", monthName: "December", coachFirst: "Ada", isCurrentMonth: true }),
+    { lead: "Coach Ada ", accent: "this month" });
+  assert.deepEqual(headlineParts({ mode: "month", monthName: "December", coachFirst: "Ada", isCurrentMonth: false }),
+    { lead: "Coach Ada ", accent: "in December" });
+});
+
+test("amendment: spotsLabel — 3 / 1 / 0", () => {
+  assert.equal(spotsLabel(3), "3 spots left");
+  assert.equal(spotsLabel(1), "1 spot left");
+  assert.equal(spotsLabel(0), "Full");
+  assert.equal(spotsLabel(null), "Full");
+  assert.equal(spotsLabel(undefined), "Full");
+});
+
+test("amendment: classLine — spots suffix with 3, 1 and 0, only when enabled", () => {
+  const c3 = { time: "7:00 AM", name: "Flow", coach: "Ada", spots_left: 3 };
+  const c1 = { time: "6:00 PM", name: "Mat", coach: null, spots_left: 1 };
+  const c0 = { time: "9:00 AM", name: "Burn", coach: "Mia", spots_left: 0 };
+  assert.equal(classLine(c3), "7:00 AM Flow with Ada");                       // off by default
+  assert.equal(classLine(c3, { showSpots: true }), "7:00 AM Flow with Ada · 3 spots left");
+  assert.equal(classLine(c1, { showSpots: true }), "6:00 PM Mat · 1 spot left");
+  assert.equal(classLine(c0, { showSpots: true }), "9:00 AM Burn with Mia · Full");
+});
+
+test("amendment: caption carries the spots suffix only when enabled", () => {
+  const days = [{ date: "2026-11-09", label: "Monday 09 Nov", count: 1, classes: [
+    { time: "7:00 AM", name: "Flow", coach: "Ada", tier: "core", spots_left: 2 },
+  ] }];
+  const off = captionText({ days, mode: "day" });
+  assert.ok(!/spot/.test(off), "no suffix when showSpots off");
+  assert.equal(off.split("\n").pop(), "7:00 AM Flow with Ada");
+  const on = captionText({ days, mode: "day", showSpots: true });
+  assert.ok(/7:00 AM Flow with Ada · 2 spots left/.test(on), "suffix present when showSpots on");
 });
 
 test("editorial: shortName is the first word; receiptNo is month+day", () => {

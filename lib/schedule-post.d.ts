@@ -1,4 +1,4 @@
-export type PostClass = { time: string; name: string; coach: string | null; tier: string };
+export type PostClass = { time: string; name: string; coach: string | null; tier: string; spots_left?: number };
 export type PostDay = { date: string; label: string; count: number; classes: PostClass[] };
 export type PostData = {
   studio_name: string;
@@ -24,8 +24,9 @@ export declare function defaultDate(mode: PostMode, todayIso: string): string;
 export declare function rangeFor(mode: PostMode, isoDate: string): { from: string; to: string };
 export declare function coreOnlyDefault(flexMin: number): boolean;
 export declare function filterDays(days: PostDay[], coreOnly: boolean): PostDay[];
-export declare function classLine(c: PostClass): string;
-export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null; coachFirst?: string | null; mode?: PostMode }): string;
+export declare function spotsLabel(n: number | null | undefined): string;
+export declare function classLine(c: PostClass, opts?: { showSpots?: boolean }): string;
+export declare function captionText(data: { days?: PostDay[]; hashtags?: string | null; coachFirst?: string | null; mode?: PostMode; showSpots?: boolean }): string;
 export declare function monthGrid(days: PostDay[], monthStart: string): MonthGridCell[][];
 export declare function totalClasses(days: PostDay[]): number;
 
@@ -46,7 +47,7 @@ export declare function canUndo<T>(stack: T[]): boolean;
 // --- Editorial styles (amendment) -------------------------------------------
 export declare const POST_STYLES: PostStyle[];
 export declare const STYLE_LABELS: Record<PostStyle, string>;
-export declare function headlineParts(args: { mode: PostMode; weekday?: string; monthName?: string; coachFirst?: string | null }): { lead: string; accent: string };
+export declare function headlineParts(args: { mode: PostMode; weekday?: string; monthName?: string; coachFirst?: string | null; isToday?: boolean; isCurrentMonth?: boolean }): { lead: string; accent: string };
 export declare function shortName(name: string): string;
 export declare function receiptNo(isoDate: string): string;
 export declare function titleCase(s: string): string;
@@ -58,7 +59,7 @@ export declare const STYLE_FIT: Record<PostStyle, {
 }>;
 export declare function stepFit(h: number, budget: number, steps: number[], floor: number): { scale: number; fits: boolean };
 export declare function editorialPlan(args: { days: PostDay[]; mode: PostMode; format: PostFormat; style: PostStyle }): FitPlan;
-export type WeekRow = { icon: string; time: string; name: string; coach: string };
+export type WeekRow = { icon: string; time: string; name: string; coach: string; spots_left?: number };
 export type WeekGroup = { label: string; classes: WeekRow[] };
 export declare function weekRows(days: PostDay[], opts?: { coachMode?: boolean }): WeekGroup[];
 export declare function anyFlex(days: PostDay[]): boolean;

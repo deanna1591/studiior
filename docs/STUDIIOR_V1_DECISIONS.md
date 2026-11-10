@@ -2268,3 +2268,13 @@ The lock screen clock never shows a leading zero (6:00, not 06:00), in both line
 ### Amendment, 9 Nov 2026 — month grid
 
 Month mode renders a calendar grid in every style instead of a day list: 7 columns Mon to Sun, as many rows as the month needs (5 or 6), always one page in both formats. Each cell shows the day number (Instrument Serif) and the class count in small mono ("16 classes", or "1 class"); a day with no classes shows the number only in the muted colour; a day outside the month is blank. A ✦ in the kit accent marks a day with at least one core class. The month headline keeps the existing form ("December's schedule"). Guest Check puts the grid inside the receipt, The Times under the masthead, Invitation inside the card, Lock screen stays Day only. The Month caption is one line per day ("Tue 1 Dec · 16 classes"), then a blank line, then "Full schedule on the app" and the hashtags. Coach mode counts only that coach's classes.
+
+### Amendment, 10 Nov 2026: titles, spots left, coach photo
+
+Titles. Guest Check and Invitation carry the period as the title instead of the style name: "Wednesday's schedule", "This week's schedule", "December's schedule" (capital first letter, accent italic on "schedule" as today). The Times keeps its masthead and uses the same headline. Style names in the picker are unchanged.
+
+Coach mode headline in every style: day = "Coach {First} today" when the date is today, otherwise "Coach {First} on {Weekday}"; week = "Coach {First} this week"; month = "Coach {First} this month" when it is the current month, otherwise "Coach {First} in {Month}". The accent italic is on the period words ("today", "this week", "on Wednesday", "this month", "in December").
+
+Spots left. A tick box "Show spots left" next to "Core classes only", off by default. When ticked each class line ends with "{n} spots left" ("1 spot left"), or "Full" when none, in the muted colour; the caption gets the same suffix. The number is the count at the moment the post is made. schedule_post_data returns spots_left per class (capacity minus live seats, never below 0), re-issued from its newest definition, same signature.
+
+Coach photo. When a coach is chosen and has a profile photo, the photo is the full-bleed background of the post in every style, under the kit ink tint at 0.55 so it stays visible and the text reads (same treatment as the lock screen photo). Without a photo the normal background shows. All-classes posts are unchanged. An uploaded edit photo still wins over the coach photo.

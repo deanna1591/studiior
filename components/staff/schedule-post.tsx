@@ -5,7 +5,7 @@ import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses,
-  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero,
+  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero, spotsLabel,
   pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
@@ -58,6 +58,7 @@ export default function SchedulePosts({
   const [mode, setMode] = useState<PostMode>("week");
   const [dateStr, setDateStr] = useState<string>(() => defaultDate("week", todayIso));
   const [coreOnly, setCoreOnly] = useState<boolean>(() => coreOnlyDefault(flexMin));
+  const [showSpots, setShowSpots] = useState<boolean>(false);   // "Show spots left", off by default
   const [format, setFormat] = useState<PostFormat>("square");
   const [coachId, setCoachId] = useState<string>("");          // "" = all classes
   const [raw, setRaw] = useState<PostData | null>(null);
@@ -128,6 +129,8 @@ export default function SchedulePosts({
   const { from, to } = rangeFor(mode, dateStr);
   const weekday = labelWeekday(from);
   const monthName = labelMonth(from);
+  const isToday = from === todayIso;                               // day mode: the selected day is today
+  const isCurrentMonth = from.slice(0, 7) === todayIso.slice(0, 7); // month mode: this calendar month
   const rangeLabel = labelForRange(mode, from, to, days);
 
   async function download() {
@@ -161,7 +164,7 @@ export default function SchedulePosts({
   }
 
   async function copyCaption() {
-    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode });
+    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode, showSpots });
     try { await navigator.clipboard.writeText(text); setNote("Caption copied."); }
     catch { setNote("Could not copy. Select the caption below instead."); }
   }
@@ -256,6 +259,10 @@ export default function SchedulePosts({
           <input type="checkbox" checked={coreOnly} onChange={(e) => setCoreOnly(e.target.checked)} />
           Core classes only
         </label>
+        <label className="flex items-center gap-2 text-[13px] text-ink-2">
+          <input type="checkbox" checked={showSpots} onChange={(e) => setShowSpots(e.target.checked)} />
+          Show spots left
+        </label>
         <Tabs value={format} onChange={(v) => setFormat(v as PostFormat)}
           options={[["square", "Square 1080×1080"], ["story", "Story 1080×1920"]]} />
       </div>
@@ -285,6 +292,7 @@ export default function SchedulePosts({
               style={style} spec={activeSpec} page={page} mode={mode} format={format}
               studioName={studioName} logoData={logoData} coachFirst={coachFirst} coachData={coachData}
               bgData={bgData} rangeLabel={rangeLabel} weekday={weekday} monthName={monthName}
+              isToday={isToday} isCurrentMonth={isCurrentMonth} showSpots={showSpots}
               footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading}
               weekTotal={totalClasses(days)} monthStart={from} />
           </div>
@@ -348,7 +356,7 @@ export default function SchedulePosts({
           <div>
             <p className="text-[11px] text-ink-3">Caption</p>
             <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-paper p-3 text-[12px] text-ink-2">
-{empty ? "No classes to post for these dates." : captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode })}
+{empty ? "No classes to post for these dates." : captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode, showSpots })}
             </pre>
           </div>
         </div>
@@ -452,23 +460,36 @@ type StyleProps = {
   t: Tokens; page: FitPage; mode: PostMode; format: PostFormat;
   headline: { lead: string; accent: string }; rangeLabel: string;
   studioShort: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
-  footer: string; scale: number; story: boolean; weekTotal: number; monthStart: string;
+  footer: string; scale: number; story: boolean; weekTotal: number; monthStart: string; showSpots: boolean;
+  bgPhoto: string | null;   // a chosen coach's photo, full-bleed under a 0.55 ink tint (null for all-classes / edit photo)
 };
+
+/** The coach-photo background layer: full-bleed image under the kit ink tint at
+ *  0.55 (the lock screen treatment), behind a style's content. */
+function CoachBg({ photo, ink }: { photo: string; ink: string }) {
+  return (
+    <>
+      <img src={photo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: soft(ink, 0.55) }} />
+    </>
+  );
+}
 
 function EditorialPost({
   style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
-  rangeLabel, weekday, monthName, footer, empty, loading, weekTotal, monthStart,
+  rangeLabel, weekday, monthName, isToday, isCurrentMonth, showSpots, footer, empty, loading, weekTotal, monthStart,
 }: {
   style: PostStyle; spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
   studioName: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
   bgData: string | null; rangeLabel: string; weekday: string; monthName: string;
+  isToday: boolean; isCurrentMonth: boolean; showSpots: boolean;
   footer: string; empty: boolean; loading: boolean; weekTotal: number; monthStart: string;
 }) {
   const t = tokens(spec);
   const story = format === "story";
   const H = story ? 1920 : 1080;
   const studioShort = shortName(studioName);
-  const headline = headlineParts({ mode, weekday, monthName, coachFirst });
+  const headline = headlineParts({ mode, weekday, monthName, coachFirst, isToday, isCurrentMonth });
   const scale = page.scale;
 
   if (loading) {
@@ -484,12 +505,20 @@ function EditorialPost({
 
   // Lock screen owns its own background (photo or gradient), the logo watermark
   // and the sparkle; it never passes through the generic photo/watermark wrappers.
+  // An edit photo wins; otherwise a chosen coach's photo is the background (the
+  // lock screen already tints it with soft(ink, 0.55)).
   if (style === "lock_screen") {
-    const photo = bgData && spec.background_image ? bgData : null;
-    return <LockScreen t={t} page={page} format={format} coachFirst={coachFirst} footer={footer} photo={photo} logoData={logoData} />;
+    const photo = bgData && spec.background_image ? bgData : (coachFirst && coachData ? coachData : null);
+    return <LockScreen t={t} page={page} format={format} coachFirst={coachFirst} footer={footer} photo={photo} logoData={logoData} showSpots={showSpots} />;
   }
 
-  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal, monthStart };
+  // A chosen coach's photo is the full-bleed background of the post (every style),
+  // under the kit ink tint at 0.55 (the lock screen treatment); the card/content
+  // sits on top so the text still reads. An uploaded edit photo wins, so coachBg
+  // is null when one is set; all-classes posts have no coach, so it is null too.
+  const editing = bgData && spec.background_image;
+  const coachBg = !editing && coachFirst && coachData ? coachData : null;
+  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal, monthStart, showSpots, bgPhoto: coachBg };
   const styled = style === "guest_check" ? <GuestCheck {...p} />
     : style === "times" ? <Times {...p} />
     : <Invitation {...p} />;
@@ -572,7 +601,7 @@ function MonthGrid({ t, days, monthStart, story }: {
 
 // --- Guest Check ------------------------------------------------------------
 function GuestCheck(p: StyleProps) {
-  const { t, page, mode, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story, weekTotal, monthStart } = p;
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, footer, scale, story, weekTotal, monthStart, showSpots, bgPhoto } = p;
   const day0 = page.days[0];
   const partTag = page.parts > 1 ? `Part ${page.part} of ${page.parts}` : null;
   const cardW = story ? 840 : 700;
@@ -584,13 +613,16 @@ function GuestCheck(p: StyleProps) {
     </div>
   );
   return (
-    <div style={{ ["--spark" as string]: t.accent, width: 1080, height: story ? 1920 : 1080, background: t.background, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" } as CSSProperties}>
+    <div style={{ ["--spark" as string]: t.accent, width: 1080, height: story ? 1920 : 1080, background: bgPhoto ? "transparent" : t.background, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" } as CSSProperties}>
+      {bgPhoto && <CoachBg photo={bgPhoto} ink={t.ink} />}
       <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
       <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
-      <div style={{ width: cardW, background: t.surface, padding: "44px 44px 36px", boxShadow: "0 30px 60px rgba(0,0,0,.18)", transform: story ? "rotate(-1deg)" : "rotate(-2deg)", color: t.ink }}>
+      <div style={{ width: cardW, background: t.surface, padding: "44px 44px 36px", boxShadow: "0 30px 60px rgba(0,0,0,.18)", transform: story ? "rotate(-1deg)" : "rotate(-2deg)", color: t.ink, position: "relative" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: `2px solid ${t.ink}`, paddingBottom: 10 }}>
-          <h1 style={{ fontFamily: t.df, fontWeight: 400, fontSize: 60, margin: 0, lineHeight: 1, color: t.ink }}>Guest Check</h1>
-          <span style={{ fontFamily: t.mono, color: t.accent, fontWeight: 700, fontSize: 18 }}>{receiptNo(day0?.date ?? "")}</span>
+          <h1 style={{ fontFamily: t.df, fontWeight: 400, fontSize: 54, margin: 0, lineHeight: 1, color: t.ink, flex: 1, paddingRight: 14 }}>
+            {headline.lead}<em style={{ fontStyle: "italic", color: t.accent }}>{headline.accent}</em>
+          </h1>
+          <span style={{ fontFamily: t.mono, color: t.accent, fontWeight: 700, fontSize: 18, flex: "0 0 auto" }}>{receiptNo(day0?.date ?? "")}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${metaCols},1fr)`, borderBottom: `2px solid ${t.ink}` }}>
           <div style={{ fontFamily: t.mono, fontSize: 11, letterSpacing: ".15em", padding: "8px 6px", borderRight: `1px solid ${t.ink}` }}>
@@ -607,7 +639,10 @@ function GuestCheck(p: StyleProps) {
           ? (day0?.classes ?? []).map((c, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 ${Math.round(4 * scale)}px` }}>
               <span style={{ fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
-              <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}{c.coach ? `, ${c.coach}` : ""}</span>
+              <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>
+                {c.time}{c.coach ? `, ${c.coach}` : ""}
+                {showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(c.spots_left)}</span>}
+              </span>
             </div>))
           : weekRows(page.days, { coachMode: !!coachFirst }).map((g) => (
             <div key={g.label}>
@@ -616,7 +651,7 @@ function GuestCheck(p: StyleProps) {
                 <div key={i} style={{ display: "grid", gridTemplateColumns: "26px 96px 1fr", gap: 8, alignItems: "baseline", borderBottom: `1px solid ${line}`, padding: `${Math.round(6 * scale)}px 0` }}>
                   <span style={{ fontFamily: t.hand, fontSize: Math.round(22 * scale), color: t.accent }}>{c.icon}</span>
                   <span style={{ fontFamily: t.mono, fontSize: Math.round(15 * scale), color: t.ink }}>{c.time}</span>
-                  <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}</span>
+                  <span style={{ fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}{showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(c.spots_left)}</span>}</span>
                 </div>))}
             </div>))}
         <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `2px solid ${line}`, padding: "16px 0 6px", fontSize: 32, color: t.accent }}>
@@ -638,15 +673,16 @@ function GuestCheck(p: StyleProps) {
 
 // --- The Times --------------------------------------------------------------
 function Times(p: StyleProps) {
-  const { t, page, mode, headline, rangeLabel, studioShort, logoData, footer, scale, story, monthStart } = p;
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, footer, scale, story, monthStart, showSpots, bgPhoto } = p;
   const cardW = story ? 980 : 900;
   const line = soft(t.secondary, 0.3);
   const rule = soft(t.secondary, 0.28);
   return (
-    <div style={{ width: 1080, height: story ? 1920 : 1080, background: t.background, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+    <div style={{ width: 1080, height: story ? 1920 : 1080, background: bgPhoto ? "transparent" : t.background, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      {bgPhoto && <CoachBg photo={bgPhoto} ink={t.ink} />}
       <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
       <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
-      <div style={{ width: cardW, background: t.surface, padding: "34px 44px", transform: story ? "rotate(0.5deg)" : "rotate(-1.2deg)", boxShadow: "0 30px 60px rgba(0,0,0,.18)", color: t.ink }}>
+      <div style={{ width: cardW, background: t.surface, padding: "34px 44px", transform: story ? "rotate(0.5deg)" : "rotate(-1.2deg)", boxShadow: "0 30px 60px rgba(0,0,0,.18)", color: t.ink, position: "relative" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontFamily: t.mono, fontSize: 13, letterSpacing: ".1em", borderBottom: `1.5px solid ${t.ink}`, paddingBottom: 8 }}>
           <span>EST. {new Date().getFullYear()}</span><span>{footer.toUpperCase()}</span><span>FREE</span>
         </div>
@@ -665,6 +701,7 @@ function Times(p: StyleProps) {
                     <b style={{ fontFamily: t.mono, fontSize: Math.round(11 * scale), display: "block", color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}</b>
                     {c.name}
                     <i style={{ display: "block", fontStyle: "normal", color: t.secondary, fontSize: Math.round(11 * scale) }}>{c.coach ?? ""}</i>
+                    {showSpots && <i style={{ display: "block", fontStyle: "normal", color: t.secondary, fontSize: Math.round(11 * scale) }}>{spotsLabel(c.spots_left)}</i>}
                   </div>))}
               </div>))}
           </div>
@@ -675,7 +712,7 @@ function Times(p: StyleProps) {
             <div key={i} style={{ display: "grid", gridTemplateColumns: "140px 1fr auto", gap: 14, alignItems: "baseline", padding: `${Math.round(9 * scale)}px 0`, borderBottom: `1px solid ${rule}` }}>
               <span style={{ fontFamily: t.mono, fontSize: Math.round(16 * scale), fontWeight: 700 }}>{c.time}</span>
               <span style={{ fontFamily: t.df, fontSize: Math.round(30 * scale) }}>{c.name}</span>
-              <span style={{ fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : ""}</span>
+              <span style={{ fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : ""}{showSpots ? ` · ${spotsLabel(c.spots_left)}` : ""}</span>
             </div>))
         )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 18 }}>
@@ -689,20 +726,21 @@ function Times(p: StyleProps) {
 
 // --- Invitation -------------------------------------------------------------
 function Invitation(p: StyleProps) {
-  const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, monthStart } = p;
+  const { t, page, mode, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, monthStart, showSpots, bgPhoto } = p;
   const partTag = page.parts > 1 ? `Part ${page.part} of ${page.parts}` : null;
   const cardW = story ? 900 : 860;
-  type Row = { icon: string; time: string; text: string; sub: string };
+  type Row = { icon: string; time: string; text: string; sub: string; spots?: number };
   // Day is a flat list; week lists every class under a day heading; month is the
   // calendar grid.
-  const rows: Row[] = (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "" }));
+  const rows: Row[] = (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "", spots: c.spots_left }));
   const groups = mode === "week" ? weekRows(page.days, { coachMode: !!coachFirst }) : null;
   const showLegend = anyFlex(page.days);
   return (
-    <div style={{ width: 1080, height: story ? 1920 : 1080, background: `linear-gradient(160deg, ${t.background}, ${mixHex(t.background, t.surface, 0.5)})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+    <div style={{ width: 1080, height: story ? 1920 : 1080, background: bgPhoto ? "transparent" : `linear-gradient(160deg, ${t.background}, ${mixHex(t.background, t.surface, 0.5)})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      {bgPhoto && <CoachBg photo={bgPhoto} ink={t.ink} />}
       <div style={{ position: "absolute", left: 48, top: 40, fontSize: 70, color: t.accent }}>✦</div>
       <div style={{ position: "absolute", right: 60, bottom: 150, fontSize: 44, color: t.accent }}>✦</div>
-      <div style={{ width: cardW, background: t.surface, borderRadius: 34, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,.18)" }}>
+      <div style={{ width: cardW, background: t.surface, borderRadius: 34, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,.18)", position: "relative" }}>
         <div style={{ background: t.accent, color: t.onAccent, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px 40px", fontSize: 22 }}>
           <span style={{ fontFamily: t.mono, fontSize: 20 }}>
             {mode === "day" ? (page.days[0]?.label ?? rangeLabel) : rangeLabel}
@@ -727,13 +765,13 @@ function Invitation(p: StyleProps) {
                     <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", fontSize: Math.round(22 * scale), padding: `${Math.round(5 * scale)}px 0`, color: t.ink }}>
                       <span style={{ color: t.accent, fontSize: Math.round(20 * scale), width: 24, textAlign: "center" }}>{c.icon}</span>
                       <b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(18 * scale), color: t.ink, minWidth: 92 }}>{c.time}</b>
-                      <span>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}</i></span>
+                      <span>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}</i>{showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(c.spots_left)}</span>}</span>
                     </div>))}
                 </div>))
             : rows.map((r, i) => (
                 <div key={i} style={{ display: "flex", gap: 18, alignItems: "center", fontSize: Math.round(25 * scale), padding: `${Math.round(9 * scale)}px 0`, color: t.ink }}>
                   <span style={{ color: t.accent, fontSize: Math.round(22 * scale), width: 28, textAlign: "center" }}>{r.icon}</span>
-                  <span><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
+                  <span><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i>{showSpots && <span style={{ color: t.secondary }}> · {spotsLabel(r.spots)}</span>}</span>
                 </div>))}
           {showLegend && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>✦ = always runs ♡</div>}
           {!showLegend && <div style={{ height: 22 }} />}
@@ -757,9 +795,9 @@ function Invitation(p: StyleProps) {
 // space; mapped here ×0.54 to the 1080 export (card + margins = 1080, clock ≈13%
 // of height, matching the reference). Fonts are fixed (Manrope / Instrument
 // Serif / Nothing You Could Do), not the kit's — the lock screen is iOS chrome.
-function LockScreen({ t, page, format, coachFirst, footer, photo, logoData }: {
+function LockScreen({ t, page, format, coachFirst, footer, photo, logoData, showSpots }: {
   t: Tokens; page: FitPage; format: PostFormat; coachFirst: string | null;
-  footer: string; photo: string | null; logoData: string | null;
+  footer: string; photo: string | null; logoData: string | null; showSpots: boolean;
 }) {
   const H = format === "story" ? 1920 : 1080;
   const MARGIN = 70;
@@ -796,6 +834,7 @@ function LockScreen({ t, page, format, coachFirst, footer, photo, logoData }: {
           const parts: string[] = [];
           if (!coachMode && c.coach) parts.push(`with ${c.coach}`);
           if (core) parts.push("always runs");
+          if (showSpots) parts.push(spotsLabel(c.spots_left));
           const body = parts.join(" · ");
           return (
             <div key={i} style={{ width: CARD_W, height: 108, borderRadius: 22, background: "rgba(255,255,255,0.8)", backdropFilter: "blur(11px)", WebkitBackdropFilter: "blur(11px)", display: "flex", alignItems: "center", gap: 20, padding: "0 26px", boxSizing: "border-box" }}>
