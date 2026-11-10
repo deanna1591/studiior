@@ -2278,3 +2278,13 @@ Coach mode headline in every style: day = "Coach {First} today" when the date is
 Spots left. A tick box "Show spots left" next to "Core classes only", off by default. When ticked each class line ends with "{n} spots left" ("1 spot left"), or "Full" when none, in the muted colour; the caption gets the same suffix. The number is the count at the moment the post is made. schedule_post_data returns spots_left per class (capacity minus live seats, never below 0), re-issued from its newest definition, same signature.
 
 Coach photo. When a coach is chosen and has a profile photo, the photo is the full-bleed background of the post in every style, under the kit ink tint at 0.55 so it stays visible and the text reads (same treatment as the lock screen photo). Without a photo the normal background shows. All-classes posts are unchanged. An uploaded edit photo still wins over the coach photo.
+
+### Amendment, 10 Nov 2026 (part c): instructor posts and Share
+
+Instructors get a "Posts" entry in the instructor app (same host as the member app, instructor area): Day / Week / Month, Square / Story, the four styles from the studio's current brand kit, "Core classes only", "Show spots left", Download PNG, Copy caption, Share. The coach is always the signed-in instructor (no picker), the headline is the Coach form ("Coach {First} this week"), their profile photo is the background. No edit box, no brand kit changes, no footer or hashtag settings (those come from the studio).
+
+Share: on a phone that supports sharing files, the Share button opens the system share sheet with the PNG and the caption attached (Web Share API with files), so the instructor can pick Instagram, Facebook, Threads or anything else. Where file sharing is not supported, Share downloads the PNG and copies the caption, and a toast says "Image saved and caption copied. Paste it into your post." The staff Schedule posts page gets the same Share button. One-click posting into Meta stays part (b).
+
+Readers: instructor_schedule_post_data(p_from, p_to, p_core_only) returns the caller's own classes only (resolved from auth, never a parameter), same row shape as schedule_post_data including spots_left and coach_photo; instructor_brand_kit() returns the current kit spec and the studio's footer line, hashtags and post style for the caller's studio, read-only. Both authenticated-only; anon stays THIRTEEN. post-images insert policy allows an instructor to upload the Download copy into their studio folder.
+
+Permissions doc section 17 amended: instructors can make and share posts of their own classes; cannot see other coaches' posts, cannot edit with Claude, cannot change the brand kit.

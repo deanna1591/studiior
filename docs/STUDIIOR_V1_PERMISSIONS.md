@@ -305,5 +305,9 @@ Some fields must be denied inside tables a role can otherwise read. Implemented 
 | View the brand kit (read-only) | ✅ | ✅ | ❌ | 👁 | ❌ |
 | Manage connected accounts (Instagram/Facebook — part b) | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Generate / edit / download schedule posts | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Make / share posts of their OWN classes (Decision 93 part c) | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Share a post (PNG + caption to the system share sheet) | ✅ | ✅ | ✅ | ✅ | ❌ |
 
 Managing the brand kit (and, in part b, connected accounts) is manager-up. Front desk may generate, edit and download posts but not the brand kit — they see the Brand kit page read-only. Instructors and members: nothing. Enforced in RLS and RPC, not only in the UI: `brand_kit_save` / `brand_kit_run_allowed` are `is_manager_up`, `brand_kit_current` is `is_desk_up` (read), and the `brand-references` storage bucket's write/read policies are manager-up.
+
+Decision 93 part (c): instructors can make and share posts of their OWN classes from a Posts entry in the instructor app. They cannot see other coaches' posts, cannot edit a post with Claude, and cannot change the brand kit. Enforced in the readers, not only the UI: `instructor_schedule_post_data` resolves the caller's classes from auth (never a parameter) and `instructor_brand_kit` returns the caller's studio's current kit spec plus footer line, hashtags and post style (read-only); both are authenticated-only and refuse a caller who is not an active instructor of the studio. The `post-images` insert policy lets an instructor upload the Download copy into their own studio's folder. Share (PNG + caption to the system share sheet, or a download-and-copy fallback with a toast) is available to every staff role and instructors; one-click posting into Meta stays part (b).

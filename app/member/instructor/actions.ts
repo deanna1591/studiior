@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { validateWeek, type Day } from "@/lib/availability";
+import type { PostData } from "@/lib/schedule-post";
 
 export type InstructorState = { error: string } | { ok: string } | null;
 
@@ -511,4 +512,62 @@ export async function markGuide(hint: string): Promise<void> {
   revalidatePath("/instructor/me");
   revalidatePath("/instructor/schedule");
   revalidatePath("/instructor/pay");
+}
+
+// --- Decision 93 part (c): instructor posts ---------------------------------
+// The instructor makes and shares posts of their OWN classes. The readers
+// resolve the caller from auth (never a parameter) and refuse a non-instructor,
+// so these actions pass no studio or instructor id. The brand kit is read-only
+// (the studio owns it); there is no edit box and no style persistence.
+
+/** The caller's own classes for the range, same shape as schedule_post_data
+ *  (incl. spots_left and coach_photo). The coach arg is ignored — the coach is
+ *  always the signed-in instructor, resolved from auth. */
+export async function instructorSchedulePostData(
+  from: string, to: string, _coach?: string | null,
+): Promise<{ data?: PostData; error?: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return { error: "Bad dates." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("instructor_schedule_post_data", {
+    p_from: from, p_to: to, p_core_only: false,
+  });
+  if (error) {
+    return /PT403|instructor/i.test(error.message)
+      ? { error: "Only instructors can make these posts." }
+      : { error: error.message };
+  }
+  return { data: data as unknown as PostData };
+}
+
+/** Upload the Download copy of the post PNG into the instructor's own studio
+ *  folder in post-images (the instructor insert policy). The studio comes from
+ *  the page; the storage policy refuses any folder that is not the caller's. */
+export async function instructorUploadPostImage(
+  fd: FormData,
+): Promise<{ ok?: true; path?: string; error?: string }> {
+  const file = fd.get("file") as File | null;
+  const studioId = String(fd.get("studio_id") ?? "");
+  if (!file || file.size === 0) return { error: "Nothing to upload." };
+  if (file.type !== "image/png") return { error: "PNG only." };
+  if (file.size > 5_242_880) return { error: "That image is over 5 MB." };
+  if (!/^[0-9a-f-]{36}$/i.test(studioId)) return { error: "Bad studio." };
+  const supabase = createClient();
+  const yyyymm = new Date().toISOString().slice(0, 7);
+  const path = `${studioId}/${yyyymm}/post-${Date.now()}.png`;
+  const { error } = await supabase.storage.from("post-images").upload(path, file, {
+    upsert: false, contentType: "image/png",
+  });
+  if (error) {
+    return /row-level security|Unauthorized/i.test(error.message)
+      ? { error: "Your account cannot save posts." }
+      : { error: error.message };
+  }
+  return { ok: true, path };
+}
+
+/** No-op: the instructor post has no Claude-edit background photo to sign, so
+ *  the renderer never needs a signed URL. Kept so the shared component can call
+ *  an injected signer uniformly. */
+export async function instructorSignPostImage(_path: string): Promise<{ url?: string; error?: string }> {
+  return {};
 }

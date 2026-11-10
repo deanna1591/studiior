@@ -14,6 +14,7 @@ import {
 } from "@/app/staff/settings/marketing/actions";
 import { createClient } from "@/lib/supabase/client";
 import { prepareUpload, uploadExt, EDIT_PHOTO_MAX_PX } from "@/lib/browser-image";
+import { sharePost, SHARE_FALLBACK_TOAST } from "@/lib/share-post";
 
 type Coach = { id: string; first: string };
 
@@ -42,6 +43,8 @@ function useInlineImage(url: string | null): string | null {
 
 export default function SchedulePosts({
   spec, studioName, studioId, todayIso, flexMin, canEdit, editUsed, editCap, initialStyle, coaches,
+  loadPostData = schedulePostData, signImage = signPostImage, uploadImage = uploadPostImage,
+  onPickStyle = savePostStyle, lockedCoach = null, hideEdit = false,
 }: {
   spec: BrandSpec;
   studioName: string;
@@ -53,6 +56,15 @@ export default function SchedulePosts({
   editCap: number;
   initialStyle: PostStyle;
   coaches: Coach[];
+  // Decision 93 part (c): the instructor Posts page reuses this one component.
+  // It injects its own data/upload actions (the staff ones are desk-up guarded),
+  // locks the coach to the signed-in instructor, and hides the Claude edit box.
+  loadPostData?: (from: string, to: string, coach: string | null) => Promise<{ data?: PostData; error?: string }>;
+  signImage?: (path: string) => Promise<{ url?: string; error?: string }>;
+  uploadImage?: (fd: FormData) => Promise<{ ok?: true; path?: string; error?: string }>;
+  onPickStyle?: ((style: string) => void | Promise<unknown>) | null;
+  lockedCoach?: Coach | null;  // when set: no coach picker, coach fixed to this instructor
+  hideEdit?: boolean;          // when true: no "Tell Claude what to change" box
 }) {
   const [style, setStyle] = useState<PostStyle>(initialStyle);
   const [mode, setMode] = useState<PostMode>("week");
@@ -60,7 +72,7 @@ export default function SchedulePosts({
   const [coreOnly, setCoreOnly] = useState<boolean>(() => coreOnlyDefault(flexMin));
   const [showSpots, setShowSpots] = useState<boolean>(false);   // "Show spots left", off by default
   const [format, setFormat] = useState<PostFormat>("square");
-  const [coachId, setCoachId] = useState<string>("");          // "" = all classes
+  const [coachId, setCoachId] = useState<string>(lockedCoach?.id ?? "");   // "" = all classes; locked for an instructor
   const [raw, setRaw] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -89,11 +101,11 @@ export default function SchedulePosts({
   const load = useCallback(async (m: PostMode, d: string, coach: string) => {
     setLoading(true); setErr(null);
     const { from, to } = rangeFor(m, d);
-    const r = await schedulePostData(from, to, coach || null);
+    const r = await loadPostData(from, to, coach || null);
     if (r.error) { setErr(r.error); setRaw(null); }
     else setRaw(r.data ?? null);
     setLoading(false);
-  }, []);
+  }, [loadPostData]);
 
   useEffect(() => { void load(mode, dateStr, coachId); }, [mode, dateStr, coachId, load]);
   useEffect(() => { setPartIdx(0); }, [mode, dateStr, format, coreOnly, coachId, style, stack]);
@@ -101,7 +113,7 @@ export default function SchedulePosts({
   function pickMode(m: PostMode) { setMode(m); setDateStr(defaultDate(m, todayIso)); }
   function pickStyle(s: PostStyle) {
     setStyle(s);
-    void savePostStyle(s);                         // best-effort persist (manager-up)
+    void onPickStyle?.(s);                            // best-effort persist (manager-up); instructor: no persist
     if (s === "lock_screen" && mode !== "day") { setMode("day"); setDateStr(defaultDate("day", todayIso)); }
   }
 
@@ -115,9 +127,9 @@ export default function SchedulePosts({
     const path = activeSpec.background_image ?? null;
     setBgUrl(null);
     if (!path) return;
-    (async () => { const r = await signPostImage(path); if (live && r.url) setBgUrl(r.url); })();
+    (async () => { const r = await signImage(path); if (live && r.url) setBgUrl(r.url); })();
     return () => { live = false; };
-  }, [activeSpec.background_image]);
+  }, [activeSpec.background_image, signImage]);
   const bgData = useInlineImage(bgUrl);
 
   const days: PostDay[] = filterDays(raw?.days ?? [], coreOnly);
@@ -133,38 +145,66 @@ export default function SchedulePosts({
   const isCurrentMonth = from.slice(0, 7) === todayIso.slice(0, 7); // month mode: this calendar month
   const rangeLabel = labelForRange(mode, from, to, days);
 
-  async function download() {
+  // Render the post node to a 1080-wide PNG blob + a filename (shared by Download
+  // and Share). Returns null if the node is not mounted.
+  async function renderBlob(): Promise<{ blob: Blob; filename: string } | null> {
     const node = postRef.current;
-    if (!node) return;
+    if (!node) return null;
+    const { toPng } = await import("html-to-image");
+    const W = 1080, H = format === "story" ? 1920 : 1080;
+    const t = tokens(activeSpec);
+    const dataUrl = await toPng(node, {
+      width: W, height: H, canvasWidth: W, canvasHeight: H, pixelRatio: 1,
+      backgroundColor: style === "lock_screen" ? t.ink : t.background,
+      style: { transform: "none", transformOrigin: "top left", margin: "0" },
+      cacheBust: true,
+    });
+    const partTag = page.parts > 1 ? `-part${page.part}` : "";
+    const coachTag = coachFirst ? `-${coachFirst.toLowerCase()}` : "";
+    const filename = `${studioName.replace(/\s+/g, "-").toLowerCase()}-${style}-${mode}-${format}${coachTag}${partTag}.png`;
+    const blob = await (await fetch(dataUrl)).blob();
+    return { blob, filename };
+  }
+
+  function captionNow(): string {
+    return captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode, showSpots });
+  }
+
+  async function download() {
     setNote(null);
     try {
-      const { toPng } = await import("html-to-image");
-      const W = 1080, H = format === "story" ? 1920 : 1080;
-      const t = tokens(activeSpec);
-      const dataUrl = await toPng(node, {
-        width: W, height: H, canvasWidth: W, canvasHeight: H, pixelRatio: 1,
-        backgroundColor: style === "lock_screen" ? t.ink : t.background,
-        style: { transform: "none", transformOrigin: "top left", margin: "0" },
-        cacheBust: true,
-      });
-      const partTag = page.parts > 1 ? `-part${page.part}` : "";
-      const coachTag = coachFirst ? `-${coachFirst.toLowerCase()}` : "";
+      const r = await renderBlob();
+      if (!r) return;
+      const url = URL.createObjectURL(r.blob);
       const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${studioName.replace(/\s+/g, "-").toLowerCase()}-${style}-${mode}-${format}${coachTag}${partTag}.png`;
-      a.click();
-      const blob = await (await fetch(dataUrl)).blob();
+      a.href = url; a.download = r.filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       const fd = new FormData();
-      fd.set("file", new File([blob], "post.png", { type: "image/png" }));
-      const up = await uploadPostImage(fd);
+      fd.set("file", new File([r.blob], "post.png", { type: "image/png" }));
+      fd.set("studio_id", studioId);
+      const up = await uploadImage(fd);
       setNote(up.ok ? "Downloaded and saved to your posts." : `Downloaded. ${up.error ?? "Could not save a copy."}`);
     } catch {
       setNote("Could not make the PNG. Try again.");
     }
   }
 
+  async function share() {
+    setNote(null);
+    try {
+      const r = await renderBlob();
+      if (!r) return;
+      const outcome = await sharePost({ blob: r.blob, filename: r.filename, caption: captionNow() });
+      if (outcome === "fallback") setNote(SHARE_FALLBACK_TOAST);
+      else if (outcome === "shared") setNote("Shared.");
+      // "cancelled": the person backed out of the share sheet; say nothing.
+    } catch {
+      setNote("Could not make the PNG. Try again.");
+    }
+  }
+
   async function copyCaption() {
-    const text = captionText({ days: page.days, hashtags: raw?.hashtags ?? null, coachFirst, mode, showSpots });
+    const text = captionNow();
     try { await navigator.clipboard.writeText(text); setNote("Caption copied."); }
     catch { setNote("Could not copy. Select the caption below instead."); }
   }
@@ -244,13 +284,15 @@ export default function SchedulePosts({
       <div className="flex flex-wrap items-end gap-4">
         <Tabs value={mode} onChange={(v) => pickMode(v as PostMode)}
           options={lockDayOnly ? [["day", "Day"]] : [["day", "Day"], ["week", "Week"], ["month", "Month"]]} />
-        <label className="block text-[11px] text-ink-3">Coach
-          <select value={coachId} onChange={(e) => setCoachId(e.target.value)}
-            className="mt-1 block rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink">
-            <option value="">All classes</option>
-            {coaches.map((c) => <option key={c.id} value={c.id}>{c.first}</option>)}
-          </select>
-        </label>
+        {!lockedCoach && (
+          <label className="block text-[11px] text-ink-3">Coach
+            <select value={coachId} onChange={(e) => setCoachId(e.target.value)}
+              className="mt-1 block rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink">
+              <option value="">All classes</option>
+              {coaches.map((c) => <option key={c.id} value={c.id}>{c.first}</option>)}
+            </select>
+          </label>
+        )}
         <label className="block text-[11px] text-ink-3">Date
           <input type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)}
             className="mt-1 block rounded border border-line-2 bg-surface px-2 py-1.5 text-[13px] text-ink" />
@@ -310,9 +352,14 @@ export default function SchedulePosts({
               className="rounded-xl border border-line-2 px-4 py-2 text-[14px] text-ink disabled:opacity-50">
               Copy caption
             </button>
+            <button onClick={share} disabled={empty || loading}
+              className="rounded-xl border border-line-2 px-4 py-2 text-[14px] text-ink disabled:opacity-50">
+              Share
+            </button>
           </div>
 
           {/* Tell Claude what to change */}
+          {!hideEdit && (
           <div className="rounded-xl border border-line bg-surface p-3">
             <p className="text-[13px] font-medium text-ink">Tell Claude what to change</p>
             <p className="mt-0.5 text-[12px] text-ink-3">Attach a photo to use it as the background. Ask for a faint logo to watermark it.</p>
@@ -352,6 +399,7 @@ export default function SchedulePosts({
               </div>
             )}
           </div>
+          )}
 
           <div>
             <p className="text-[11px] text-ink-3">Caption</p>

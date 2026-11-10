@@ -279,6 +279,34 @@ select expect_num('spots_left: full class (capacity 2, 2 live) -> 0',
 select expect_text('spots_left: the counted class is the 06:00 "Spots Two"',
   call_jsonb(:'MGR', 'select schedule_post_data('''|| :'SA' ||''',''2027-03-16'',''2027-03-16'',false)') -> 'days' -> 0 -> 'classes' -> 0 ->> 'name', 'Spots Two');
 
+-- ===========================================================================
+-- 10. Decision 93 part (c): instructor posts. INST (user a4) resolves to
+-- instructor Ada (f1). On 2027-03-15 Ada teaches the visible e001 (07:00) and
+-- e002 (09:00); Cleo (f3) teaches Reformer Sculpt (e005, 11:00), which is NOT
+-- Ada's. The reader resolves the caller from auth, never a parameter.
+select expect_num('instructor posts: Ada sees her 2 visible classes',
+  jsonb_array_length(call_jsonb(:'INST','select instructor_schedule_post_data(''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes'), 2);
+select expect_text('instructor posts: coach_first is Ada',
+  call_jsonb(:'INST','select instructor_schedule_post_data(''2027-03-15'',''2027-03-15'',false)') ->> 'coach_first', 'Ada');
+select expect_true('instructor posts: Cleo''s Reformer Sculpt is absent from Ada''s post',
+  not (call_jsonb(:'INST','select instructor_schedule_post_data(''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes' @> '[{"name":"Reformer Sculpt"}]'::jsonb));
+select expect_true('instructor posts: a class carries spots_left (same shape)',
+  call_jsonb(:'INST','select instructor_schedule_post_data(''2027-03-15'',''2027-03-15'',false)') -> 'days' -> 0 -> 'classes' -> 0 ? 'spots_left');
+select expect_raise('instructor posts: front desk refused (no instructor row)', :'FD'::uuid,
+  'select instructor_schedule_post_data(''2027-03-15'',''2027-03-15'',false)', 'PT403');
+select expect_raise('instructor posts: manager refused (no instructor row)', :'MGR'::uuid,
+  'select instructor_schedule_post_data(''2027-03-15'',''2027-03-15'',false)', 'PT403');
+
+-- instructor_brand_kit returns the caller's studio kit, read-only.
+select expect_text('instructor brand kit: footer is the studio''s',
+  call_jsonb(:'INST','select instructor_brand_kit()') ->> 'footer_line', 'See you on the reformer');
+select expect_text('instructor brand kit: hashtags are the studio''s',
+  call_jsonb(:'INST','select instructor_brand_kit()') ->> 'hashtags', '#poststudio #pilates');
+select expect_true('instructor brand kit: carries a spec',
+  call_jsonb(:'INST','select instructor_brand_kit()') ? 'spec');
+select expect_raise('instructor brand kit: front desk refused', :'FD'::uuid,
+  'select instructor_brand_kit()', 'PT403');
+
 -- 6. anon refused, and the surface is EXACTLY THIRTEEN
 do $$
 declare got text;

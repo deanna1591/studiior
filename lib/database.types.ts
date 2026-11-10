@@ -8530,6 +8530,7 @@ export type Database = {
       }
       brand_kit_current: { Args: { p_studio_id: string }; Returns: Json }
       brand_kit_defaults: { Args: { p_studio_id: string }; Returns: Json }
+      brand_kit_defaults_run: { Args: { p_studio_id: string }; Returns: Json }
       brand_kit_run_allowed: { Args: { p_studio_id: string }; Returns: Json }
       brand_kit_save: {
         Args: { p_source: string; p_spec: Json; p_studio_id: string }
@@ -9289,6 +9290,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_brand_kit: { Args: never; Returns: Json }
       instructor_can_claim_month: {
         Args: { p_instructor_id: string; p_month: string }
         Returns: boolean
@@ -9436,6 +9438,10 @@ export type Database = {
           paid: boolean
           payment_source: string
         }[]
+      }
+      instructor_schedule_post_data: {
+        Args: { p_core_only?: boolean; p_from: string; p_to: string }
+        Returns: Json
       }
       instructor_scope: { Args: { p_occurrence: string }; Returns: string }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
@@ -10455,6 +10461,16 @@ export type Database = {
       }
       say_count: { Args: { n: number }; Returns: string }
       schedule_post_data: {
+        Args: {
+          p_core_only?: boolean
+          p_from: string
+          p_instructor_id?: string
+          p_studio_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      schedule_post_data_run: {
         Args: {
           p_core_only?: boolean
           p_from: string

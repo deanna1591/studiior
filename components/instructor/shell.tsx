@@ -26,6 +26,7 @@ const TABS: Tab[] = [
   { href: "/instructor/schedule", label: "My schedule", icon: "calendar" },
   { href: "/instructor/shifts", label: "Open classes", icon: "ticket" },
   { href: "/instructor/pay", label: "My pay", icon: "card" },
+  { href: "/instructor/posts", label: "Posts", icon: "camera" },
   { href: "/instructor/me", label: "Me", icon: "user" },
 ];
 
