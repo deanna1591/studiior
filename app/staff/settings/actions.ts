@@ -204,6 +204,9 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
   const unmet = cents("flex_unmet_pay");
   const standby = cents("flex_standby_pay");
   const adjacency = int("adjacency_minutes");
+  // Decision 95: how many hours before the flex cut-off the last rescue email goes.
+  const rescueHrsRaw = int("flex_rescue_hours_before");
+  const rescueHrs = Number.isFinite(rescueHrsRaw) ? Math.min(72, Math.max(0, Math.floor(rescueHrsRaw))) : 3;
 
   const bad =
     !Number.isFinite(coreMin) || coreMin < 0 ? "A core minimum cannot be negative."
@@ -246,6 +249,7 @@ export async function saveGuarantees(_prev: PlainState, fd: FormData): Promise<P
       flex_deadline_hours: Math.floor(Number.isFinite(flexHours) ? flexHours : 12),
       flex_unmet_pay_cents: unmet,
       flex_standby_pay_cents: standby,
+      flex_rescue_hours_before: rescueHrs,
       adjacency_minutes: Math.floor(adjacency),
     })
     .eq("studio_id", ctx.studioId).select("studio_id");

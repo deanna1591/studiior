@@ -511,6 +511,26 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 95 — Flex rescue: move to a core class before the cut-off (recorded 11 Nov 2026)
+
+A booking in a flex class that is still under the studio's flex minimum gets two member emails offering a one-tap move to a core class that is going ahead, so a quiet flex slot turns into a kept booking instead of a cancellation. Instructors are not emailed by this decision.
+
+**The two emails.** `flex_rescue_2days`, sent once 2 days before the class, at the **10:00 studio-local** convention (quiet-hours-shifted via `quiet_hours_shift`). `flex_rescue_final`, sent once `{flex_rescue_hours_before}` hours before the flex cut-off (a new `studio_settings.flex_rescue_hours_before`, default 3, registered). **Neither sends** if the class has **reached its minimum** (`flex_reached_minimum_at` set, Decision 21's early latch), is cancelled, or the member has already moved or cancelled. Both ride the per-email switch (Decision 78e, `studio_template_enabled`). Platform default subjects: `"Your {class_name} on {day} still needs {n_more} more to run"` and `"Last call: move your {class_name} booking before {cutoff_time}"`.
+
+**`{class_list_core}`.** Both bodies carry the studio's core classes in the next 7 days from the flex class's start. Core classes **with at least one booking first** (each line "{n} in already" then "{spots} spots left"), then the rest, each a card with the time, the coach and a button **"Move me to this class"**. Max 8 cards, then **"See the full schedule"**. Built by a new reader `core_classes_for_rescue(occurrence)` ordered as recorded.
+
+**The move link.** A **signed-in member page** (the same `{manage_link}` mechanism, the member opens it on the member host while logged in) carrying `?booking=X&target=Y`, which calls `move_booking(p_booking_id, p_target_occurrence_id)`: **member-guarded** (`auth.uid()` does the real authorization, so there is no anon token surface), allowed only from a booking in an **unconfirmed flex class** to a **scheduled class in the same studio**; an **in-place occurrence move exactly as `rebook_member`** (seat type, free first class and credit travel intact, no cancel or confirm triggers fire). It shares `rebook_member`'s body through a common `rebook_run` twin, so the desk path (Decision 92) and the member path are one implementation. Refusals: `plan_not_covering`, `already_in_class`, `class_full`, `class_in_past`, `class_hidden`, `source_confirmed` (the flex class already reached its minimum). On success the page says **"You're in. {class_name}, {day} at {time}."** and sends the existing `booking_rebooked` email (queued by `rebook_run`). On refusal the page shows the reason sentence and the same list of core classes.
+
+**Sweep.** A dedicated `sweep_flex_rescue(now)` queues `flex_rescue_2days` on its nightly pass and `flex_rescue_final` on an hourly pass. Dedupe is the existing `queue_notification` key (`flex_rescue_2days:{booking}` / `flex_rescue_final:{booking}`) so a member never gets either twice; there is no new marker table.
+
+**Staff.** Nothing new except a **"Rescue email sent"** row in the member's Journey, a derived `member_activity` arm over `notifications` where `template_key in ('flex_rescue_2days','flex_rescue_final')` (the Decision 83 "contacted" shape). The Templates page lists both keys with their audience (Members) and when they send.
+
+**No new anon RPC** (the move page is login-gated and `move_booking` is member-guarded), so anon stays THIRTEEN.
+
+**Where:** a migration adding the setting + registry, the two templates with platform defaults, `core_classes_for_rescue`, the shared `rebook_run` twin + `move_booking`, the re-issued `rebook_member` + `member_activity`, and `sweep_flex_rescue`; the member move page; the Templates rows; the Settings entry for `flex_rescue_hours_before`. **Status:** settled. **Reuses:** Decision 92 (`rebook_member`), Decision 21 (flex), Decision 78e (per-email switch).
+
+---
+
 ## 94 — Members must give a phone number (recorded 11 Nov 2026)
 
 A member's phone number is required. When it is empty the member app shows a sheet that cannot be dismissed until a number is saved; the number is checked per the studio's country; staff see it with tap-to-call and tap-to-text; instructor projections stay without it.

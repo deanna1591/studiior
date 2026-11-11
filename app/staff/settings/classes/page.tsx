@@ -25,7 +25,7 @@ export default async function ClassesSettings() {
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Classes & instructors"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
 
   const { data: s } = await supabase.from("studio_settings")
-    .select("guarantees_enabled, flex_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, core_unmet_pay_cents, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, adjacency_minutes, auto_assign_open_classes, assign_requires_availability, claiming_enabled, core_claim_default_cap, cover_auto_accept_enabled, cover_escalation_hours, availability_due_day, week_confirm_escalate_days, week_confirm_enabled, availability_reminders_enabled, carry_forward_enabled, roster_confirm_days, instructor_booking_alerts, assignment_confirmations, instructor_class_reminders")
+    .select("guarantees_enabled, flex_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, core_unmet_pay_cents, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, flex_rescue_hours_before, adjacency_minutes, auto_assign_open_classes, assign_requires_availability, claiming_enabled, core_claim_default_cap, cover_auto_accept_enabled, cover_escalation_hours, availability_due_day, week_confirm_escalate_days, week_confirm_enabled, availability_reminders_enabled, carry_forward_enabled, roster_confirm_days, instructor_booking_alerts, assignment_confirmations, instructor_class_reminders")
     .eq("studio_id", ctx.studioId).maybeSingle();
 
   return (
@@ -46,6 +46,7 @@ export default async function ClassesSettings() {
           flex_deadline_hours: s?.flex_deadline_hours ?? 12,
           flex_unmet_pay_cents: s?.flex_unmet_pay_cents ?? 0,
           flex_standby_pay_cents: s?.flex_standby_pay_cents ?? 0,
+          flex_rescue_hours_before: s?.flex_rescue_hours_before ?? 3,
           adjacency_minutes: s?.adjacency_minutes ?? 90,
         }} />
       </SettingsSection>

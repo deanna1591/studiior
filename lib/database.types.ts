@@ -7140,6 +7140,7 @@ export type Database = {
           flex_deadline_time: string
           flex_enabled: boolean
           flex_min_bookings: number
+          flex_rescue_hours_before: number
           flex_standby_pay_cents: number
           flex_unmet_pay_cents: number
           free_first_class_enabled: boolean
@@ -7277,6 +7278,7 @@ export type Database = {
           flex_deadline_time?: string
           flex_enabled?: boolean
           flex_min_bookings?: number
+          flex_rescue_hours_before?: number
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
           free_first_class_enabled?: boolean
@@ -7414,6 +7416,7 @@ export type Database = {
           flex_deadline_time?: string
           flex_enabled?: boolean
           flex_min_bookings?: number
+          flex_rescue_hours_before?: number
           flex_standby_pay_cents?: number
           flex_unmet_pay_cents?: number
           free_first_class_enabled?: boolean
@@ -8825,6 +8828,19 @@ export type Database = {
         Returns: Json
       }
       convert_keep_sweep_all: { Args: { p_now?: string }; Returns: Json }
+      core_classes_for_rescue: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          coach_first: string
+          day_label: string
+          n_booked: number
+          name: string
+          occurrence_id: string
+          spots_left: number
+          starts_at: string
+          time_label: string
+        }[]
+      }
       cover_available_to: { Args: { p_instructor_id: string }; Returns: Json }
       create_announcement: {
         Args: {
@@ -9098,6 +9114,13 @@ export type Database = {
       flex_report: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
+      }
+      flex_rescue_block: {
+        Args: { p_booking_id: string }
+        Returns: {
+          html: string
+          txt: string
+        }[]
       }
       fmt_clock: {
         Args: { p_format?: string; p_ts: string; p_tz: string }
@@ -9771,6 +9794,10 @@ export type Database = {
           n: number
         }[]
       }
+      move_booking: {
+        Args: { p_booking_id: string; p_target_occurrence_id: string }
+        Returns: Json
+      }
       move_booking_here: {
         Args: { p_booking: string; p_target: string }
         Returns: Json
@@ -10132,6 +10159,10 @@ export type Database = {
         Returns: Json
       }
       rebook_member: {
+        Args: { p_booking: string; p_target: string }
+        Returns: Json
+      }
+      rebook_run: {
         Args: { p_booking: string; p_target: string }
         Returns: Json
       }
@@ -11045,6 +11076,7 @@ export type Database = {
       sweep_class_ended_unmarked: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
+      sweep_flex_rescue: { Args: { p_now?: string }; Returns: Json }
       sweep_guest_waivers: { Args: never; Returns: Json }
       sweep_instructor_class_reminders: {
         Args: { p_now?: string }

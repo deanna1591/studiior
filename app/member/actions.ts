@@ -12,6 +12,7 @@ import { fmtDeadlineShort } from "@/lib/time";
 import { cancelResult } from "@/lib/cancel-notice";
 import type { SeatKind } from "@/lib/cancel-notice";
 import { normalisePhone, PHONE_INVALID } from "@/lib/phone";
+import { moveResultLine, refusalSentence } from "@/lib/flex-rescue";
 import type { TablesUpdate } from "@/lib/database.types";
 
 export type SignInResult = { error: string } | { ok: true } | null;
@@ -301,6 +302,29 @@ function revalidateMember() {
 }
 
 export type ActionResult = { ok: boolean; message: string } | null;
+
+/**
+ * Decision 95 — the flex-rescue move. The member taps "Move me to this class"
+ * in a rescue email, lands on the login-gated /move page, and this performs the
+ * in-place move through the member-guarded move_booking. On success the page
+ * reads the one line; on refusal, the reason sentence.
+ */
+export type MoveResult = { ok: boolean; message: string };
+export async function moveMyBooking(bookingId: string, targetId: string): Promise<MoveResult> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "Please sign in to move your booking." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("move_booking", {
+    p_booking_id: bookingId, p_target_occurrence_id: targetId,
+  });
+  if (error) {
+    return { ok: false, message: refusalSentence(null) };
+  }
+  const r = (data ?? {}) as { ok?: boolean; reason?: string; class_name?: string; day?: string; time?: string };
+  if (!r.ok) return { ok: false, message: refusalSentence(r.reason) };
+  revalidatePath("/"); revalidatePath("/book"); revalidatePath("/class");
+  return { ok: true, message: moveResultLine({ class_name: r.class_name, day: r.day, time: r.time }) };
+}
 
 /**
  * Cancel, per Business Rules §3.1.

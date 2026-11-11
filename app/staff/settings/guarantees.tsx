@@ -42,7 +42,8 @@ export default function GuaranteesPanel({ s, currency }: {
     core_unmet_pay_cents: number | null;
     flex_min_bookings: number; flex_deadline_mode: string; flex_deadline_time: string;
     flex_deadline_hours: number; flex_unmet_pay_cents: number;
-    flex_standby_pay_cents: number; adjacency_minutes: number;
+    flex_standby_pay_cents: number; flex_rescue_hours_before: number;
+    adjacency_minutes: number;
   };
   currency: string;
 }) {
@@ -151,6 +152,13 @@ export default function GuaranteesPanel({ s, currency }: {
                  value={(s.flex_unmet_pay_cents / 100).toFixed(2)} min={0} suffix={currency} w="w-28" />
             <Num name="flex_standby_pay" label="Standby, if the slot stands alone"
                  value={(s.flex_standby_pay_cents / 100).toFixed(2)} min={0} suffix={currency} w="w-28" />
+            <Num name="flex_rescue_hours_before" label="Rescue email, hours before the cut-off"
+                 value={s.flex_rescue_hours_before} min={0} max={72} />
+            <p className="w-full max-w-[62ch] text-[12px] leading-[18px] text-ink-3">
+              Decision 95. A booking in a flex class still under its minimum gets
+              a move offer 2 days before, and a last call this many hours before
+              the cut-off, to a core class that is already going ahead.
+            </p>
             <p className="w-full max-w-[62ch] text-[12px] leading-[18px] text-ink-3">
               A fixed time so an instructor can plan a whole day at once, and it
               holds across a clock change — 20:00 stays 20:00. Standby is paid only
@@ -187,6 +195,7 @@ export default function GuaranteesPanel({ s, currency }: {
       {!flex && (
         <>
           <input type="hidden" name="flex_min_bookings" value={s.flex_min_bookings} />
+          <input type="hidden" name="flex_rescue_hours_before" value={s.flex_rescue_hours_before} />
           <input type="hidden" name="flex_deadline_mode" value={s.flex_deadline_mode ?? "previous_day_at"} />
           <input type="hidden" name="flex_deadline_time" value={(s.flex_deadline_time ?? "20:00").slice(0, 5)} />
           <input type="hidden" name="flex_deadline_hours" value={s.flex_deadline_hours} />
