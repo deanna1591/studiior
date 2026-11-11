@@ -296,6 +296,22 @@ select expect_num('a member still cannot read studio_settings itself',
   (select count(*) from studio_settings), 0);
 select expect_num('a slug they are not a member of returns nothing',
   (select count(*) from member_bootstrap('some-other-studio')), 0);
+-- Decision 94: a member with no phone reads has_phone false (the sheet shows).
+select expect_text('a member with no phone on file reads has_phone false',
+  (select has_phone::text from member_bootstrap('member-test')), 'false');
+reset role;
+
+-- The studio is PH and the member saves an E.164 number.
+update studios set country = 'PH' where id = 'eeeeeeee-0000-0000-0000-000000000001';
+update members set phone = '+639171234567'
+ where id = 'eeeeeeee-0000-0000-0000-00000000dd01';
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','eeeeeeee-0000-0000-0000-0000000000a1',false);
+select expect_text('...and has_phone true once a number is on file',
+  (select has_phone::text from member_bootstrap('member-test')), 'true');
+select expect_text('...carrying the studio country for the PH-vs-other rule',
+  (select country from member_bootstrap('member-test')), 'PH');
 reset role;
 
 -- Somebody else's session gets their own context, never the first caller's.

@@ -10,6 +10,7 @@ import { HealthBand, bandOf } from "@/components/health-band";
 import { MessageLink } from "@/components/message-link";
 import InviteToApp from "@/components/invite-to-app";
 import { formatMoney } from "@/lib/plans";
+import { formatPhone } from "@/lib/phone";
 import { dayMonthParts, dayMonthLongParts, fmtTime } from "@/lib/time";
 import { studioToday } from "@/lib/dashboard";
 import MembershipActions from "./membership-actions-panel";
@@ -302,7 +303,14 @@ export default async function MemberDetail({
       </div>
       <p className="mb-1 text-[13px] leading-[20px] text-ink-2">
         {m.email}
-        {m.phone && <> · {m.phone}</>}
+        {m.phone && (
+          <>
+            {" · "}
+            <a href={`tel:${m.phone}`} className="text-ink underline-offset-2 hover:underline">{formatPhone(m.phone)}</a>
+            {" · "}
+            <a href={`sms:${m.phone}`} className="text-ink underline-offset-2 hover:underline">Text</a>
+          </>
+        )}
         {" · joined "}{d(m.joined_on)}
         {m.status !== "active" && <> · {m.status}</>}
         {!m.waiver_signed_at && <> · <span className="text-ink">no waiver signed</span></>}

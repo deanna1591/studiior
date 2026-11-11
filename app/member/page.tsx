@@ -14,6 +14,7 @@ import Announcements, { type Announcement } from "@/components/member/announceme
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 import ClassButton from "@/components/member/class-button";
 import InstallCard from "@/components/member/install-card";
+import PhoneSheet from "@/components/member/phone-sheet";
 
 export const dynamic = "force-dynamic";
 
@@ -197,6 +198,9 @@ export default async function MemberHome() {
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+      {/* Decision 94: a phone number is required. When it is missing, Home opens
+          on a sheet that cannot be dismissed until one is saved. */}
+      {!settings.hasPhone && <PhoneSheet />}
       {/* Banner announcements sit above everything — the one filled bar on the
           screen (Decision 27 amendment). What's-on posts are at the bottom. */}
       <AnnounceStrip items={banners} />

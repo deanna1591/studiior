@@ -9574,11 +9574,13 @@ export type Database = {
           cancellation_cutoff_minutes: number
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
+          country: string
           current_streak: number
           desk_pay_available: boolean
           first_name: string
           guest_passes_enabled: boolean
           has_payment_provider: boolean
+          has_phone: boolean
           has_unread_studio_message: boolean
           how_to_buy: string
           last_name: string

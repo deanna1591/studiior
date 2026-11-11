@@ -11,6 +11,8 @@ import { requestOutcome, resetNext, validateNewPassword } from "@/lib/password-r
 import { fmtDeadlineShort } from "@/lib/time";
 import { cancelResult } from "@/lib/cancel-notice";
 import type { SeatKind } from "@/lib/cancel-notice";
+import { normalisePhone, PHONE_INVALID } from "@/lib/phone";
+import type { TablesUpdate } from "@/lib/database.types";
 
 export type SignInResult = { error: string } | { ok: true } | null;
 
@@ -599,20 +601,32 @@ export async function updateProfile(
     return v === "" ? null : v;
   };
 
-  const ecName = str("emergency_name");
-  const ecPhone = str("emergency_phone");
+  // Decision 94: a phone number is required and stored as E.164. The same
+  // validation serves the full details form and the phone-only sheet (scope
+  // "phone"), which posts to this action; the PH-vs-other rule is decided by the
+  // studio's own country, carried on the bootstrap.
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const phone = normalisePhone(ctx.bootstrap?.country, phoneRaw);
+  if (phone === null) return { ok: false, message: PHONE_INVALID };
+
+  // The sheet carries only the phone; the full details form carries scope=full.
+  // Patch only what was submitted so the sheet never clears a preferred name,
+  // emergency contact or marketing choice it never showed.
+  const full = String(formData.get("scope") ?? "") === "full";
+  const patch: TablesUpdate<"members"> = { phone, updated_at: new Date().toISOString() };
+  if (full) {
+    const ecName = str("emergency_name");
+    const ecPhone = str("emergency_phone");
+    patch.preferred_name = str("preferred_name");
+    // Stored as one object so it is either a usable contact or absent — a
+    // name with no number is not somebody you can ring.
+    patch.emergency_contact = ecName || ecPhone ? { name: ecName, phone: ecPhone } : null;
+    patch.marketing_opt_in = String(formData.get("marketing_opt_in") ?? "") === "on";
+  }
 
   const { data, error } = await supabase
     .from("members")
-    .update({
-      preferred_name: str("preferred_name"),
-      phone: str("phone"),
-      // Stored as one object so it is either a usable contact or absent — a
-      // name with no number is not somebody you can ring.
-      emergency_contact: ecName || ecPhone ? { name: ecName, phone: ecPhone } : null,
-      marketing_opt_in: String(formData.get("marketing_opt_in") ?? "") === "on",
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", ctx.memberId)
     .select("id");
 
@@ -627,6 +641,7 @@ export async function updateProfile(
 
   revalidatePath("/account");
   revalidatePath("/");
+  revalidatePath("/book");
   return { ok: true, message: "Saved." };
 }
 

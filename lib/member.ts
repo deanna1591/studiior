@@ -76,6 +76,11 @@ export async function memberScreen() {
       messagesEnabled: b?.messages_enabled ?? false,
       // Decision 67(b): the payee notice shown at checkout (blank = no line).
       payeeNoticeName: b?.payee_notice_name ?? null,
+      // Decision 94: a phone number is required. hasPhone drives the
+      // cannot-be-dismissed sheet on Home and Book; country decides the
+      // PH-vs-other validation (server-side, never hardcoded in the sheet).
+      hasPhone: b?.has_phone ?? false,
+      country: b?.country ?? null,
     },
   };
 }

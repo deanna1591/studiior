@@ -9,6 +9,7 @@ import FreeClassList from "@/components/member/free-class-list";
 import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, fmtDeadlineShort, zonedDateKey } from "@/lib/time";
 import { freeEligibleSet, whichView, nearestEligibleDay } from "@/lib/free-first-view";
+import PhoneSheet from "@/components/member/phone-sheet";
 
 export const dynamic = "force-dynamic";
 
@@ -489,6 +490,9 @@ export default async function Book({
 
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
+      {/* Decision 94: a phone number is required. Book opens on the same
+          cannot-be-dismissed sheet when one is missing. */}
+      {!settings.hasPhone && <PhoneSheet />}
       {/* The studio's banner announcements — the tenant's own one-line message
           where members choose a class. The free-first offer is no longer a
           built-in banner (Decision 27 amendment); the "Book — first class free"

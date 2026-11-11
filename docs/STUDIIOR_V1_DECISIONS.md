@@ -511,6 +511,24 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 94 — Members must give a phone number (recorded 11 Nov 2026)
+
+A member's phone number is required. When it is empty the member app shows a sheet that cannot be dismissed until a number is saved; the number is checked per the studio's country; staff see it with tap-to-call and tap-to-text; instructor projections stay without it.
+
+**The prompt.** When a member's `phone` is empty, Home and Book show a sheet that cannot be dismissed: title "Add your phone number", line "We'll call or text you about your classes and any changes to your bookings.", one field (keyboard set to phone), and a "Save" button. It appears every time the app opens until a number is saved. **The QR check-in page and the class page are NOT blocked**, so nobody is stuck at the door.
+
+**Validation.** When the studio's country is PH the number is checked as a Philippine mobile (`09XXXXXXXXX` or `+639XXXXXXXXX`); otherwise it is any number of 7 to 15 digits. The canonical value stored is **E.164** (`+639171234567`), displayed as `+63 9XX XXX XXXX`. A bad entry shows "That doesn't look like a mobile number." under the field.
+
+**Account.** Account → Your details keeps the same phone field; saving there also clears the prompt (the same validation).
+
+**Staff.** The roster row and the member profile show the number with tap-to-call (`tel:`) and tap-to-text (`sms:`) links. **Instructor projections stay without the phone** (the §14 rule, unchanged).
+
+**Reader.** `member_bootstrap` carries `has_phone` (re-issued from its newest definition, same argument signature `(p_slug text)`; adding the column to its RETURNS TABLE is a DROP+recreate that re-asserts the authenticated-only ACL). **No notification or SMS sending is part of this decision.** The requirement is a number on file, not a channel.
+
+**Where:** a migration re-issuing `member_bootstrap` with `has_phone`; the pure `lib/phone.mjs` (`normalisePhone(country, input)`); the member Home/Book sheet (`components/member/phone-sheet.tsx`) reusing the existing profile update action; Account → Your details; the staff roster row and member profile `tel:`/`sms:` links. **Status:** settled.
+
+---
+
 ## 89 — Studio messages (recorded 1 Nov 2026)
 
 Members can message the studio from the app. Every staff role — owner, admin, manager, front desk — sees a **Messages** tab on the staff app and can reply. **Instructors cannot send or see messages.** One thread per member per studio; messages never cross studios.

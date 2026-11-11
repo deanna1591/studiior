@@ -66,6 +66,7 @@ export default function ProfileForm({
       </form>
 
       <form action={action} className="m-card p-5">
+        <input type="hidden" name="scope" value="full" />
         {state && <Note ok={state.ok}>{state.message}</Note>}
 
         <label className="block">
@@ -79,7 +80,11 @@ export default function ProfileForm({
 
         <label className="mt-4 block">
           <span className="m-meta mb-1.5 block text-ink-2">Phone</span>
-          <input name="phone" type="tel" inputMode="tel" defaultValue={phone} className={field} />
+          <input name="phone" type="tel" inputMode="tel" autoComplete="tel"
+                 defaultValue={phone} className={field} />
+          <span className="m-meta mt-1 block text-ink-3">
+            {"We'll call or text you about your classes and any changes to your bookings."}
+          </span>
         </label>
 
         <div className="mt-6 border-t border-line pt-5">

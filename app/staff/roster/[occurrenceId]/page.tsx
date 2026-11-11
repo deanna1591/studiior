@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { staffScreen } from "@/lib/screen";
-import { isManagerUp } from "@/lib/auth";
+import { isManagerUp, isDeskUp } from "@/lib/auth";
+import { formatPhone } from "@/lib/phone";
 import OpenShift from "../open-shift";
 import AssignShift from "../assign-shift";
 import CancelClass from "../cancel-class";
@@ -42,6 +43,9 @@ export default async function Roster({ params, searchParams }: { params: { occur
   // labelled — only when there is actually a gap, so an assigned class pays for
   // none of it.
   const manager = isManagerUp(ctx.role);
+  // Decision 94: the desk sees the member's number with tap-to-call / tap-to-text.
+  // An instructor does not (the §14 instructor-projection rule stays).
+  const desk = isDeskUp(ctx.role);
   const unstaffed = manager && occ.status === "scheduled" && !occ.instructor_id;
 
   // Decision 30 amendment (b) follow-up: the "Open to first-timers" control
@@ -66,7 +70,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
       : Promise.resolve(null as { candidates: Awaited<ReturnType<typeof computeAssignCandidates>>; pendingApplications: number } | null),
     supabase
       .from("bookings")
-      .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at)")
+      .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at, phone)")
       .eq("occurrence_id", params.occurrenceId)
       .order("waitlist_position", { ascending: true, nullsFirst: true })
       .order("booked_at"),
@@ -362,6 +366,13 @@ export default async function Roster({ params, searchParams }: { params: { occur
                 {groupOf.has(b.member_id) && !groupOf.get(b.member_id)!.isHost && (
                   <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
                     Booked by {groupOf.get(b.member_id)!.host}
+                  </p>
+                )}
+                {desk && b.members?.phone && (
+                  <p className="mt-1 pl-9 text-[12px] leading-[18px] text-ink-2">
+                    <a href={`tel:${b.members.phone}`} className="text-ink underline decoration-line-2 underline-offset-2 hover:decoration-ink">{formatPhone(b.members.phone)}</a>
+                    {" · "}
+                    <a href={`sms:${b.members.phone}`} className="text-ink underline decoration-line-2 underline-offset-2 hover:decoration-ink">Text</a>
                   </p>
                 )}
                 {guestOf.has(b.member_id) && !b.members?.waiver_signed_at && (
