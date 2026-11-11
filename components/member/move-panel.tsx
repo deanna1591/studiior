@@ -5,6 +5,12 @@ import Link from "next/link";
 import { spotsLine, type RescueCard } from "@/lib/flex-rescue";
 import type { MoveResult } from "@/app/member/actions";
 
+// A move succeeds, and a second attempt on an already-moved booking comes back
+// source_confirmed. This guard fires the move exactly once per (booking, target)
+// for the page's lifetime: a module Set survives React's dev remount of the
+// effect (a component ref does not) and any fast re-render.
+const started = new Set<string>();
+
 /**
  * Decision 95 — the move page body. With a target in the URL it fires the move
  * once on mount (the GET did not mutate, so an email prefetch is safe) and shows
@@ -24,10 +30,12 @@ export default function MovePanel({
   const [moving, setMoving] = useState(!!(bookingId && targetId));
 
   useEffect(() => {
+    if (!(bookingId && targetId)) return;
+    const key = `${bookingId}:${targetId}`;
+    if (started.has(key)) return;
+    started.add(key);
     let live = true;
-    if (bookingId && targetId) {
-      move(bookingId, targetId).then((r) => { if (live) { setResult(r); setMoving(false); } });
-    }
+    move(bookingId, targetId).then((r) => { if (live) { setResult(r); setMoving(false); } });
     return () => { live = false; };
   }, [bookingId, targetId, move]);
 
