@@ -242,6 +242,21 @@ export default async function MemberDetail({
     mergedIntoName = keep ? `${keep.first_name} ${keep.last_name}` : null;
   }
 
+  // Decision 98: same-person duplicates (chip + preselected merge) and the
+  // Decision 97(a) merge-trace lines (merges INTO this member). Both desk-up
+  // readers; fetched only for a live member a manager is looking at.
+  let dupes: { id: string; first_name: string; last_name: string; email: string; had_free: boolean }[] = [];
+  let mergeTrace: { removed_first: string | null; removed_last: string | null; removed_email: string | null; at: string; staff_first: string }[] = [];
+  if (!mm.deleted_at) {
+    const [{ data: d }, { data: tr }] = await Promise.all([
+      manager ? supabase.rpc("member_duplicates", { p_member_id: params.id }) : Promise.resolve({ data: [] }),
+      supabase.rpc("member_merge_trace", { p_member_id: params.id }),
+    ]);
+    dupes = (d as typeof dupes) ?? [];
+    mergeTrace = (tr as typeof mergeTrace) ?? [];
+  }
+  const suggested = dupes[0] ?? null;
+
   return (
     <AppShell
       {...shell}
@@ -268,6 +283,31 @@ export default async function MemberDetail({
               : <>Deleted on {dLong(mm.deleted_at)}. Their history is kept.</>}
           </p>
         </section>
+      )}
+
+      {/* Decision 97(a): a trace of every merge INTO this member — the removed
+          names and email survive the scrub, read from the audit rows. */}
+      {mergeTrace.length > 0 && (
+        <section className="mb-6 border-l-[3px] px-3 py-2.5"
+          style={{ borderLeftColor: "var(--ink-2)", background: "var(--paper)" }}>
+          {mergeTrace.map((t, i) => (
+            <p key={i} className="text-[13px] leading-[19px] text-ink-2">
+              Merged from {t.removed_first} {t.removed_last}
+              {t.removed_email ? ` (${t.removed_email})` : ""} on {dLong(t.at)} by {t.staff_first}.
+            </p>
+          ))}
+        </section>
+      )}
+
+      {/* Decision 98: a same-person match — the "Possible duplicate" chip opens
+          the Decision 97 merge with both sides preselected (in the Danger zone). */}
+      {manager && !mm.deleted_at && suggested && (
+        <a href="#danger"
+          className="mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12.5px] font-medium"
+          style={{ borderColor: "var(--amber-deep)", color: "var(--ink)", background: "var(--amber-tint)" }}>
+          Possible duplicate: {suggested.first_name} {suggested.last_name}
+          {suggested.had_free ? " (has had a free class)" : ""} &middot; review &amp; merge
+        </a>
       )}
 
       {/* An account, or the way to offer one. Not buried in a section: for a
@@ -645,7 +685,8 @@ export default async function MemberDetail({
           never on an already-deleted/merged member. The database refuses a
           staff or instructor login with a clear message. */}
       {manager && !mm.deleted_at && (
-        <MemberDangerZone memberId={params.id} firstName={m.first_name} studioId={ctx.studioId} />
+        <MemberDangerZone memberId={params.id} firstName={m.first_name} studioId={ctx.studioId}
+          suggested={suggested ? { id: suggested.id, name: `${suggested.first_name} ${suggested.last_name}`, email: suggested.email } : null} />
       )}
     </AppShell>
   );

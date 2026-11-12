@@ -8,6 +8,7 @@ import { bookClass, bookFirstFree, cancelBooking, selfCheckIn } from "@/app/memb
 import ClassButton from "@/components/member/class-button";
 import CancelButton from "@/components/member/cancel-button";
 import type { SeatKind } from "@/lib/cancel-notice";
+import DuplicateHold from "@/components/member/duplicate-hold";
 import { classSheetView, bookRoute } from "@/lib/class-sheet";
 import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
@@ -53,7 +54,7 @@ export default function ClassDetailBody({
   occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
-  seatKind = "unlimited", cutoffMinutes = 720,
+  seatKind = "unlimited", cutoffMinutes = 720, duplicateHold = false, holdTime = null,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -83,6 +84,10 @@ export default function ClassDetailBody({
   /** Decision 73 (c): can this member still pay at the desk? When false, the
    *  page hides the pay-at-the-desk option and tells them to pay online. */
   deskPayAvailable?: boolean;
+  /** Decision 98: this seat is a held free-class duplicate — the paid-or-lose
+   *  line + checkout button, with the hold deadline. */
+  duplicateHold?: boolean;
+  holdTime?: string | null;
   /** Decision 88: does this member's plan cover the class? When true, Book books
    *  inline (unchanged); when false, Book opens /checkout to pick a plan and pay. */
   covered?: boolean;
@@ -323,6 +328,12 @@ export default function ClassDetailBody({
           </Link>
         )}
       </div>
+
+      {/* Decision 98: a free class re-flagged as a duplicate — the paid-or-lose
+          line + checkout button, with its own deadline. */}
+      {duplicateHold && !past && (
+        <DuplicateHold occurrenceId={occ.id} className={occ.name} holdTime={holdTime} />
+      )}
 
       {/* Decision 88: an unpaid drop-in booking — "Pay now" opens checkout
           (Decision 73b's /account/plan path is replaced by it), where buying any

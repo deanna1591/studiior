@@ -15,6 +15,7 @@ import CodeCheckIn from "./code-check-in";
 import PaperWaiverButton from "./paper-waiver-button";
 import MakeFreeButton from "./make-free-button";
 import RebookButton from "./rebook-button";
+import RemoveBooking from "@/components/staff/remove-booking";
 import ToastHost from "@/components/staff/toast-host";
 import ReleasePay from "./release-pay";
 import RunAnyway from "./run-anyway";
@@ -384,6 +385,13 @@ export default async function Roster({ params, searchParams }: { params: { occur
                 {/* Decision 92: rebook this member into another class (all staff). */}
                 {occ.status === "scheduled" && (b.status === "booked" || b.status === "attended") && (
                   <RebookButton bookingId={b.id} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
+                )}
+                {/* Decision 92(b): remove this member from the class (desk-up),
+                    future scheduled, live booking, not already checked in. */}
+                {desk && occ.status === "scheduled" && b.status === "booked"
+                  && new Date(occ.starts_at).getTime() > Date.now() && !checkedIn.has(b.id) && (
+                  <RemoveBooking bookingId={b.id}
+                    firstName={b.members?.preferred_name || b.members?.first_name || "this member"} />
                 )}
                 {(notesFor.get(b.member_id) ?? []).map((n, i) => (
                   <p key={i} className="mt-1 pl-9 text-[12px] leading-[18px]"

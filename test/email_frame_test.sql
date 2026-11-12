@@ -176,7 +176,10 @@ declare
     'plan_name','8 Classes Monthly','credits','3','credits_left','3',
     'expires_on','20 Nov 2026','ends_on','20 Nov 2026','renew_url','https://ef-sa.studiior.app/buy/x',
     'last_class','Reformer Flow','last_class_date','09 Nov','instructor_first','Ada','instructor_first_name','Ada',
-    'days_since','10','product','Grip socks','quantity','1');
+    'days_since','10','product','Grip socks','quantity','1',
+    'hold_time','7:00 PM on Mon 10 Nov','checkout_url','https://ef-sa.studiior.app/checkout/x',
+    'note_line',' Room closed.','note_html',' Room closed.','credit_line',' Your credit or free class is back on your account.',
+    'credit_html',' Your credit or free class is back on your account.');
   k text; v_nid uuid; r record; v_n int := 0;
   v_keys text[] := array[
     'booking_confirmed','free_booking_confirmed','flex_booking_pending','flex_booking_confirmed',
@@ -184,7 +187,7 @@ declare
     'convert_day3','convert_day7','convert_last_day','convert_missed_you',
     'keep_renew_7','keep_renew_1','keep_renew_0','keep_lapsed_3','keep_credits_7','keep_credits_2',
     'keep_winback_30','keep_winback_60','keep_drifting','membership_expiring','credit_expiry',
-    'product_order_paid'];
+    'product_order_paid','free_class_duplicate','booking_removed_by_studio'];
   -- retention_* are composer SEEDS (sent via the `retention` passthrough with the
   -- composer's rendered html, never rendered directly), so their text_body carries
   -- composer markup — not a directly-rendered template.

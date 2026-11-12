@@ -510,3 +510,39 @@ export async function rebookMember(_prev: RebookResult, fd: FormData): Promise<R
   revalidatePath("/roster");
   return { ok: true, className: r.class_name ?? className, when: r.when ?? "" };
 }
+
+// ===========================================================================
+// Decision 92(b) — remove a member from a class. Desk-up. One booking off,
+// with or without returning the credit/free class, one email, audit + Journey.
+// ===========================================================================
+export type RemoveResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string }
+  | null;
+
+const REMOVE_REASON: Record<string, string> = {
+  "no such booking": "That booking no longer exists.",
+  "This booking is not live.": "That booking is no longer live.",
+  "That class has already started.": "That class has already started.",
+  "They have already checked in.": "They have already checked in.",
+  "only studio staff remove a booking": "Only studio staff can remove a booking.",
+};
+
+export async function removeBooking(_prev: RemoveResult, fd: FormData): Promise<RemoveResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const bookingId = String(fd.get("booking_id") ?? "");
+  const ret = String(fd.get("return") ?? "1") === "1";
+  const note = String(fd.get("note") ?? "").trim() || null;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("staff_remove_booking", {
+    p_booking_id: bookingId, p_return: ret, p_note: note ?? undefined,
+  });
+  if (error) {
+    return { ok: false, message: REMOVE_REASON[error.message] ?? error.message };
+  }
+  const r = data as unknown as { ok: boolean; class_name?: string; when?: string } | null;
+  revalidatePath("/roster");
+  return { ok: true, message: `Removed from ${r?.class_name ?? "the class"}, ${r?.when ?? ""}.` };
+}

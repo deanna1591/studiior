@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice } from "@/components/ui";
 import {
@@ -31,13 +31,19 @@ function Submit({ label, busy, danger }: { label: string; busy: string; danger?:
  * name. On success the page navigates (a full load so the list refreshes).
  */
 export default function MemberDangerZone({
-  memberId, firstName, studioId,
-}: { memberId: string; firstName: string; studioId: string }) {
+  memberId, firstName, studioId, suggested = null,
+}: { memberId: string; firstName: string; studioId: string; suggested?: Target | null }) {
   const [open, setOpen] = useState<null | "merge" | "delete">(null);
 
   return (
-    <section className="mt-8 rounded-xl border border-line bg-surface px-3.5 py-3">
+    <section id="danger" className="mt-8 rounded-xl border border-line bg-surface px-3.5 py-3">
       <p className="text-[11px] uppercase leading-4 tracking-[0.06em] text-ink-3">Danger zone</p>
+      {open === null && suggested && (
+        <p className="mt-2 max-w-[60ch] text-[12.5px] leading-[18px] text-ink-2">
+          This member looks like <strong>{suggested.name}</strong> ({suggested.email}).
+          Merge is preselected below.
+        </p>
+      )}
       {open === null && (
         <div className="mt-2 flex flex-wrap gap-2">
           <button onClick={() => setOpen("merge")}
@@ -53,7 +59,7 @@ export default function MemberDangerZone({
       )}
       {open === "merge" && (
         <MergeFlow memberId={memberId} firstName={firstName} studioId={studioId}
-          onCancel={() => setOpen(null)} />
+          initialKeep={suggested} onCancel={() => setOpen(null)} />
       )}
       {open === "delete" && (
         <DeleteFlow memberId={memberId} firstName={firstName} onCancel={() => setOpen(null)} />
@@ -63,13 +69,23 @@ export default function MemberDangerZone({
 }
 
 function MergeFlow({
-  memberId, firstName, studioId, onCancel,
-}: { memberId: string; firstName: string; studioId: string; onCancel: () => void }) {
+  memberId, firstName, studioId, onCancel, initialKeep = null,
+}: { memberId: string; firstName: string; studioId: string; onCancel: () => void; initialKeep?: Target | null }) {
   const [q, setQ] = useState("");
   const [targets, setTargets] = useState<Target[]>([]);
   const [keep, setKeep] = useState<Target | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [state, action] = useFormState<DangerState, FormData>(mergeMembers, null);
+
+  // Decision 98: when opened from the "Possible duplicate" chip, preselect the
+  // suggested member to keep and load its preview once.
+  useEffect(() => {
+    if (initialKeep && !keep) {
+      setKeep(initialKeep);
+      mergePreview(initialKeep.id, memberId).then(setPreview);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function runSearch(term: string) {
     setQ(term);

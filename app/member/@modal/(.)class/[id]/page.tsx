@@ -35,7 +35,7 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
                        unpaid={data.unpaid} group={data.group} covered={data.covered}
                        waiverBlocked={waiverBlocked}
-                       seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff}
+                       seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff} duplicateHold={data.duplicateHold} holdTime={data.holdTime}
                        deskPayAvailable={deskPayAvailable} />
     </Sheet>
   );

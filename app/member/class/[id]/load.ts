@@ -37,7 +37,8 @@ export async function loadClassDetail(
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
   checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean;
   unpaid: boolean; covered: boolean; seatKind: SeatKind;
-  group: { isHost: boolean; host: string; plan: string; groupId: string } | null } | null> {
+  group: { isHost: boolean; host: string; plan: string; groupId: string } | null;
+  duplicateHold: boolean; holdTime: string | null } | null> {
 
   const occQuery = supabase
     .from("class_occurrences")
@@ -92,11 +93,17 @@ export async function loadClassDetail(
   // guarded SECURITY DEFINER; the caller is always this studio's member, so it
   // returns true/false (never PT403). In the parallel wave — no extra hop.
   const coverQuery = supabase.rpc("member_covers_occurrence", { p_occurrence_id: id });
+  // Decision 98: is this member's seat on this class a held free-class duplicate
+  // (comp seat re-flagged, now a 24-hour paid-or-lose hold)? In the parallel wave.
+  const heldDupQuery = supabase.from("bookings").select("hold_until")
+    .eq("member_id", memberId).eq("occurrence_id", id)
+    .eq("status", "pending_payment").eq("hold_reason", "free_class_duplicate").maybeSingle();
 
   const finish = (occ: Record<string, unknown> | null, type: unknown, booking: unknown,
                   activeGuests: number | null, elig: unknown, freeCount: number | null,
                   pend: unknown, checkinRow: { checked_in_at: string } | null,
-                  paidCount: number | null, groupRow: unknown, cover: unknown) => {
+                  paidCount: number | null, groupRow: unknown, cover: unknown,
+                  heldDup: { hold_until: string | null } | null) => {
     if (!occ) return null;
     const gr = groupRow as { is_host: boolean; group_purchases: {
       id: string; members: { first_name: string | null } | null;
@@ -148,21 +155,24 @@ export async function loadClassDetail(
       covered: (cover as boolean) === true,
       // Decision 76: the group (Barkada) this seat belongs to, if any.
       group,
+      // Decision 98: a held free-class duplicate — the line + checkout button.
+      duplicateHold: heldDup != null,
+      holdTime: heldDup?.hold_until ?? null,
     };
   };
 
   if (classTypeId) {
     // One wave: nothing waits on the occurrence.
-    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }] =
-      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery]);
-    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover);
+    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }, { data: heldDup }] =
+      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery, heldDupQuery]);
+    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover, heldDup);
   }
 
   // No hint (deep link / refresh): occurrence, booking and guest in parallel;
   // then type, the one read that needs the occurrence's class_type_id.
-  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }] =
-    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery]);
+  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }, { data: heldDup }] =
+    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery, heldDupQuery]);
   if (!occ) return null;
   const { data: type } = occ.class_type_id ? await typeQuery(occ.class_type_id) : { data: null };
-  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover);
+  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover, heldDup);
 }

@@ -511,6 +511,26 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 98 — One free class per person (recorded 12 Nov 2026)
+
+A new member's first class is free (Decision 30), kept once-ever on the normalised email key. A second email defeats it: on hosted Reform two people (Jen De Guzman, Jason Caling) have taken a free class twice, each with two Gmail addresses. This decision closes that by testing the person, not the email, and it changes nothing about who is already a member.
+
+**Same person.** Two members are the same person, within one studio, when their normalised full name is equal OR their phone is equal. The normalised name is lower-cased, trimmed, internal whitespace collapsed to single spaces, and accents stripped by an IMMUTABLE `translate()`-based accent strip (not `unaccent`, which is not installed on local or hosted and is `STABLE` not `IMMUTABLE`, so it cannot back a functional index or an immutable helper). The phone is normalised to digits (E.164 where the country gives one), mirroring `lib/phone.mjs`. A blank name or a blank phone never matches anything. "Has had a free class" means any booking with `payment_source = 'comp'` in status booked, attended, no_show or late_cancelled, or the member's free-first marked used.
+
+**The gate gains a reason.** `free_first_eligibility_run` keys everything on the email key today; it gains a `same_person_match(p_studio, p_member)` read and a new refusal reason `duplicate` when another member of the studio is the same person and has already had a free class. The reason sits alongside `already_member` and `already_had_free`.
+
+**Invite time.** A guest invite captures first name, last name, email, no phone (`book_guest`). So the invite-time check is name only: if the invited name matches an existing member who has had a free class, the invite is refused. Member-app copy: "It looks like {first_name} already has an account with us. Ask them to sign in instead." Staff copy: "{name} looks like an existing member who has already had a free class. Invite them as a paying guest, or find their account."
+
+**Claim time and phone-save time (a new hook).** The claim flow runs no eligibility check today; it gains one. When a guest claims their account (`claim_member_account`) and when a member saves a phone number for the first time (Decision 94's phone sheet / `updateProfile`), the same-person test runs. If it now matches someone who has had a free class, the member's pending free booking is marked ineligible: the comp seat becomes `pending_payment` with a 24-hour hold, reason `duplicate`. The 24-hour hold has its OWN `hold_until` column and its OWN sweep step; these held bookings are EXCLUDED from the existing 15-minute drop-in sweep (`sweep_unpaid_dropins`), whose window keys on `booked_at` and would otherwise cancel a re-flagged booking at once. The member sees a line on Home and on the class page ("This class is no longer free on your account, because it looks like you have taken one with us before. Pay to keep your spot before {time}.") with a checkout button, and gets one email, template `free_class_duplicate`, on the per-email switch. The host is not emailed. Unpaid at the end of the hold, the booking is cancelled the normal way (seat freed, waitlist promoted, no penalty).
+
+**Staff.** A member who is a same-person match to another member shows a "Possible duplicate" chip on the profile, which opens the Decision 97 merge flow with both sides preselected (owner or manager confirms as usual). "Make this their free class" (Decision 30c) still overrides the `duplicate` reason, exactly as it overrides `late_cancel`.
+
+**Nothing retroactive.** The migration cancels nothing and refunds nothing. Existing duplicate pairs (the two real ones on hosted, plus the studio's own staff and test rows) are only surfaced as chips; a free class already taken stays taken. The gate applies from here forward.
+
+**Where:** Business Rules §2 (free-first eligibility), §3 (the drop-in hold); Permissions §5; migrations 158 and 163 (free first class), 237 (self-deletion scrub reused by the chip's merge), 336 (Decision 94 phone), 340 (merge). **Status:** settled. **Extends:** Decision 30 (free first class, and 30c "Make this their free class"), Decision 94 (phone). **Reuses:** `free_first_eligibility_run`, `claim_member_account`, `updateProfile`, the merge flow (Decision 97), `lib/phone.mjs`. Deanna, 12 Nov 2026.
+
+---
+
 ## 97 — Merge members, staff delete, invite trail (recorded 12 Nov 2026)
 
 Three things a studio needs once it has real member data: a staff member can delete a member, merge a duplicate member into the one to keep, and the invite trail survives both. Decision 69 built member self-deletion (the scrub); this extends it. Nothing is ever purged. Anon stays THIRTEEN.
@@ -524,6 +544,8 @@ Three things a studio needs once it has real member data: a staff member can del
 **The scrub is one implementation.** `delete_my_account`'s body (the per-member steps, steps 1 to 5 of STEP 0) is extracted into a service-only `delete_member_run(p_member_id, p_send_email)` twin keyed on the member id; the `studiior.account_deleting` guard branch is who-agnostic and column-narrowed, so a staff or service caller may scrub the row. `p_send_email` is true for self-deletion and staff delete and **false for merge**. The login is removed only when the member being scrubbed is the **last non-deleted member row for that `user_id`**, so a single-studio delete or merge never signs the person out of their other studios. `delete_my_account` stays the thin `auth.uid()` wrapper that loops the login's member rows through the twin (the last call removes the login). The twin never blanks `host_name_at_invite`/`invited_at` on any `guest_passes` row.
 
 **Where:** Business Rules §5; Permissions §5 and §6; migrations 027 (invites), 127 (guest passes), 237 (self-deletion), 311 and 313 (messages). **Status:** settled. **Extends:** Decision 69 (self-deletion scrub), Decision 26 (guest passes / invite trail). **Reuses:** `cancel_booking`, `guard_member_self_update`'s `account_deleting` flag, the `account_deleted` template. Deanna, 12 Nov 2026.
+
+Amendment (a), 12 Nov 2026. Merge trace on the kept profile. The removed member is scrubbed, so a studio looking at the kept member cannot see what was folded in. The kept member's profile shows a line under the header, one for every merge into it: "Merged from {removed first name} {removed last name} ({removed email}) on {date} by {staff first name}". The Journey carries the same as a row, "Merged {removed email} into this account". Both are read from the `member.merged` audit rows (actor and before/after captured at merge time), not from the scrubbed removed row, so past merges show too and the names and email survive the scrub. Ships in the Decision 98 build.
 
 ---
 
@@ -2276,6 +2298,8 @@ Instructor: no email; the two rosters update.
 Not in scope: rebooking into a different studio, rebooking several members at once, rebooking from the member page (later), member-side self-rebook (members cancel and rebook as today).
 
 Amendment, 7 Nov 2026. Rows carry the button "Rebook to this class"; the selected day uses the staff selection style. The booking_rebooked email carries a calendar file for the new class that updates the member's existing calendar event in place: same UID as the original booking's invite with SEQUENCE increased, so the old time disappears and the new one appears. If the original invite's UID is not per booking, the email carries two files: a CANCEL for the old class and a REQUEST for the new. The subscription feed already reflects the move.
+
+Amendment (b), 12 Nov 2026. Remove a member from a class. Decision 92 moves a booking; this one takes it off entirely. There is no way today to take one member off a class from a roster (only the whole class cancels). Desk-up staff (owner, manager, front desk) get a "Remove from class" control on the member's roster row, opening a sheet: a tick "Return their credit or free class" (on by default), an optional note, and a "Remove" button. Tick on, the booking is cancelled through the normal member path with no penalty: `free_cancel_until` is set first, so the credit or free class is returned, the seat frees, and the waitlist is promoted. Tick off, it is a late cancel (the member keeps no credit, the seat still frees). One email, a new member template `booking_removed_by_studio` on the per-email switch, subject "{studio_name} took you off {class_name} on {day}". One audit row and one Journey row "Removed from {class_name} by {staff first name}". Refusals: the class is in the past, the booking is not live, or the member has already checked in. Instructors are not given this; they keep "Move them here" on their own class only (Decision 81a).
 
 ---
 

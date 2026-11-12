@@ -15,6 +15,7 @@ import AnnounceStrip, { type StripItem } from "@/components/member/announce-stri
 import ClassButton from "@/components/member/class-button";
 import InstallCard from "@/components/member/install-card";
 import PhoneSheet from "@/components/member/phone-sheet";
+import DuplicateHold from "@/components/member/duplicate-hold";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,8 @@ export default async function MemberHome() {
 
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { data: monthCheckins },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
-         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems }] =
+         { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems },
+         { data: dupHolds }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -102,8 +104,26 @@ export default async function MemberHome() {
     // Decision 63: whether the studio sells merchandise (the Shop card appears
     // only when at least one active product exists — inert otherwise).
     supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
+    // Decision 98: a free first class re-flagged as a duplicate is held 24h and
+    // must be paid for. The line + checkout button show at the top of Home.
+    supabase
+      .from("bookings")
+      .select("occurrence_id, hold_until, class_occurrences(name)")
+      .eq("member_id", ctx.memberId)
+      .eq("status", "pending_payment")
+      .eq("hold_reason", "free_class_duplicate"),
   ]);
   const hasShop = Array.isArray(shopItems) && (shopItems as unknown[]).length > 0;
+  // Decision 98: held free-class-duplicate bookings — the line + checkout button.
+  const holdItems = ((dupHolds ?? []) as {
+    occurrence_id: string; hold_until: string | null; class_occurrences: { name: string } | null;
+  }[]).map((h) => ({
+    occurrenceId: h.occurrence_id,
+    className: h.class_occurrences?.name ?? "This class",
+    holdTime: h.hold_until
+      ? `${fmtTime(h.hold_until, ctx.timeZone, ctx.timeFormat)} on ${fmtDayLong(h.hold_until, ctx.timeZone)}`
+      : null,
+  }));
   // Decision 68: a booked class checked in by any door (self, scan or desk)
   // reads "Checked in" — a 12h look-back catches today's. "Classes this month"
   // is the same table from the month's start. Both derived from the one read.
@@ -208,6 +228,11 @@ export default async function MemberHome() {
           the installed (standalone) app and once dismissed. */}
       <InstallCard studioName={studioName} dismissed={!!installRow} />
       {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
+      {/* Decision 98: a free class re-flagged as a duplicate — pay or lose it. */}
+      {holdItems.map((h) => (
+        <DuplicateHold key={h.occurrenceId} occurrenceId={h.occurrenceId}
+          className={h.className} holdTime={h.holdTime} />
+      ))}
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}
       {/* Text only. The greeting had the member's photograph beside it and the

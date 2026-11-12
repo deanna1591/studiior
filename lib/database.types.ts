@@ -543,6 +543,8 @@ export type Database = {
           credit_entry_id: string | null
           fee_charged_cents: number
           free_cancel_until: string | null
+          hold_reason: string | null
+          hold_until: string | null
           id: string
           is_demo: boolean
           is_late_cancel: boolean
@@ -573,6 +575,8 @@ export type Database = {
           credit_entry_id?: string | null
           fee_charged_cents?: number
           free_cancel_until?: string | null
+          hold_reason?: string | null
+          hold_until?: string | null
           id?: string
           is_demo?: boolean
           is_late_cancel?: boolean
@@ -603,6 +607,8 @@ export type Database = {
           credit_entry_id?: string | null
           fee_charged_cents?: number
           free_cancel_until?: string | null
+          hold_reason?: string | null
+          hold_until?: string | null
           id?: string
           is_demo?: boolean
           is_late_cancel?: boolean
@@ -9103,6 +9109,30 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_like: {
+        Args: { actual: string; label: string; pat: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raise: {
+        Args: { code: string; label: string; sql: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9679,6 +9709,7 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
+      member_duplicates: { Args: { p_member_id: string }; Returns: Json }
       member_first_class: {
         Args: { p_member_id: string }
         Returns: {
@@ -9696,6 +9727,10 @@ export type Database = {
         }[]
       }
       member_goal_progress: { Args: { p_goal_id: string }; Returns: Json }
+      member_has_had_free: {
+        Args: { p_member_id: string; p_studio_id: string }
+        Returns: boolean
+      }
       member_health: { Args: { p_member_id: string }; Returns: Json }
       member_invite_preview: {
         Args: { p_token: string }
@@ -9719,6 +9754,7 @@ export type Database = {
         }[]
       }
       member_is_staff_login: { Args: { p_member_id: string }; Returns: boolean }
+      member_merge_trace: { Args: { p_member_id: string }; Returns: Json }
       member_messages: { Args: { p_studio_id: string }; Returns: Json }
       member_milestones: { Args: { p_studio_id: string }; Returns: Json }
       member_next_class_day: {
@@ -9905,6 +9941,11 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      normalise_name: { Args: { p: string }; Returns: string }
+      normalise_phone: {
+        Args: { p_country: string; p_phone: string }
+        Returns: string
       }
       normalize_email_key: { Args: { p_email: string }; Returns: string }
       notification_api_key: { Args: never; Returns: string }
@@ -10219,6 +10260,10 @@ export type Database = {
         Returns: number
       }
       rebuild_timeline_rows: { Args: { p_member_id: string }; Returns: number }
+      recheck_free_first_duplicate: {
+        Args: { p_member_id: string }
+        Returns: boolean
+      }
       recompute_member_stats: {
         Args: { p_member_ids?: string[]; p_studio_id: string }
         Returns: number
@@ -10543,6 +10588,10 @@ export type Database = {
           p_to: string
         }
         Returns: Json
+      }
+      same_person_match: {
+        Args: { p_member_id: string; p_studio_id: string }
+        Returns: string[]
       }
       say_count: { Args: { n: number }; Returns: string }
       schedule_post_data: {
@@ -10927,6 +10976,10 @@ export type Database = {
       staff_mark_thread_read: { Args: { p_thread_id: string }; Returns: Json }
       staff_message_thread: { Args: { p_thread_id: string }; Returns: Json }
       staff_message_threads: { Args: { p_studio_id: string }; Returns: Json }
+      staff_remove_booking: {
+        Args: { p_booking_id: string; p_note?: string; p_return?: boolean }
+        Returns: Json
+      }
       staff_send_message: {
         Args: {
           p_attachment_bytes?: number
@@ -11129,6 +11182,7 @@ export type Database = {
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_flex_rescue: { Args: { p_now?: string }; Returns: Json }
+      sweep_free_duplicate_holds: { Args: never; Returns: Json }
       sweep_guest_waivers: { Args: never; Returns: Json }
       sweep_instructor_class_reminders: {
         Args: { p_now?: string }
@@ -11144,6 +11198,15 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      t9801_free_seat: {
+        Args: {
+          p_at: string
+          p_member: string
+          p_occ: string
+          p_status: string
+        }
+        Returns: string
+      }
       template_sample_context: {
         Args: { p_first_name: string; p_studio_id: string; p_to_email: string }
         Returns: Json
