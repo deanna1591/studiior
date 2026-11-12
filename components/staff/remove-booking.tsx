@@ -37,7 +37,7 @@ export default function RemoveBooking({
         Return their credit or free class
       </label>
       <p className="mt-1 text-[11.5px] leading-[16px] text-ink-3">
-        {ret ? "No penalty — their credit or free class goes back." : "Counts as a late cancel inside the cut-off."}
+        {ret ? "No penalty. Their credit or free class goes back." : "Counts as a late cancel inside the cut-off."}
       </p>
       <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)"
         className="mt-2 w-full rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[12.5px] text-ink" />
