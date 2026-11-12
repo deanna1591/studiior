@@ -22,6 +22,7 @@ import GoalsPanel from "./records/goals";
 import DocumentsPanel, { PhotoUpload } from "./records/documents";
 import { AttendancePattern } from "./attendance";
 import { ResendGuestInvite } from "./resend-guest";
+import MemberDangerZone from "./danger";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export default async function MemberDetail({
 
   const { data: m } = await supabase
     .from("members")
-    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason")
+    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason, deleted_at, merged_into")
     .eq("id", params.id)
     .maybeSingle();
   if (!m) notFound();
@@ -108,7 +109,7 @@ export default async function MemberDetail({
     // host's first name comes from the guest pass; the invite date/expiry from
     // the member's latest invite.
     supabase.from("guest_passes")
-      .select("host_member_id, created_at, members!host_member_id(first_name)")
+      .select("host_member_id, created_at, invited_at, host_name_at_invite, members!host_member_id(first_name, deleted_at, merged_into)")
       .eq("guest_member_id", params.id).not("host_member_id", "is", null)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("member_invites")
@@ -215,15 +216,31 @@ export default async function MemberDetail({
     return <><span className="num">{day}</span> {month}</>;
   };
 
-  // Decision 26(b): a guest/friend brought by a host (host not null), and their
-  // latest invite's dates — all in the studio time zone via d().
-  const host = (guestPass as { members?: { first_name: string | null } | null } | null)?.members?.first_name ?? null;
+  // Decision 26(b) / 97: a guest/friend brought by a host. The host name is the
+  // invite SNAPSHOT (host_name_at_invite), so it survives the host being deleted
+  // or merged; when the host account is since gone we say so.
+  const gp = guestPass as {
+    host_name_at_invite?: string | null; created_at?: string | null; invited_at?: string | null;
+    members?: { first_name: string | null; deleted_at: string | null; merged_into: string | null } | null;
+  } | null;
+  const host = gp?.host_name_at_invite ?? gp?.members?.first_name ?? null;
+  const hostGone = !!gp?.members && (!!gp.members.deleted_at || !!gp.members.merged_into);
   const invExpIso = (lastInvite as { expires_at?: string | null } | null)?.expires_at ?? null;
   const invMadeIso = (lastInvite as { created_at?: string | null } | null)?.created_at
-    ?? (guestPass as { created_at?: string | null } | null)?.created_at ?? null;
+    ?? gp?.invited_at ?? gp?.created_at ?? null;
   const invAcceptedIso = (lastInvite as { accepted_at?: string | null } | null)?.accepted_at ?? null;
   const isGuestBrought = !!host && !!invExpIso;
   const inviteExpired = invExpIso ? new Date(invExpIso).getTime() <= Date.now() : false;
+
+  // Decision 97: a merged-away or deleted member is read-only, with a line
+  // naming where they went. The kept member's name is a single lookup.
+  const mm = m as typeof m & { deleted_at: string | null; merged_into: string | null };
+  let mergedIntoName: string | null = null;
+  if (mm.merged_into) {
+    const { data: keep } = await supabase.from("members")
+      .select("first_name, last_name").eq("id", mm.merged_into).maybeSingle();
+    mergedIntoName = keep ? `${keep.first_name} ${keep.last_name}` : null;
+  }
 
   return (
     <AppShell
@@ -241,11 +258,23 @@ export default async function MemberDetail({
         </>
       }
     >
+      {/* Decision 97: a deleted or merged member is read-only. */}
+      {mm.deleted_at && (
+        <section className="mb-6 border-l-[3px] px-3 py-2.5"
+          style={{ borderLeftColor: "var(--ink-2)", background: "var(--paper)" }}>
+          <p className="text-[13px] leading-[19px] text-ink">
+            {mm.merged_into
+              ? <>Merged into {mergedIntoName ?? "another member"} on {dLong(mm.deleted_at)}.</>
+              : <>Deleted on {dLong(mm.deleted_at)}. Their history is kept.</>}
+          </p>
+        </section>
+      )}
+
       {/* An account, or the way to offer one. Not buried in a section: for a
           member who has never been invited this is the single most useful thing
           on the screen, and until now the only way to send one was for an
           operator to copy a link out of a database. */}
-      {isDeskUp(ctx.role) && !m.user_id && (
+      {isDeskUp(ctx.role) && !m.user_id && !mm.deleted_at && (
         <section className="mb-6 rounded-xl border border-line bg-surface px-3.5 py-3">
           <SectionLabel>App account</SectionLabel>
           {isGuestBrought ? (
@@ -255,7 +284,7 @@ export default async function MemberDetail({
               <p className="mb-2.5 mt-1 max-w-[58ch] text-[13px] leading-[19px] text-ink-2">
                 {inviteExpired
                   ? <>{m.first_name}&rsquo;s link expired on {dLong(invExpIso!)}.</>
-                  : <>{m.first_name} was invited by {host} on {dLong(invMadeIso!)}. Their link to set
+                  : <>{m.first_name} was invited by {host}{hostGone && " (account deleted)"} on {dLong(invMadeIso!)}. Their link to set
                       a password and sign the waiver is open until {dLong(invExpIso!)}.</>}
               </p>
               <ResendGuestInvite memberId={params.id}
@@ -611,6 +640,13 @@ export default async function MemberDetail({
           voided_reason: r.voided_reason,
         }))}
       />
+
+      {/* Decision 97: merge a duplicate or delete the member. Manager-up, and
+          never on an already-deleted/merged member. The database refuses a
+          staff or instructor login with a clear message. */}
+      {manager && !mm.deleted_at && (
+        <MemberDangerZone memberId={params.id} firstName={m.first_name} studioId={ctx.studioId} />
+      )}
     </AppShell>
   );
 }

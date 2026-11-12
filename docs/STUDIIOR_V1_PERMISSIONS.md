@@ -70,6 +70,9 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 | Create member | ✅ | ✅ | ❌ | ✅ | ⚠️⁹ |
 | Edit member details | ✅ | ✅ | ❌ | ✅ | ⚠️⁷ |
 | Archive member | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Delete member (Decision 97) | ✅ | ✅ | ❌ | ❌ | ⚠️¹⁰ |
+| Merge duplicate members (Decision 97) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Show deleted members (read-only) | ✅ | ✅ | ❌ | ❌ | ❌ |
 | View lifetime value / revenue fields | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Manage tags | ✅ | ✅ | ❌ | ✅ | ❌ |
 | View / edit goals | ✅ | ✅ | 👁 | 👁 | ⚠️⁷ |
@@ -82,6 +85,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 ⁷ Own record only.
 ⁸ Attendance, challenge and achievement events only. No payment or membership events.
 ⁹ **Member → lead only (Decision 90).** A member may create a person only as a *lead*, only through "Bring a friend for their free first class", and always with a free first booking attached — never a bare member record and no other member-creation path.
+¹⁰ **Member self-deletion (Decision 69).** A member deletes their own account only, through the member app, and never another member's. Owner/Manager `delete_member` and `merge_members` refuse a member who is studio staff or has an instructor login, a member already deleted, and (merge) two members in different studios or the same member on both sides. Both run the same scrub as self-deletion (history kept, future bookings cancelled with no penalty, the login removed only when it is the member's sole studio); merge moves every row onto the kept member, folds message threads, keeps both active memberships (flagged), keeps the earliest waiver and marketing-on-if-either, and sends no `account_deleted` email. The invite trail (`guest_passes.host_name_at_invite`) is a snapshot that survives a host's deletion or merge and is never scrubbed. Nothing is purged.
 
 ---
 

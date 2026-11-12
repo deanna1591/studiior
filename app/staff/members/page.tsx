@@ -64,11 +64,56 @@ type Row = {
 export default async function Members({
   searchParams,
 }: {
-  searchParams: { filter?: string; plan?: string; sort?: string };
+  searchParams: { filter?: string; plan?: string; sort?: string; deleted?: string };
 }) {
   const screen = await staffScreen("/members");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
+
+  // Decision 97: "Show deleted" lists deleted members read-only (member_plan_
+  // overview excludes them). Manager-up, since only a manager deletes or merges.
+  if (searchParams.deleted === "1" && isManagerUp(ctx.role)) {
+    const { data: gone } = await supabase
+      .from("members")
+      .select("id, first_name, last_name, email, deleted_at, merged_into")
+      .eq("studio_id", ctx.studioId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    const rows = (gone ?? []) as { id: string; first_name: string; last_name: string; email: string; deleted_at: string; merged_into: string | null }[];
+    const keepIds = Array.from(new Set(rows.map((r) => r.merged_into).filter(Boolean))) as string[];
+    const names = new Map<string, string>();
+    if (keepIds.length) {
+      const { data: keeps } = await supabase.from("members").select("id, first_name, last_name").in("id", keepIds);
+      for (const k of keeps ?? []) names.set(k.id, `${k.first_name} ${k.last_name}`);
+    }
+    return (
+      <AppShell {...shell} title="Deleted members"
+        actions={<NavLink href="/members">Back to members</NavLink>}>
+        {rows.length === 0 ? (
+          <Empty>No deleted members.</Empty>
+        ) : (
+          <Rows>
+            {rows.map((r) => {
+              const { day, month } = dayMonthParts(r.deleted_at, ctx.timeZone);
+              return (
+                <div key={r.id} className="px-3 py-2.5">
+                  <Link href={`/members/${r.id}`} className="text-[14px] font-medium leading-5 text-ink-2 underline underline-offset-4">
+                    {r.first_name} {r.last_name}
+                  </Link>
+                  <div className="mt-0.5 text-[12px] leading-4 text-ink-3">
+                    {r.merged_into
+                      ? <>Merged into {names.get(r.merged_into) ?? "another member"} · </>
+                      : <>Deleted · </>}
+                    <span className="num">{day}</span> {month}
+                  </div>
+                </div>
+              );
+            })}
+          </Rows>
+        )}
+      </AppShell>
+    );
+  }
 
   const { data: rows } = await supabase.rpc("member_plan_overview", {
     p_studio_id: ctx.studioId,
@@ -186,6 +231,7 @@ export default async function Members({
             {all.length} <span className="font-sans">active</span>
           </span>
           <NavLink href="/members/invites">Invites</NavLink>
+          {isManagerUp(ctx.role) && <NavLink href="/members?deleted=1">Show deleted</NavLink>}
           <NavLink href="/members/new">Add a member</NavLink>
         </>
       }

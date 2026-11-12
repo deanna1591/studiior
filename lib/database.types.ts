@@ -2387,7 +2387,9 @@ export type Database = {
           guest_member_id: string
           host_booking_id: string | null
           host_member_id: string | null
+          host_name_at_invite: string | null
           id: string
+          invited_at: string | null
           occurrence_id: string
           status: string
           studio_id: string
@@ -2400,7 +2402,9 @@ export type Database = {
           guest_member_id: string
           host_booking_id?: string | null
           host_member_id?: string | null
+          host_name_at_invite?: string | null
           id?: string
+          invited_at?: string | null
           occurrence_id: string
           status?: string
           studio_id: string
@@ -2413,7 +2417,9 @@ export type Database = {
           guest_member_id?: string
           host_booking_id?: string | null
           host_member_id?: string | null
+          host_name_at_invite?: string | null
           id?: string
+          invited_at?: string | null
           occurrence_id?: string
           status?: string
           studio_id?: string
@@ -4234,6 +4240,8 @@ export type Database = {
           marketing_opt_in: boolean
           marketing_token: string
           marketing_unsubscribed_at: string | null
+          merged_at: string | null
+          merged_into: string | null
           phone: string | null
           preferred_name: string | null
           source: string | null
@@ -4274,6 +4282,8 @@ export type Database = {
           marketing_opt_in?: boolean
           marketing_token?: string
           marketing_unsubscribed_at?: string | null
+          merged_at?: string | null
+          merged_into?: string | null
           phone?: string | null
           preferred_name?: string | null
           source?: string | null
@@ -4314,6 +4324,8 @@ export type Database = {
           marketing_opt_in?: boolean
           marketing_token?: string
           marketing_unsubscribed_at?: string | null
+          merged_at?: string | null
+          merged_into?: string | null
           phone?: string | null
           preferred_name?: string | null
           source?: string | null
@@ -4329,6 +4341,20 @@ export type Database = {
             columns: ["desk_pay_restored_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "members"
             referencedColumns: ["id"]
           },
           {
@@ -9011,6 +9037,15 @@ export type Database = {
         Returns: Json
       }
       delete_announcement: { Args: { p_id: string }; Returns: Json }
+      delete_member: { Args: { p_member_id: string }; Returns: Json }
+      delete_member_run: {
+        Args: {
+          p_member_id: string
+          p_merged_into?: string
+          p_send_email?: boolean
+        }
+        Returns: undefined
+      }
       delete_my_account: { Args: never; Returns: undefined }
       deliver_notification: {
         Args: { p_notification_id: string }
@@ -9067,14 +9102,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -9691,6 +9718,7 @@ export type Database = {
           state: string
         }[]
       }
+      member_is_staff_login: { Args: { p_member_id: string }; Returns: boolean }
       member_messages: { Args: { p_studio_id: string }; Returns: Json }
       member_milestones: { Args: { p_studio_id: string }; Returns: Json }
       member_next_class_day: {
@@ -9775,6 +9803,14 @@ export type Database = {
       }
       memberships_due: {
         Args: { p_studio_id: string; p_within_days?: number }
+        Returns: Json
+      }
+      merge_members: {
+        Args: { p_keep: string; p_remove: string }
+        Returns: Json
+      }
+      merge_preview: {
+        Args: { p_keep: string; p_remove: string }
         Returns: Json
       }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
