@@ -529,6 +529,14 @@ A booking in a flex class that is still under the studio's flex minimum gets two
 
 **Where:** a migration adding the setting + registry, the two templates with platform defaults, `core_classes_for_rescue`, the shared `rebook_run` twin + `move_booking`, the re-issued `rebook_member` + `member_activity`, and `sweep_flex_rescue`; the member move page; the Templates rows; the Settings entry for `flex_rescue_hours_before`. **Status:** settled. **Reuses:** Decision 92 (`rebook_member`), Decision 21 (flex), Decision 78e (per-email switch).
 
+### Amendment (a) — free first class twins (recorded 11 Nov 2026)
+
+When the booking in the under-minimum flex class is a **free first class** (a `comp` seat with a host-null `guest_passes` row, the Decision 30 signature), the sweep queues **`free_rescue_2days`** and **`free_rescue_final`** instead of the flex pair, with the **same timing, same suppression, same dedupe keys** (`flex_rescue_2days:{booking}` / `flex_rescue_final:{booking}`, so a booking still gets one email per phase whichever variant it is), the **same `{class_list_core}`** and the same move link. Platform default subjects: **"Your free {class_name} on {day} still needs {n_more} more to run"** and **"Last call: move your free class before {cutoff_time}"**. The bodies say **"free class"** instead of "credit" and end with the reminder that **the free class is kept when they move or when the class does not run**. Both are on the per-email switch (Decision 78e), feature-gated to `free_first`, and listed on the Templates page under Free first class.
+
+**Sweep schedule (from the read-only hosted check).** `sweep_flex_rescue` is scheduled on hosted as **one** pg_cron job `studiior-flex-rescue`, `0 * * * *` (hourly), running `select sweep_flex_rescue()`. That single hourly call runs **both** passes: the 2-day pass is gated to the studio-local date 2 days before the class and deduped to once per booking (so running hourly it fires once), and the final pass runs each hour near the cut-off. Neither pass is missing, so no schedule is added in this build; the free twins ride the existing job.
+
+**Where:** a migration adding the two `free_rescue_*` templates with platform defaults and re-issuing `sweep_flex_rescue` to pick the free pair for a free-first booking; the Templates rows. **Status:** settled. **Reuses:** Decision 95 (the flex-rescue machinery), Decision 30 (free first class).
+
 ---
 
 ## 94 — Members must give a phone number (recorded 11 Nov 2026)

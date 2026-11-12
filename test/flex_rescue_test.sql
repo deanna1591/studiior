@@ -63,7 +63,8 @@ insert into members (id, studio_id, user_id, first_name, last_name, email, statu
   ('95f10000-0000-0000-0000-0000000000b1','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000000f1','Mia','One','m1@e.com','lead'),
   ('95f10000-0000-0000-0000-0000000000b2','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000000f2','Mo','Two','m2@e.com','active'),
   ('95f10000-0000-0000-0000-0000000000b3','95f10000-0000-0000-0000-0000000000a0',null,'Len','Latch','ml@e.com','active'),
-  ('95f10000-0000-0000-0000-0000000000b4','95f10000-0000-0000-0000-0000000000a0',null,'Pat','Plan','m3@e.com','active');
+  ('95f10000-0000-0000-0000-0000000000b4','95f10000-0000-0000-0000-0000000000a0',null,'Pat','Plan','m3@e.com','active'),
+  ('95f10000-0000-0000-0000-0000000000b5','95f10000-0000-0000-0000-0000000000a0',null,'Fay','Free','mf@e.com','lead');
 
 insert into memberships (id, studio_id, member_id, plan_id, status, credits_remaining, price_cents, currency, starts_on) values
   ('95f10000-0000-0000-0000-000000005004','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000000b4','95f10000-0000-0000-0000-00000000a101','active',9,500000,'PHP', current_date);
@@ -73,7 +74,8 @@ insert into class_occurrences (id, studio_id, location_id, class_type_id, room_i
   ('95f10000-0000-0000-0000-0000000f0001','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d1','95f10000-0000-0000-0000-0000000000e1','Flex Two Day',10,3,true,null, now()+interval '2 days', now()+interval '2 days 1 hour','scheduled',1),            -- FX
   ('95f10000-0000-0000-0000-0000000f0002','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d1','95f10000-0000-0000-0000-0000000000e1','Flex Final',10,3,true,null, now()+interval '5 hours', now()+interval '6 hours','scheduled',1),                        -- FX2
   ('95f10000-0000-0000-0000-0000000f0003','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d1','95f10000-0000-0000-0000-0000000000e1','Flex Latched',10,3,true,now(), now()+interval '2 days 6 hours', now()+interval '2 days 7 hours','scheduled',3),  -- FXLATCH
-  ('95f10000-0000-0000-0000-0000000f0004','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d1','95f10000-0000-0000-0000-0000000000e1','Flex Plan',10,3,true,null, now()+interval '2 days 2 hours', now()+interval '2 days 3 hours','scheduled',1);          -- FX3
+  ('95f10000-0000-0000-0000-0000000f0004','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d1','95f10000-0000-0000-0000-0000000000e1','Flex Plan',10,3,true,null, now()+interval '2 days 2 hours', now()+interval '2 days 3 hours','scheduled',1),          -- FX3
+  ('95f10000-0000-0000-0000-0000000f0005','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d2','95f10000-0000-0000-0000-0000000000e2','Flex Free Final',10,3,true,null, now()+interval '5 hours', now()+interval '5 hours 30 minutes','scheduled',1);  -- FXF (free-first, near deadline)
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity, flex, starts_at, ends_at, status, booked_count, hidden_from_members) values
   ('95f10000-0000-0000-0000-00000000c001','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d2','95f10000-0000-0000-0000-0000000000e2','Core One',10,false, now()+interval '2 days 1 hour', now()+interval '2 days 2 hours','scheduled',1,false),   -- C1 booked
   ('95f10000-0000-0000-0000-00000000c002','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000010c','95f10000-0000-0000-0000-0000000000c1','95f10000-0000-0000-0000-0000000000d2','95f10000-0000-0000-0000-0000000000e2','Core Two',10,false, now()+interval '2 days 3 hours', now()+interval '2 days 4 hours','scheduled',0,false),   -- C2 empty
@@ -89,11 +91,13 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
   ('95f10000-0000-0000-0000-0000000b0003','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000f0003','95f10000-0000-0000-0000-0000000000b3','booked','drop_in', false), -- ML on FXLATCH
   ('95f10000-0000-0000-0000-0000000b0004','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000c001','95f10000-0000-0000-0000-0000000000b2','booked','drop_in', false), -- M2 on C1 (makes it "booked")
   ('95f10000-0000-0000-0000-0000000b0005','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-00000000cf04','95f10000-0000-0000-0000-0000000000b3','booked','drop_in', false), -- filler on CFULL
-  ('95f10000-0000-0000-0000-0000000b0006','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000f0004','95f10000-0000-0000-0000-0000000000b4','booked','class_pack', false); -- M3 plan seat on FX3
+  ('95f10000-0000-0000-0000-0000000b0006','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000f0004','95f10000-0000-0000-0000-0000000000b4','booked','class_pack', false), -- M3 plan seat on FX3
+  ('95f10000-0000-0000-0000-0000000b0007','95f10000-0000-0000-0000-0000000000a0','95f10000-0000-0000-0000-0000000f0005','95f10000-0000-0000-0000-0000000000b5','booked','comp', true);   -- MF free-first on FXF (near-deadline)
 update bookings set membership_id = '95f10000-0000-0000-0000-000000005004' where id = '95f10000-0000-0000-0000-0000000b0006';
--- M1's free-first host-null guest_passes row (travels with the move)
+-- free-first host-null guest_passes rows (M1 on FX, MF on FXF)
 insert into guest_passes (id, studio_id, host_member_id, guest_member_id, guest_email, occurrence_id, guest_booking_id, status) values
-  ('95f10000-0000-0000-0000-00000000a001','95f10000-0000-0000-0000-0000000000a0', null,'95f10000-0000-0000-0000-0000000000b1','m1@e.com','95f10000-0000-0000-0000-0000000f0001','95f10000-0000-0000-0000-0000000b0001','confirmed');
+  ('95f10000-0000-0000-0000-00000000a001','95f10000-0000-0000-0000-0000000000a0', null,'95f10000-0000-0000-0000-0000000000b1','m1@e.com','95f10000-0000-0000-0000-0000000f0001','95f10000-0000-0000-0000-0000000b0001','confirmed'),
+  ('95f10000-0000-0000-0000-00000000a002','95f10000-0000-0000-0000-0000000000a0', null,'95f10000-0000-0000-0000-0000000000b5','mf@e.com','95f10000-0000-0000-0000-0000000f0005','95f10000-0000-0000-0000-0000000b0007','confirmed');
 
 delete from notifications where studio_id = '95f10000-0000-0000-0000-0000000000a0';
 
@@ -102,26 +106,39 @@ delete from notifications where studio_id = '95f10000-0000-0000-0000-0000000000a
 -- =============================================================================
 select sweep_flex_rescue(now());
 
-select expect_num('2-day fired once for the flex-two-day member',
-  (select count(*) from notifications where template_key='flex_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'), 1);
-select expect_num('2-day did NOT fire for the latched class member',
-  (select count(*) from notifications where template_key='flex_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b3'), 0);
-select expect_num('final fired once for the near-deadline member',
+-- Decision 95(a): b1 is a FREE FIRST class (comp + host-null pass) -> the free
+-- twin; b4 is a PAID plan seat -> the flex twin.
+select expect_num('a free first 2-day booking gets free_rescue_2days',
+  (select count(*) from notifications where template_key='free_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'), 1);
+select expect_num('...and NOT flex_rescue_2days',
+  (select count(*) from notifications where template_key='flex_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'), 0);
+select expect_num('a paid flex 2-day booking gets flex_rescue_2days',
+  (select count(*) from notifications where template_key='flex_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b4'), 1);
+select expect_num('...and NOT free_rescue_2days',
+  (select count(*) from notifications where template_key='free_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b4'), 0);
+select expect_num('2-day did NOT fire for the latched class member (neither twin)',
+  (select count(*) from notifications where template_key in ('flex_rescue_2days','free_rescue_2days') and member_id='95f10000-0000-0000-0000-0000000000b3'), 0);
+-- finals: b2 paid -> flex twin, b5 free-first -> free twin
+select expect_num('a paid flex final gets flex_rescue_final',
   (select count(*) from notifications where template_key='flex_rescue_final' and member_id='95f10000-0000-0000-0000-0000000000b2'), 1);
-select expect_num('the 2-day class did NOT also get a final (deadline far off)',
-  (select count(*) from notifications where template_key='flex_rescue_final' and member_id='95f10000-0000-0000-0000-0000000000b1'), 0);
--- the payload carries the card list and the scalar tokens
-select expect_true('the 2-day payload carries class_list_core html + n_more',
+select expect_num('a free first final gets free_rescue_final',
+  (select count(*) from notifications where template_key='free_rescue_final' and member_id='95f10000-0000-0000-0000-0000000000b5'), 1);
+select expect_num('...and the free-first final is NOT the flex one',
+  (select count(*) from notifications where template_key='flex_rescue_final' and member_id='95f10000-0000-0000-0000-0000000000b5'), 0);
+select expect_num('the free-first 2-day class did NOT also get a final (deadline far off)',
+  (select count(*) from notifications where template_key in ('flex_rescue_final','free_rescue_final') and member_id='95f10000-0000-0000-0000-0000000000b1'), 0);
+-- the free 2-day payload carries the same card list + tokens
+select expect_true('the free 2-day payload carries class_list_core html + n_more',
   (select (payload ->> 'class_list_core') like '%Move me to this class%'
        and (payload ->> 'n_more') = '2'
-     from notifications where template_key='flex_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'));
+     from notifications where template_key='free_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'));
 
--- a second sweep adds nothing (dedupe on the queue key)
+-- a second sweep adds nothing (dedupe is the SAME key whichever twin)
 select sweep_flex_rescue(now());
-select expect_num('a second sweep queues no duplicate 2-day',
-  (select count(*) from notifications where template_key='flex_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'), 1);
-select expect_num('a second sweep queues no duplicate final',
-  (select count(*) from notifications where template_key='flex_rescue_final' and member_id='95f10000-0000-0000-0000-0000000000b2'), 1);
+select expect_num('a second sweep queues no duplicate free 2-day',
+  (select count(*) from notifications where template_key='free_rescue_2days' and member_id='95f10000-0000-0000-0000-0000000000b1'), 1);
+select expect_num('a second sweep queues no duplicate free final',
+  (select count(*) from notifications where template_key='free_rescue_final' and member_id='95f10000-0000-0000-0000-0000000000b5'), 1);
 
 -- =============================================================================
 -- 2. core_classes_for_rescue — ordered, filtered
