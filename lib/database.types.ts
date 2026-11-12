@@ -9068,6 +9068,14 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -10348,6 +10356,10 @@ export type Database = {
           to_email: string
         }[]
       }
+      reopen_availability_submission: {
+        Args: { p_note?: string; p_submission_id: string }
+        Returns: Json
+      }
       reopen_studio: { Args: { p_closure_id: string }; Returns: Json }
       reorder_plans: {
         Args: { p_plan_ids: string[]; p_studio_id: string }
@@ -10355,6 +10367,10 @@ export type Database = {
       }
       republish_open_shift: { Args: { p_occurrence_id: string }; Returns: Json }
       request_availability_changes: {
+        Args: { p_note: string; p_submission_id: string }
+        Returns: Json
+      }
+      request_availability_changes_run: {
         Args: { p_note: string; p_submission_id: string }
         Returns: Json
       }

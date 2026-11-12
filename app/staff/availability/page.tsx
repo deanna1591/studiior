@@ -3,6 +3,7 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, SectionLabel } from "@/components/ui";
 import ReviewControls from "./review";
+import ReopenControls from "./reopen";
 import { standingNote } from "@/lib/availability-line";
 import { standingCoverage } from "@/lib/availability-standing";
 
@@ -170,11 +171,23 @@ export default async function AvailabilityInbox({
           <SectionLabel>Approved — {done.length}</SectionLabel>
           <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-surface">
             {done.map((i) => (
-              <li key={i.instructor_id} className="px-3.5 py-2.5 text-[14px] leading-5 text-ink-2">
-                {i.name}
+              <li key={i.instructor_id} className="px-3.5 py-2.5">
+                <span className="text-[14px] leading-5 text-ink-2">{i.name}</span>
+                {/* Decision 96: reopen an approved month so the instructor can
+                    edit it — but only before the cut-off. After the due day the
+                    button is gone (the function refuses too, as a belt). */}
+                {i.submission_id && !cycle.overdue && (
+                  <ReopenControls submissionId={i.submission_id} />
+                )}
               </li>
             ))}
           </ul>
+          {cycle.overdue && (
+            <p className="mt-2 max-w-[58ch] text-[12px] leading-[18px] text-ink-3">
+              The cut-off for {month} has passed, so these can no longer be reopened.
+              Ask the instructor to send a change request instead.
+            </p>
+          )}
         </section>
       )}
     </AppShell>

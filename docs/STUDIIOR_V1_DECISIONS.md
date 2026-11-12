@@ -511,6 +511,16 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 96 — Reopen availability before the cut-off (recorded 11 Nov 2026)
+
+Decision 18 governs how an instructor submits a month of availability and how a manager reviews it (submitted, approved, changes_requested). This decision adds one action on top of that flow and changes nothing in Decision 18.
+
+An owner or manager can reopen a submitted or approved availability submission so the instructor can edit it, with a button "Reopen for editing" on the review page and an optional note. Reopening puts the submission and its rows back to `changes_requested` and sends the existing `availability_changes_requested` email with the note, or with "Reopened by {studio_name} so you can make changes." when no note is given. Reopening is allowed only while the studio-local date is on or before the availability due day for that period (`availability_due_day` of the month before). The cut-off date is read from `availability_cycle(studio_id, period_start)->>'due_on'`, the single existing source, and is not computed again. After the cut-off the button is gone and the function refuses with reason `cutoff_passed`: "The cut-off for {Month} was {date}. Ask the instructor to send a change request instead." Rows already used by auto-assign are not touched by reopening; assignments stand until changed, exactly as `request_availability_changes` already behaves (it flips the submission and its `instructor_availability` rows to `changes_requested` and touches no `class_occurrences`). The reopen reuses the `request_availability_changes` body through a shared service-only `_run` twin, so there is one implementation of "send a month back to the instructor"; the cut-off check and the note default sit in the reopen wrapper, and the existing public `request_availability_changes` (which still requires a note) is unchanged. Status before this: Approve and Ask-for-a-change showed only on a `submitted` submission, and an `approved` month had no action at all, so a studio could not let an instructor amend an approved month even before the cut-off.
+
+**Where:** Business Rules §3.3; migration 066 (availability submissions and review). **Status:** settled. **References:** Decision 18 for the submission and review flow. **Reuses:** `request_availability_changes` (through a shared `_run` twin), `availability_cycle` for the cut-off, the `availability_changes_requested` email. Deanna, 11 Nov 2026.
+
+---
+
 ## 95 — Flex rescue: move to a core class before the cut-off (recorded 11 Nov 2026)
 
 A booking in a flex class that is still under the studio's flex minimum gets two member emails offering a one-tap move to a core class that is going ahead, so a quiet flex slot turns into a kept booking instead of a cancellation. Instructors are not emailed by this decision.

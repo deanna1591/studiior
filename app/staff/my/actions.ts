@@ -143,3 +143,28 @@ export async function requestChanges(_prev: MyState, fd: FormData): Promise<MySt
       : `Recorded. ${r.instructor} has no login, so nothing was emailed — tell them yourself.`,
   };
 }
+
+/**
+ * Decision 96: reopen a submitted or approved month so the instructor can edit
+ * it, before the cut-off. The note is optional (the database supplies a default
+ * sentence); the cut-off refusal (PT409 cutoff_passed) comes back as its own
+ * sentence, which `say` passes through unchanged.
+ */
+export async function reopenSubmission(_prev: MyState, fd: FormData): Promise<MyState> {
+  const note = String(fd.get("note") ?? "").trim();
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("reopen_availability_submission", {
+    p_submission_id: String(fd.get("submission_id") ?? ""),
+    p_note: note || undefined,
+  });
+  if (error) return { ok: false, message: say(error.message) };
+  const r = data as unknown as { instructor: string; notified: boolean };
+  revalidatePath("/availability");
+  revalidatePath("/schedule");
+  return {
+    ok: true,
+    message: r.notified
+      ? `Reopened for ${r.instructor} to edit. They have been emailed.`
+      : `Reopened for ${r.instructor} to edit. They have no login, so nothing was emailed — tell them yourself.`,
+  };
+}
