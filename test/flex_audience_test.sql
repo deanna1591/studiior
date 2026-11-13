@@ -121,7 +121,9 @@ values
    ((current_date+2)+time '07:00') at time zone 'Asia/Manila', ((current_date+2)+time '07:50') at time zone 'Asia/Manila','scheduled','assigned',true,1);
 
 -- =============================================================================
--- 1. THE INSTRUCTOR IS TOLD THE MOMENT IT CROSSES — ONCE
+-- 1. THE FLEX LATCH STAMPS WHEN IT CROSSES, SILENTLY.
+--    Decision 101 retired the per-class flex_going_ahead send (the daily digest
+--    replaces it); the latch still stamps flex_reached_minimum_at, it tells no-one.
 -- =============================================================================
 set role authenticated;
 select set_config('request.jwt.claim.sub','f0f4f0f4-0000-0000-0000-0000000000e1',false);  -- M1
@@ -141,22 +143,19 @@ select expect_text('M2 books C1 — crosses the minimum',
 reset role;
 select expect_true('...C1 is now latched',
   (select flex_reached_minimum_at is not null from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101'));
-select expect_num('...and Ada is told, once',
+select expect_num('Decision 101: the latch is SILENT (no flex_going_ahead)',
   (select count(*) from notifications where template_key='flex_going_ahead'
-      and dedupe_key like 'flex_going_ahead:f0f4f0f4-0000-0000-0000-00000000c101:%'), 1);
-select expect_text('...the message is about the right class',
-  (select payload ->> 'class_name' from notifications where template_key='flex_going_ahead' limit 1),
-  'Reformer Reaches');
+      and dedupe_key like 'flex_going_ahead:f0f4f0f4-0000-0000-0000-00000000c101:%'), 0);
 
--- A third booking does not send a second message.
+-- A third booking still sends nothing.
 set role authenticated;
 select set_config('request.jwt.claim.sub','f0f4f0f4-0000-0000-0000-0000000000e3',false);  -- M3
 select expect_text('M3 books C1 too',
   (book_class('f0f4f0f4-0000-0000-0000-00000000c101','f0f4f0f4-0000-0000-0000-000000dd0003','member')).status::text, 'booked');
 reset role;
-select expect_num('six bookings is still one message',
+select expect_num('six bookings is still no flex_going_ahead',
   (select count(*) from notifications where template_key='flex_going_ahead'
-      and dedupe_key like 'flex_going_ahead:f0f4f0f4-0000-0000-0000-00000000c101:%'), 1);
+      and dedupe_key like 'flex_going_ahead:f0f4f0f4-0000-0000-0000-00000000c101:%'), 0);
 
 -- =============================================================================
 -- 2. THE LATCH HOLDS: members cancel below the minimum, it still runs
@@ -218,10 +217,12 @@ select expect_true('Ada sees C2 on her week, marked not running with the reason'
              and c ->> 'status' = 'cancelled'
              and c ->> 'cancellation_cause' = 'unmet_minimum'));
 reset role;
-select expect_true('...and Ada was told at the deadline, in the digest',
-  (select count(*) > 0 from notifications where template_key='commitment_digest'
+-- Decision 101: Ada's daily digest for C2's date lists it in the "Cancelled,
+-- not enough bookings" table (the per-class instructor_class_cancelled is gone).
+select expect_true('...and Ada was told at the deadline, in her daily digest',
+  (select count(*) > 0 from notifications where template_key='instructor_daily_digest'
       and user_id='f0f4f0f4-0000-0000-0000-0000000000a2'
-      and payload ->> 'lines' like '%NOT ON%'));
+      and (payload ->> 'cancelled_text') like '%Reformer Empty%'));
 
 -- STAFF: on the calendar, not running, with the count.
 set role authenticated;
@@ -264,6 +265,6 @@ update studio_settings set flex_enabled = false
  where studio_id in ('f0f4f0f4-0000-0000-0000-000000000001','f0f4f0f4-0000-0000-0000-000000000002');
 delete from notifications
  where studio_id in ('f0f4f0f4-0000-0000-0000-000000000001','f0f4f0f4-0000-0000-0000-000000000002')
-    or template_key = 'flex_going_ahead';
+    or template_key = 'instructor_daily_digest';
 
 select 'flex audience suite finished' as done;

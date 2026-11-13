@@ -39,6 +39,7 @@ const LABELS: Record<string, { title: string; action?: boolean }> = {
   flex_confirmed:                 { title: "A flex class is confirmed" },
   flex_cancelled:                 { title: "A flex class is not running" },
   core_committed:                 { title: "A class is going ahead" },
+  instructor_daily_digest:        { title: "Your classes for the day", action: true },
   booking_cancelled_committed:    { title: "A member cancelled a class you are committed to" },
   commitment_digest:              { title: "Your teaching this term" },
 };

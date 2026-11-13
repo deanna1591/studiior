@@ -88,8 +88,10 @@ select expect_num('teeth: with the flat cleared, A falls back to 50% of base = 4
 update studio_settings set core_unmet_pay_cents = 40000 where studio_id='9c079c07-0000-0000-0000-000000000001';
 
 -- =============================================================================
--- C. Core early latch: stamp + notify at the first booking, once,
---    notification-only (committed_at / booked_at_cutoff untouched).
+-- C. Core early latch: stamp at the first booking, SILENT.
+--    Decision 101 retired the per-class core_committed send (the daily digest
+--    replaces it); the latch still stamps core_reached_minimum_at and still
+--    leaves committed_at / booked_at_cutoff untouched, but tells no-one.
 -- =============================================================================
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name,
        starts_at, ends_at, capacity, booked_count, status) values
@@ -102,13 +104,13 @@ select expect_true('the core class latched at the first booking',
   (select core_reached_minimum_at is not null from class_occurrences where id='9c079c07-0000-0000-0000-00000000ac01'));
 select expect_true('NOTIFICATION ONLY: committed_at and booked_at_cutoff are still null',
   (select committed_at is null and booked_at_cutoff is null from class_occurrences where id='9c079c07-0000-0000-0000-00000000ac01'));
-select expect_num('the instructor is told once, on the right channel',
-  (select count(*) from notifications where template_key='core_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1'), 1);
+select expect_num('Decision 101: the latch is SILENT (no per-class core_committed send)',
+  (select count(*) from notifications where template_key='core_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1'), 0);
 
--- A second booking must not re-stamp or re-notify.
+-- A second booking must not re-stamp, and still sends nothing.
 update class_occurrences set booked_count = 2 where id='9c079c07-0000-0000-0000-00000000ac01';
-select expect_num('a second booking sends no second commitment notice',
-  (select count(*) from notifications where template_key='core_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1'), 1);
+select expect_num('a second booking still sends no core_committed notice',
+  (select count(*) from notifications where template_key='core_committed' and user_id='9c079c07-0000-0000-0000-0000000000d1'), 0);
 
 -- A guarantees-OFF studio latches nothing and tells no-one.
 update class_occurrences set booked_count = 1 where id='9c079c07-0000-0000-0000-00000000cc01';

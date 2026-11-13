@@ -255,25 +255,35 @@ select expect_num('...telling no members, because there are none',
     where n.template_key = 'class_cancelled'
       and n.member_id is not null
       and n.dedupe_key like '%' || current_setting('t.day3') || '%')::bigint, 0);
--- CHANGED BY DECISION 22, deliberately, and this assertion now asserts the
--- inverse of what it used to. Decision 21 sent one message per class, so this
--- counted seven. Decision 22 batches per evaluation run: ONE digest per
--- instructor listing everything that was decided, because five pings about five
--- classes is how a studio teaches its instructors to stop reading them.
-select expect_num('the coach is told once, not once per class',
+-- CHANGED BY DECISION 22 then DECISION 101, and this assertion now asserts the
+-- inverse of what it once did. Decision 21 sent one message per class. Decision
+-- 22 batched per evaluation run. Decision 101 re-keys it to ONE
+-- instructor_daily_digest per instructor per class-DATE — so a weekly series
+-- decided in one sweep gets one digest per day it has a class, never one per
+-- class, because five pings about five classes is how a studio teaches its
+-- instructors to stop reading them.
+select set_config('t.ddates',
+  (select count(distinct (starts_at at time zone 'Europe/Prague')::date)::text
+     from class_occurrences
+    where studio_id = 'f1e0f1e0-0000-0000-0000-000000000001'
+      and (committed_at is not null or cancellation_cause = 'unmet_minimum')), false);
+select expect_num('the coach is told once PER DATE, not once per class',
   (select count(*) from notifications
-    where template_key = 'commitment_digest'
-      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')::bigint, 1);
+    where template_key = 'instructor_daily_digest'
+      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')::bigint,
+  current_setting('t.ddates')::bigint);
 select expect_num('...and no per-class ping is sent any more',
   (select count(*) from notifications
-    where template_key in ('flex_confirmed','flex_cancelled')
+    where template_key in ('flex_confirmed','flex_cancelled','flex_going_ahead')
       and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')::bigint, 0);
-select expect_true('...and the one digest names every class it decided',
-  (select (payload ->> 'lines') like '%RUNNING%'
-      and (payload ->> 'lines') like '%NOT ON%'
-     from notifications
-    where template_key = 'commitment_digest'
-      and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001' limit 1));
+select expect_true('...and across the digests, something ran and something was cut',
+  (select bool_or((payload ->> 'n_running')::int >= 1) from notifications
+     where template_key = 'instructor_daily_digest'
+       and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001')
+  and
+  (select bool_or((payload ->> 'n_cancelled')::int >= 1) from notifications
+     where template_key = 'instructor_daily_digest'
+       and studio_id = 'f1e0f1e0-0000-0000-0000-000000000001'));
 
 -- =============================================================================
 -- 4. A SINGLE OCCURRENCE FLIPPED TO GUARANTEED SURVIVES THE SWEEP

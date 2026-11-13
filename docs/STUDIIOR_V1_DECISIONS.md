@@ -513,6 +513,20 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 101 — Instructor daily digest (recorded 13 Nov 2026)
+
+Instructors stop getting a separate "your class is confirmed" and a separate "your class was cancelled" for every class decided at the day's flex cut-off. Instead, one digest per instructor per day, sent at the cut-off once the decisions are made, listing what is going ahead and what was cancelled for want of bookings. Plus a polish pass on every instructor template. Two parts: (a) the digest, (b) the 80a polish.
+
+**(a) The digest.** At each day's flex cut-off, after the decisions are made, every instructor with at least one class decided that day gets one email `instructor_daily_digest`. Subject: `"Your classes for {day}: {n_running} going ahead, {n_cancelled} cancelled"`. Body: a line `"Here's how {day} looks."`, then a table "Going ahead" with columns Time, Class, Booked (as `"4 of 6"`), then a table "Cancelled, not enough bookings" with columns Time, Class, Booked (as `"1 of 3 needed"`). An empty table is replaced by one line (`"Nothing cancelled."` / `"No classes going ahead."`). Then the pay line already used today, and a "See my schedule" accent button. Times in the studio clock. The tables render as real HTML tables inside the 80a frame and as aligned text in the plain body. Dedupe key `instructor_digest:{instructor}:{date}`, so one digest per instructor per day and a second sweep is a no-op. On the per-email switch (Decision 78e), on by default like the sends it replaces.
+
+**What it replaces, and what still fires per class.** `core_committed` no longer sends to instructors, and `flex_going_ahead` (the flex-tier twin of `core_committed`: the per-class "going ahead" email to the instructor when a flex class reaches its minimum at the early latch) is replaced by the digest for the same reason, so a flex studio is not told twice. `instructor_class_cancelled` no longer sends when the cause is "not enough bookings". `instructor_class_cancelled` still sends immediately for a studio reason, an instructor reason, or something beyond anyone's control, and gains the class time in its wording. `core_committed` is removed from the Templates page (it no longer sends to anyone); the template row stays in the database, unused. Members keep their own per-booking emails unchanged. The digest never touches member mail.
+
+**(b) The polish.** Every instructor template gets the 80a class card per class and a "See my schedule" accent button, and names the class with its time: `"{class_name} on {day} at {time}"`, plus the room when the studio has more than one room. No em dashes. The three roster and closure templates (`month_roster`, `month_roster_plain`, `instructor_closure_notice`) already carry their own action link and class list, so they are left for Deanna's overrides rather than re-dressed in this build. Platform defaults are corrected in this build; Reform's own overrides are rewritten by Deanna from drafts, so the build does not write tenant override text.
+
+**Where:** the flex decision sweep (where the day's cut-off decisions are made, Decision 21), re-issued to queue one `instructor_daily_digest` per instructor per day and to skip the two replaced sends for the not-enough-bookings cause; the instructor template family and its platform defaults, re-dressed with the 80a card and the button and given the `{time}` and `{room}` tokens they lack; `render_email` for HTML table support if needed; `template_sample_context` extended; the Templates page row. **Status:** settled. **Reuses:** Decision 21 (flex cut-off and its decision sweep), Decision 39 (instructor class reminders, left as they are), Decision 78e (per-email switch, on by default), Decision 80a (frame, cards, accent button). Deanna, 13 Nov 2026.
+
+---
+
 ## 100 — Staff book for a member, and edit contact details (recorded 12 Nov 2026)
 
 Staff can book a class on a member's behalf, and can edit a member's phone and emergency contact. Both reuse what already exists rather than inventing a parallel booking engine or a parallel phone rule.

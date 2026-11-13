@@ -161,7 +161,11 @@ select expect_true('class_cancelled carries manage_link + book_url',
     where template_key='class_cancelled' and member_id='48ee0000-0000-0000-0000-00000dd00001'));
 
 -- =============================================================================
--- 5. FLEX CUT-OFF CANCELS -> INSTRUCTOR TOLD, WITH THE REASON
+-- 5. FLEX CUT-OFF CANCELS -> MEMBER TOLD; the instructor is NOT told per class.
+--    Decision 101: evaluate_commitment no longer sends instructor_class_cancelled
+--    for the not-enough-bookings cause (the daily digest, built by
+--    sweep_commitments, replaces it). The member still gets
+--    flex_booking_not_confirmed from cancel_occurrence.
 -- =============================================================================
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, instructor_id, name, capacity,
                                starts_at, ends_at, status, staffing, flex, minimum_bookings) values
@@ -173,14 +177,9 @@ insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_s
 update class_occurrences set booked_count = 1 where id='48ee0000-0000-0000-0000-00000c010006';
 select expect_text('the flex class with one booking does not run',
   (evaluate_commitment('48ee0000-0000-0000-0000-00000c010006'))->>'decision', 'not_running');
-select expect_num('task 5: the assigned instructor is told once, via instructor_class_cancelled',
+select expect_num('task 5: Decision 101 — evaluate_commitment sends no per-class instructor_class_cancelled for unmet minimum',
   (select count(*) from notifications where template_key='instructor_class_cancelled'
-     and user_id='48ee0000-0000-0000-0000-0000000000d1'
-     and payload->>'occurrence_id'='48ee0000-0000-0000-0000-00000c010006'), 1);
-select expect_text('task 5: the reason is the cut-off wording',
-  (select payload->>'reason' from notifications where template_key='instructor_class_cancelled'
-     and payload->>'occurrence_id'='48ee0000-0000-0000-0000-00000c010006' limit 1),
-  'didn''t reach its minimum by the cut-off');
+     and payload->>'occurrence_id'='48ee0000-0000-0000-0000-00000c010006'), 0);
 select expect_true('the member on the shortfall class got flex_booking_not_confirmed with the keys',
   (select payload->>'manage_link' like '%/class/%' and payload->>'book_url' like '%/book' from notifications
     where template_key='flex_booking_not_confirmed' and member_id='48ee0000-0000-0000-0000-00000dd00001'

@@ -43,7 +43,8 @@ test("templateEntry / templateFeature reflect the data", () => {
   assert.equal(templateFeature("flex_booking_pending"), "flex");
   assert.equal(templateFeature("convert_after_class"), "free_first");
   assert.equal(templateFeature("product_order_paid"), "shop");
-  assert.equal(templateFeature("core_committed"), "guarantees");
+  assert.equal(templateFeature("booking_cancelled_committed"), "guarantees");
+  assert.equal(templateFeature("instructor_daily_digest"), null);
   assert.equal(templateFeature("booking_confirmed"), null);
   assert.equal(templateEntry("nope"), null);
 });

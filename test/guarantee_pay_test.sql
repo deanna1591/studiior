@@ -179,10 +179,17 @@ select expect_num('...and tells no member, because there are none',
   (select count(*) from notifications
     where template_key = 'class_cancelled'
       and dedupe_key like '%9a179a17-0000-0000-0000-00000000a002%')::bigint, 0);
-select expect_num('...while the coach gets exactly one digest for both',
+-- Decision 101: one instructor_daily_digest per (instructor, class-date). a001
+-- and a002 are ~an hour apart, so they share a Prague date except in the narrow
+-- 19:00-20:00 window where +5h crosses midnight; comparing to the distinct
+-- date count is correct on any clock.
+select expect_num('...while the coach gets one digest per distinct class-date',
   (select count(*) from notifications
-    where template_key = 'commitment_digest'
-      and studio_id = '9a179a17-0000-0000-0000-000000000001')::bigint, 1);
+    where template_key = 'instructor_daily_digest'
+      and studio_id = '9a179a17-0000-0000-0000-000000000001')::bigint,
+  (select count(distinct (starts_at at time zone 'Europe/Prague')::date)
+    from class_occurrences
+    where id in ('9a179a17-0000-0000-0000-00000000a001','9a179a17-0000-0000-0000-00000000a002'))::bigint);
 
 -- =============================================================================
 -- 3. COMMITTED IS TERMINAL
@@ -245,11 +252,11 @@ select expect_text('a booking cannot revive a class that is not running',
 -- =============================================================================
 -- 5. IDEMPOTENT
 -- =============================================================================
-select set_config('t.n1', (select count(*)::text from notifications where template_key='commitment_digest'), false);
+select set_config('t.n1', (select count(*)::text from notifications where template_key='instructor_daily_digest'), false);
 select set_config('t.p1', (select count(*)::text from instructor_pay_records), false);
 select sweep_commitments() is not null as again;
 select expect_num('a second run sends no second notification',
-  (select count(*) from notifications where template_key='commitment_digest')::bigint,
+  (select count(*) from notifications where template_key='instructor_daily_digest')::bigint,
   current_setting('t.n1')::bigint);
 select expect_num('...and writes no second pay record',
   (select count(*) from instructor_pay_records)::bigint, current_setting('t.p1')::bigint);
@@ -1031,19 +1038,13 @@ reset role;
 select expect_true('...it is committed',
   (select committed_at is not null from class_occurrences where id='9a179a17-0000-0000-0000-0000000000fc'));
 
--- Decision 72(b): the assigned instructor (d101 → login a3) is told the class is
--- confirmed to run. Exactly one core_committed notice carrying the occurrence_id,
--- addressed to that instructor's login. (tg_core_reached_minimum never puts
--- occurrence_id in the payload, so counting by it isolates the force-commit path.)
-select expect_num('force-commit queues one core_committed for the login instructor',
+-- Decision 101: force_commit_occurrence no longer sends the per-class
+-- core_committed notice (the daily digest replaces it). The force-commit still
+-- commits the class; it just tells no-one directly here.
+select expect_num('Decision 101: force-commit sends no core_committed',
   (select count(*) from notifications
     where template_key='core_committed'
-      and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fc')::bigint, 1);
-select expect_text('...addressed to the instructor''s login',
-  (select user_id::text from notifications
-    where template_key='core_committed'
-      and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fc'),
-  '9a179a17-0000-0000-0000-0000000000a3');
+      and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fc')::bigint, 0);
 
 -- The cutoff sweep now leaves it SCHEDULED (committed occurrences are skipped),
 -- where an uncommitted below-minimum flex class would have been cancelled.
@@ -1061,9 +1062,9 @@ select expect_true('...and it is a real headcount payment, not the unmet-minimum
   (select amount_cents from instructor_pay_records
     where occurrence_id='9a179a17-0000-0000-0000-0000000000fc' and type='class') > 0);
 
--- Decision 72(b): a class whose assigned instructor has NO app login (d103,
--- 'Later Coach', no studio_staff row) force-commits fine but queues NO notice —
--- no row, no error.
+-- A class whose assigned instructor has NO app login (d103, 'Later Coach', no
+-- studio_staff row) force-commits fine and (Decision 101) queues no core_committed
+-- either — no row, no error.
 insert into class_occurrences (id, studio_id, location_id, class_type_id, name,
                                instructor_id, capacity, starts_at, ends_at,
                                flex, minimum_bookings, guarantee_tier, booked_count)
@@ -1081,7 +1082,7 @@ set role authenticated;
 select expect_true('a no-login instructor''s class still force-commits (no error)',
   ((force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fd','numbers are fine')) ->> 'ok')::boolean);
 reset role;
-select expect_num('...and queues NO core_committed (no login to reach)',
+select expect_num('...and queues NO core_committed either (Decision 101)',
   (select count(*) from notifications
     where template_key='core_committed'
       and payload->>'occurrence_id'='9a179a17-0000-0000-0000-0000000000fd')::bigint, 0);
