@@ -8528,6 +8528,7 @@ export type Database = {
       book_class: {
         Args: {
           p_member_id: string
+          p_membership_id?: string
           p_occurrence_id: string
           p_override_reason?: string
           p_payment_source?: Database["public"]["Enums"]["payment_source"]
@@ -8545,7 +8546,10 @@ export type Database = {
         Args: { p_status: Database["public"]["Enums"]["member_status"] }
         Returns: boolean
       }
-      book_first_free: { Args: { p_occurrence_id: string }; Returns: Json }
+      book_first_free: {
+        Args: { p_member_id?: string; p_occurrence_id: string }
+        Returns: Json
+      }
       book_group: {
         Args: {
           p_emails: string[]
@@ -10948,6 +10952,19 @@ export type Database = {
         Returns: Json
       }
       staff_announcements: { Args: { p_studio_id: string }; Returns: Json }
+      staff_book_member: {
+        Args: {
+          p_member_id: string
+          p_note?: string
+          p_occurrence_id: string
+          p_source: Json
+        }
+        Returns: Json
+      }
+      staff_booking_options: {
+        Args: { p_member_id: string; p_occurrence_id: string }
+        Returns: Json
+      }
       staff_bootstrap: {
         Args: never
         Returns: {
@@ -10991,6 +11008,10 @@ export type Database = {
           p_body: string
           p_thread_id: string
         }
+        Returns: Json
+      }
+      staff_set_member_phone: {
+        Args: { p_member_id: string; p_phone: string }
         Returns: Json
       }
       stamp_open_shift: {

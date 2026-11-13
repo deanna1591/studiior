@@ -16,6 +16,7 @@ import PaperWaiverButton from "./paper-waiver-button";
 import MakeFreeButton from "./make-free-button";
 import RebookButton from "./rebook-button";
 import RemoveBooking from "@/components/staff/remove-booking";
+import { BookMemberFromRoster } from "@/components/staff/book-member";
 import ToastHost from "@/components/staff/toast-host";
 import ReleasePay from "./release-pay";
 import RunAnyway from "./run-anyway";
@@ -288,7 +289,11 @@ export default async function Roster({ params, searchParams }: { params: { occur
       <CodeCheckIn occurrenceId={occ.id} />
 
       <ToastHost />
-      <SectionLabel>Roster</SectionLabel>
+      <div className="mb-2 flex items-center justify-between">
+        <SectionLabel>Roster</SectionLabel>
+        {/* Decision 100: book a member into this class. */}
+        {desk && occ.status === "scheduled" && <BookMemberFromRoster occurrenceId={occ.id} />}
+      </div>
       {booked.length === 0 ? (
         <Empty>Nobody has booked yet. They will appear here as they do.</Empty>
       ) : (

@@ -45,4 +45,7 @@ export const REASONS: Record<string, string> = {
   desk_pay_blocked: "Pay online to book. Paying at the desk is not available on this account.",
   // Decision 98: a same-person twin has already had a free class.
   duplicate: "It looks like you've had a free class with us before. You can still book this one by paying.",
+  // Decision 100: staff pinned a plan in the "Pay with" dropdown that does not
+  // cover this class type.
+  plan_not_covering: "That plan does not cover this class.",
 };

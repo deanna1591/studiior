@@ -23,6 +23,9 @@ import DocumentsPanel, { PhotoUpload } from "./records/documents";
 import { AttendancePattern } from "./attendance";
 import { ResendGuestInvite } from "./resend-guest";
 import MemberDangerZone from "./danger";
+import EditPhone from "@/components/staff/edit-phone";
+import { BookClassFromProfile } from "@/components/staff/book-member";
+import ToastHost from "@/components/staff/toast-host";
 
 export const dynamic = "force-dynamic";
 
@@ -384,6 +387,14 @@ export default async function MemberDetail({
         {m.status !== "active" && <> · {m.status}</>}
         {!m.waiver_signed_at && <> · <span className="text-ink">no waiver signed</span></>}
       </p>
+      <ToastHost />
+      {/* Decision 100: the desk edits the phone and books a class for them. */}
+      {isDeskUp(ctx.role) && !mm.deleted_at && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <EditPhone memberId={m.id} current={m.phone} />
+          <BookClassFromProfile memberId={m.id} />
+        </div>
+      )}
       {/* Whether they can actually use the app they are being messaged about. */}
       <div className="mb-4 mt-2">
         {m.user_id ? (

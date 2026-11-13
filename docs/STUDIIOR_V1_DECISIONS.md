@@ -511,6 +511,26 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 100 — Staff book for a member, and edit contact details (recorded 12 Nov 2026)
+
+Staff can book a class on a member's behalf, and can edit a member's phone and emergency contact. Both reuse what already exists rather than inventing a parallel booking engine or a parallel phone rule.
+
+**Where.** The roster gains "Book a member" (search by name or email). The member profile gains "Book a class" (a class picker: the next 14 days of scheduled, visible classes with spots). Both open the same sheet.
+
+**The sheet.** It shows the class, then "Pay with" as a dropdown listing only what applies to this member and this class: each active plan or pass that covers it ("Intro Offer, 3 of 3 credits, valid to 27 Nov"; an unlimited membership as "Founding Member Unlimited"); "Free first class" when the member is eligible, or, when not eligible, "Free first class (override)" for manager-up only; "Drop-in, paid at the studio"; "Drop-in, pay later" only when the member's unpaid cap allows it; "Complimentary" for manager-up. The first covering plan is preselected. An optional note.
+
+**Booking goes through the member's own rules.** Capacity, cut-off, hidden, desk pay blocked, duplicate, and waitlist when full (with the member's consent box ticked) all apply exactly as they do for the member's own booking. `staff_book_member` never re-implements the plan pick: it calls the existing paths. A plan or pass spends a credit exactly as a self-booking does, through `book_class`. When staff pick a specific plan or pass in the dropdown, that choice is honoured: `book_class_run` gains an optional `p_membership_id` that pins the candidate, and if that plan does not cover the class it is refused with `plan_not_covering`; the member's own calls leave `p_membership_id` null, so nothing changes for them. "Drop-in, paid at the studio" records the desk payment the way `record_desk_dropin_paid` does today. "Free first class" uses `book_first_free`, and the override uses `convert_booking_to_free_first`. "Complimentary" books a comp seat with reason `staff_comp`. The member gets the normal booking confirmed email.
+
+**Refusals and the trail.** A refusal shows the member-facing sentence from `lib/booking-reasons.ts` with the member's name in front ("Maxine: Booking has closed for that class."). One audit row, and a Journey row "Booked by {staff first name} with {source}".
+
+**Roles.** Desk-up can book with a plan, a free first class when the member is eligible, and drop-ins. Manager-up can also override free first and give complimentary.
+
+**Contact details.** Desk-up staff can edit a member's phone and emergency contact on the profile, with the same validation as the member's own sheet (Decision 94: a PH mobile stored as E.164, shown as +63 9XX XXX XXXX, the error "That doesn't look like a mobile number."). `staff_set_member_phone` only normalises and writes, because the Decision 98 same-person check is already a trigger on any phone change (`members_phone_recheck`), so it runs exactly as a member's own save does. Name and email edits stay as they are today. One audit row "Phone changed by {staff first name}".
+
+**Where:** Business Rules §2 (booking) and §5 (member records); Permissions §5 and §6; migrations 002/028/319 (`book_class`), 081a (`add_walk_in`, `record_desk_dropin_paid`, `sell_plan_at_desk`), 158/163 (`book_first_free`), 295/370 (`convert_booking_to_free_first`), 336 (Decision 94 phone), 341 (Decision 98 phone recheck trigger). **Status:** settled. **Extends:** Decision 15 (lead booking), Decision 30 (free first class), Decision 73 (desk pay, unpaid cap), Decision 94 (phone), Decision 98 (same-person recheck). **Reuses:** `book_class`, `book_first_free`, `convert_booking_to_free_first`, `record_desk_dropin_paid`, the `members_phone_recheck` trigger, `lib/phone.mjs`, `lib/booking-reasons.ts`. Deanna, 12 Nov 2026.
+
+---
+
 ## 99 — Instructors block off dates (recorded 12 Nov 2026)
 
 References Decision 18 for availability and its per-date exceptions (`instructor_availability.exception_date`, `set_availability_exception()`, migration 053). This adds one action and changes nothing in Decision 18: it reuses the exception mechanism rather than inventing a second kind of time off.
@@ -527,6 +547,8 @@ References Decision 18 for availability and its per-date exceptions (`instructor
 **Staff.** The coach's Availability page shows the same ranges, read-only, with the reason. Staff clear them exactly as they clear any exception today (manager-up write, Decision 18). Blocking an instructor's dates reassigns nothing: the class stays assigned to them until the studio covers it, which is the unstaffed and cover flow Decision 18 already runs, and the email is what tells the studio there is cover to arrange.
 
 **Note (12 Nov 2026):** the `instructor_time_off` email's text class list bullets each line with "· " (the HTML list already bullets through `<li>`). The bullets are built by `instructor_block_dates` into the `{class_list}` token, not the template default, so the function was re-issued from its newest definition (migration 342) with the leading "· "; the template default carries only the token and was re-asserted byte-identical (migration 343, `20260833390000`).
+
+**Note (12 Nov 2026):** Time off lives under Me, below My availability. The Time off card and list move from My schedule to the Me tab, directly under the My availability card, heading "Time off". App-only, no SQL.
 
 **Where:** Business Rules §3.3; Permissions §6; migration 053 (availability exceptions). **Status:** settled. **References:** Decision 18 (availability, per-date exceptions, cover). **Reuses:** `set_availability_exception()` (through a `_run` twin where staff-guarded), `queue_shift_notice`, the roster page, and the studio's existing shift cut-off for swaps. Deanna, 12 Nov 2026.
 

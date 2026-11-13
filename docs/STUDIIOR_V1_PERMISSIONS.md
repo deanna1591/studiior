@@ -68,7 +68,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 | List & search members | ✅ | ✅ | ⚠️⁵ | ✅ | ❌ |
 | View member profile | ✅ | ✅ | ⚠️⁵ | ⚠️⁶ | ⚠️⁷ |
 | Create member | ✅ | ✅ | ❌ | ✅ | ⚠️⁹ |
-| Edit member details | ✅ | ✅ | ❌ | ✅ | ⚠️⁷ |
+| Edit member details | ✅ | ✅ | ❌ | ✅¹¹ | ⚠️⁷ |
 | Archive member | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Delete member (Decision 97) | ✅ | ✅ | ❌ | ❌ | ⚠️¹⁰ |
 | Merge duplicate members (Decision 97) | ✅ | ✅ | ❌ | ❌ | ❌ |
@@ -85,6 +85,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 ⁷ Own record only.
 ⁸ Attendance, challenge and achievement events only. No payment or membership events.
 ⁹ **Member → lead only (Decision 90).** A member may create a person only as a *lead*, only through "Bring a friend for their free first class", and always with a free first booking attached — never a bare member record and no other member-creation path.
+¹¹ **Edit a member's phone (Decision 100).** Desk-up edits a member's phone (and emergency contact) on the profile with the member sheet's own rule (Decision 94: a PH mobile stored as E.164). `staff_set_member_phone` normalises and writes; the Decision 98 same-person recheck runs on the write (the `members_phone_recheck` trigger). Name and email edits are unchanged.
 ¹⁰ **Member self-deletion (Decision 69).** A member deletes their own account only, through the member app, and never another member's. Owner/Manager `delete_member` and `merge_members` refuse a member who is studio staff or has an instructor login, a member already deleted, and (merge) two members in different studios or the same member on both sides. Both run the same scrub as self-deletion (history kept, future bookings cancelled with no penalty, the login removed only when it is the member's sole studio); merge moves every row onto the kept member, folds message threads, keeps both active memberships (flagged), keeps the earliest waiver and marketing-on-if-either, and sends no `account_deleted` email. The invite trail (`guest_passes.host_name_at_invite`) is a snapshot that survives a host's deletion or merge and is never scrubbed. Nothing is purged.
 
 ---
@@ -117,7 +118,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 
 | Action | O | M | I | FD | Mem |
 |---|---|---|---|---|---|
-| Book a member into a class | ✅ | ✅ | ⚠️²³ | ✅ | ⚠️¹² |
+| Book a member into a class | ✅ | ✅ | ⚠️²³ | ✅²⁴ | ⚠️¹² |
 | Cancel a booking | ✅ | ✅ | ❌ | ✅ | ⚠️¹² |
 | Override the eligibility gate | ✅ | ✅ | ❌ | ✅ | ❌ |
 | Waive a late-cancel fee | ✅ | ✅ | ❌ | ✅ | ❌ |
@@ -131,6 +132,7 @@ Columns: **O** Owner · **M** Manager · **I** Instructor · **FD** Front Desk �
 Chapter 7 excludes the social layer, so "who's going" is a V2 question for members.
 ¹² Own bookings only.
 ²³ Instructor: only a class they teach, **today**, as a **walk-in** (or a same-day Move-here) checked in at once — not general on-behalf booking (Decision 81a). Scoped in SQL to a published occurrence that is theirs and is today.
+²⁴ **Staff book for a member (Decision 100).** From the roster ("Book a member", search by name or email) or the member profile ("Book a class", the next 14 days), both opening the same sheet. `staff_book_member` goes through the member's own rules via the existing paths (`book_class` for a plan or drop-in, `book_first_free` for a free first class, `convert_booking_to_free_first` for the manager-up override, a comp seat for complimentary) and never re-implements the pick; a staff-pinned plan is honoured by `book_class`'s new optional `p_membership_id` (refused `plan_not_covering` if it does not cover). **Desk-up** books with a plan, a free first class when eligible, and drop-ins; **manager-up** can also override free first and give complimentary. One audit row and a Journey row "Booked by {staff first name} with {source}".
 ²⁴ Rebook from the roster (Decision 92) is all staff roles. An instructor keeps the existing same-day **"Move them here"** on a class they teach (Decision 81a, footnote ²³); they do not get the general rebook.
 
 Waitlist order is strictly FIFO and nobody can reorder it, including the Owner. Business Rules §4.1 — a queue people believe in is worth more than a queue that can be adjusted.

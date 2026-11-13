@@ -6,6 +6,7 @@ import { CalendarFeedControl } from "@/components/member/calendar-feed";
 import { mintFeed, revokeFeed } from "@/lib/feed-actions";
 import PhotoUpload from "@/components/instructor/photo-upload";
 import ShowIntroAgain from "@/components/instructor/show-intro-again";
+import TimeOff, { type TimeOffRange } from "@/components/instructor/time-off";
 import { uploadMyPhoto, removeMyPhoto } from "./actions";
 import { markGuide } from "../actions";
 
@@ -32,11 +33,13 @@ type Rec = {
  */
 export default async function MePage() {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data }, { data: relData }, { data: feed }] = await Promise.all([
+  const [{ data }, { data: relData }, { data: feed }, { data: timeOffData }] = await Promise.all([
     supabase.rpc("instructor_recognition", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("instructor_reliability", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("calendar_feed_state", { p_studio_id: ctx.studio_id, p_kind: "instructor" }),
+    supabase.rpc("instructor_time_off"),
   ]);
+  const timeOffRanges = (timeOffData ?? []) as unknown as TimeOffRange[];
   const feedState = (feed ?? {}) as { active?: boolean; last_used_at?: string | null };
   const r = data as Rec | null;
   const rel = relData as unknown as
@@ -124,6 +127,9 @@ export default async function MePage() {
         </span>
         <span className="shrink-0 text-ink-3">›</span>
       </Link>
+
+      {/* Decision 99: Time off lives under Me, below My availability. */}
+      <TimeOff ranges={timeOffRanges} />
 
       {/* Decision 85: the Studio Guide, and a way to see the intro again. */}
       <div className="m-card mt-4 px-4 py-4">
