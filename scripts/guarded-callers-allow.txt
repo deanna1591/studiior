@@ -35,3 +35,5 @@ book_first_free -> free_first_eligibility           # the member books their OWN
 convert_booking_to_free_first -> free_first_eligibility  # manager/service converts a drop-in; is_desk_up/is_service passes
 free_first_eligible_classes_run -> free_first_eligibility  # the member's own free-class picker (self) or service; guard passes
 book_class -> free_first_eligibility                 # the free-first belt fires only for a self-serve lead (v_is_self); free_first_eligibility is_self passes
+instructor_block_dates -> set_availability_exception    # passes only the caller's OWN instructor id (resolved from auth.uid()); set_availability_exception's same-subject guard (auth_instructor_id) passes
+instructor_unblock_dates -> clear_availability_exception # passes only the caller's OWN instructor id (resolved from auth.uid()); clear_availability_exception's same-subject guard passes

@@ -179,7 +179,11 @@ declare
     'days_since','10','product','Grip socks','quantity','1',
     'hold_time','7:00 PM on Mon 10 Nov','checkout_url','https://ef-sa.studiior.app/checkout/x',
     'note_line',' Room closed.','note_html',' Room closed.','credit_line',' Your credit or free class is back on your account.',
-    'credit_html',' Your credit or free class is back on your account.');
+    'credit_html',' Your credit or free class is back on your account.',
+    'instructor_name','Ada Example','range','Mon 15 Dec to Wed 17 Dec',
+    'reason_line',' (holiday)','reason_html',' (holiday)',
+    'class_list','Reformer Flow · Mon 15 Dec 07:00',
+    'class_list_html','<li><a href="https://app.studiior.com/roster/x">Reformer Flow · Mon 15 Dec 07:00</a></li>');
   k text; v_nid uuid; r record; v_n int := 0;
   v_keys text[] := array[
     'booking_confirmed','free_booking_confirmed','flex_booking_pending','flex_booking_confirmed',
@@ -187,7 +191,7 @@ declare
     'convert_day3','convert_day7','convert_last_day','convert_missed_you',
     'keep_renew_7','keep_renew_1','keep_renew_0','keep_lapsed_3','keep_credits_7','keep_credits_2',
     'keep_winback_30','keep_winback_60','keep_drifting','membership_expiring','credit_expiry',
-    'product_order_paid','free_class_duplicate','booking_removed_by_studio'];
+    'product_order_paid','free_class_duplicate','booking_removed_by_studio','instructor_time_off'];
   -- retention_* are composer SEEDS (sent via the `retention` passthrough with the
   -- composer's rendered html, never rendered directly), so their text_body carries
   -- composer markup — not a directly-rendered template.

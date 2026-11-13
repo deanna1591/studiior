@@ -571,3 +571,64 @@ export async function instructorUploadPostImage(
 export async function instructorSignPostImage(_path: string): Promise<{ url?: string; error?: string }> {
   return {};
 }
+
+/* ===========================================================================
+ * Decision 99 — Time off. The instructor blocks or clears their own dates.
+ * previewTimeOff counts the classes a range contains so the sheet can warn
+ * before saving; block/clear go through the DB functions, which refuse past
+ * dates and a class too close to the swap cut-off.
+ * ======================================================================== */
+export async function previewTimeOff(
+  from: string, to: string,
+): Promise<{ count: number } | { error: string }> {
+  if (!from || !to) return { count: 0 };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("instructor_time_off_classes", {
+    p_from: from, p_to: to,
+  });
+  if (error) return { error: "That could not be checked." };
+  return { count: (data ?? []).length };
+}
+
+function timeOffReason(error: { message: string }): string {
+  if (/PT403/.test(error.message)) return "Only you can set your own time off.";
+  if (/past/i.test(error.message)) return "Those dates are in the past.";
+  if (/before the start/i.test(error.message)) return "The end date is before the start date.";
+  if (/too soon to block/i.test(error.message)) return error.message.replace(/^.*?:\s*/, "");
+  return error.message;
+}
+
+export async function blockTimeOff(
+  form: FormData,
+): Promise<{ ok: string } | { error: string }> {
+  const from = String(form.get("from") ?? "");
+  const to = String(form.get("to") ?? "") || from;
+  const reason = String(form.get("reason") ?? "").trim();
+  if (!from) return { error: "Pick a start date." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("instructor_block_dates", {
+    p_from: from, p_to: to, p_reason: reason || undefined,
+  });
+  if (error) return { error: timeOffReason(error) };
+  revalidatePath("/instructor/schedule");
+  revalidatePath("/instructor");
+  const r = data as { days: number; class_count: number; range: string };
+  return {
+    ok: r.class_count > 0
+      ? `Saved. ${r.range} is blocked. The studio has been emailed to cover ${r.class_count} class${r.class_count === 1 ? "" : "es"}.`
+      : `Saved. ${r.range} is blocked.`,
+  };
+}
+
+export async function unblockTimeOff(
+  from: string, to: string,
+): Promise<{ ok: string } | { error: string }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("instructor_unblock_dates", {
+    p_from: from, p_to: to,
+  });
+  if (error) return { error: timeOffReason(error) };
+  revalidatePath("/instructor/schedule");
+  revalidatePath("/instructor");
+  return { ok: "Removed. You are available on those days again." };
+}

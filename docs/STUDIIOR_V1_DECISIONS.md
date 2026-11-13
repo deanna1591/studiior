@@ -511,6 +511,25 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 99 — Instructors block off dates (recorded 12 Nov 2026)
+
+References Decision 18 for availability and its per-date exceptions (`instructor_availability.exception_date`, `set_availability_exception()`, migration 053). This adds one action and changes nothing in Decision 18: it reuses the exception mechanism rather than inventing a second kind of time off.
+
+**The instructor blocks a date or a range.** From their app, My schedule gains "Time off": pick a start and end date, an optional reason, "Save". It writes one unavailable exception per day in the range through the existing exception mechanism, with the reason stored as the note on each day. An instructor can block dates; they cannot touch the studio's exceptions on any other coach, and the block and unblock functions resolve the caller from auth and act only on their own rows.
+
+**Rules.**
+- A date in the past is refused.
+- A date that already has the instructor assigned to a scheduled class is allowed, not refused. The sheet warns before saving, "You're down to teach {n} classes in these dates. The studio will need to cover them.", and on save the studio gets one email, template `instructor_time_off`, subject "{instructor_name} is off {range}", listing those classes with a link to each roster. One email per save, to the studio owner login via `queue_shift_notice`.
+- A block inside the published month is allowed up to the shift cut-off the studio already uses for swaps. Past that cut-off the instructor asks for cover on the class instead, exactly as Decision 18 already provides.
+
+**The instructor's own list.** Time off shows under My schedule as a list of ranges with the reason and a "Remove" per range. Removing clears those days' exceptions. Past days cannot be removed: a block that has already happened is history, like a past booking.
+
+**Staff.** The coach's Availability page shows the same ranges, read-only, with the reason. Staff clear them exactly as they clear any exception today (manager-up write, Decision 18). Blocking an instructor's dates reassigns nothing: the class stays assigned to them until the studio covers it, which is the unstaffed and cover flow Decision 18 already runs, and the email is what tells the studio there is cover to arrange.
+
+**Where:** Business Rules §3.3; Permissions §6; migration 053 (availability exceptions). **Status:** settled. **References:** Decision 18 (availability, per-date exceptions, cover). **Reuses:** `set_availability_exception()` (through a `_run` twin where staff-guarded), `queue_shift_notice`, the roster page, and the studio's existing shift cut-off for swaps. Deanna, 12 Nov 2026.
+
+---
+
 ## 98 — One free class per person (recorded 12 Nov 2026)
 
 A new member's first class is free (Decision 30), kept once-ever on the normalised email key. A second email defeats it: on hosted Reform two people (Jen De Guzman, Jason Caling) have taken a free class twice, each with two Gmail addresses. This decision closes that by testing the person, not the email, and it changes nothing about who is already a member.

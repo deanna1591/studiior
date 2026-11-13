@@ -7,6 +7,7 @@ import PayCheckIn from "../pay-checkin";
 import GuideHint from "@/components/instructor/guide-hint";
 import { HINTS } from "@/lib/instructor-guide";
 import ClassTag from "@/components/instructor/class-tag";
+import TimeOff, { type TimeOffRange } from "@/components/instructor/time-off";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function MySchedule({
   // Decision 82: the main wave queries the chosen week (current by default)
   // alongside the two lists — ONE wave. The separate instructor_next_teaching_week
   // round trip is gone; instructor_week returns next_teaching_week in its payload.
-  const [week, pendingData, reqData] = await Promise.all([
+  const [week, pendingData, reqData, timeOffData] = await Promise.all([
     supabase.rpc("instructor_week", {
       p_instructor_id: ctx.instructor_id, p_from: from, p_to: to,
     }),
@@ -76,7 +77,10 @@ export default async function MySchedule({
     supabase.rpc("instructor_pending_claims", { p_instructor_id: ctx.instructor_id }),
     // Decision 38: classes the studio assigned that need confirming.
     supabase.rpc("instructor_assignment_requests", { p_instructor_id: ctx.instructor_id }),
+    // Decision 99: the instructor's own time off, as ranges.
+    supabase.rpc("instructor_time_off"),
   ]);
+  const timeOffRanges = (timeOffData.data ?? []) as unknown as TimeOffRange[];
 
   let w = week.data as
     { state: string; classes: Klass[]; empty_hint: string; confirmations_on: boolean;
@@ -280,6 +284,9 @@ export default async function MySchedule({
         <Link href={`/instructor/schedule?w=${offset + 1}`}
               className="m-sub text-ink-2 underline underline-offset-4">Later →</Link>
       </div>
+
+      {/* Decision 99: block off dates you cannot teach. */}
+      <TimeOff ranges={timeOffRanges} />
     </InstructorShell>
   );
 }

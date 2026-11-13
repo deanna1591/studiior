@@ -9109,30 +9109,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_like: {
-        Args: { actual: string; label: string; pat: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raise: {
-        Args: { code: string; label: string; sql: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9378,6 +9354,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      instructor_block_dates: {
+        Args: { p_from: string; p_reason?: string; p_to: string }
+        Returns: Json
+      }
       instructor_brand_kit: { Args: never; Returns: Json }
       instructor_can_claim_month: {
         Args: { p_instructor_id: string; p_month: string }
@@ -9532,6 +9512,28 @@ export type Database = {
         Returns: Json
       }
       instructor_scope: { Args: { p_occurrence: string }; Returns: string }
+      instructor_time_off: {
+        Args: never
+        Returns: {
+          class_count: number
+          from_date: string
+          is_past: boolean
+          reason: string
+          to_date: string
+        }[]
+      }
+      instructor_time_off_classes: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          class_name: string
+          occurrence_id: string
+          when_label: string
+        }[]
+      }
+      instructor_unblock_dates: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
       instructor_user_id: { Args: { p_instructor_id: string }; Returns: string }
       instructor_valid_on: {
         Args: { p_instructor_id: string; p_on: string }
@@ -11198,15 +11200,6 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
-      t9801_free_seat: {
-        Args: {
-          p_at: string
-          p_member: string
-          p_occ: string
-          p_status: string
-        }
-        Returns: string
-      }
       template_sample_context: {
         Args: { p_first_name: string; p_studio_id: string; p_to_email: string }
         Returns: Json
