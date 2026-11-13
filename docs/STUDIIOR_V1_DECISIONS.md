@@ -364,6 +364,8 @@ Because rule 5 is evaluated *before* §2.2 resolves who pays, a second guard run
 
 Attending as a drop-in does not itself promote a lead to `active`. Status is a thing staff set when they sell something, and a booking that is never paid for at the desk should not leave a `lead` looking like a member.
 
+**Amendment (13 Nov 2026), a purchase activates the member.** When a membership, pack, intro offer or trial is created for a member whose status is lead, the member becomes active in the same transaction, whether the plan was bought online, sold at the desk, granted by staff or imported. The flip is recorded as a `membership_events` row and an audit row. Existing leads holding an active or trialing membership are activated once by the migration with the same audit.
+
 **Where:** Business Rules §2.1 rule 5, §2.2; migration 027. **Status:** settled.
 
 ---

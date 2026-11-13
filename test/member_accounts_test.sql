@@ -303,7 +303,12 @@ select expect_text('and it resolves to drop-in, because they have bought nothing
 select expect_text('booking does not promote them — status is what staff set',
   (select status::text from members where id = current_setting('a.leadid')::uuid), 'lead');
 
--- A lead with a plan attached but never activated must not spend its credits.
+-- Decision 15 amendment (migration 345): creating a membership for a lead
+-- activates them in the same transaction, whatever the path. A direct memberships
+-- insert is the staff-grant / import path, so the lead becomes active and the
+-- plan's credits are theirs to spend. (Before the amendment a lead holding an
+-- unactivated plan was refused member_not_active; that is the rule the amendment
+-- deliberately overturns — the fault seen for Maxine at Reform.)
 insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits, validity_days)
 values ('abababab-0000-0000-0000-00000000aa01','abababab-0000-0000-0000-000000000001',
         '10-Class Pack','class_pack',500000,'CZK',10,180);
@@ -319,22 +324,32 @@ insert into class_occurrences (id, studio_id, location_id, class_type_id, room_i
    'abababab-0000-0000-0000-00000000ee01','Day after',
    now() + interval '2 days', now() + interval '2 days' + interval '50 min', 10, 'scheduled');
 
+select expect_text('the membership grant activated the lead',
+  (select status::text from members where id = current_setting('a.leadid')::uuid), 'active');
+
 set role authenticated;
 select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000b3',false);
-select expect_text('a lead may not spend credits nobody activated them for',
-  (book_class('abababab-0000-0000-0000-00000000bb02',
-              current_setting('a.leadid')::uuid, 'member')).failure_reason,
-  'member_not_active');
+select expect_text('and the now-active member spends the pack credit',
+  coalesce((book_class('abababab-0000-0000-0000-00000000bb02',
+              current_setting('a.leadid')::uuid, 'member')).failure_reason, 'ok'),
+  'ok');
 reset role;
-select expect_num('and the credits are untouched',
-  (select credits_remaining from memberships where member_id = current_setting('a.leadid')::uuid), 10);
+select expect_num('one credit spent',
+  (select credits_remaining from memberships where member_id = current_setting('a.leadid')::uuid), 9);
 
--- Everything else rule 5 refused, it still refuses.
+-- Everything else rule 5 refused, it still refuses: an inactive member cannot book
+-- (the amendment only flips lead->active on a membership creation, never inactive).
+insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
+                               starts_at, ends_at, capacity, status) values
+  ('abababab-0000-0000-0000-00000000bb03','abababab-0000-0000-0000-000000000001',
+   'abababab-0000-0000-0000-00000000000c','abababab-0000-0000-0000-00000000cc01',
+   'abababab-0000-0000-0000-00000000ee01','Two days after',
+   now() + interval '3 days', now() + interval '3 days' + interval '50 min', 10, 'scheduled');
 update members set status = 'inactive' where id = current_setting('a.leadid')::uuid;
 set role authenticated;
 select set_config('request.jwt.claim.sub','abababab-0000-0000-0000-0000000000b3',false);
 select expect_text('an inactive member is still refused',
-  (book_class('abababab-0000-0000-0000-00000000bb02',
+  (book_class('abababab-0000-0000-0000-00000000bb03',
               current_setting('a.leadid')::uuid, 'member')).failure_reason,
   'member_not_active');
 reset role;
