@@ -137,6 +137,15 @@ select expect_true('the studio owner was emailed instructor_time_off (once per s
       and n.recipient_type = 'staff'
       and n.payload->>'class_list_html' like '%/roster/99f00000-0000-0000-0000-0000000000c1%'));
 
+-- The text class list bullets each line with "· " (the HTML list uses <li>).
+select expect_true('each text class line starts with "· "',
+  (select bool_and(line like '· %')
+     from notifications n
+     cross join lateral unnest(string_to_array(n.payload->>'class_list', E'\n')) as line
+    where n.template_key = 'instructor_time_off'
+      and n.user_id = '99f00000-0000-0000-0000-0000000000a1'
+      and n.payload->>'class_list' is not null));
+
 \echo ''
 \echo '=== 3. THE INSTRUCTOR LIST — consecutive days as one range ==='
 set role authenticated;

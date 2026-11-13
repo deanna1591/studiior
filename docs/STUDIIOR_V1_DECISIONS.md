@@ -526,6 +526,8 @@ References Decision 18 for availability and its per-date exceptions (`instructor
 
 **Staff.** The coach's Availability page shows the same ranges, read-only, with the reason. Staff clear them exactly as they clear any exception today (manager-up write, Decision 18). Blocking an instructor's dates reassigns nothing: the class stays assigned to them until the studio covers it, which is the unstaffed and cover flow Decision 18 already runs, and the email is what tells the studio there is cover to arrange.
 
+**Note (12 Nov 2026):** the `instructor_time_off` email's text class list bullets each line with "· " (the HTML list already bullets through `<li>`). The bullets are built by `instructor_block_dates` into the `{class_list}` token, not the template default, so the function was re-issued from its newest definition (migration 342) with the leading "· "; the template default carries only the token and was re-asserted byte-identical (migration 343, `20260833390000`).
+
 **Where:** Business Rules §3.3; Permissions §6; migration 053 (availability exceptions). **Status:** settled. **References:** Decision 18 (availability, per-date exceptions, cover). **Reuses:** `set_availability_exception()` (through a `_run` twin where staff-guarded), `queue_shift_notice`, the roster page, and the studio's existing shift cut-off for swaps. Deanna, 12 Nov 2026.
 
 ---
