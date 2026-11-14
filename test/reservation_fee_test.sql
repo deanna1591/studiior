@@ -344,6 +344,65 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_text('dues: the released member stays free-first eligible', current_setting('t.elig7'), 'true');
 
 -- =============================================================================
+-- 10b. Decision 103 hotfix — paying the due on an EXISTING free booking. M9
+--      already holds their free class (booked comp + host-null pass). The
+--      pay-to-keep path must go straight to xendit_begin_reservation with NO
+--      eligibility check, and the webhook reserves the SAME booking, not a second
+--      seat. (The old path ran reserve_free_first -> already_had_free.)
+-- =============================================================================
+insert into auth.users (id) values ('d1030000-0000-0000-0000-0000000000ed');
+insert into profiles (id, email) values ('d1030000-0000-0000-0000-0000000000ed','rzd@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status)
+  values ('d1030000-0000-0000-0000-0000000000fd','d1030000-0000-0000-0000-000000000001',
+          'd1030000-0000-0000-0000-0000000000ed','Mem','Nine','rzd@example.com','lead');
+-- M9 books their free class directly (the pre-fee shape: booked comp + host-null pass).
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ed',false);
+select set_config('t.bk9', (book_first_free('d1030000-0000-0000-0000-00000000c007') ->> 'booking_id'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('pay-to-keep: M9 holds a booked comp free booking',
+  (select status::text||'/'||payment_source::text from bookings where id = current_setting('t.bk9')::uuid), 'booked/comp');
+
+-- The BUG: the new-booking path (reserve_free_first / eligibility) refuses M9's
+-- OWN existing booking as already_had_free.
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ed',false);
+select set_config('t.r9', (reserve_free_first('d1030000-0000-0000-0000-00000000c007') ->> 'reason'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('pay-to-keep: reserve_free_first (the NEW-booking path) WOULD refuse already_had_free',
+  current_setting('t.r9'), 'already_had_free');
+
+-- The FIX: begin the fee on the existing booking, no eligibility, no second booking.
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ed',false);
+select set_config('t.p9', (select purchase_id::text from xendit_begin_reservation(
+  'd1030000-0000-0000-0000-000000000001', current_setting('t.bk9')::uuid)), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('pay-to-keep: begin on the existing booking succeeds (no refusal)',
+  nullif(current_setting('t.p9'), '') is not null);
+select expect_num('pay-to-keep: still exactly one booking for M9 on c007 (no second seat)',
+  (select count(*) from bookings where member_id='d1030000-0000-0000-0000-0000000000fd'
+     and occurrence_id='d1030000-0000-0000-0000-00000000c007'), 1);
+select expect_num('pay-to-keep: one reservation purchase for the booking', (select count(*) from xendit_purchases
+   where booking_id = current_setting('t.bk9')::uuid), 1);
+
+-- The webhook completes it -> the SAME booking becomes reserved (a fee payment),
+-- no second booking, no second guest_pass.
+select d103_complete(current_setting('t.bk9')::uuid);
+select expect_text('pay-to-keep: the SAME booking is still booked comp after payment',
+  (select status::text||'/'||payment_source::text from bookings where id = current_setting('t.bk9')::uuid), 'booked/comp');
+select expect_num('pay-to-keep: still exactly one booking for M9 (webhook booked no new seat)',
+  (select count(*) from bookings where member_id='d1030000-0000-0000-0000-0000000000fd'
+     and occurrence_id='d1030000-0000-0000-0000-00000000c007'), 1);
+select expect_num('pay-to-keep: a succeeded reservation_fee payment of 15000 on the booking', (select count(*) from payments
+   where booking_id = current_setting('t.bk9')::uuid and kind='reservation_fee' and status='succeeded' and amount_cents=15000), 1);
+select expect_num('pay-to-keep: exactly one host-null guest_pass (not re-created)', (select count(*) from guest_passes
+   where guest_booking_id = current_setting('t.bk9')::uuid and host_member_id is null), 1);
+-- The due is cleared (the booking is reserved; member_reservation_dues excludes a fee-paid booking).
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ed',false);
+select set_config('t.dues9', (select count(*)::text from member_reservation_dues('d1030000-0000-0000-0000-000000000001')
+   where booking_id = current_setting('t.bk9')::uuid), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_num('pay-to-keep: the due is cleared after paying', current_setting('t.dues9')::bigint, 0);
+
+-- =============================================================================
 -- 11. Guards.
 -- =============================================================================
 -- xendit_begin_reservation refuses a booking that is not a held reservation.

@@ -180,15 +180,35 @@ export async function startReservation(occId: string): Promise<BuyState> {
   if (!origin) return { ok: false, message: "Could not work out the studio address." };
 
   const supabase = createClient();
-  const { data: held, error: hErr } = await supabase.rpc("reserve_free_first", { p_occurrence_id: occId });
-  if (hErr) return { ok: false, message: hErr.message };
-  const h = held as { ok: boolean; reason?: string; booking_id?: string } | null;
-  if (!h?.ok || !h.booking_id) {
-    return { ok: false, message: FREE_RESERVE_REASONS[h?.reason ?? ""] ?? "That didn’t work — please try again." };
+
+  // Decision 103 hotfix: an EXISTING free booking (the member already holds their
+  // free class and got a "pay to keep your spot" due) goes straight to the fee
+  // checkout. reserve_free_first is only for a brand-new first-timer — running it
+  // here would check eligibility against the member's own comp booking and refuse
+  // "already_had_free". We reuse the existing seat; the fee makes it reserved.
+  let bookingId: string | null = null;
+  const { data: existing } = await supabase.from("bookings")
+    .select("id")
+    .eq("occurrence_id", occId)
+    .eq("member_id", ctx.memberId)
+    .eq("payment_source", "comp")
+    .in("status", ["booked", "pending_payment"])
+    .limit(1);
+  bookingId = existing?.[0]?.id ?? null;
+
+  if (!bookingId) {
+    // A brand-new first-timer: hold a comp seat through the eligibility gate.
+    const { data: held, error: hErr } = await supabase.rpc("reserve_free_first", { p_occurrence_id: occId });
+    if (hErr) return { ok: false, message: hErr.message };
+    const h = held as { ok: boolean; reason?: string; booking_id?: string } | null;
+    if (!h?.ok || !h.booking_id) {
+      return { ok: false, message: FREE_RESERVE_REASONS[h?.reason ?? ""] ?? "That didn’t work — please try again." };
+    }
+    bookingId = h.booking_id;
   }
 
   const { data: begun, error: bErr } = await supabase.rpc("xendit_begin_reservation", {
-    p_studio_id: ctx.studioId, p_booking_id: h.booking_id,
+    p_studio_id: ctx.studioId, p_booking_id: bookingId,
   });
   const purchase = Array.isArray(begun) ? begun[0] : begun;
   if (bErr || !purchase) return { ok: false, message: bErr?.message || "Could not start the reservation." };
@@ -198,7 +218,7 @@ export async function startReservation(occId: string): Promise<BuyState> {
     amountCents: purchase.amount_cents,
     currency: purchase.currency,
     description: `${ctx.studioName} — reservation fee`,
-    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "reservation", booking_id: h.booking_id },
+    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "reservation", booking_id: bookingId },
     successUrl: `${origin}/class/${occId}?reserved=1`,
     cancelUrl: `${origin}/class/${occId}`,
   });
