@@ -4,6 +4,7 @@ import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
 import { payeeNoticeLine } from "@/lib/payee-notice";
+import CreditApplied from "@/components/member/credit-applied";
 import { sortPlans } from "@/lib/plan-order";
 import { dayMonthParts, addDays, dayStart } from "@/lib/time";
 import { safeNext } from "@/lib/auth-redirect";
@@ -277,6 +278,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                   </div>
                   {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
                   <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
+                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={p.price_cents} currency={p.currency} />
                   {/* Decision 40/66: buy online when the studio has Xendit — a
                       pack, drop-in, trial, or a recurring plan one period at a
                       time (renew by hand). Decision 62: show the intro-once

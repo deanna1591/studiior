@@ -371,6 +371,144 @@ end $$;
 select set_config('request.jwt.claim.sub','',false); reset role;
 
 -- =============================================================================
+-- 11b. Decision 103a — the waiver, the closure cards, and the sample tokens.
+-- =============================================================================
+-- Fresh logins: wv1 (eligible), wv2 (a due), a front desk, and an instructor's
+-- three closure classes.
+insert into auth.users (id, email) values
+  ('d1030000-0000-0000-0000-0000000000e9','rz9@example.com'),
+  ('d1030000-0000-0000-0000-0000000000ea','rza@example.com'),
+  ('d1030000-0000-0000-0000-0000000000eb','rzb@example.com'),
+  ('d1030000-0000-0000-0000-0000000000ec','rzc@example.com');
+insert into profiles (id, email) select id, email from auth.users where id in
+  ('d1030000-0000-0000-0000-0000000000e9','d1030000-0000-0000-0000-0000000000ea','d1030000-0000-0000-0000-0000000000eb','d1030000-0000-0000-0000-0000000000ec');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status) values
+  ('d1030000-0000-0000-0000-0000000000f9','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000000e9','Wava','One','rz9@example.com','lead'),
+  ('d1030000-0000-0000-0000-0000000000fa','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000000ea','Dura','Due','rza@example.com','lead');
+insert into studio_staff (studio_id, user_id, email, role) values
+  ('d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000000eb','d103-fd@example.com','front_desk');
+-- An instructor WITH a login (closure_instructor_test picks only login instructors).
+insert into studio_staff (id, studio_id, user_id, email, role, status) values
+  ('d1030000-0000-0000-0000-00000d103c99','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000000ec','d103-inst@example.com','instructor','active');
+insert into instructors (id, studio_id, staff_id, display_name, status) values
+  ('d1030000-0000-0000-0000-00000d103c01','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-00000d103c99','Ivy Closure','active');
+
+-- wv1 and wv2 booking slots + the instructor's three closure classes, all on a
+-- future day inside the booking window, staggered so a room never overlaps.
+insert into class_occurrences (id, studio_id, class_type_id, room_id, location_id, name, instructor_id,
+                               starts_at, ends_at, capacity, status, staffing)
+values
+  ('d1030000-0000-0000-0000-00000d103a01','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000cf001','d1030000-0000-0000-0000-00000000b001','d1030000-0000-0000-0000-00000000000a','Reformer Flow',null,
+   (date '2026-12-05' + time '07:00') at time zone 'Asia/Manila', (date '2026-12-05' + time '07:50') at time zone 'Asia/Manila', 20, 'scheduled','open'),
+  ('d1030000-0000-0000-0000-00000d103a02','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000cf001','d1030000-0000-0000-0000-00000000b001','d1030000-0000-0000-0000-00000000000a','Reformer Flow',null,
+   (date '2026-12-05' + time '09:00') at time zone 'Asia/Manila', (date '2026-12-05' + time '09:50') at time zone 'Asia/Manila', 20, 'scheduled','open'),
+  ('d1030000-0000-0000-0000-00000d103b01','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000cf001','d1030000-0000-0000-0000-00000000b002','d1030000-0000-0000-0000-00000000000a','Barre','d1030000-0000-0000-0000-00000d103c01',
+   (date '2026-12-05' + time '10:00') at time zone 'Asia/Manila', (date '2026-12-05' + time '10:50') at time zone 'Asia/Manila', 20, 'scheduled','assigned'),
+  ('d1030000-0000-0000-0000-00000d103b02','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000cf001','d1030000-0000-0000-0000-00000000b002','d1030000-0000-0000-0000-00000000000a','Mat Pilates','d1030000-0000-0000-0000-00000d103c01',
+   (date '2026-12-05' + time '12:00') at time zone 'Asia/Manila', (date '2026-12-05' + time '12:50') at time zone 'Asia/Manila', 20, 'scheduled','assigned'),
+  ('d1030000-0000-0000-0000-00000d103b03','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000cf001','d1030000-0000-0000-0000-00000000b002','d1030000-0000-0000-0000-00000000000a','Reformer Sculpt','d1030000-0000-0000-0000-00000d103c01',
+   (date '2026-12-05' + time '14:00') at time zone 'Asia/Manila', (date '2026-12-05' + time '14:50') at time zone 'Asia/Manila', 20, 'scheduled','assigned');
+
+update studio_settings set free_first_reservation_fee_cents = 15000,
+       free_first_reservation_from = (now() at time zone 'Asia/Manila')::date
+ where studio_id = 'd1030000-0000-0000-0000-000000000001';
+
+-- (a) A front desk cannot waive -> PT403.
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000eb',false);
+do $$ begin
+  begin perform staff_set_reservation_fee_waiver('d1030000-0000-0000-0000-0000000000f9', true, 'x');
+    perform set_config('t.fd','NO_GUARD',false);
+  exception when others then perform set_config('t.fd', sqlstate, false); end;
+end $$;
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('front desk cannot waive -> PT403', current_setting('t.fd'), 'PT403');
+
+-- (b) Waive wv1 (as the owner, manager-up). Audit row + member flag.
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000a1',false);
+select set_config('t.wv', staff_set_reservation_fee_waiver('d1030000-0000-0000-0000-0000000000f9', true, 'VIP comp')::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('waive wv1: ok', (current_setting('t.wv')::jsonb ->> 'ok')::boolean);
+select expect_true('waive wv1: member flag set',
+  (select reservation_fee_waived_at is not null from members where id='d1030000-0000-0000-0000-0000000000f9'));
+select expect_num('waive wv1: one audit row', (select count(*) from audit_logs
+   where action='member.reservation_fee_waived' and entity_id='d1030000-0000-0000-0000-0000000000f9'), 1);
+
+-- (c) A waived member books free DIRECTLY (book_first_free), no fee; reserve_free
+--     _first refuses with the fee_waived belt; member_bootstrap carries fee_waived.
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000e9',false);
+select set_config('t.belt', (reserve_free_first('d1030000-0000-0000-0000-00000d103a01') ->> 'reason'), false);
+select set_config('t.wb', (book_first_free('d1030000-0000-0000-0000-00000d103a01') ->> 'ok'), false);
+select set_config('t.fw', (select fee_waived::text from member_bootstrap('d103-s')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('waived: reserve_free_first refuses fee_waived', current_setting('t.belt'), 'fee_waived');
+select expect_text('waived: book_first_free books directly', current_setting('t.wb'), 'true');
+select expect_text('waived: member_bootstrap fee_waived true', current_setting('t.fw'), 'true');
+select expect_num('waived: a comp booking, no reservation_fee payment', (select count(*) from bookings b
+   where b.member_id='d1030000-0000-0000-0000-0000000000f9' and b.occurrence_id='d1030000-0000-0000-0000-00000d103a01'
+     and b.payment_source='comp' and not exists (select 1 from payments p where p.booking_id=b.id and p.kind='reservation_fee')), 1);
+
+-- (d) wv2 has an open due; waiving withdraws it (booking stays, no email).
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ea',false);
+select book_first_free('d1030000-0000-0000-0000-00000d103a02');
+select set_config('request.jwt.claim.sub','',false); reset role;
+select set_config('t.wb2', (select id::text from bookings where member_id='d1030000-0000-0000-0000-0000000000fa'
+   and occurrence_id='d1030000-0000-0000-0000-00000d103a02' limit 1), false);
+select sweep_free_reservation_dues();
+select expect_num('wv2: a due email was queued before waiving', (select count(*) from notifications
+   where dedupe_key = 'free_reservation_due:' || current_setting('t.wb2')), 1);
+-- Waive wv2.
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000a1',false);
+select set_config('t.wv2', staff_set_reservation_fee_waiver('d1030000-0000-0000-0000-0000000000fa', true, null)::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_num('waive wv2: the open due email is withdrawn',
+  (current_setting('t.wv2')::jsonb ->> 'withdrawn_dues')::int, 1);
+select expect_num('waive wv2: the scheduled due notification is gone', (select count(*) from notifications
+   where dedupe_key = 'free_reservation_due:' || current_setting('t.wb2') and status='scheduled'), 0);
+select expect_true('waive wv2: the booking stays booked',
+  (select status='booked' from bookings where id = current_setting('t.wb2')::uuid));
+-- wv2's Home/class due notice is gone (member_reservation_dues excludes them).
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ea',false);
+select set_config('t.dues', (select count(*)::text from member_reservation_dues('d1030000-0000-0000-0000-000000000001')), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('waive wv2: no Home due notice while waived', current_setting('t.dues'), '0');
+
+-- (e) Switch off wv2 -> member flag cleared; the booking is grandfathered so the
+--     sweep never re-asks it (new bookings only).
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000a1',false);
+select staff_set_reservation_fee_waiver('d1030000-0000-0000-0000-0000000000fa', false, null);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_true('switch off wv2: member flag cleared',
+  (select reservation_fee_waived_at is null from members where id='d1030000-0000-0000-0000-0000000000fa'));
+select expect_true('switch off wv2: the booking is grandfathered',
+  (select reservation_fee_waived from bookings where id = current_setting('t.wb2')::uuid));
+select sweep_free_reservation_dues();
+select expect_num('switch off wv2: the grandfathered booking is NOT re-asked', (select count(*) from notifications
+   where dedupe_key = 'free_reservation_due:' || current_setting('t.wb2')), 0);
+
+-- (f) The closure notice renders three classes as three cards.
+select expect_true('closure_card_html renders a bordered card',
+  closure_card_html('Reformer Flow','Mon 5 Dec, 07:00') like '%border:1px solid #E7E5E4;border-radius:8px%');
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000a1',false);
+select closure_instructor_test('d1030000-0000-0000-0000-000000000001','Closed','We are closed for a day',
+   date '2026-12-05', date '2026-12-05', date '2026-12-06');
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_num('closure notice: three classes render as three cards',
+  (select (length(payload->>'class_list_html')
+           - length(replace(payload->>'class_list_html','border:1px solid #E7E5E4;border-radius:8px','')))
+          / length('border:1px solid #E7E5E4;border-radius:8px')
+     from notifications where template_key='instructor_closure_notice'
+       and user_id='d1030000-0000-0000-0000-0000000000a1' order by created_at desc limit 1), 3);
+
+-- (g) template_sample_context fills the closure tokens.
+select expect_true('sample context: closure from/to/resume_date/notice present',
+  (select (c->>'from') is not null and (c->>'to') is not null
+      and (c->>'resume_date') is not null and nullif(c->>'notice','') is not null
+     from (select template_sample_context('d1030000-0000-0000-0000-000000000001','s@example.com','Sam') as c) x));
+select expect_true('sample context: class_list_html is a card',
+  (select (template_sample_context('d1030000-0000-0000-0000-000000000001','s@example.com','Sam')->>'class_list_html')
+          like '%border:1px solid #E7E5E4;border-radius:8px%'));
+
+-- =============================================================================
 -- 12. Anon surface EXACTLY THIRTEEN.
 -- =============================================================================
 select expect_num('anon surface is exactly thirteen',

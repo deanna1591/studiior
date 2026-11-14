@@ -48,6 +48,8 @@ const PLAN_FILTERS: { key: string; label: string; match: (m: Row) => boolean }[]
   { key: "unpaid", label: "Unpaid booking", match: (m) => m.has_unpaid_booking },
   // A member with an unpaid booking is excluded here — they DID book.
   { key: "none", label: "Signed up, nothing booked", match: (m) => m.plan_state === "none" && !m.has_unpaid_booking },
+  // Decision 103a: members whose reservation fee is waived.
+  { key: "fee_waived", label: "Fee waived", match: (m) => m.reservation_fee_waived },
 ];
 
 type Row = {
@@ -58,7 +60,7 @@ type Row = {
   expires_on: string | null; credits_remaining: number | null;
   plan_state: string; complimentary: boolean; free_stage: string | null;
   has_unpaid_booking: boolean; joined_on: string | null;
-  desk_pay_blocked: boolean;
+  desk_pay_blocked: boolean; reservation_fee_waived: boolean;
 };
 
 export default async function Members({
@@ -373,6 +375,7 @@ export default async function Members({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-ink-3">
                   <PlanLine m={m} timeZone={ctx.timeZone} />
                   {m.desk_pay_blocked && <StateChip state="no_desk_pay" />}
+                  {m.reservation_fee_waived && <StateChip state="fee_waived" />}
                 </div>
                 {loud && <HealthBand band={band} reason={m.health_reason} />}
               </div>

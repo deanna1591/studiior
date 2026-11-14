@@ -191,6 +191,10 @@ export type MemberBootstrap = {
   free_first_reservation_fee_cents: number;
   /** Decision 103: the studio currency, so member screens can format the fee. */
   currency: string;
+  /** Decision 103a: this member's reservation fee is waived — book free directly. */
+  fee_waived: boolean;
+  /** Decision 103a: unused reservation credit (minor units), applied at checkout. */
+  reservation_credit_cents: number;
 };
 
 /** Who is making this request, on the member PWA. */

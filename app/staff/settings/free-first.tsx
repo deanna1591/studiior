@@ -18,10 +18,10 @@ function Save() {
  * charges anyone already booked — their seat is an ordinary comp booking.
  */
 export default function FreeFirstPanel({
-  enabled, peakAllowed, coreOnly, seatsPerClass, confirmAt, reservationFeeCents, reservationFrom, currency,
+  enabled, peakAllowed, coreOnly, seatsPerClass, confirmAt, reservationFeeCents, reservationFrom, currency, waivedCount = 0,
 }: { enabled: boolean; peakAllowed: boolean; coreOnly: boolean;
      seatsPerClass: number | null; confirmAt: number | null;
-     reservationFeeCents: number; reservationFrom: string | null; currency: string }) {
+     reservationFeeCents: number; reservationFrom: string | null; currency: string; waivedCount?: number }) {
   const [state, action] = useFormState<PlainState, FormData>(saveFreeFirst, null);
 
   return (
@@ -111,6 +111,11 @@ export default function FreeFirstPanel({
                      className="w-28 rounded border border-line-2 bg-paper px-2 py-1 text-[13px] text-ink num" />
             </span>
           </label>
+          {reservationFeeCents > 0 && waivedCount > 0 && (
+            <p className="mt-2 text-[12px] leading-[18px] text-ink-3">
+              <a href="/members?plan=fee_waived" className="underline">Members with the fee waived: {waivedCount}</a>
+            </p>
+          )}
         </div>
 
         <div className="mt-3 border-t border-line pt-3">

@@ -29,6 +29,8 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   // the sale "unpaid" chip — informational on the list; the pay flow is elsewhere.
   unpaid_booking: { label: "Unpaid booking" },
   no_desk_pay: { label: "No desk pay" },
+  // Decision 103a: the reservation fee is waived for this member.
+  fee_waived: { label: "Fee waived" },
   // sale_status (sales_history)
   active: { label: "Active" },
   refunded: { label: "Refunded" },

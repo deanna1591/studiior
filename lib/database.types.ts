@@ -560,6 +560,7 @@ export type Database = {
           release_reason:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
+          reservation_fee_waived: boolean
           source: Database["public"]["Enums"]["booking_source"]
           status: Database["public"]["Enums"]["booking_status"]
           studio_id: string
@@ -592,6 +593,7 @@ export type Database = {
           release_reason?:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
+          reservation_fee_waived?: boolean
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id: string
@@ -624,6 +626,7 @@ export type Database = {
           release_reason?:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
+          reservation_fee_waived?: boolean
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string
@@ -4335,6 +4338,9 @@ export type Database = {
           merged_into: string | null
           phone: string | null
           preferred_name: string | null
+          reservation_fee_waived_at: string | null
+          reservation_fee_waived_by: string | null
+          reservation_fee_waived_note: string | null
           source: string | null
           status: Database["public"]["Enums"]["member_status"]
           studio_id: string
@@ -4377,6 +4383,9 @@ export type Database = {
           merged_into?: string | null
           phone?: string | null
           preferred_name?: string | null
+          reservation_fee_waived_at?: string | null
+          reservation_fee_waived_by?: string | null
+          reservation_fee_waived_note?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["member_status"]
           studio_id: string
@@ -4419,6 +4428,9 @@ export type Database = {
           merged_into?: string | null
           phone?: string | null
           preferred_name?: string | null
+          reservation_fee_waived_at?: string | null
+          reservation_fee_waived_by?: string | null
+          reservation_fee_waived_note?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["member_status"]
           studio_id?: string
@@ -8841,6 +8853,10 @@ export type Database = {
         }
         Returns: Json
       }
+      closure_card_html: {
+        Args: { p_name: string; p_when: string }
+        Returns: string
+      }
       closure_impact: {
         Args: {
           p_ends_at_time?: string
@@ -9792,6 +9808,7 @@ export type Database = {
           currency: string
           current_streak: number
           desk_pay_available: boolean
+          fee_waived: boolean
           first_name: string
           free_first_reservation_fee_cents: number
           guest_passes_enabled: boolean
@@ -9807,6 +9824,7 @@ export type Database = {
           open_offers: number
           payee_notice_name: string
           preferred_name: string
+          reservation_credit_cents: number
           status: Database["public"]["Enums"]["member_status"]
           studio_contact_email: string
           studio_id: string
@@ -9934,6 +9952,7 @@ export type Database = {
           plan_state: string
           plan_type: string
           reservation_credit_cents: number
+          reservation_fee_waived: boolean
           status: string
           user_id: string
         }[]
@@ -11150,6 +11169,10 @@ export type Database = {
       }
       staff_set_member_phone: {
         Args: { p_member_id: string; p_phone: string }
+        Returns: Json
+      }
+      staff_set_reservation_fee_waiver: {
+        Args: { p_member_id: string; p_note?: string; p_on: boolean }
         Returns: Json
       }
       stamp_open_shift: {

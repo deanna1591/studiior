@@ -157,7 +157,8 @@ export async function bookFirstFree(_prev: BookResult, formData: FormData): Prom
   // Decision 103: when the studio charges a reservation fee, a free class is held
   // through the reservation checkout, never booked at zero here. (The picker and
   // class page route to /reserve first; this is the belt for any other path.)
-  if ((ctx.bootstrap?.free_first_reservation_fee_cents ?? 0) > 0) {
+  if ((ctx.bootstrap?.free_first_reservation_fee_cents ?? 0) > 0
+      && !(ctx.bootstrap?.fee_waived ?? false)) {
     return { ok: false, message: "This class needs a reservation fee to hold your spot — open the class to reserve." };
   }
   const supabase = createClient();

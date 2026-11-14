@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
 import Infractions from "./infractions";
 import DeskPay from "./desk-pay";
+import ReservationFeeWaiver from "./reservation-fee-waiver";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
 import { InviteOne } from "../invites/panel";
@@ -59,12 +60,18 @@ export default async function MemberDetail({
 
   const { data: m } = await supabase
     .from("members")
-    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason, deleted_at, merged_into")
+    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason, deleted_at, merged_into, reservation_fee_waived_at, reservation_fee_waived_note")
     .eq("id", params.id)
     .maybeSingle();
   if (!m) notFound();
 
   const manager = isManagerUp(ctx.role);
+  // Decision 103a: the "No reservation fee" switch is shown only when the studio
+  // charges a reservation fee (otherwise it is moot).
+  const { data: feeSetting } = manager
+    ? await supabase.from("studio_settings").select("free_first_reservation_fee_cents").eq("studio_id", ctx.studioId).maybeSingle()
+    : { data: null };
+  const studioChargesReservationFee = (feeSetting?.free_first_reservation_fee_cents ?? 0) > 0;
   // §9 gives front desk payments, so the desk gets the button that takes one.
   const desk = isDeskUp(ctx.role);
 
@@ -655,6 +662,12 @@ export default async function MemberDetail({
       {manager && m.desk_pay_blocked_at && (
         <DeskPay memberId={m.id} since={m.desk_pay_blocked_at}
                  reason={m.desk_pay_blocked_reason as "no_show" | "late_cancel" | null} />
+      )}
+      {manager && studioChargesReservationFee && !m.deleted_at && (
+        <ReservationFeeWaiver memberId={m.id}
+          waived={m.reservation_fee_waived_at != null}
+          since={m.reservation_fee_waived_at as string | null}
+          note={m.reservation_fee_waived_note as string | null} />
       )}
       <Infractions
         standing={

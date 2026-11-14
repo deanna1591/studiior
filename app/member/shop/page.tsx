@@ -62,7 +62,8 @@ export default async function Shop() {
                       : null}
                 </p>
                 {canBuy && !p.sold_out ? (
-                  <BuyProduct productId={p.id} max={p.stock_left} />
+                  <BuyProduct productId={p.id} max={p.stock_left}
+                    creditCents={settings.reservationCreditCents} unitPriceCents={p.price_cents} currency={p.currency} />
                 ) : (
                   <p className="m-micro mt-1 text-ink-3">
                     {canBuy ? "Sold out — ask the studio when it’s back." : "Ask at the front desk."}

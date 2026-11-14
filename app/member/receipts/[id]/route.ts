@@ -100,6 +100,20 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const when = fmtDayLong(whenIso, tz);
   const settings = (inv ?? null) as any;
 
+  // Decision 103a: a reservation credit applied to this Xendit purchase (the
+  // amount paid is already net of it). Shown on the receipt. Members read their
+  // own xendit_purchases under RLS; joined on xendit_payment_id = reference.
+  let appliedCredit = 0;
+  if (p.provider === "xendit" && p.reference) {
+    const { data: xp } = await supabase
+      .from("xendit_purchases")
+      .select("credit_applied_cents")
+      .eq("member_id", p.member_id ?? "")
+      .eq("xendit_payment_id", p.reference)
+      .maybeSingle();
+    appliedCredit = ((xp as any)?.credit_applied_cents as number | null) ?? 0;
+  }
+
   let bytes: Uint8Array;
   let name: string;
 
@@ -114,7 +128,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const fonts = await loadInvoiceFonts(req.url);
     if (invoiceNo && fonts) {
       const refunded = p.refunded_cents ?? 0;
-      const items: InvoiceData["items"] = [{ desc: item, qty: 1, price: p.amount_cents }];
+      // Show the gross price, then the reservation credit as a deduction, so the
+      // total still equals what was paid (amount_cents, already net of credit).
+      const items: InvoiceData["items"] = [{ desc: item, qty: 1, price: p.amount_cents + appliedCredit }];
+      if (appliedCredit > 0) items.push({ desc: "Reservation credit applied", qty: 1, price: -appliedCredit });
       if (refunded > 0) items.push({ desc: "Refund", qty: 1, price: -refunded });
       const data: InvoiceData = {
         seller: {
@@ -190,6 +207,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     ["Date", win(when)],
     ["Item", win(item)],
     ["Amount", win(formatMoney(p.amount_cents, p.currency).replace(/[^\u0000-ÿ]\s*/, `${p.currency} `))],
+    ...(appliedCredit > 0
+      ? [["Reservation credit applied", win(formatMoney(appliedCredit, p.currency).replace(/[^\u0000-ÿ]\s*/, `${p.currency} `))] as [string, string]]
+      : []),
     ["Payment method", receiptMethod(p.provider as string | null, p.method as string | null)],
     ["Payment ID", p.id],
   ];

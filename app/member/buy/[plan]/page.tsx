@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
+import CreditApplied from "@/components/member/credit-applied";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { buyPath } from "@/lib/member-urls";
 import { safeNext } from "@/lib/auth-redirect";
@@ -200,6 +201,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
         <p className="m-sub mt-1 text-ink-2">
           <span className="num">{formatMoney(plan.price_cents, plan.currency)}</span>
         </p>
+        <CreditApplied creditCents={settings.reservationCreditCents} priceCents={plan.price_cents} currency={plan.currency} />
         {plan.description && <p className="m-body mt-3 text-ink">{plan.description}</p>}
         <p className="m-sub mt-2 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
 

@@ -128,7 +128,7 @@ select expect_num('digest n_running = 2',
   (select (payload ->> 'n_running')::int from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 2);
 select expect_num('digest n_cancelled = 1',
   (select (payload ->> 'n_cancelled')::int from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 1);
-select expect_contains('Going ahead table heading', (select payload ->> 'going_ahead' from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 'Going ahead');
+select expect_contains('Running table heading (Decision 103a)', (select payload ->> 'going_ahead' from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 'Running');
 select expect_contains('Going ahead lists Reformer Flow', (select payload ->> 'going_ahead' from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 'Reformer Flow');
 select expect_contains('Going ahead lists Barre', (select payload ->> 'going_ahead' from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 'Barre');
 select expect_contains('Cancelled table heading', (select payload ->> 'cancelled' from notifications where template_key = 'instructor_daily_digest' and user_id = 'd101d101-0000-0000-0000-0000000000b1'), 'Cancelled, not enough bookings');

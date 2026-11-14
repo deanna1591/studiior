@@ -91,6 +91,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
         deskPayAvailable={ctx.bootstrap?.desk_pay_available ?? true}
         payeeNoticeName={settings.payeeNoticeName}
         studioName={studioName}
+        creditCents={settings.reservationCreditCents}
       />
     </MemberShell>
   );

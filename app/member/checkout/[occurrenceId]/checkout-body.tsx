@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/plans";
 import { payeeNoticeLine } from "@/lib/payee-notice";
 import { haptic } from "@/lib/haptics";
 import GuestInvite from "@/components/member/guest-invite";
+import CreditApplied from "@/components/member/credit-applied";
 import { checkoutPay, payAtDesk, type DeskState } from "./actions";
 import type { BuyState } from "@/app/member/account/plan/actions";
 
@@ -26,6 +27,7 @@ export type CheckoutPlanRow = {
 export default function CheckoutBody({
   occId, className, whenLabel, instructorFirst, costLine, covered,
   plans, guestAvailable, deskPayAvailable, payeeNoticeName, studioName,
+  creditCents,
 }: {
   occId: string;
   className: string;
@@ -38,6 +40,7 @@ export default function CheckoutBody({
   deskPayAvailable: boolean;
   payeeNoticeName: string | null;
   studioName: string;
+  creditCents: number;
 }) {
   // Decision 67(b): when online payments settle to an account under a different
   // legal name, say so before the member leaves for Xendit. Blank = no line.
@@ -130,6 +133,7 @@ export default function CheckoutBody({
                 <span className="m-sub text-ink-2">{selected.name}</span>
                 <span className="num text-[15px] text-ink">{formatMoney(selected.price_cents, selected.currency)}</span>
               </div>
+              <CreditApplied creditCents={creditCents} priceCents={selected.price_cents} currency={selected.currency} />
               <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2">
                 <span className="text-[15px] font-semibold text-ink">Total</span>
                 <span className="num text-[17px] font-semibold text-ink">{formatMoney(selected.price_cents, selected.currency)}</span>

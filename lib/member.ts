@@ -85,6 +85,10 @@ export async function memberScreen() {
       // = off). Drives the picker button and the reservation checkout.
       reservationFeeCents: b?.free_first_reservation_fee_cents ?? 0,
       currency: b?.currency ?? "",
+      // Decision 103a: a manager has waived the fee for this member (book free
+      // directly), and their unused reservation credit (applied at checkout).
+      feeWaived: b?.fee_waived ?? false,
+      reservationCreditCents: b?.reservation_credit_cents ?? 0,
     },
   };
 }
