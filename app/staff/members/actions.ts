@@ -28,10 +28,11 @@ export async function createMember(_prev: MemberState, fd: FormData): Promise<Me
   const ctx = await getStaffContext();
   if (!ctx) return { error: "You are not signed in." };
 
+  // Decision 102: one name is enough. The last name is left empty, never a copy.
   const first_name = text(fd, "first_name");
   const last_name = text(fd, "last_name");
   const email = text(fd, "email").toLowerCase();
-  if (!first_name || !last_name) return { error: "A member needs a first and last name." };
+  if (!first_name) return { error: "A member needs a first name." };
   if (!email) return { error: "An email address — it is how they get their account and their receipts." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "That email does not look right." };
 

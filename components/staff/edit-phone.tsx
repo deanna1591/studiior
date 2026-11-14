@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setMemberPhoneAction } from "@/app/staff/members/book-actions";
+import Link from "next/link";
+import { setMemberPhoneAction, type PhoneTaken } from "@/app/staff/members/book-actions";
 import { formatPhone } from "@/lib/phone";
 
 // Decision 100. Desk-up edits a member's phone, with the member sheet's own
@@ -15,6 +16,7 @@ export default function EditPhone({
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(current ?? "");
   const [err, setErr] = useState<string | null>(null);
+  const [taken, setTaken] = useState<PhoneTaken | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, start] = useTransition();
 
@@ -36,18 +38,28 @@ export default function EditPhone({
              className="rounded-lg border border-line-2 bg-paper px-3 py-1.5 text-[14px] text-ink" />
       <button disabled={pending}
               onClick={() => start(async () => {
-                setErr(null);
+                setErr(null); setTaken(null);
                 const r = await setMemberPhoneAction(memberId, val);
-                if ("error" in r) { setErr(r.error); return; }
+                if ("error" in r) { setErr(r.error); setTaken(r.taken ?? null); return; }
                 setEditing(false); setOk(true); router.refresh();
               })}
               className="rounded-lg px-3 py-1.5 text-[13px] font-semibold disabled:opacity-60"
               style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
         {pending ? "Saving…" : "Save"}
       </button>
-      <button onClick={() => { setEditing(false); setVal(current ?? ""); setErr(null); }}
+      <button onClick={() => { setEditing(false); setVal(current ?? ""); setErr(null); setTaken(null); }}
               className="rounded-lg border border-line-2 bg-surface px-3 py-1.5 text-[13px] text-ink">Cancel</button>
       {err && <span className="w-full text-[12px] text-coral-deep">{err}</span>}
+      {taken && taken.otherId && (
+        <span className="flex w-full items-center gap-3 text-[12px]">
+          <Link href={`/members/${taken.otherId}`} className="font-semibold text-lime-text underline">
+            Open {taken.otherName}&rsquo;s profile
+          </Link>
+          <Link href={`/members/${memberId}#danger`} className="font-semibold text-lime-text underline">
+            Merge
+          </Link>
+        </span>
+      )}
     </span>
   );
 }

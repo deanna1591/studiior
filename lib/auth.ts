@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { currentSlug } from "@/lib/tenant";
+import { fullName } from "@/lib/full-name";
 
 export type StaffRole = "owner" | "manager" | "instructor" | "front_desk";
 
@@ -195,6 +196,8 @@ export type MemberBootstrap = {
   fee_waived: boolean;
   /** Decision 103a: unused reservation credit (minor units), applied at checkout. */
   reservation_credit_cents: number;
+  /** Decision 30 amendment: the studio limits the free first class to core classes. */
+  free_first_core_only: boolean;
 };
 
 /** Who is making this request, on the member PWA. */
@@ -255,7 +258,7 @@ export const getMemberContext = cache(async (): Promise<MemberContext | null> =>
   return {
     userId,
     memberId: row.member_id,
-    name: `${row.first_name} ${row.last_name}`,
+    name: fullName(row.first_name, row.last_name),
     firstName: row.first_name,
     status: row.status,
     streak: row.current_streak ?? 0,

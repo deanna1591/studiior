@@ -6,6 +6,7 @@ import { Icon } from "@/components/member/icons";
 import { fmtTime, dayMonthParts } from "@/lib/time";
 import { eligibleGroupClasses } from "@/lib/group";
 import { EmailsForm, SwapForm, CancelGroupForm } from "./forms";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function GroupBooking({
     const rows = (seats ?? []).map((s) => {
       const m = s.members as unknown as { first_name: string | null; last_name: string | null; email: string | null } | null;
       return { isHost: s.is_host as boolean,
-               name: `${m?.first_name ?? ""} ${m?.last_name ?? ""}`.trim() || (m?.email ?? "Guest"),
+               name: fullName(m?.first_name, m?.last_name) || (m?.email ?? "Guest"),
                email: m?.email ?? "" };
     }).sort((a, b) => (a.isHost === b.isHost ? 0 : a.isHost ? -1 : 1));
 

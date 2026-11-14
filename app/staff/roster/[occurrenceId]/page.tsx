@@ -25,6 +25,7 @@ import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
 import ScrollToMember from "./scroll-to-member";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +114,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
       return [g.member_id as string, {
         isHost: g.is_host as boolean,
         plan: gpu?.membership_plans?.name ?? "Group",
-        host: `${host?.first_name ?? ""} ${host?.last_name ?? ""}`.trim() || "a member",
+        host: fullName(host?.first_name, host?.last_name) || "a member",
       }];
     }),
   );
@@ -202,7 +203,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
   const fcAfter = fcAudit?.after as { reason?: string; at?: string } | null | undefined;
 
   const nameOf = new Map((bookings ?? []).map((b) =>
-    [b.member_id, `${b.members?.preferred_name || b.members?.first_name || ""} ${b.members?.last_name || ""}`.trim()]));
+    [b.member_id, fullName(b.members?.preferred_name || b.members?.first_name, b.members?.last_name)]));
 
   const notesFor = new Map<string, { category: string; body: string }[]>();
   for (const n of pinned ?? []) {
@@ -331,7 +332,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
                       signed URLs, and a member who has not uploaded one falls
                       back to initials rather than a grey silhouette. */}
                   <StaffAvatar
-                    name={`${b.members?.first_name ?? ""} ${b.members?.last_name ?? ""}`}
+                    name={fullName(b.members?.first_name, b.members?.last_name)}
                     url={avatars.get(b.members?.avatar_url ?? "") ?? null}
                   />
                   <Link

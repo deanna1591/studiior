@@ -312,7 +312,7 @@ function revalidateMember() {
   for (const p of ["/", "/book", "/history", "/account"]) revalidatePath(p);
 }
 
-export type ActionResult = { ok: boolean; message: string } | null;
+export type ActionResult = { ok: boolean; message: string; phoneTaken?: boolean } | null;
 
 /**
  * Decision 95 — the flex-rescue move. The member taps "Move me to this class"
@@ -636,43 +636,60 @@ export async function updateProfile(
     return v === "" ? null : v;
   };
 
-  // Decision 94: a phone number is required and stored as E.164. The same
-  // validation serves the full details form and the phone-only sheet (scope
-  // "phone"), which posts to this action; the PH-vs-other rule is decided by the
-  // studio's own country, carried on the bootstrap.
+  // Decision 94: a phone number is required and stored as E.164. The PH-vs-other
+  // rule is decided by the studio's own country, carried on the bootstrap.
   const phoneRaw = String(formData.get("phone") ?? "").trim();
   const phone = normalisePhone(ctx.bootstrap?.country, phoneRaw);
   if (phone === null) return { ok: false, message: PHONE_INVALID };
 
+  // Decision 102: a phone belongs to one member per studio. member_set_phone is
+  // a definer that checks for another live member with this number and writes
+  // the phone; a member cannot read the other row under RLS, so it returns a
+  // masked email for the refusal. It is the only member-side phone writer.
+  const { data: ps, error: pe } = await supabase.rpc("member_set_phone", {
+    p_member_id: ctx.memberId, p_phone: phoneRaw,
+  });
+  if (pe) {
+    return pe.code === "PT403"
+      ? { ok: false, message: "That is not something you can change here — ask the studio." }
+      : { ok: false, message: pe.message };
+  }
+  const pr = ps as unknown as { ok: boolean; reason?: string; masked_email?: string };
+  if (!pr.ok) {
+    if (pr.reason === "phone_taken") {
+      return {
+        ok: false,
+        message: `This number is already on another account (${pr.masked_email ?? ""}). Sign in to that account instead, or message the studio.`,
+        phoneTaken: true,
+      };
+    }
+    return { ok: false, message: PHONE_INVALID };
+  }
+
   // The sheet carries only the phone; the full details form carries scope=full.
-  // Patch only what was submitted so the sheet never clears a preferred name,
-  // emergency contact or marketing choice it never showed.
+  // Patch only the other fields the full form showed (the phone is already
+  // written above). The sheet never clears a name or marketing choice it never
+  // showed, because it carries no scope.
   const full = String(formData.get("scope") ?? "") === "full";
-  const patch: TablesUpdate<"members"> = { phone, updated_at: new Date().toISOString() };
   if (full) {
     const ecName = str("emergency_name");
     const ecPhone = str("emergency_phone");
+    const patch: TablesUpdate<"members"> = { updated_at: new Date().toISOString() };
     patch.preferred_name = str("preferred_name");
     // Stored as one object so it is either a usable contact or absent — a
     // name with no number is not somebody you can ring.
     patch.emergency_contact = ecName || ecPhone ? { name: ecName, phone: ecPhone } : null;
     patch.marketing_opt_in = String(formData.get("marketing_opt_in") ?? "") === "on";
-  }
 
-  const { data, error } = await supabase
-    .from("members")
-    .update(patch)
-    .eq("id", ctx.memberId)
-    .select("id");
-
-  if (error) {
-    return error.code === "PT403" || /may change their own contact details/.test(error.message)
-      ? { ok: false, message: "That is not something you can change here — ask the studio." }
-      : { ok: false, message: error.message };
+    const { data, error } = await supabase
+      .from("members").update(patch).eq("id", ctx.memberId).select("id");
+    if (error) {
+      return error.code === "PT403" || /may change their own contact details/.test(error.message)
+        ? { ok: false, message: "That is not something you can change here — ask the studio." }
+        : { ok: false, message: error.message };
+    }
+    if (!data || data.length === 0) return { ok: false, message: "That did not save. Please try again." };
   }
-  // RLS refuses an UPDATE by making the row invisible, which PostgREST returns
-  // as 200 and an empty array rather than an error.
-  if (!data || data.length === 0) return { ok: false, message: "That did not save. Please try again." };
 
   revalidatePath("/account");
   revalidatePath("/");

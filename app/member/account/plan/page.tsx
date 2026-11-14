@@ -278,7 +278,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                   </div>
                   {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
                   <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
-                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={p.price_cents} currency={p.currency} />
+                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={p.price_cents} currency={p.currency} showNet />
                   {/* Decision 40/66: buy online when the studio has Xendit — a
                       pack, drop-in, trial, or a recurring plan one period at a
                       time (renew by hand). Decision 62: show the intro-once

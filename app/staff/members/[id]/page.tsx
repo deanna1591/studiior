@@ -27,6 +27,7 @@ import MemberDangerZone from "./danger";
 import EditPhone from "@/components/staff/edit-phone";
 import { BookClassFromProfile } from "@/components/staff/book-member";
 import ToastHost from "@/components/staff/toast-host";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -249,7 +250,7 @@ export default async function MemberDetail({
   if (mm.merged_into) {
     const { data: keep } = await supabase.from("members")
       .select("first_name, last_name").eq("id", mm.merged_into).maybeSingle();
-    mergedIntoName = keep ? `${keep.first_name} ${keep.last_name}` : null;
+    mergedIntoName = keep ? fullName(keep.first_name, keep.last_name) : null;
   }
 
   // Decision 98: same-person duplicates (chip + preselected merge) and the
@@ -270,7 +271,7 @@ export default async function MemberDetail({
   return (
     <AppShell
       {...shell}
-      title={`${m.first_name} ${m.last_name}`}
+      title={fullName(m.first_name, m.last_name)}
       actions={
         <>
           {/* Front desk sells (§9) but cannot see the Payments section below,
@@ -374,7 +375,7 @@ export default async function MemberDetail({
           signing up at the desk. */}
       <div className="mb-4">
         {isDeskUp(ctx.role)
-          ? <PhotoUpload memberId={m.id} name={`${m.first_name} ${m.last_name}`} url={photo} />
+          ? <PhotoUpload memberId={m.id} name={fullName(m.first_name, m.last_name)} url={photo} />
           : photo && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo} alt="" aria-hidden className="h-16 w-16 rounded-full object-cover" />
@@ -710,7 +711,7 @@ export default async function MemberDetail({
           staff or instructor login with a clear message. */}
       {manager && !mm.deleted_at && (
         <MemberDangerZone memberId={params.id} firstName={m.first_name} studioId={ctx.studioId}
-          suggested={suggested ? { id: suggested.id, name: `${suggested.first_name} ${suggested.last_name}`, email: suggested.email } : null} />
+          suggested={suggested ? { id: suggested.id, name: fullName(suggested.first_name, suggested.last_name), email: suggested.email } : null} />
       )}
     </AppShell>
   );

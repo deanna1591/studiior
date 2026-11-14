@@ -26,8 +26,8 @@ export default function NewMemberForm() {
         <Field label="First name">
           <input name="first_name" required className={inputClass} autoComplete="given-name" />
         </Field>
-        <Field label="Last name">
-          <input name="last_name" required className={inputClass} autoComplete="family-name" />
+        <Field label="Last name (optional)">
+          <input name="last_name" className={inputClass} autoComplete="family-name" />
         </Field>
       </div>
 

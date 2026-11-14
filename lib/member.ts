@@ -89,6 +89,10 @@ export async function memberScreen() {
       // directly), and their unused reservation credit (applied at checkout).
       feeWaived: b?.fee_waived ?? false,
       reservationCreditCents: b?.reservation_credit_cents ?? 0,
+      // Decision 30 amendment: the studio limits the free first class to core
+      // classes, so the picker chooses its line (the eligible-classes reader
+      // already excludes flex).
+      freeFirstCoreOnly: b?.free_first_core_only ?? false,
     },
   };
 }

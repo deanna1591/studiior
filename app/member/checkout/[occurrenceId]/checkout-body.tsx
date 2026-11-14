@@ -8,6 +8,7 @@ import { payeeNoticeLine } from "@/lib/payee-notice";
 import { haptic } from "@/lib/haptics";
 import GuestInvite from "@/components/member/guest-invite";
 import CreditApplied from "@/components/member/credit-applied";
+import { netTotalCents } from "@/lib/reservation-credit";
 import { checkoutPay, payAtDesk, type DeskState } from "./actions";
 import type { BuyState } from "@/app/member/account/plan/actions";
 
@@ -136,7 +137,7 @@ export default function CheckoutBody({
               <CreditApplied creditCents={creditCents} priceCents={selected.price_cents} currency={selected.currency} />
               <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2">
                 <span className="text-[15px] font-semibold text-ink">Total</span>
-                <span className="num text-[17px] font-semibold text-ink">{formatMoney(selected.price_cents, selected.currency)}</span>
+                <span className="num text-[17px] font-semibold text-ink">{formatMoney(netTotalCents(creditCents, selected.price_cents), selected.currency)}</span>
               </div>
             </section>
           )}

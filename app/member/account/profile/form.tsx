@@ -67,7 +67,16 @@ export default function ProfileForm({
 
       <form action={action} className="m-card p-5">
         <input type="hidden" name="scope" value="full" />
-        {state && <Note ok={state.ok}>{state.message}</Note>}
+        {state && (
+          <Note ok={state.ok}>
+            {state.message}
+            {state.phoneTaken && (
+              <a href="/messages" className="mt-1 block font-semibold text-lime-text underline">
+                Message the studio
+              </a>
+            )}
+          </Note>
+        )}
 
         <label className="block">
           <span className="m-meta mb-1.5 block text-ink-2">What we should call you</span>

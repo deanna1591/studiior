@@ -8,6 +8,7 @@ import { StateChip } from "@/components/state-chip";
 import { MessageLink } from "@/components/message-link";
 import { defaultSortMode } from "@/lib/members-list";
 import { studioToday } from "@/lib/dashboard";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export default async function Members({
     const names = new Map<string, string>();
     if (keepIds.length) {
       const { data: keeps } = await supabase.from("members").select("id, first_name, last_name").in("id", keepIds);
-      for (const k of keeps ?? []) names.set(k.id, `${k.first_name} ${k.last_name}`);
+      for (const k of keeps ?? []) names.set(k.id, fullName(k.first_name, k.last_name));
     }
     return (
       <AppShell {...shell} title="Deleted members"

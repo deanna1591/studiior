@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/plans";
 import { AppShell, Denied, Empty } from "@/components/ui";
 import { StateChip } from "@/components/state-chip";
 import MembershipActions from "../members/[id]/membership-actions-panel";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -273,7 +274,7 @@ export default async function Sales({
                       {g.membership_plans?.name ?? "Group"} · <span className="num">{g.group_size}</span> people
                     </td>
                     <td className="px-3 py-2">
-                      {`${g.members?.first_name ?? ""} ${g.members?.last_name ?? ""}`.trim() || "—"}
+                      {fullName(g.members?.first_name, g.members?.last_name) || "—"}
                     </td>
                     <td className="px-3 py-2"><StateChip state={GROUP_STATE[g.status] ?? g.status} /></td>
                     <td className="px-3 py-2 text-ink-2">

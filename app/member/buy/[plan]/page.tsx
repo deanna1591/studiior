@@ -201,7 +201,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
         <p className="m-sub mt-1 text-ink-2">
           <span className="num">{formatMoney(plan.price_cents, plan.currency)}</span>
         </p>
-        <CreditApplied creditCents={settings.reservationCreditCents} priceCents={plan.price_cents} currency={plan.currency} />
+        <CreditApplied creditCents={settings.reservationCreditCents} priceCents={plan.price_cents} currency={plan.currency} showNet />
         {plan.description && <p className="m-body mt-3 text-ink">{plan.description}</p>}
         <p className="m-sub mt-2 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
 

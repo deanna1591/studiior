@@ -11,6 +11,7 @@ import { standaloneFlexSentence, outsideHoursSentence } from "@/lib/flex-copy";
 import { standbyText, openingHoursText } from "@/app/staff/series/shared";
 import { buildAuthCallback } from "@/lib/auth-redirect";
 import { requestOutcome, resetNext, validateNewPassword } from "@/lib/password-reset";
+import { fullName } from "@/lib/full-name";
 
 export async function signIn(_prev: string | null, formData: FormData) {
   const supabase = createClient();
@@ -238,7 +239,7 @@ export async function checkInByCode(_prev: CodeState, fd: FormData): Promise<Cod
   if (!booking) {
     return {
       ok: false,
-      message: `${row.first_name} ${row.last_name} is not booked into this class. Book them in first, or check the class.`,
+      message: `${fullName(row.first_name, row.last_name)} is not booked into this class. Book them in first, or check the class.`,
     };
   }
 
@@ -254,7 +255,7 @@ export async function checkInByCode(_prev: CodeState, fd: FormData): Promise<Cod
   const ci = ciData as { ok: boolean; already?: boolean } | null;
   revalidatePath(`/roster/${occurrenceId}`);
   if (ci?.already) return { ok: true, message: `${row.first_name} is already checked in.` };
-  return { ok: true, message: `${row.first_name} ${row.last_name} checked in.` };
+  return { ok: true, message: `${fullName(row.first_name, row.last_name)} checked in.` };
 }
 
 export type InviteState = { ok: boolean; message: string; link?: string } | null;

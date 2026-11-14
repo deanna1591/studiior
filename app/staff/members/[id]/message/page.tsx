@@ -4,6 +4,7 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { HealthBand, bandOf } from "@/components/health-band";
 import ComposeForm from "./compose-form";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export default async function ComposeMessage({ params }: { params: { id: string 
     marketing_opt_in: boolean; transactional: boolean;
   };
 
-  const name = `${m.first_name} ${m.last_name}`;
+  const name = fullName(m.first_name, m.last_name);
 
   return (
     <AppShell

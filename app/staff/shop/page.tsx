@@ -4,6 +4,7 @@ import { staffScreen } from "@/lib/screen";
 import { isManagerUp } from "@/lib/auth";
 import { formatMoney } from "@/lib/plans";
 import { RecordSaleForm, CollectButton, ArchiveButton } from "./forms";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function Shop() {
   const archived = list.filter((p) => p.status !== "active");
   const saleProducts = active.map((p) => ({ id: p.id, name: p.name, price_cents: p.price_cents, track_stock: p.track_stock, stock: p.stock }));
   const memberOpts = ((members ?? []) as { id: string; first_name: string; last_name: string }[])
-    .map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name}`.trim() }));
+    .map((m) => ({ id: m.id, name: fullName(m.first_name, m.last_name) }));
   const collect = (toCollect ?? []) as {
     id: string; quantity: number; created_at: string;
     products: { name: string } | null; members: { first_name: string; last_name: string } | null;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { creditOnCheckout, creditLines, CREDIT_FLOOR_CENTS } from "../lib/reservation-credit.mjs";
+import { creditOnCheckout, creditLines, netTotalCents, CREDIT_FLOOR_CENTS } from "../lib/reservation-credit.mjs";
 
 const peso = (c) => `₱${(c / 100).toFixed(0)}`;
 
@@ -41,4 +41,17 @@ test("lines: applied + remainder", () => {
 test("lines: nothing applied -> no lines", () => {
   const { applied, remaining } = creditOnCheckout(15000, 2000);
   assert.deepEqual(creditLines(applied, remaining, peso), []);
+});
+
+test("netTotalCents: Decision 103 note — the Total is the net after the credit", () => {
+  // Credit fully applies: price 14000, credit 5000, floor 2000 -> applied 5000.
+  assert.equal(netTotalCents(5000, 14000), 9000);
+  // Capped by the floor: price 15000, credit 15000 -> applied 13000, net = floor.
+  assert.equal(netTotalCents(15000, 15000), CREDIT_FLOOR_CENTS);
+  // Net never drops below the floor.
+  assert.ok(netTotalCents(999999, 15000) >= CREDIT_FLOOR_CENTS);
+  // No credit -> net is the gross price.
+  assert.equal(netTotalCents(0, 14000), 14000);
+  // Price at or below the floor -> nothing applies, net is the price.
+  assert.equal(netTotalCents(15000, 2000), 2000);
 });

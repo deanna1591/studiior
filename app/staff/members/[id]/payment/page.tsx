@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
 import PaymentForm from "./form";
+import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export default async function RecordPayment({ params }: { params: { id: string }
 
   if (!member) notFound();
 
-  const name = `${member.first_name} ${member.last_name}`.trim();
+  const name = fullName(member.first_name, member.last_name);
 
   return (
     <AppShell {...shell} title={`Record a payment — ${name}`}

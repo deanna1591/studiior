@@ -506,7 +506,8 @@ export default async function Book({
         <FreeClassList
           classes={freeList} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat}
           bookFirstFree={bookFirstFree}
-          heading="Choose your free class — open to first-timers"
+          heading="Book your free class"
+          coreOnly={settings.freeFirstCoreOnly}
           fullTimetableHref={qs({ all: "1" })}
           initialDayKey={freeDeepLinkDay}
           reservationFeeLabel={settings.reservationFeeCents > 0

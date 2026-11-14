@@ -6,6 +6,7 @@ import type { Json } from "@/lib/database.types";
 import { getStaffContext } from "@/lib/auth";
 import { REASONS } from "@/lib/booking-reasons";
 import { normalisePhone, PHONE_INVALID } from "@/lib/phone";
+import { fullName } from "@/lib/full-name";
 
 // Decision 100. Staff book a class for a member, and edit a member's phone.
 // Every path is a thin wrapper over the SQL (staff_booking_options,
@@ -78,7 +79,7 @@ export async function searchBookMembers(term: string): Promise<MemberHit[]> {
     .order("first_name")
     .limit(10);
   return (data ?? []).map((m) => ({
-    id: m.id, name: `${m.first_name} ${m.last_name}`, email: m.email,
+    id: m.id, name: fullName(m.first_name, m.last_name), email: m.email,
   }));
 }
 
@@ -114,9 +115,11 @@ export async function classPickerDays(): Promise<PickClass[]> {
   });
 }
 
+export type PhoneTaken = { otherId: string; otherName: string; maskedEmail: string };
+
 export async function setMemberPhoneAction(
   memberId: string, phoneRaw: string,
-): Promise<{ ok: true; phone: string } | { error: string }> {
+): Promise<{ ok: true; phone: string } | { error: string; taken?: PhoneTaken }> {
   const ctx = await getStaffContext();
   if (!ctx) return { error: "Not signed in." };
   const supabase = createClient();
@@ -135,7 +138,22 @@ export async function setMemberPhoneAction(
       : /PT422/.test(error.message) ? PHONE_INVALID
       : error.message };
   }
+  const r = data as unknown as {
+    ok: boolean; phone?: string; reason?: string;
+    other_member_id?: string; other_name?: string; masked_email?: string;
+  };
+  // Decision 102: a phone belongs to one member per studio.
+  if (!r.ok && r.reason === "phone_taken") {
+    return {
+      error: `This number is already on another account (${r.masked_email ?? ""}). Sign in to that account instead, or message the studio.`,
+      taken: {
+        otherId: r.other_member_id ?? "",
+        otherName: r.other_name ?? "that member",
+        maskedEmail: r.masked_email ?? "",
+      },
+    };
+  }
+  if (!r.ok) return { error: "That did not save." };
   revalidatePath(`/members/${memberId}`);
-  const r = data as unknown as { ok: boolean; phone?: string };
-  return r.ok ? { ok: true, phone: r.phone ?? e164 } : { error: "That did not save." };
+  return { ok: true, phone: r.phone ?? e164 };
 }

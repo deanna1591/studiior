@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffAccess, isManagerUp } from "@/lib/auth";
 import { fmtTime } from "@/lib/time";
 import type { SearchItem } from "@/components/dashboard/topbar";
+import { fullName } from "@/lib/full-name";
 
 /**
  * 4.1's universal search.
@@ -57,7 +58,7 @@ export async function searchStudio(q: string): Promise<SearchItem[]> {
   const out: SearchItem[] = [];
   for (const m of members.data ?? []) {
     out.push({
-      label: `${m.first_name} ${m.last_name}`,
+      label: fullName(m.first_name, m.last_name),
       sub: m.email ?? null,
       href: `/members/${m.id}`,
       group: "Member",

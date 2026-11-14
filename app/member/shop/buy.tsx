@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { buyProduct, type BuyState } from "./actions";
 import { formatMoney } from "@/lib/plans";
-import { creditOnCheckout, creditLines } from "@/lib/reservation-credit";
+import { creditOnCheckout, creditLines, netTotalCents } from "@/lib/reservation-credit";
 
 function BuyButton() {
   const { pending } = useFormStatus();
@@ -58,6 +58,11 @@ export default function BuyProduct({
     {credit.length > 0 && (
       <div className="mt-1 text-[13px] text-lime-text">
         {credit.map((l, i) => <p key={i}>{l}</p>)}
+        {applied > 0 && (
+          <p className="font-semibold text-ink">
+            You pay {formatMoney(netTotalCents(creditCents, unitPriceCents * qty), currency)}
+          </p>
+        )}
       </div>
     )}
     </>

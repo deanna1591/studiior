@@ -42,7 +42,16 @@ export default function PhoneSheet() {
         </p>
 
         <form action={action} className="mt-4">
-          {state && !state.ok && <Note ok={false}>{state.message}</Note>}
+          {state && !state.ok && (
+            <Note ok={false}>
+              {state.message}
+              {state.phoneTaken && (
+                <a href="/messages" className="mt-1 block font-semibold text-lime-text underline">
+                  Message the studio
+                </a>
+              )}
+            </Note>
+          )}
           <input
             name="phone"
             type="tel"

@@ -9757,6 +9757,7 @@ export type Database = {
       mark_series_confirmed: { Args: { p_series_id: string }; Returns: Json }
       mark_stripe_stub_done: { Args: { p_studio_id: string }; Returns: boolean }
       mark_task_contacted: { Args: { p_task_id: string }; Returns: Json }
+      mask_email: { Args: { p: string }; Returns: string }
       member_activity: {
         Args: { p_from: string; p_member_id: string; p_to: string }
         Returns: {
@@ -9810,6 +9811,7 @@ export type Database = {
           desk_pay_available: boolean
           fee_waived: boolean
           first_name: string
+          free_first_core_only: boolean
           free_first_reservation_fee_cents: number
           guest_passes_enabled: boolean
           has_payment_provider: boolean
@@ -9983,6 +9985,10 @@ export type Database = {
         }
         Returns: Json
       }
+      member_set_phone: {
+        Args: { p_member_id: string; p_phone: string }
+        Returns: Json
+      }
       member_shop: { Args: { p_studio_id: string }; Returns: Json }
       member_snapshot: { Args: { p_member_id: string }; Returns: Json }
       member_suspension: { Args: { p_member_id: string }; Returns: Json }
@@ -10069,6 +10075,7 @@ export type Database = {
         Args: { p_instructor_id: string; p_month: string }
         Returns: Json
       }
+      name_last_part: { Args: { p: string }; Returns: string }
       narrative_covers_days: { Args: { p_facts: Json }; Returns: number }
       narrative_numbers: { Args: { p_text: string }; Returns: string[] }
       narrative_offending_number: {

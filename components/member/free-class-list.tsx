@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { fmtTime, zonedDateKey } from "@/lib/time";
+import { FREE_PICKER_HEADING, freePickerSubline } from "@/lib/free-picker";
 import type { BookResult } from "@/app/member/actions";
 import type { TimeFormat } from "@/lib/time";
 
@@ -23,6 +24,7 @@ type FreeClass = {
 export default function FreeClassList({
   classes, timeZone, timeFormat = "24h", bookFirstFree,
   heading, fullTimetableHref, initialDayKey, reservationFeeLabel = null,
+  coreOnly = false,
 }: {
   classes: FreeClass[]; timeZone: string; timeFormat?: TimeFormat;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
@@ -34,6 +36,9 @@ export default function FreeClassList({
   // "Book free, {fee} to reserve" and routes to the reservation checkout instead
   // of booking directly.
   reservationFeeLabel?: string | null;
+  // Decision 30 amendment: the studio limits the free first class to core
+  // classes, so the line reads "These classes always run."
+  coreOnly?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [booked, setBooked] = useState<string | null>(null);
@@ -87,13 +92,11 @@ export default function FreeClassList({
 
   return (
     <section aria-label="Your free class" className="mb-5">
-      <h2 className="m-head mb-1 text-[16px] leading-5 text-ink">{heading ?? "Your free class — pick one."}</h2>
+      <h2 className="m-head mb-1 text-[16px] leading-5 text-ink">{heading ?? FREE_PICKER_HEADING}</h2>
       <p className="m-sub mb-3 text-[12.5px] leading-[18px] text-ink-2">
-        {reservationFeeLabel
-          ? `A ${reservationFeeLabel} reservation fee holds your spot and comes off your next purchase when you show up.`
-          : "Days with people already in are a good bet."}
+        {freePickerSubline({ coreOnly, reservationFeeLabel })}
         {fullTimetableHref && (
-          <> · <Link href={fullTimetableHref} className="text-lime-text underline underline-offset-4">See the full timetable</Link></>
+          <> · <Link href={fullTimetableHref} className="text-lime-text underline underline-offset-4">See all classes</Link></>
         )}
       </p>
 

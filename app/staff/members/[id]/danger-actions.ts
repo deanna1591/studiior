@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
+import { fullName } from "@/lib/full-name";
 
 export type DangerState = { ok: boolean; message: string; href?: string } | null;
 
@@ -30,7 +31,7 @@ export async function searchMergeTargets(
     .order("first_name")
     .limit(8);
   return (data ?? []).map((m) => ({
-    id: m.id, name: `${m.first_name} ${m.last_name}`, email: m.email,
+    id: m.id, name: fullName(m.first_name, m.last_name), email: m.email,
   }));
 }
 

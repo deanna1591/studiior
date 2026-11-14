@@ -3,6 +3,7 @@ export function creditOnCheckout(
   creditCents: number,
   priceCents: number
 ): { applied: number; remaining: number };
+export function netTotalCents(creditCents: number, priceCents: number): number;
 export function creditLines(
   applied: number,
   remaining: number,
