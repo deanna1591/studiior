@@ -68,6 +68,11 @@ export default async function PurchasesScreen({
     refundLabel: r.refunded_cents > 0 ? `${formatMoney(r.refunded_cents, r.currency)} refunded` : null,
   }));
 
+  // Decision 103: unused reservation credits (shown on the Payments tab).
+  const credits = ((walletData as { credits?: { amount_cents: number; currency: string }[] } | null)?.credits ?? []);
+  const creditTotal = credits.reduce((s, c) => s + (c.amount_cents ?? 0), 0);
+  const creditCurrency = credits[0]?.currency ?? "";
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl}
                  studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent} title="My purchases">
@@ -100,7 +105,17 @@ export default async function PurchasesScreen({
                        validUntil={(m) => m.expires_on} date={shortDate} pass />
         </div>
       ) : (
-        <PaymentsList rows={pRows} />
+        <>
+          {creditTotal > 0 && (
+            <div className="mb-3 rounded-2xl px-3.5 py-3"
+                 style={{ background: "var(--accent-chip)", color: "var(--ink)",
+                          boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
+              <span className="num font-semibold">{formatMoney(creditTotal, creditCurrency)}</span>{" "}
+              reservation credit. Use it on your next purchase.
+            </div>
+          )}
+          <PaymentsList rows={pRows} />
+        </>
       )}
     </MemberShell>
   );

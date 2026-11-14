@@ -748,12 +748,22 @@ export async function saveFreeFirst(_prev: PlainState, fd: FormData): Promise<Pl
   if (confirmAt !== null && (!Number.isFinite(confirmAt) || confirmAt < 2))
     return { ok: false, message: "Confirm-at must be at least 2 people, or left blank to confirm on booking." };
 
+  // Decision 103: the reservation fee (pesos -> minor units) and the applies-from date.
+  const feeRaw = String(fd.get("free_first_reservation_fee") ?? "").trim();
+  const feeCents = feeRaw === "" ? 0 : Math.round(Number(feeRaw) * 100);
+  if (!Number.isFinite(feeCents) || feeCents < 0)
+    return { ok: false, message: "The reservation fee must be 0 or more." };
+  const fromRaw = String(fd.get("free_first_reservation_from") ?? "").trim();
+  const reservationFrom = fromRaw === "" ? null : fromRaw;
+
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
     .update({ free_first_class_enabled: on, free_first_peak_allowed: peak,
               free_first_core_only: coreOnly,
               free_first_seats_per_class: cap,
-              free_first_confirm_at: confirmAt })
+              free_first_confirm_at: confirmAt,
+              free_first_reservation_fee_cents: feeCents,
+              free_first_reservation_from: reservationFrom })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };

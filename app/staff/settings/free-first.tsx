@@ -18,9 +18,10 @@ function Save() {
  * charges anyone already booked — their seat is an ordinary comp booking.
  */
 export default function FreeFirstPanel({
-  enabled, peakAllowed, coreOnly, seatsPerClass, confirmAt,
+  enabled, peakAllowed, coreOnly, seatsPerClass, confirmAt, reservationFeeCents, reservationFrom, currency,
 }: { enabled: boolean; peakAllowed: boolean; coreOnly: boolean;
-     seatsPerClass: number | null; confirmAt: number | null }) {
+     seatsPerClass: number | null; confirmAt: number | null;
+     reservationFeeCents: number; reservationFrom: string | null; currency: string }) {
   const [state, action] = useFormState<PlainState, FormData>(saveFreeFirst, null);
 
   return (
@@ -92,6 +93,36 @@ export default function FreeFirstPanel({
                      className="w-28 rounded border border-line-2 bg-paper px-2 py-1 text-[13px] text-ink num" />
               <span className="text-[12px] text-ink-3">people</span>
             </span>
+          </label>
+        </div>
+
+        <div className="mt-3 border-t border-line pt-3">
+          <label className="block text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Reservation fee</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Charged only when a first-timer books their free class. Comes off their next purchase
+              when they show up. Kept if they don&rsquo;t. Leave at 0 for no fee.
+            </span>
+            <span className="mt-1.5 flex items-center gap-1.5">
+              <span className="text-[13px] text-ink-3">{currency}</span>
+              <input type="number" name="free_first_reservation_fee" min={0} step="0.01"
+                     defaultValue={reservationFeeCents > 0 ? (reservationFeeCents / 100).toString() : ""}
+                     placeholder="0"
+                     className="w-28 rounded border border-line-2 bg-paper px-2 py-1 text-[13px] text-ink num" />
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-3 border-t border-line pt-3">
+          <label className="block text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Reservation fee applies to classes from</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Leave blank for new bookings only. Set a date and free bookings already made for
+              classes on or after it are asked to pay the fee or be released.
+            </span>
+            <input type="date" name="free_first_reservation_from"
+                   defaultValue={reservationFrom ?? ""}
+                   className="mt-1.5 rounded border border-line-2 bg-paper px-2 py-1 text-[13px] text-ink" />
           </label>
         </div>
 

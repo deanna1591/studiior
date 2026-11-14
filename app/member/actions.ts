@@ -154,6 +154,12 @@ const FREE_FIRST_REASONS: Record<string, string> = {
 export async function bookFirstFree(_prev: BookResult, formData: FormData): Promise<BookResult> {
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "Not signed in." };
+  // Decision 103: when the studio charges a reservation fee, a free class is held
+  // through the reservation checkout, never booked at zero here. (The picker and
+  // class page route to /reserve first; this is the belt for any other path.)
+  if ((ctx.bootstrap?.free_first_reservation_fee_cents ?? 0) > 0) {
+    return { ok: false, message: "This class needs a reservation fee to hold your spot — open the class to reserve." };
+  }
   const supabase = createClient();
   const { data, error } = await supabase.rpc("book_first_free", {
     p_occurrence_id: String(formData.get("occurrence_id") ?? ""),

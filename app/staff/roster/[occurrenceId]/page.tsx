@@ -18,6 +18,7 @@ import RebookButton from "./rebook-button";
 import RemoveBooking from "@/components/staff/remove-booking";
 import { BookMemberFromRoster } from "@/components/staff/book-member";
 import ToastHost from "@/components/staff/toast-host";
+import { formatMoney } from "@/lib/plans";
 import ReleasePay from "./release-pay";
 import RunAnyway from "./run-anyway";
 import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
@@ -145,6 +146,8 @@ export default async function Roster({ params, searchParams }: { params: { occur
   const dropinIds = manager
     ? (bookings ?? []).filter((b) => b.status === "booked" && b.payment_source === "drop_in").map((b) => b.id)
     : [];
+  // Decision 103: comp seats that may carry a reservation fee -> "Reserved ₱X".
+  const compIds = (bookings ?? []).filter((b) => b.payment_source === "comp").map((b) => b.id);
   const memberIds = (bookings ?? []).map((b) => b.member_id).filter(Boolean);
   const forced = manager && occ.committed_at && (occ.flex || (gs?.guarantees_enabled && (occ.guarantee_tier ?? "core") === "core"));
 
@@ -153,7 +156,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
   // avatars, and the force_committed audit row (one query for the whole roster,
   // never one per row). The audit's ACTOR, when there is one, is the single
   // genuine dependency left serial below.
-  const [{ data: paidRows }, { data: pinned }, avatars, { data: fcAudit }] = await Promise.all([
+  const [{ data: paidRows }, { data: pinned }, avatars, { data: fcAudit }, { data: resvRows }] = await Promise.all([
     dropinIds.length
       ? supabase.from("payments").select("booking_id")
           .in("booking_id", dropinIds).in("status", ["succeeded", "partially_refunded"])
@@ -170,10 +173,18 @@ export default async function Roster({ params, searchParams }: { params: { occur
           .eq("entity_id", occ.id).eq("action", "occurrence.force_committed")
           .order("created_at", { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
+    compIds.length
+      ? supabase.from("payments").select("booking_id, amount_cents, currency")
+          .in("booking_id", compIds).eq("kind", "reservation_fee")
+          .in("status", ["succeeded", "partially_refunded"])
+      : Promise.resolve({ data: [] as { booking_id: string | null; amount_cents: number; currency: string }[] }),
   ]);
 
   const paidBookings = new Set<string>();
   for (const p of paidRows ?? []) if (p.booking_id) paidBookings.add(p.booking_id as string);
+  // Decision 103: a free seat that paid its reservation fee -> "Reserved ₱X".
+  const reservedFee = new Map<string, { amount: number; currency: string }>();
+  for (const p of resvRows ?? []) if (p.booking_id) reservedFee.set(p.booking_id as string, { amount: p.amount_cents, currency: p.currency });
 
   // The committed-to-run after-state: who forced it and why. The actor is
   // identified by their studio_staff email (the app keys staff by email), or the
@@ -349,6 +360,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
                   )}
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
                     {b.payment_source?.replace("_", " ") ?? "—"}
+                    {reservedFee.has(b.id) ? ` · Reserved ${formatMoney(reservedFee.get(b.id)!.amount, reservedFee.get(b.id)!.currency)}` : ""}
                     {b.override_reason ? ` · override: ${b.override_reason}` : ""}
                     {checkedIn.has(b.id) && methodLabel(checkinMeta.get(b.id)) ? ` · ${methodLabel(checkinMeta.get(b.id))}` : ""}
                   </span>

@@ -81,6 +81,10 @@ export async function memberScreen() {
       // PH-vs-other validation (server-side, never hardcoded in the sheet).
       hasPhone: b?.has_phone ?? false,
       country: b?.country ?? null,
+      // Decision 103: the reservation fee for a free first class (minor units; 0
+      // = off). Drives the picker button and the reservation checkout.
+      reservationFeeCents: b?.free_first_reservation_fee_cents ?? 0,
+      currency: b?.currency ?? "",
     },
   };
 }

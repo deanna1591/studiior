@@ -3523,6 +3523,91 @@ export type Database = {
           },
         ]
       }
+      member_credits: {
+        Row: {
+          amount_cents: number
+          booking_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          member_id: string
+          payment_id: string | null
+          reason: string
+          studio_id: string
+          used_cents: number
+          voided_at: string | null
+        }
+        Insert: {
+          amount_cents: number
+          booking_id?: string | null
+          created_at?: string
+          currency: string
+          id?: string
+          member_id: string
+          payment_id?: string | null
+          reason: string
+          studio_id: string
+          used_cents?: number
+          voided_at?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          booking_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          member_id?: string
+          payment_id?: string | null
+          reason?: string
+          studio_id?: string
+          used_cents?: number
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_credits_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_credits_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_credits_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_credits_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_credits_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_credits_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_dismissals: {
         Row: {
           dismissed_at: string
@@ -5429,6 +5514,7 @@ export type Database = {
           id: string
           invoice_no: string | null
           is_demo: boolean
+          kind: string | null
           member_id: string | null
           membership_id: string | null
           method: string | null
@@ -5467,6 +5553,7 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           is_demo?: boolean
+          kind?: string | null
           member_id?: string | null
           membership_id?: string | null
           method?: string | null
@@ -5505,6 +5592,7 @@ export type Database = {
           id?: string
           invoice_no?: string | null
           is_demo?: boolean
+          kind?: string | null
           member_id?: string | null
           membership_id?: string | null
           method?: string | null
@@ -7179,6 +7267,8 @@ export type Database = {
           free_first_confirm_at: number | null
           free_first_core_only: boolean
           free_first_peak_allowed: boolean
+          free_first_reservation_fee_cents: number
+          free_first_reservation_from: string | null
           free_first_seats_per_class: number | null
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
@@ -7317,6 +7407,8 @@ export type Database = {
           free_first_confirm_at?: number | null
           free_first_core_only?: boolean
           free_first_peak_allowed?: boolean
+          free_first_reservation_fee_cents?: number
+          free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
@@ -7455,6 +7547,8 @@ export type Database = {
           free_first_confirm_at?: number | null
           free_first_core_only?: boolean
           free_first_peak_allowed?: boolean
+          free_first_reservation_fee_cents?: number
+          free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
           guarantees_enabled?: boolean
           guest_passes_enabled?: boolean
@@ -8150,8 +8244,10 @@ export type Database = {
       xendit_purchases: {
         Row: {
           amount_cents: number
+          booking_id: string | null
           completed_at: string | null
           created_at: string
+          credit_applied_cents: number
           currency: string
           failure_reason: string | null
           id: string
@@ -8170,8 +8266,10 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          booking_id?: string | null
           completed_at?: string | null
           created_at?: string
+          credit_applied_cents?: number
           currency: string
           failure_reason?: string | null
           id?: string
@@ -8190,8 +8288,10 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          booking_id?: string | null
           completed_at?: string | null
           created_at?: string
+          credit_applied_cents?: number
           currency?: string
           failure_reason?: string | null
           id?: string
@@ -8209,6 +8309,13 @@ export type Database = {
           xendit_payment_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "xendit_purchases_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "xendit_purchases_member_id_fkey"
             columns: ["member_id"]
@@ -8550,6 +8657,7 @@ export type Database = {
         Args: { p_member_id?: string; p_occurrence_id: string }
         Returns: Json
       }
+      book_first_free_run: { Args: { p_booking_id: string }; Returns: Json }
       book_group: {
         Args: {
           p_emails: string[]
@@ -8854,6 +8962,14 @@ export type Database = {
       confirm_week: {
         Args: { p_instructor_id: string; p_week_start?: string }
         Returns: Json
+      }
+      consume_reservation_credit: {
+        Args: {
+          p_amount_cents: number
+          p_member_id: string
+          p_studio_id: string
+        }
+        Returns: number
       }
       convert_booking_to_free_first: {
         Args: { p_booking_id: string }
@@ -9395,6 +9511,10 @@ export type Database = {
         Args: { p_instructor_id: string }
         Returns: number
       }
+      instructor_digest_block: {
+        Args: { p_date: string; p_instructor_id: string; p_studio_id: string }
+        Returns: Json
+      }
       instructor_guide_mark: { Args: { p_hint: string }; Returns: undefined }
       instructor_invite_preview: { Args: { p_token: string }; Returns: Json }
       instructor_invite_status: { Args: { p_studio_id: string }; Returns: Json }
@@ -9669,9 +9789,11 @@ export type Database = {
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
           country: string
+          currency: string
           current_streak: number
           desk_pay_available: boolean
           first_name: string
+          free_first_reservation_fee_cents: number
           guest_passes_enabled: boolean
           has_payment_provider: boolean
           has_phone: boolean
@@ -9811,6 +9933,7 @@ export type Database = {
           membership_status: string
           plan_state: string
           plan_type: string
+          reservation_credit_cents: number
           status: string
           user_id: string
         }[]
@@ -9818,6 +9941,16 @@ export type Database = {
       member_portal_url: {
         Args: { p_path: string; p_studio_id: string }
         Returns: string
+      }
+      member_reservation_dues: {
+        Args: { p_studio_id: string }
+        Returns: {
+          booking_id: string
+          class_name: string
+          fee_cents: number
+          occurrence_id: string
+          starts_at: string
+        }[]
       }
       member_sees_ai_drafts: { Args: never; Returns: boolean }
       member_send_message: {
@@ -10482,6 +10615,11 @@ export type Database = {
         Args: { p_address: string; p_from_name: string }
         Returns: string
       }
+      reservation_credit_available: {
+        Args: { p_member_id: string; p_studio_id: string }
+        Returns: number
+      }
+      reserve_free_first: { Args: { p_occurrence_id: string }; Returns: Json }
       resolve_checkin_code: {
         Args: { p_code: string }
         Returns: {
@@ -11206,6 +11344,7 @@ export type Database = {
       sweep_cover_escalations: { Args: never; Returns: number }
       sweep_flex_rescue: { Args: { p_now?: string }; Returns: Json }
       sweep_free_duplicate_holds: { Args: never; Returns: Json }
+      sweep_free_reservation_dues: { Args: { p_now?: string }; Returns: Json }
       sweep_guest_waivers: { Args: never; Returns: Json }
       sweep_instructor_class_reminders: {
         Args: { p_now?: string }
@@ -11313,6 +11452,10 @@ export type Database = {
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
+      write_reservation_credit: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       xendit_activate_success_internal: {
         Args: { p_payment_id: string; p_purchase_id: string }
         Returns: string
@@ -11337,12 +11480,22 @@ export type Database = {
         Args: { p_product_id: string; p_quantity: number; p_studio_id: string }
         Returns: {
           amount_cents: number
+          credit_applied_cents: number
           currency: string
           purchase_id: string
         }[]
       }
       xendit_begin_purchase: {
         Args: { p_plan_id: string; p_studio_id: string }
+        Returns: {
+          amount_cents: number
+          credit_applied_cents: number
+          currency: string
+          purchase_id: string
+        }[]
+      }
+      xendit_begin_reservation: {
+        Args: { p_booking_id: string; p_studio_id: string }
         Returns: {
           amount_cents: number
           currency: string

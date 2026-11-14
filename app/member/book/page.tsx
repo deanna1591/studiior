@@ -9,6 +9,7 @@ import FreeClassList from "@/components/member/free-class-list";
 import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
 import { addDays, dayStart, fmtTime, fmtDeadlineShort, zonedDateKey } from "@/lib/time";
 import { freeEligibleSet, whichView, nearestEligibleDay } from "@/lib/free-first-view";
+import { formatMoney } from "@/lib/plans";
 import PhoneSheet from "@/components/member/phone-sheet";
 
 export const dynamic = "force-dynamic";
@@ -508,6 +509,8 @@ export default async function Book({
           heading="Choose your free class — open to first-timers"
           fullTimetableHref={qs({ all: "1" })}
           initialDayKey={freeDeepLinkDay}
+          reservationFeeLabel={settings.reservationFeeCents > 0
+            ? formatMoney(settings.reservationFeeCents, settings.currency) : null}
         />
       ) : (
       <>

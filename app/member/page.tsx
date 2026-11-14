@@ -10,6 +10,7 @@ import { bookClass, bookFirstFree, respondToOffer, selfCheckIn } from "./actions
 import { fmtTime, fmtDayLong, relativeDayName, dayMonthParts, fmtDeadlineShort } from "@/lib/time";
 import { accentRamp, accentGradient, neutralAccent } from "@/lib/theme";
 import WaiverBanner from "@/components/member/waiver-banner";
+import ReservationDueNotice, { type ReservationDue } from "@/components/member/reservation-due";
 import Announcements, { type Announcement } from "@/components/member/announcements";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 import ClassButton from "@/components/member/class-button";
@@ -216,6 +217,12 @@ export default async function MemberHome() {
   // like lime is 1.3 with white on it bare and 7.0 under the scrim.
   const heroFallback = `linear-gradient(140deg, ${g1} 0%, ${g2} 100%)`;
 
+  // Decision 103: free bookings that now need the reservation fee (only queried
+  // when the studio charges one, so a fee-off studio pays no extra hop).
+  const reservationDues: ReservationDue[] = (settings.reservationFeeCents ?? 0) > 0
+    ? ((await supabase.rpc("member_reservation_dues", { p_studio_id: ctx.studioId })).data ?? []) as ReservationDue[]
+    : [];
+
   return (
     <MemberShell openOffers={openOffers} memberName={memberName} avatarUrl={avatarUrl} studioName={studioName} logoUrl={logoUrl} preset={preset} accent={accent}>
       {/* Decision 94: a phone number is required. When it is missing, Home opens
@@ -228,6 +235,8 @@ export default async function MemberHome() {
           the installed (standalone) app and once dismissed. */}
       <InstallCard studioName={studioName} dismissed={!!installRow} />
       {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
+      {/* Decision 103: a free booking that now needs the reservation fee. */}
+      <ReservationDueNotice dues={reservationDues} currency={settings.currency} timeZone={ctx.timeZone} />
       {/* Decision 98: a free class re-flagged as a duplicate — pay or lose it. */}
       {holdItems.map((h) => (
         <DuplicateHold key={h.occurrenceId} occurrenceId={h.occurrenceId}

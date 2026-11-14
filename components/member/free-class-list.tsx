@@ -22,7 +22,7 @@ type FreeClass = {
  */
 export default function FreeClassList({
   classes, timeZone, timeFormat = "24h", bookFirstFree,
-  heading, fullTimetableHref, initialDayKey,
+  heading, fullTimetableHref, initialDayKey, reservationFeeLabel = null,
 }: {
   classes: FreeClass[]; timeZone: string; timeFormat?: TimeFormat;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
@@ -30,6 +30,10 @@ export default function FreeClassList({
   // first-timer heading, a link to the full timetable, chips to narrow by class,
   // and a ?d= deep-link day.
   heading?: string; fullTimetableHref?: string; initialDayKey?: string | null;
+  // Decision 103: when the studio charges a reservation fee, the button reads
+  // "Book free, {fee} to reserve" and routes to the reservation checkout instead
+  // of booking directly.
+  reservationFeeLabel?: string | null;
 }) {
   const [pending, start] = useTransition();
   const [booked, setBooked] = useState<string | null>(null);
@@ -85,7 +89,9 @@ export default function FreeClassList({
     <section aria-label="Your free class" className="mb-5">
       <h2 className="m-head mb-1 text-[16px] leading-5 text-ink">{heading ?? "Your free class — pick one."}</h2>
       <p className="m-sub mb-3 text-[12.5px] leading-[18px] text-ink-2">
-        Days with people already in are a good bet.
+        {reservationFeeLabel
+          ? `A ${reservationFeeLabel} reservation fee holds your spot and comes off your next purchase when you show up.`
+          : "Days with people already in are a good bet."}
         {fullTimetableHref && (
           <> · <Link href={fullTimetableHref} className="text-lime-text underline underline-offset-4">See the full timetable</Link></>
         )}
@@ -180,6 +186,13 @@ export default function FreeClassList({
                   // is provisional with no fixed deadline — it confirms once the
                   // class is on.
                   <span className="relative z-10 shrink-0 text-[12.5px] font-medium text-ink-2">Booked · we&rsquo;ll confirm once the class is on</span>
+                ) : c.free_bookable && reservationFeeLabel ? (
+                  // Decision 103: the fee is on — go to the reservation checkout.
+                  <Link href={`/reserve/${c.occurrence_id}`}
+                        className="m-press relative z-10 shrink-0 rounded-full px-3.5 py-2 text-center text-[13px] font-semibold"
+                        style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+                    Book free, {reservationFeeLabel} to reserve
+                  </Link>
                 ) : c.free_bookable ? (
                   <button onClick={() => book(c.occurrence_id)} disabled={pending}
                           className="m-press relative z-10 shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold disabled:opacity-60"

@@ -183,7 +183,10 @@ declare
     'instructor_name','Ada Example','range','Mon 15 Dec to Wed 17 Dec',
     'reason_line',' (holiday)','reason_html',' (holiday)',
     'class_list','Reformer Flow · Mon 15 Dec 07:00',
-    'class_list_html','<li><a href="https://app.studiior.com/roster/x">Reformer Flow · Mon 15 Dec 07:00</a></li>');
+    'class_list_html','<li><a href="https://app.studiior.com/roster/x">Reformer Flow · Mon 15 Dec 07:00</a></li>',
+    'reservation_line','','reservation_html','','fee','₱150','from_date','13 Nov',
+    'deadline','7:00 PM on Sun 08 Nov','pay_url','https://ef-sa.studiior.app/class/x',
+    'cancel_url','https://ef-sa.studiior.app/class/x');
   k text; v_nid uuid; r record; v_n int := 0;
   v_keys text[] := array[
     'booking_confirmed','free_booking_confirmed','flex_booking_pending','flex_booking_confirmed',
@@ -191,7 +194,8 @@ declare
     'convert_day3','convert_day7','convert_last_day','convert_missed_you',
     'keep_renew_7','keep_renew_1','keep_renew_0','keep_lapsed_3','keep_credits_7','keep_credits_2',
     'keep_winback_30','keep_winback_60','keep_drifting','membership_expiring','credit_expiry',
-    'product_order_paid','free_class_duplicate','booking_removed_by_studio','instructor_time_off'];
+    'product_order_paid','free_class_duplicate','booking_removed_by_studio','instructor_time_off',
+    'free_reservation_due','free_reservation_released'];
   -- retention_* are composer SEEDS (sent via the `retention` passthrough with the
   -- composer's rendered html, never rendered directly), so their text_body carries
   -- composer markup — not a directly-rendered template.

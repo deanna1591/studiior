@@ -187,6 +187,10 @@ export type MemberBootstrap = {
   payee_notice_name: string | null;
   has_phone: boolean;
   country: string | null;
+  /** Decision 103: the reservation fee for a free first class (minor units; 0 = off). */
+  free_first_reservation_fee_cents: number;
+  /** Decision 103: the studio currency, so member screens can format the fee. */
+  currency: string;
 };
 
 /** Who is making this request, on the member PWA. */

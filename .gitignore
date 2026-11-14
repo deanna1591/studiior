@@ -23,3 +23,5 @@ embed/out/
 # Decision 93 brand references — large local PNGs, never committed
 docs/brand-reference/
 docs/post-design/
+scratchpad/
+Claude outputs/

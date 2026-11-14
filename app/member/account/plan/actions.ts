@@ -64,6 +64,35 @@ export async function beginXenditCheckout(
     return { ok: false, message: m || "Could not start the purchase." };
   }
 
+  const { data: plan } = await supabase.from("membership_plans")
+    .select("name").eq("id", planId).maybeSingle();
+
+  return openXenditSession(ctx, {
+    purchaseId: purchase.purchase_id,
+    amountCents: purchase.amount_cents,
+    currency: purchase.currency,
+    description: `${ctx.studioName} — ${plan?.name ?? "plan"}`,
+    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
+    successUrl: `${origin}/purchase/${purchase.purchase_id}${returnTo && returnTo !== "/" ? `?return=${encodeURIComponent(returnTo)}` : ""}`,
+    cancelUrl: `${origin}/account/plan`,
+  });
+}
+
+/**
+ * The ONE Xendit-session creation for a purchase that already exists (the SQL
+ * begin function snapshotted the amount). Decrypts the studio secret in this
+ * runtime, creates the hosted session (reusing the member's Xendit customer),
+ * attaches it, and returns the hosted-checkout URL. Shared by the plan checkout
+ * (beginXenditCheckout) and the Decision 103 reservation checkout.
+ */
+async function openXenditSession(
+  ctx: MemberCtx,
+  opts: {
+    purchaseId: string; amountCents: number; currency: string; description: string;
+    metadata: Record<string, string>; successUrl: string; cancelUrl: string;
+  },
+): Promise<BuyState> {
+  const supabase = createClient();
   const { data: cctx, error: cErr } = await supabase.rpc("xendit_checkout_context", {
     p_studio_id: ctx.studioId,
   });
@@ -77,37 +106,27 @@ export async function beginXenditCheckout(
     return { ok: false, message: "The studio’s payment key couldn’t be read — ask the studio to reconnect Xendit." };
   }
 
-  const [{ data: plan }, { data: member }, { data: cust }] = await Promise.all([
-    supabase.from("membership_plans").select("name").eq("id", planId).maybeSingle(),
-    // Xendit requires a customer.reference_id + given_names; the member reads
-    // their own row (members_self RLS).
+  const [{ data: member }, { data: cust }] = await Promise.all([
     supabase.from("members").select("first_name, last_name, email").eq("id", ctx.memberId).maybeSingle(),
-    // A Xendit customer created on a prior checkout — reused as customer_id so
-    // we do not re-send the reference_id (which Xendit refuses the second time).
     supabase.from("member_payment_customers").select("customer_ref")
       .eq("member_id", ctx.memberId).eq("provider", "xendit").maybeSingle(),
   ]);
 
-  // Must match buildSessionBody's stripping, so the /customers lookup uses the
-  // same reference_id we would have created the customer with.
   const strippedRef = ctx.memberId.replace(/[^a-zA-Z0-9]/g, "");
   const common = {
-    referenceId: purchase.purchase_id,
-    amountCents: purchase.amount_cents,
-    currency: purchase.currency,
+    referenceId: opts.purchaseId,
+    amountCents: opts.amountCents,
+    currency: opts.currency,
     country: "PH",
-    description: `${ctx.studioName} — ${plan?.name ?? "plan"}`,
-    // purchase_id is the primary way the callback resolves back to this purchase.
-    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
-    // Carry ?return through the poll screen so it can offer "Back to your class"
-    // on success (omitted when it is the default "/").
-    successUrl: `${origin}/purchase/${purchase.purchase_id}${returnTo && returnTo !== "/" ? `?return=${encodeURIComponent(returnTo)}` : ""}`,
-    cancelUrl: `${origin}/account/plan`,
+    description: opts.description,
+    metadata: opts.metadata,
+    successUrl: opts.successUrl,
+    cancelUrl: opts.cancelUrl,
   };
   const withCustomerId = (customerId: string) => createSession(secret, { ...common, customerId });
   const withCustomerObject = () => createSession(secret, {
     ...common,
-    customerReferenceId: ctx.memberId, // hyphens stripped in buildSessionBody
+    customerReferenceId: ctx.memberId,
     customerGivenNames: member?.first_name ?? ctx.firstName ?? "Member",
     customerSurname: member?.last_name ?? undefined,
     customerEmail: member?.email ?? undefined,
@@ -122,8 +141,6 @@ export async function beginXenditCheckout(
     if (res.ok) {
       newCustomerId = res.data.customer_id ?? null;
     } else if (/reference_id.*used before|has been used before/i.test(res.error.message)) {
-      // We created the customer on a prior checkout but did not store its id;
-      // look it up by reference_id and retry once with customer_id.
       const found = await getCustomerByReferenceId(secret, strippedRef);
       if (found) {
         await supabase.rpc("xendit_set_customer", { p_studio_id: ctx.studioId, p_customer_id: found });
@@ -140,10 +157,74 @@ export async function beginXenditCheckout(
   }
 
   await supabase.rpc("xendit_attach_session", {
-    p_purchase_id: purchase.purchase_id,
+    p_purchase_id: opts.purchaseId,
     p_session_id: res.data.payment_session_id,
     p_link_url: res.data.payment_link_url,
   });
 
   return { ok: true, url: res.data.payment_link_url };
 }
+
+/**
+ * Decision 103: hold a free-first seat and take the reservation fee. reserve_free_first
+ * holds the seat as pending_payment (the drop-in window), xendit_begin_reservation
+ * creates the fee purchase, and the webhook completes the comp free seat
+ * (book_first_free_run). On return the member lands on the class page, which shows
+ * one of the three states.
+ */
+export async function startReservation(occId: string): Promise<BuyState> {
+  if (!occId) return { ok: false, message: "No class chosen." };
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const origin = currentMemberOrigin();
+  if (!origin) return { ok: false, message: "Could not work out the studio address." };
+
+  const supabase = createClient();
+  const { data: held, error: hErr } = await supabase.rpc("reserve_free_first", { p_occurrence_id: occId });
+  if (hErr) return { ok: false, message: hErr.message };
+  const h = held as { ok: boolean; reason?: string; booking_id?: string } | null;
+  if (!h?.ok || !h.booking_id) {
+    return { ok: false, message: FREE_RESERVE_REASONS[h?.reason ?? ""] ?? "That didn’t work — please try again." };
+  }
+
+  const { data: begun, error: bErr } = await supabase.rpc("xendit_begin_reservation", {
+    p_studio_id: ctx.studioId, p_booking_id: h.booking_id,
+  });
+  const purchase = Array.isArray(begun) ? begun[0] : begun;
+  if (bErr || !purchase) return { ok: false, message: bErr?.message || "Could not start the reservation." };
+
+  return openXenditSession(ctx, {
+    purchaseId: purchase.purchase_id,
+    amountCents: purchase.amount_cents,
+    currency: purchase.currency,
+    description: `${ctx.studioName} — reservation fee`,
+    metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "reservation", booking_id: h.booking_id },
+    successUrl: `${origin}/class/${occId}?reserved=1`,
+    cancelUrl: `${origin}/class/${occId}`,
+  });
+}
+
+const FREE_RESERVE_REASONS: Record<string, string> = {
+  no_reservation_fee: "This class does not need a reservation fee.",
+  not_authorised: "You are not signed in.",
+  not_found: "That class could not be found.",
+  class_not_bookable: "That class is not open for booking.",
+  class_in_past: "That class has already started.",
+  class_full: "That class is full.",
+  not_first: "Your free first class has already been used.",
+  already_had_free: "Your free first class has already been used.",
+  already_member: "This looks like an existing account.",
+  missed: "Your free class was used when you missed it.",
+  late_cancel: "Your free class was used.",
+  duplicate: "Your free first class has already been used.",
+  not_staffed_yet: "This class isn’t open for booking yet.",
+  class_hidden: "That class isn’t available.",
+  past_booking_cutoff: "Booking has closed for that class.",
+  outside_booking_window: "That class isn’t open for booking yet.",
+  free_first_closed_here: "This class isn’t open to first-timers.",
+  flex_not_allowed: "Free classes are on core classes only here.",
+  not_trial_class: "This class isn’t open to first-timers.",
+  free_seats_full: "The free spots for this class are taken.",
+  peak_not_allowed: "Free classes aren’t available at peak times.",
+  month_not_published: "That class isn’t open for booking yet.",
+};

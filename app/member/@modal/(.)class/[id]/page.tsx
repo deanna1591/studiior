@@ -2,6 +2,7 @@ import { memberScreen } from "@/lib/member";
 import Sheet from "@/components/member/sheet";
 import ClassDetailBody from "@/components/member/class-detail-body";
 import { loadClassDetail } from "@/app/member/class/[id]/load";
+import { formatMoney } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,8 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
                        unpaid={data.unpaid} group={data.group} covered={data.covered}
                        waiverBlocked={waiverBlocked}
                        seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff} duplicateHold={data.duplicateHold} holdTime={data.holdTime}
-                       deskPayAvailable={deskPayAvailable} />
+                       deskPayAvailable={deskPayAvailable}
+                       reservationFeeLabel={settings.reservationFeeCents > 0 ? formatMoney(settings.reservationFeeCents, settings.currency) : null} />
     </Sheet>
   );
 }
