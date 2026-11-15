@@ -15,6 +15,7 @@ import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
+import { HoldCountdown, PaymentPendingActions } from "@/components/member/payment-pending";
 
 /**
  * One class, in full — the body shared by the full page (`/class/[id]`) and the
@@ -56,7 +57,7 @@ export default function ClassDetailBody({
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
   seatKind = "unlimited", cutoffMinutes = 720, duplicateHold = false, holdTime = null,
-  reservationFeeLabel = null,
+  reservationFeeLabel = null, reservationHold = null, due = null,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -106,6 +107,13 @@ export default function ClassDetailBody({
    *  both. Computed server-side in load.ts / from member_bootstrap. */
   seatKind?: SeatKind;
   cutoffMinutes?: number;
+  /** Decision 103(c): a reservation hold (a pending_payment comp seat) on this
+   *  class — "Payment pending", never booked. The member's own booking is null
+   *  while a hold is live, so this is how the page knows. */
+  reservationHold?: { bookingId: string | null; holdUntil: string } | null;
+  /** Decision 103(d) pay-to-keep: this booked free seat owes the fee. Shows
+   *  "Booked, {fee} due by {deadline}" + a Pay button, above the flex line. */
+  due?: { feeCents: number } | null;
 }) {
   const spaces = occ.capacity - occ.booked_count;
   const full = spaces <= 0;
@@ -149,6 +157,17 @@ export default function ClassDetailBody({
     : null;
   const waitingLabel = pending && !past
     ? flexWaitingLabel(pending.until ? fmtDeadlineShort(pending.until, timeZone, timeFormat) : null)
+    : null;
+  // Decision 103(d) pay-to-keep: a booked free seat that owes the fee reads
+  // "Booked, {fee} due by {deadline} to keep your spot" + a Pay button on the
+  // row, with the flex "we'll confirm by" line following. The fee is the
+  // studio's reservation fee (reservationFeeLabel); the deadline is the
+  // cancellation cut-off, when the sweep releases an unpaid ask.
+  const payToKeep = hasBooking && !isWaitlisted && !past && !!due && !!reservationFeeLabel;
+  const dueDeadline = payToKeep
+    ? fmtDeadlineShort(
+        new Date(new Date(occ.starts_at).getTime() - cutoffMinutes * 60_000).toISOString(),
+        timeZone, timeFormat)
     : null;
   const mins = occ.ends_at
     ? Math.round((new Date(occ.ends_at).getTime() - new Date(occ.starts_at).getTime()) / 60000)
@@ -200,6 +219,25 @@ export default function ClassDetailBody({
         </p>
       )}
 
+      {reservationHold ? (
+        /* Decision 103(c): a reservation hold is "Payment pending", never
+           booked. The seat holds while the member pays the fee; Finish paying
+           reopens the payment page, Cancel releases it at once. When the sweep
+           releases the hold the page returns to Book with no notice. */
+        <div className="m-card mt-4 p-4">
+          <p className="m-sub mb-3 font-semibold" style={{ color: "var(--amber-deep)" }}>
+            <HoldCountdown holdUntil={reservationHold.holdUntil} />
+          </p>
+          <p className="m-sub mb-4 text-ink-3">
+            Your spot is held while you pay the {reservationFeeLabel} reservation fee.
+          </p>
+          <PaymentPendingActions
+            occurrenceId={occ.id}
+            bookingId={reservationHold.bookingId}
+            cancelBooking={cancelBooking}
+          />
+        </div>
+      ) : (
       <div className="m-card mt-4 p-4">
         {/* FIX A: the member's own status wins over capacity. checked_in is a
             greyed, non-clickable line with the check-in time; the capacity line
@@ -209,6 +247,7 @@ export default function ClassDetailBody({
             : past && !view.hideCapacity ? "This class has already started."
             : isCheckedIn ? <>You&rsquo;re checked in{checkedInAt && <> · <span className="num">{fmtTime(checkedInAt, timeZone, timeFormat)}</span></>}</>
             : isWaitlisted ? <>You&rsquo;re #<span className="num">{booking!.waitlist_position}</span> on the waitlist.</>
+            : payToKeep ? <>Booked, {reservationFeeLabel} due by {dueDeadline} to keep your spot</>
             : hasBooking ? (waitingLabel ?? "You're booked in.")
             : full ? <>Fully booked{(occ.waitlist_count ?? 0) > 0 && <> · <span className="num">{occ.waitlist_count}</span> waiting</>}</>
             : <><span className="num font-medium text-ink">{spaces}</span> {spaces === 1 ? "place" : "places"} left</>}
@@ -219,9 +258,23 @@ export default function ClassDetailBody({
         {confirmLine && !view.hideCapacity && (
           <p className="m-sub mb-3 text-ink-3">{confirmLine}</p>
         )}
+        {/* Decision 103(d): on a pay-to-keep row, the flex "we'll confirm by"
+            line follows the fee-due line, each on its own line. */}
+        {payToKeep && waitingLabel && (
+          <p className="m-sub mb-3 text-ink-3">{waitingLabel}</p>
+        )}
 
         {past || isCheckedIn ? null : hasBooking ? (
           <>
+            {/* Decision 103(d): Pay the reservation fee to keep this free seat —
+                the Pay button on the card, alongside the due card elsewhere. */}
+            {payToKeep && (
+              <Link href={`/reserve/${occ.id}`}
+                    className="m-action m-press mb-3 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold"
+                    style={accentSolid()}>
+                Pay {reservationFeeLabel}
+              </Link>
+            )}
             {/* Decision 68: the one button — but the page keeps its own status
                 line and Cancel, so here it adds only the new affordance:
                 Check in now (in the window). Nothing for the plain reserved /
@@ -358,6 +411,7 @@ export default function ClassDetailBody({
           </Link>
         )}
       </div>
+      )}
 
       {/* Decision 98: a free class re-flagged as a duplicate — the paid-or-lose
           line + checkout button, with its own deadline. */}

@@ -38,6 +38,7 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
                        waiverBlocked={waiverBlocked}
                        seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff} duplicateHold={data.duplicateHold} holdTime={data.holdTime}
                        deskPayAvailable={deskPayAvailable}
+                       reservationHold={data.reservationHold} due={data.due}
                        reservationFeeLabel={settings.reservationFeeCents > 0 ? formatMoney(settings.reservationFeeCents, settings.currency) : null} />
     </Sheet>
   );

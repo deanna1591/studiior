@@ -18,6 +18,8 @@ import ClassButton from "@/components/member/class-button";
 import InstallCard from "@/components/member/install-card";
 import PhoneSheet from "@/components/member/phone-sheet";
 import DuplicateHold from "@/components/member/duplicate-hold";
+import { HoldCountdown, PaymentPendingActions } from "@/components/member/payment-pending";
+import { cancelBooking } from "@/app/member/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +52,7 @@ export default async function MemberHome() {
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { data: monthCheckins },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
          { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems },
-         { data: dupHolds }] =
+         { data: dupHolds }, { data: resHolds }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -114,6 +116,16 @@ export default async function MemberHome() {
       .eq("member_id", ctx.memberId)
       .eq("status", "pending_payment")
       .eq("hold_reason", "free_class_duplicate"),
+    // Decision 103(c): reservation holds (a pending_payment comp seat while the
+    // member pays the fee) — "Payment pending", never booked. Excludes the dup
+    // hold (hold_reason set) and any drop-in hold (payment_source drop_in).
+    supabase
+      .from("bookings")
+      .select("id, occurrence_id, class_occurrences(name)")
+      .eq("member_id", ctx.memberId)
+      .eq("status", "pending_payment")
+      .eq("payment_source", "comp")
+      .is("hold_reason", null),
   ]);
   const hasShop = Array.isArray(shopItems) && (shopItems as unknown[]).length > 0;
   // Decision 98: held free-class-duplicate bookings — the line + checkout button.
@@ -138,9 +150,26 @@ export default async function MemberHome() {
 
   // pending_until is null for a free provisional seat (Decision 30 amendment):
   // present in the map means "Waiting for confirmation", a value adds "· by {time}".
+  // Decision 103(c): member_pending_bookings now carries holds too (status
+  // pending_payment), so this flex map is scoped to booked rows only — a hold is
+  // never "Waiting for confirmation".
+  const pendRowsTyped = ((pendingRows ?? []) as {
+    occurrence_id: string; status: string | null; hold_until: string | null; pending_until: string | null;
+  }[]);
   const pendingUntil = new Map<string, string | null>(
-    ((pendingRows ?? []) as { occurrence_id: string; pending_until: string | null }[])
-      .map((p) => [p.occurrence_id, p.pending_until]));
+    pendRowsTyped.filter((p) => p.status === "booked").map((p) => [p.occurrence_id, p.pending_until]));
+  // Decision 103(c): the hold countdown target (booked_at + window), by occurrence.
+  const holdUntilMap = new Map<string, string | null>(
+    pendRowsTyped.filter((p) => p.status === "pending_payment").map((p) => [p.occurrence_id, p.hold_until]));
+  // "Payment pending" cards at the top of Home — one per reservation hold.
+  const reservationHoldItems = ((resHolds ?? []) as {
+    id: string; occurrence_id: string; class_occurrences: { name: string } | null;
+  }[]).map((h) => ({
+    occurrenceId: h.occurrence_id,
+    bookingId: h.id,
+    className: h.class_occurrences?.name ?? "This class",
+    holdUntil: holdUntilMap.get(h.occurrence_id) ?? null,
+  }));
 
   const ms = milestones as unknown as { total: number; next_target: number | null; to_go: number | null } | null;
 
@@ -242,6 +271,20 @@ export default async function MemberHome() {
       {holdItems.map((h) => (
         <DuplicateHold key={h.occurrenceId} occurrenceId={h.occurrenceId}
           className={h.className} holdTime={h.holdTime} />
+      ))}
+      {/* Decision 103(c): a reservation hold — "Payment pending", never booked.
+          Finish paying reopens the fee checkout; Cancel releases the hold. */}
+      {reservationHoldItems.map((h) => (
+        <div key={h.occurrenceId} className="m-card mb-3 p-4">
+          <p className="m-sub font-semibold" style={{ color: "var(--amber-deep)" }}>
+            {h.className} · <HoldCountdown holdUntil={h.holdUntil ?? ""} />
+          </p>
+          <p className="m-sub mb-3 mt-1 text-ink-3">
+            Your spot is held while you pay the reservation fee.
+          </p>
+          <PaymentPendingActions occurrenceId={h.occurrenceId} bookingId={h.bookingId}
+            cancelBooking={cancelBooking} />
+        </div>
       ))}
       {/* The greeting. First person, their name, their part of the day — the one
           line in the app that speaks TO them rather than about their booking. */}

@@ -24,7 +24,7 @@ import Link from "next/link";
 export default function ClassCard({
   href, startLabel, endLabel, durationLabel, name, instructor, room,
   statusLabel, statusTone = "quiet", action, dimmed = false, booked = false, tag = null,
-  alwaysRuns = false,
+  alwaysRuns = false, stackAction = false, extraLine = null,
 }: {
   href: string;
   /** "06:30" — the start alone, in the studio's zone. */
@@ -52,67 +52,84 @@ export default function ClassCard({
    *  the studio accent at 0.12 and adds an "Always runs" chip at the end of the
    *  first line. Only passed when the studio runs guarantees. */
   alwaysRuns?: boolean;
+  /** Decision 103(c): when the action label is more than one word, or the row
+   *  is booked/held/owes a fee, the action sits on its own full-width line
+   *  BELOW the text so the class name, coach and studio never truncate and the
+   *  time stays on one line. */
+  stackAction?: boolean;
+  /** A second status line under the first (the flex "we'll confirm by" line on a
+   *  pay-to-keep row), kept on its own line. */
+  extraLine?: React.ReactNode;
 }) {
   const muted = dimmed || statusTone === "full";
+  // Decision 103(c): stacked rows never truncate the name/coach; the time keeps
+  // its own fixed column.
+  const nameTrunc = stackAction ? "" : "truncate";
   return (
-    <li className={`m-card relative flex items-stretch gap-3 py-4 pl-4 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}
+    <li className={`m-card relative py-4 pl-4 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}
         style={alwaysRuns ? { background: "var(--accent-chip)" } : undefined}>
       <Link href={href} className="absolute inset-0 rounded-[22px]" aria-label={`Open ${name}`}>
         <span className="sr-only">Open {name}</span>
       </Link>
 
-      <span aria-hidden className={`m-stripe ${muted ? "m-stripe-muted" : ""}`} />
+      <div className="relative flex items-stretch gap-3">
+        <span aria-hidden className={`m-stripe ${muted ? "m-stripe-muted" : ""}`} />
 
-      {/* A fixed column, so six cards line their times up on one edge. Ragged
-          times are what made the old list read as prose. */}
-      <div className="pointer-events-none w-[56px] shrink-0 pt-0.5">
-        <p className="num m-time-lg text-ink">{startLabel}</p>
-        {tag}
-        {endLabel && <p className="num m-dur mt-0.5 text-ink-3">{endLabel}</p>}
-      </div>
-
-      <div className="pointer-events-none min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className={`m-name truncate ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
-          {alwaysRuns && (
-            <span className="m-micro shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
-                  style={{ background: "var(--surface)", color: "var(--lime-text)" }}>
-              Always runs
-            </span>
-          )}
+        {/* A fixed column, so six cards line their times up on one edge, and the
+            time always stays on one line. */}
+        <div className="pointer-events-none w-[56px] shrink-0 pt-0.5">
+          <p className="num m-time-lg whitespace-nowrap text-ink">{startLabel}</p>
+          {tag}
+          {endLabel && <p className="num m-dur mt-0.5 whitespace-nowrap text-ink-3">{endLabel}</p>}
         </div>
-        <p className="m-subtle mt-0.5 truncate text-ink-3">
-          {/* Absent, not "TBC". Decision 17: an open shift reads as a normal
-              class to a member, and a row saying nobody has agreed to teach it
-              is a doubt they can do nothing with. */}
-          {[instructor, room].filter(Boolean).join(" · ")}
-        </p>
-        <p className="m-subtle mt-1.5">
-          {/* Duration and seats on one line, in one weight, with the status
-              carrying the only colour. An icon chip belongs on a stat, where
-              it is the only thing distinguishing three identical numbers —
-              here it would be a third mark competing with the stripe. */}
-          <span className="text-ink-3">{durationLabel} · </span>
-          <span
-            className={statusTone === "quiet" ? "text-ink-3" : "font-semibold"}
-            style={
-              statusTone === "booked"  ? { color: "var(--lime-text)" }
-              : statusTone === "holding" ? { color: "var(--amber-deep)" }
-              : statusTone === "full"    ? { color: "var(--ink-3)" }
-              : undefined
-            }
-          >
-            {statusLabel}
-          </span>
-        </p>
+
+        <div className="pointer-events-none min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className={`m-name ${nameTrunc} ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
+            {alwaysRuns && (
+              <span className="m-micro shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
+                    style={{ background: "var(--surface)", color: "var(--lime-text)" }}>
+                Always runs
+              </span>
+            )}
+          </div>
+          <p className={`m-subtle mt-0.5 ${nameTrunc} text-ink-3`}>
+            {/* Absent, not "TBC". Decision 17: an open shift reads as a normal
+                class to a member, and a row saying nobody has agreed to teach it
+                is a doubt they can do nothing with. */}
+            {[instructor, room].filter(Boolean).join(" · ")}
+          </p>
+          <p className="m-subtle mt-1.5">
+            <span className="text-ink-3">{durationLabel} · </span>
+            <span
+              className={statusTone === "quiet" ? "text-ink-3" : "font-semibold"}
+              style={
+                statusTone === "booked"  ? { color: "var(--lime-text)" }
+                : statusTone === "holding" ? { color: "var(--amber-deep)" }
+                : statusTone === "full"    ? { color: "var(--ink-3)" }
+                : undefined
+              }
+            >
+              {statusLabel}
+            </span>
+          </p>
+          {/* Decision 103(c): the flex "we'll confirm by" line keeps its OWN
+              line under the status on a pay-to-keep row. */}
+          {extraLine && <p className="m-subtle mt-0.5 text-ink-3">{extraLine}</p>}
+        </div>
+
+        {/* Beside the text for a short, single-word action (Book). relative z-10
+            lifts it above the overlay Link so the tap fires. */}
+        {!stackAction && (
+          <div className="pointer-events-auto relative z-10 flex shrink-0 items-center">{action}</div>
+        )}
       </div>
 
-      {/* relative z-10 lifts the action above the absolute overlay Link, which
-          otherwise paints on top of it (absolute over static) and swallows the
-          tap — so Book/Cancel opened the detail sheet instead of firing. The
-          rest of the card stays the Link's, so tapping anywhere else opens the
-          class. */}
-      <div className="pointer-events-auto relative z-10 flex shrink-0 items-center">{action}</div>
+      {/* Decision 103(c): a multi-word or booked/held action sits on its own
+          full-width line below the text, so nothing above it is squeezed. */}
+      {stackAction && action && (
+        <div className="pointer-events-auto relative z-10 mt-3 pl-[68px]">{action}</div>
+      )}
     </li>
   );
 }

@@ -67,6 +67,8 @@ export default function BookWeek({
   selfCheckIn,
   startCheckout,
   payAtDesk,
+  cancelBooking,
+  currency,
   opensBeforeMin,
   closesAfterMin,
 }: {
@@ -91,6 +93,8 @@ export default function BookWeek({
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  cancelBooking: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  currency: string;
   opensBeforeMin: number;
   closesAfterMin: number;
 }) {
@@ -312,6 +316,8 @@ export default function BookWeek({
             selfCheckIn={selfCheckIn}
             startCheckout={startCheckout}
             payAtDesk={payAtDesk}
+            cancelBooking={cancelBooking}
+            currency={currency}
             opensBeforeMin={opensBeforeMin}
             closesAfterMin={closesAfterMin}
           />

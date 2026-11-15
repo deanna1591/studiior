@@ -71,14 +71,7 @@ export function toCents(input: string): number | null {
   return Number(whole) * 100 + Number(frac.padEnd(2, "0"));
 }
 
-export function fromCents(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
-
-export function formatMoney(cents: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(cents / 100);
-  } catch {
-    return `${fromCents(cents)} ${currency}`;
-  }
-}
+// Money formatting lives in a pure .mjs so a node test can prove the
+// whole-amount rule (Decision 103(c)); re-exported here so every existing
+// `from "@/lib/plans"` import is unchanged.
+export { fromCents, formatMoney } from "@/lib/format-money";

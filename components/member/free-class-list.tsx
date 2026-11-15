@@ -164,19 +164,22 @@ export default function FreeClassList({
               // booking row); the inline Book-free button sits above the overlay
               // link and books directly. A form/button cannot nest in an anchor,
               // so the link is an absolute overlay.
+              // Decision 103(c): a column, not a row — the action sits on its own
+              // full-width line BELOW the text so the class name, coach and studio
+              // never truncate and the time stays on one line.
               <li key={c.occurrence_id}
-                  className="relative flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3"
+                  className="relative flex flex-col gap-2.5 rounded-2xl bg-surface px-3.5 py-3"
                   style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06), 0 6px 20px rgb(26 21 18 / 0.05)",
                            opacity: muted && !isBooked ? 0.72 : 1 }}>
                 <Link href={`/class/${c.occurrence_id}`} className="absolute inset-0 rounded-2xl"
                       aria-label={`Open ${c.name}`} />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
-                    <span className="num text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</span>
-                    <span className="m-body truncate text-ink">{c.name}</span>
+                    <span className="num whitespace-nowrap text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</span>
+                    <span className="m-body text-ink">{c.name}</span>
                   </div>
-                  <div className="m-micro mt-0.5 flex items-center gap-1.5 text-ink-3">
-                    <span className="truncate">{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
+                  <div className="m-micro mt-0.5 flex flex-wrap items-center gap-1.5 text-ink-3">
+                    <span>{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
                     {c.headcount > 0 && (
                       <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                             style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
@@ -189,22 +192,22 @@ export default function FreeClassList({
                   // Decision 21 amendment (20 Oct 2026): plain words. A free seat
                   // is provisional with no fixed deadline — it confirms once the
                   // class is on.
-                  <span className="relative z-10 shrink-0 text-[12.5px] font-medium text-ink-2">Booked · we&rsquo;ll confirm once the class is on</span>
+                  <span className="relative z-10 text-[12.5px] font-medium text-ink-2">Booked · we&rsquo;ll confirm once the class is on</span>
                 ) : c.free_bookable && reservationFeeLabel ? (
                   // Decision 103: the fee is on — go to the reservation checkout.
                   <Link href={`/reserve/${c.occurrence_id}`}
-                        className="m-press relative z-10 shrink-0 rounded-full px-3.5 py-2 text-center text-[13px] font-semibold"
+                        className="m-press relative z-10 w-full rounded-full px-3.5 py-2 text-center text-[13px] font-semibold"
                         style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
                     Book free, {reservationFeeLabel} to reserve
                   </Link>
                 ) : c.free_bookable ? (
                   <button onClick={() => book(c.occurrence_id)} disabled={pending}
-                          className="m-press relative z-10 shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold disabled:opacity-60"
+                          className="m-press relative z-10 w-full rounded-full px-3.5 py-2 text-center text-[13px] font-semibold disabled:opacity-60"
                           style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
                     {pending ? "…" : "Book free"}
                   </button>
                 ) : (
-                  <span className="relative z-10 shrink-0 text-[12px] text-ink-3">Full for free classes</span>
+                  <span className="relative z-10 text-[12px] text-ink-3">Full for free classes</span>
                 )}
               </li>
             );

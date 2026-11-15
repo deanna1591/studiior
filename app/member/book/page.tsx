@@ -8,7 +8,7 @@ import { loadLen, windowOffsets as windowOffsetsFor } from "@/lib/book-window";
 import { type Row } from "@/components/member/day-classes";
 import BookWeek, { type DayBundle } from "@/components/member/book-week";
 import FreeClassList from "@/components/member/free-class-list";
-import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk } from "../actions";
+import { bookClass, bookFirstFree, selfCheckIn, startCheckout, payAtDesk, cancelBooking } from "../actions";
 import { addDays, dayStart, fmtTime, fmtDeadlineShort, zonedDateKey } from "@/lib/time";
 import { freeEligibleSet, whichView, nearestEligibleDay } from "@/lib/free-first-view";
 import { formatMoney } from "@/lib/plans";
@@ -105,7 +105,8 @@ export default async function Book({
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
          { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig },
-         { data: announceRaw }, { data: freeListRaw }, { data: checkinRows }, { data: pendingRows }] =
+         { data: announceRaw }, { data: freeListRaw }, { data: checkinRows }, { data: pendingRows },
+         { data: dueRows }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -185,8 +186,13 @@ export default async function Book({
         .gte("checked_in_at", winFrom.toISOString())
         .lt("checked_in_at", winTo.toISOString()),
       // Decision 21: a booked flex class still awaiting its cutoff reads
-      // "Waiting for confirmation", not "Reserved". Same batch, no extra hop.
+      // "Waiting for confirmation", not "Reserved". Decision 103(c): the same
+      // call now carries a reservation HOLD (pending_payment comp) with its
+      // expiry, so the row shows "Payment pending" rather than booked. Same
+      // batch, no extra hop.
       supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId }),
+      // Decision 103(d) pay-to-keep: existing free bookings that owe the fee.
+      supabase.rpc("member_reservation_dues", { p_studio_id: ctx.studioId }),
     ]);
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const freeList = ((freeListRaw ?? []) as unknown as {
@@ -237,9 +243,25 @@ export default async function Book({
   // bare — it confirms the moment the class is on, so a deadline would mislead.
   // Keep the value, not just presence, so the Book list can tell them apart the
   // way Home and the class page already do.
-  const pendingMap = new Map(((pendingRows ?? []) as
-    { occurrence_id: string; pending_until: string | null }[])
-    .map((r) => [r.occurrence_id, r.pending_until]));
+  // Decision 103(c): member_pending_bookings now carries the booking status and,
+  // for a RESERVATION HOLD (pending_payment comp), its expiry. A hold is shown
+  // as "Payment pending", never as a booked flex. Split the rows accordingly.
+  type PendRow = { occurrence_id: string; booking_id: string | null; status: string;
+                   hold_until: string | null; pending_until: string | null };
+  const holdMap = new Map<string, { bookingId: string | null; holdUntil: string | null }>();
+  const flexPendingMap = new Map<string, string | null>(); // occ -> pending_until (flex deadline)
+  for (const r of (pendingRows ?? []) as PendRow[]) {
+    if (r.status === "pending_payment") {
+      holdMap.set(r.occurrence_id, { bookingId: r.booking_id, holdUntil: r.hold_until });
+    } else {
+      flexPendingMap.set(r.occurrence_id, r.pending_until);
+    }
+  }
+  // Decision 103(d): existing free bookings that owe the fee -> the pay-to-keep
+  // row line. The deadline is the cancellation cut-off (start minus the cut-off).
+  const dueMap = new Map<string, number>(
+    ((dueRows ?? []) as { occurrence_id: string; fee_cents: number }[])
+      .map((d) => [d.occurrence_id, d.fee_cents]));
 
   // Initial filter state; the client filters the fetched week in place now.
   const typeFilter = searchParams.type ?? "";
@@ -364,9 +386,19 @@ export default async function Book({
     // 'attended' is a booked seat that has been checked in (Decision 68).
     const booked = booking?.status === "booked" || booking?.status === "attended";
     const waiting = booking?.status === "waitlisted";
-    const holding = booking?.status === "pending_payment";
+    // Decision 103(c): a reservation hold (pending_payment comp) comes from
+    // member_pending_bookings, not the bookings query (which excludes it).
+    const hold = holdMap.get(o.id) ?? null;
+    const holding = !!hold;
     const checkedIn = checkedInSet.has(o.id) || booking?.status === "attended";
-    const pendingUntil = pendingMap.get(o.id) ?? null;
+    const pendingUntil = flexPendingMap.get(o.id) ?? null;
+    // Decision 103(d): a booked free booking that owes the fee -> pay-to-keep.
+    const dueFee = booked ? (dueMap.get(o.id) ?? null) : null;
+    const dueDeadline = dueFee != null
+      ? fmtDeadlineShort(
+          new Date(new Date(o.starts_at).getTime() - settings.cancellationCutoff * 60_000).toISOString(),
+          ctx.timeZone, ctx.timeFormat)
+      : null;
     const loc = (o as unknown as { locations?: { latitude: number | null;
       longitude: number | null; self_checkin_requires_location: boolean } | null }).locations ?? null;
     const selfCheckinAvailable = loc
@@ -394,17 +426,20 @@ export default async function Book({
     const opensOn = outOfWindow
       ? dayLabel(new Date(new Date(o.starts_at).getTime() - windowMs).toISOString())
       : null;
-    const base: Row["base"] = past ? "past" : holding ? "holding" : booked ? "booked"
+    const base: Row["base"] = past ? "past" : holding ? "reservationHold" : booked ? "booked"
       : waiting ? "waiting" : outOfWindow ? "future" : peakBlocked ? "peakBlocked" : full ? "full" : "none";
     const row: Row = {
       id: o.id,
       classTypeId: o.class_type_id ?? null,
       instructorId: o.instructor_id ?? null,
-      bookingId: booking?.id ?? null,
+      bookingId: hold?.bookingId ?? booking?.id ?? null,
       bookingStatus: booking?.status ?? null,
       checkedIn,
-      flexPending: pendingMap.has(o.id),
+      flexPending: flexPendingMap.has(o.id),
       pendingLabel: pendingUntil ? fmtDeadlineShort(pendingUntil, ctx.timeZone, ctx.timeFormat) : null,
+      holdUntil: hold?.holdUntil ?? null,
+      dueFee,
+      dueDeadline,
       startsAt: o.starts_at,
       endsAt: o.ends_at ?? null,
       selfCheckinAvailable,
@@ -553,6 +588,8 @@ export default async function Book({
         selfCheckIn={selfCheckIn}
         startCheckout={startCheckout}
         payAtDesk={payAtDesk}
+        cancelBooking={cancelBooking}
+        currency={settings.currency}
         opensBeforeMin={settings.checkinOpensBefore}
         closesAfterMin={settings.checkinClosesAfter}
       />

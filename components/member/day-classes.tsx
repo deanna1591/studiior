@@ -1,10 +1,13 @@
 "use client";
 
 import { Fragment, useState, useTransition } from "react";
+import Link from "next/link";
 import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import ClassCard from "./class-card";
 import ClassButton from "./class-button";
+import { HoldCountdown, PaymentPendingActions } from "./payment-pending";
+import { formatMoney } from "@/lib/plans";
 import { haptic } from "@/lib/haptics";
 import type { BookResult, ActionResult, CheckInResult } from "@/app/member/actions";
 
@@ -65,7 +68,14 @@ export type Row = {
    *  "Always runs" chip, only when the studio runs guarantees. */
   alwaysRuns: boolean;
   /** The resolved state the server computed for this row. */
-  base: "none" | "booked" | "waiting" | "holding" | "full" | "past" | "peakBlocked" | "future";
+  base: "none" | "booked" | "waiting" | "holding" | "reservationHold" | "full" | "past" | "peakBlocked" | "future";
+  /** Decision 103(c): a reservation HOLD (pending_payment comp) expires at this
+   *  instant; the row shows "Payment pending" with the minutes left. */
+  holdUntil: string | null;
+  /** Decision 103(d) pay-to-keep: an existing free booking owes the fee. The
+   *  row shows "Booked, {fee} due by {deadline} to keep your spot" + Pay. */
+  dueFee: number | null;
+  dueDeadline: string | null;
   spaces: number;
   waitlistPosition: number | null;
   waitlistEnabled: boolean;
@@ -92,6 +102,8 @@ export default function DayClasses({
   selfCheckIn,
   startCheckout,
   payAtDesk,
+  cancelBooking,
+  currency,
   opensBeforeMin,
   closesAfterMin,
 }: {
@@ -106,6 +118,10 @@ export default function DayClasses({
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  /** Decision 103(c): release a reservation hold at once (the existing cancel
+   *  path for a pending_payment booking). */
+  cancelBooking: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  currency: string;
   opensBeforeMin: number;
   closesAfterMin: number;
 }) {
@@ -162,8 +178,15 @@ export default function DayClasses({
         const state = effectiveState(r);
         const err = errors[r.id];
 
+        // Decision 103(d) pay-to-keep: an existing free booking that owes the
+        // fee reads the due text on the row, with Pay.
+        const payToKeep = state === "booked" && r.dueFee != null;
+        const feeLabel = r.dueFee != null ? formatMoney(r.dueFee, currency) : "";
+
         const statusLabel =
-          state === "booked" ? "Booked"
+          state === "reservationHold" ? <HoldCountdown holdUntil={r.holdUntil!} />
+          : payToKeep ? <>Booked, {feeLabel} due by {r.dueDeadline} to keep your spot</>
+          : state === "booked" ? "Booked"
           : state === "holding" ? "Holding your spot"
           : state === "waiting" ? <>You&rsquo;re #<span className="num">{r.waitlistPosition}</span> on the list</>
           : state === "past" ? "This one has started"
@@ -176,16 +199,44 @@ export default function DayClasses({
           : <><span className="num">{r.spaces}</span> left</>;
 
         const statusTone: "quiet" | "booked" | "full" | "holding" =
-          state === "booked" ? "booked"
+          state === "reservationHold" ? "holding"
+          : payToKeep ? "booked"
+          : state === "booked" ? "booked"
           : state === "holding" ? "holding"
           : state === "full" ? "full"
           : "quiet";
+
+        // Decision 103(c): a multi-word action (Book free, Finish paying, a
+        // booked/held/pay-to-keep row) sits on its own full-width line below the
+        // text, so the name/coach never truncate. A plain single-word "Book"
+        // stays beside.
+        const rowIsFreeBtn = state === "none" && freeFirstEligible && !!freeEligibleIds?.has(r.id);
+        const stackAction =
+          state === "reservationHold" || state === "holding"
+          || state === "booked" || state === "waiting"
+          || (state === "full" && r.waitlistEnabled)
+          || rowIsFreeBtn;
+        const btnW = stackAction ? "w-full text-center" : "min-w-[84px]";
+        const extraLine = payToKeep && r.pendingLabel
+          ? <>We&rsquo;ll confirm by {r.pendingLabel}</> : null;
 
         let action: React.ReactNode = null;
         // Decision 55 follow-up: set in the Book-button branch when this row is
         // not free-bookable for an eligible member (→ a muted note below).
         let freeNote = false;
         if (state === "past") action = null;
+        else if (state === "reservationHold") {
+          // Decision 103(c): a reservation hold is "Payment pending", never
+          // booked — Finish paying reopens the payment page, Cancel releases it.
+          action = (
+            <PaymentPendingActions
+              occurrenceId={r.id}
+              bookingId={r.bookingId}
+              cancelBooking={cancelBooking}
+              onCancelled={() => setOverride((s) => ({ ...s, [r.id]: "cancelled" }))}
+            />
+          );
+        }
         else if (state === "future") {
           // Too far ahead to book yet — say when it opens, rather than a Book
           // button that would refuse on tap.
@@ -209,7 +260,7 @@ export default function DayClasses({
               <form action={(fd) => { startCheckout(null, fd); }}>
                 <input type="hidden" name="kind" value="dropin" />
                 <input type="hidden" name="booking_id" value={r.bookingId ?? ""} />
-                <button className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
+                <button className={`m-tap m-press ${btnW} rounded-full px-4 text-[13px] font-bold`}
                         style={accentSolid()}>
                   Pay now
                 </button>
@@ -221,6 +272,17 @@ export default function DayClasses({
                 </button>
               </form>
             </span>
+          );
+        } else if (payToKeep) {
+          // Decision 103(d) pay-to-keep: an existing free booking owes the fee.
+          // The row carries a Pay button (the due card is still shown too); the
+          // flex "we'll confirm by" line sits under the status (extraLine).
+          action = (
+            <Link href={`/reserve/${r.id}`}
+                  className={`m-tap m-press ${btnW} rounded-full px-4 text-[13px] font-bold`}
+                  style={accentSolid({ display: "inline-block" })}>
+              Pay {feeLabel}
+            </Link>
           );
         } else if (state === "booked" || state === "waiting") {
           // Decision 68: one button carries where the member is —
@@ -256,7 +318,7 @@ export default function DayClasses({
               style={r.alwaysRuns
                 ? { background: "transparent", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }
                 : { background: "var(--accent-chip)", color: "var(--ink)" }}
-              className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
+              className={`m-tap m-press ${btnW} rounded-full px-4 text-[13px] font-bold`}
             >
               Join waitlist
             </button>
@@ -275,7 +337,7 @@ export default function DayClasses({
               style={r.alwaysRuns
                 ? { background: "transparent", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }
                 : { background: "var(--accent-chip)", color: "var(--ink)" }}
-              className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
+              className={`m-tap m-press ${btnW} rounded-full px-4 text-[13px] font-bold`}
             >
               {rowIsFree ? "Book free" : "Book"}
             </button>
@@ -306,6 +368,8 @@ export default function DayClasses({
               statusLabel={statusLabel}
               statusTone={statusTone}
               action={action}
+              stackAction={stackAction}
+              extraLine={extraLine}
               booked={state === "booked"}
               dimmed={state === "past" || state === "peakBlocked"}
               alwaysRuns={r.alwaysRuns}

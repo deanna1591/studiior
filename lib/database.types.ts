@@ -9929,8 +9929,11 @@ export type Database = {
       member_pending_bookings: {
         Args: { p_studio_id: string }
         Returns: {
+          booking_id: string
+          hold_until: string
           occurrence_id: string
           pending_until: string
+          status: string
         }[]
       }
       member_plan_overview: {

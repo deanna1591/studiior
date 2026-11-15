@@ -46,6 +46,7 @@ export async function signOut() {
 // sentence. It lives in a plain module (not this "use server" file, which may
 // only export async functions) so the checkout actions can share it.
 import { REASONS } from "@/lib/booking-reasons";
+import { RESERVATION_HOLD_RETAP } from "@/lib/reservation-hold";
 
 export type BookResult = { ok: true; message: string } | { ok: false; message: string } | null;
 
@@ -78,6 +79,15 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
   if (!result) return { ok: false, message: "No response from the booking function." };
 
   if (result.failure_reason) {
+    // Decision 103(c): if this member is already HOLDING an unpaid reservation
+    // on this class, a re-tap means "finish paying, or cancel the hold" — not
+    // "you are already on the list". A hold reads as pending_payment in
+    // member_pending_bookings; a genuinely-used free class does not.
+    const occId0 = String(formData.get("occurrence_id") ?? "");
+    const { data: held } = await supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId });
+    const heldRow = (held as { occurrence_id: string; status: string | null }[] | null)
+      ?.find((p) => p.occurrence_id === occId0 && p.status === "pending_payment");
+    if (heldRow) return { ok: false, message: RESERVATION_HOLD_RETAP };
     return { ok: false, message: REASONS[result.failure_reason] ?? result.failure_reason };
   }
 
@@ -104,8 +114,8 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
   // scheduled); a flex seat carries a deadline, so pending_until is set here.
   const occId = String(formData.get("occurrence_id") ?? "");
   const { data: pend } = await supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId });
-  const pendingRow = (pend as { occurrence_id: string; pending_until: string | null }[] | null)
-    ?.find((p) => p.occurrence_id === occId);
+  const pendingRow = (pend as { occurrence_id: string; status: string | null; pending_until: string | null }[] | null)
+    ?.find((p) => p.occurrence_id === occId && p.status === "booked");
   if (pendingRow) {
     const by = pendingRow.pending_until
       ? ` by ${fmtDeadlineShort(pendingRow.pending_until, ctx.timeZone, ctx.timeFormat)}`
