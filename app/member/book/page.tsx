@@ -3,6 +3,7 @@ import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { type MonthDay } from "@/components/member/week-strip";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
+import { showsAlwaysRuns } from "@/lib/tier-tint";
 import { type Row } from "@/components/member/day-classes";
 import BookWeek, { type DayBundle } from "@/components/member/book-week";
 import FreeClassList from "@/components/member/free-class-list";
@@ -106,7 +107,7 @@ export default async function Book({
     await Promise.all([
       supabase
         .from("class_occurrences")
-        .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, instructors!instructor_id(display_name, avatar_url), class_types(image_url), rooms(name), locations(latitude, longitude, self_checkin_requires_location)")
+        .select("id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, class_type_id, instructor_id, guarantee_tier, flex, instructors!instructor_id(display_name, avatar_url), class_types(image_url), class_series(guarantee_tier, flex), rooms(name), locations(latitude, longitude, self_checkin_requires_location)")
         // A flex class the cutoff turned off is GONE here — not shown cancelled,
         // not struck through, absent. occ_member_read already hides it from a
         // member who never booked it; this closes the own-read path for one who
@@ -413,6 +414,14 @@ export default async function Book({
       instructor: o.instructors?.display_name ?? null,
       room: o.rooms?.name ?? null,
       isPeak,
+      // Decision 22 amendment: a core (or always-runs) class is tinted with an
+      // "Always runs" chip, only when the studio runs guarantees.
+      alwaysRuns: showsAlwaysRuns(settings.guaranteesEnabled, {
+        tier: (o as { guarantee_tier?: string | null }).guarantee_tier ?? null,
+        flex: (o as { flex?: boolean | null }).flex ?? null,
+        seriesTier: (o as { class_series?: { guarantee_tier?: string | null } | null }).class_series?.guarantee_tier ?? null,
+        seriesFlex: (o as { class_series?: { flex?: boolean | null } | null }).class_series?.flex ?? null,
+      }),
       base,
       spaces,
       waitlistPosition: booking?.waitlist_position ?? null,

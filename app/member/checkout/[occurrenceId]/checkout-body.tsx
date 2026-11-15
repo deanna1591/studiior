@@ -27,7 +27,7 @@ export type CheckoutPlanRow = {
  */
 export default function CheckoutBody({
   occId, className, whenLabel, instructorFirst, costLine, covered,
-  plans, guestAvailable, deskPayAvailable, payeeNoticeName, studioName,
+  plans, guestAvailable, canInviteGuest, deskPayAvailable, payeeNoticeName, studioName,
   creditCents,
 }: {
   occId: string;
@@ -38,6 +38,7 @@ export default function CheckoutBody({
   covered: boolean;
   plans: CheckoutPlanRow[];
   guestAvailable: boolean;
+  canInviteGuest: boolean;
   deskPayAvailable: boolean;
   payeeNoticeName: string | null;
   studioName: string;
@@ -93,7 +94,7 @@ export default function CheckoutBody({
       ) : (
         <>
           {/* 2. Add a guest (existing guest-pass flow), only when one is available */}
-          {guestAvailable && <GuestInvite occurrenceId={occId} />}
+          {guestAvailable && <GuestInvite occurrenceId={occId} canInvite={canInviteGuest} />}
 
           {/* 3. Choose how to pay */}
           <section className="mt-5">

@@ -93,6 +93,12 @@ export async function memberScreen() {
       // classes, so the picker chooses its line (the eligible-classes reader
       // already excludes flex).
       freeFirstCoreOnly: b?.free_first_core_only ?? false,
+      // Decision 22 amendment: the studio runs guarantees, so a core class is
+      // tinted on the member Book and class readers.
+      guaranteesEnabled: b?.guarantees_enabled ?? false,
+      // Decision 26(c): the member may invite a guest (switch off, or a plan).
+      // Defaults true so an absent field never hides the invite.
+      canInviteGuest: b?.can_invite_guest ?? true,
     },
   };
 }

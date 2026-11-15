@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function ClassSheet({ params, searchParams }: { params: { id: string }; searchParams: { t?: string } }) {
   const { ctx, supabase, settings, preset, accent } = await memberScreen();
-  const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
+  const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null, settings.canInviteGuest, settings.guaranteesEnabled);
   const deskPayAvailable = ctx.bootstrap?.desk_pay_available ?? true;
   // Not found or not visible: show no sheet rather than an empty one. The
   // address bar still reads /class/[id]; a back step closes it.
@@ -31,7 +31,7 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
   return (
     <Sheet preset={preset} accent={accent}>
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending}
+                       timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} alwaysRuns={data.alwaysRuns} freeFirst={data.freeFirst} pending={data.pending}
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
                        unpaid={data.unpaid} group={data.group} covered={data.covered}

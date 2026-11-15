@@ -546,3 +546,38 @@ export async function removeBooking(_prev: RemoveResult, fd: FormData): Promise<
   revalidatePath("/roster");
   return { ok: true, message: `Removed from ${r?.class_name ?? "the class"}, ${r?.when ?? ""}.` };
 }
+
+export type AlwaysRunsState = { ok: boolean; message: string } | null;
+
+/**
+ * Decision 21 amendment — "Runs regardless of bookings". Sets the occurrence
+ * guarantee_tier to 'always' (on) or null (off); the flex flag and minimum are
+ * never touched. Locked once the class is decided (committed or cancelled) or
+ * has started — the DB raises PT409, surfaced as "Decided at the cut-off".
+ */
+export async function setAlwaysRuns(_prev: AlwaysRunsState, fd: FormData): Promise<AlwaysRunsState> {
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const on = String(fd.get("on") ?? "") === "1";
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_occurrence_always_runs", {
+    p_occurrence_id: occurrenceId, p_on: on,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers change the timetable."
+        : /PT409/.test(m) ? "Decided at the cut-off — this class can no longer be changed."
+        : m,
+    };
+  }
+  revalidatePath(`/roster/${occurrenceId}`);
+  revalidatePath("/schedule");
+  revalidatePath("/schedule/flex");
+  return {
+    ok: true,
+    message: on
+      ? "This class runs regardless of bookings now."
+      : "Back to flex — it runs only if it reaches its minimum.",
+  };
+}

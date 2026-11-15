@@ -21,7 +21,7 @@ function Submit() {
  * said plainly (one free class ever; one guest at a time); the refusals come
  * back from book_guest as whole sentences.
  */
-export default function GuestInvite({ occurrenceId }: { occurrenceId: string }) {
+export default function GuestInvite({ occurrenceId, canInvite = true }: { occurrenceId: string; canInvite?: boolean }) {
   const [state, action] = useFormState<BookResult, FormData>(bringGuest, null);
 
   return (
@@ -35,6 +35,17 @@ export default function GuestInvite({ occurrenceId }: { occurrenceId: string }) 
               style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>Free</span>
       </summary>
 
+      {/* Decision 26(c): the studio only lets members with a plan invite a guest. */}
+      {!canInvite ? (
+        <div className="border-t border-line p-4">
+          <p className="m-sub text-ink">Guest invites are for members with a plan. Pick a plan to bring a friend.</p>
+          <a href="/account/plan"
+             className="m-tap m-press mt-3 inline-block rounded-full px-5 py-2.5 text-[14px] font-bold"
+             style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            See plans
+          </a>
+        </div>
+      ) : (
       <form action={action} className="border-t border-line p-4">
         {state && (
           <p className={`m-sub mb-3 rounded-xl px-3 py-2 ${state.ok ? "text-ink" : "text-ink"}`}
@@ -62,6 +73,7 @@ export default function GuestInvite({ occurrenceId }: { occurrenceId: string }) 
           </>
         )}
       </form>
+      )}
     </details>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { republishShift, openShift } from "@/app/staff/roster/actions";
+import { republishShift, openShift, setAlwaysRuns, type AlwaysRunsState } from "@/app/staff/roster/actions";
 import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
 import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
@@ -33,6 +33,16 @@ export type BlockFacts = {
   hidden?: boolean;
   /** Decision 91: whether this class is core, for the hide-confirm warning. */
   isCore?: boolean;
+  /** Decision 21 amendment: the effective tier ('core'|'flex'|'always'), for the
+   *  "Runs regardless of bookings" switch (shown only on a flex or always class). */
+  tier?: string | null;
+  /** Decision 21 amendment: the class is committed (decided) — locks the switch. */
+  committed?: boolean;
+  /** Decision 21 amendment: the class start, in ms — locks the switch once past. */
+  startsAtMs?: number;
+  /** Decision 21 amendment: the studio runs guarantees or flex, so the tier and
+   *  the "Runs regardless" switch are relevant. */
+  showTier?: boolean;
 };
 
 /**
@@ -321,6 +331,16 @@ export default function BlockPanel({
           <FreeFirstCard occurrenceId={facts.id} initial={facts.freeFirst} onChange={onFreeFirstChange} />
         )}
 
+        {/* Decision 21 amendment: "Runs regardless of bookings" for a flex class.
+            Shown on a flex or already-always class when the studio runs flex or
+            guarantees; locked once the class is decided or has started. */}
+        {canManage && !facts.cancelled && facts.showTier
+          && (facts.tier === "flex" || facts.tier === "always") && (
+          <AlwaysRunsCard occurrenceId={facts.id}
+                          on={facts.tier === "always"}
+                          locked={!!facts.committed || (facts.startsAtMs != null && facts.startsAtMs <= Date.now())} />
+        )}
+
         {/* Decision 91: take this class off the member side without cancelling. */}
         {canManage && !facts.cancelled && (
           <VisibilityCard occurrenceId={facts.id} hidden={!!facts.hidden}
@@ -352,6 +372,54 @@ function causeLabel(cause?: string | null): string {
     case "closure": return "the studio was closed";
     default: return "cancelled";
   }
+}
+
+/**
+ * Decision 21 amendment — "Runs regardless of bookings". A manager flips a flex
+ * class to run regardless (guarantee_tier = always) or back to flex (null). The
+ * flex flag and minimum are never touched. Locked once the class is decided or
+ * has started; the card then reads "Decided at the cut-off".
+ */
+function AlwaysRunsCard({ occurrenceId, on, locked }: {
+  occurrenceId: string; on: boolean; locked: boolean;
+}) {
+  const [pending, start] = useTransition();
+  const [cur, setCur] = useState(on);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState(false);
+  function toggle(next: boolean) {
+    const fd = new FormData();
+    fd.set("occurrence_id", occurrenceId);
+    fd.set("on", next ? "1" : "0");
+    start(async () => {
+      const r: AlwaysRunsState = await setAlwaysRuns(null, fd);
+      if (r?.ok) { setCur(next); setErr(false); setMsg(r.message); }
+      else { setErr(true); setMsg(r?.message ?? "That could not be done."); }
+    });
+  }
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <p className="text-[13px] font-medium text-ink">Runs regardless of bookings</p>
+      <p className="mt-0.5 text-[12px] leading-[18px] text-ink-3">
+        The class runs and the instructor is paid even if nobody books.
+      </p>
+      {locked ? (
+        <p className="mt-2 text-[12px] text-ink-2">Decided at the cut-off.</p>
+      ) : (
+        <label className="mt-2 flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={cur} disabled={pending}
+                 onChange={(e) => toggle(e.target.checked)} />
+          <span className="text-[13px] text-ink">{cur ? "On" : "Off"}</span>
+          {pending && <span className="text-[12px] text-ink-3">Saving…</span>}
+        </label>
+      )}
+      {msg && (
+        <p className="mt-1.5 text-[12px]" style={{ color: err ? "var(--coral-deep)" : "var(--ink-2)" }}>
+          {msg}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**

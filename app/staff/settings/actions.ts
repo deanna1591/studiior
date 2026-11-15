@@ -398,10 +398,12 @@ export async function saveGuestPasses(_prev: PlainState, fd: FormData): Promise<
   if (!ctx) return { ok: false, message: "You are not signed in." };
 
   const on = String(fd.get("guest_passes_enabled") ?? "") === "on";
+  // Decision 26(c): only members with a plan may invite.
+  const membersOnly = String(fd.get("guest_invites_members_only") ?? "") === "on";
 
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
-    .update({ guest_passes_enabled: on })
+    .update({ guest_passes_enabled: on, guest_invites_members_only: membersOnly })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };

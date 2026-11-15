@@ -187,6 +187,8 @@ const GUEST_REASONS: Record<string, string> = {
   host_not_booked: "We couldn't book you into this class, so there's nothing to bring a guest to.",
   not_authorised: "Please sign in as a member to bring a guest.",
   not_found: "That class could not be found.",
+  // Decision 26(c): the studio only lets members with a plan invite a guest.
+  invite_needs_plan: "Guest invites are for members with a plan. Pick a plan to bring a friend.",
 };
 
 export async function bringGuest(_prev: BookResult, formData: FormData): Promise<BookResult> {

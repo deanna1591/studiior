@@ -26,6 +26,8 @@ export type FreeFirst = { eligible: boolean; isFreeBooking: boolean };
  *  confirmed, and how the deadline is expressed. Null for core/always/decided. */
 export type Pending = { until: string | null; mode: string } | null;
 
+import { showsAlwaysRuns } from "@/lib/tier-tint";
+
 export async function loadClassDetail(
   supabase: Supa,
   memberId: string,
@@ -33,16 +35,18 @@ export async function loadClassDetail(
   id: string,
   guestPassesEnabled: boolean,
   classTypeId?: string | null,
+  canInviteGuest: boolean = true,
+  guaranteesEnabled: boolean = false,
 ): Promise<{ occ: DetailOccurrence; type: DetailType; booking: DetailBooking;
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
   checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean;
-  unpaid: boolean; covered: boolean; seatKind: SeatKind;
+  unpaid: boolean; covered: boolean; seatKind: SeatKind; alwaysRuns: boolean;
   group: { isHost: boolean; host: string; plan: string; groupId: string } | null;
   duplicateHold: boolean; holdTime: string | null } | null> {
 
   const occQuery = supabase
     .from("class_occurrences")
-    .select("id, studio_id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, status, class_type_id, instructor_id, rooms(name), instructors!instructor_id(display_name, bio, avatar_url, certifications), locations(latitude, longitude, self_checkin_requires_location)")
+    .select("id, studio_id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, status, class_type_id, instructor_id, guarantee_tier, flex, rooms(name), instructors!instructor_id(display_name, bio, avatar_url, certifications), class_series(guarantee_tier, flex), locations(latitude, longitude, self_checkin_requires_location)")
     .eq("id", id).maybeSingle();
   const typeQuery = (ctid: string) => supabase.from("class_types")
     .select("name, description, image_url, image_focus_x, image_focus_y").eq("id", ctid).maybeSingle();
@@ -133,7 +137,18 @@ export async function loadClassDetail(
       occ: occ as unknown as DetailOccurrence,
       type: (type ?? null) as DetailType,
       booking: bk,
-      guest: { enabled: guestPassesEnabled, canInvite: guestPassesEnabled && (activeGuests ?? 0) === 0 },
+      // Decision 26(c): `enabled` = show the guest block (feature on, room for a
+      // guest); `canInvite` = the member may actually invite (plan gate, else the
+      // block shows "pick a plan").
+      guest: { enabled: guestPassesEnabled && (activeGuests ?? 0) === 0, canInvite: canInviteGuest },
+      // Decision 22 amendment: the class page header is tinted for a core (or
+      // always-runs) class when the studio runs guarantees.
+      alwaysRuns: showsAlwaysRuns(guaranteesEnabled, {
+        tier: (occ as { guarantee_tier?: string | null }).guarantee_tier ?? null,
+        flex: (occ as { flex?: boolean | null }).flex ?? null,
+        seriesTier: (occ as { class_series?: { guarantee_tier?: string | null } | null }).class_series?.guarantee_tier ?? null,
+        seriesFlex: (occ as { class_series?: { flex?: boolean | null } | null }).class_series?.flex ?? null,
+      }),
       freeFirst: { eligible: e?.ok === true, isFreeBooking: (freeCount ?? 0) > 0 },
       // Decision 68: checked in by any door, and whether the geofenced self
       // check-in can run (else the button falls back to the desk code).

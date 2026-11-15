@@ -198,6 +198,10 @@ export type MemberBootstrap = {
   reservation_credit_cents: number;
   /** Decision 30 amendment: the studio limits the free first class to core classes. */
   free_first_core_only: boolean;
+  /** Decision 22 amendment: the studio runs guarantees, so a core class is tinted. */
+  guarantees_enabled: boolean;
+  /** Decision 26(c): the member may invite a guest (switch off, or holds a plan). */
+  can_invite_guest: boolean;
 };
 
 /** Who is making this request, on the member PWA. */

@@ -165,7 +165,9 @@ export default async function ShiftsPage() {
       ) : (
         <ul className="space-y-2">
           {openList.map((o) => (
-            <li key={o.occurrence_id} className="m-card px-3 py-3">
+            <li key={o.occurrence_id} className="m-card px-3 py-3"
+                style={ctx.guaranteesEnabled && (o.tier === "core" || o.tier === "always")
+                  ? { background: "var(--accent-chip)" } : undefined}>
               <div className="flex items-baseline gap-3">
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">

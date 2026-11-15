@@ -547,6 +547,12 @@ A manager or owner can waive the reservation fee for one member from the profile
 
 **Email fixes (recorded as notes, built with the amendment):** `instructor_closure_notice`'s `{class_list}` renders one class per line as a class card in HTML (today the lines collapse into one paragraph). `template_sample_context` carries the closure sample tokens (`{from}`, `{to}`, `{resume_date}`, `{notice}`) so the Templates preview fills them. The instructor digest's table tokens (`{going_ahead_table}`, `{cancelled_table}`) and the flex rescue `{class_list_core}` card token are available to overrides. The digest table heading reads "Running" instead of "Going ahead". The plain-text body of `free_booking_confirmed` gets a space before `{reservation_line}` so the reservation sentence does not abut the prior one.
 
+### Amendment (b): the credit-back email (recorded 15 Nov 2026, POOLED — not yet built)
+
+When a reservation credit is written after a check-in, one email `free_reservation_credited` goes to the member. Subject: "Your ₱{fee} is back on your account". Body: "Thanks for coming to {class_name} today. Your ₱{fee} reservation fee is now credit on your account. It comes off your next class package or merchandise automatically." with a button "See plans" to the plans page. On the per-email switch (Decision 78e). Platform default only; Reform's override is Deanna's to write.
+
+**Where:** the `write_reservation_credit` path (where the credit row is written after an attended check-in, Decision 103) queues `free_reservation_credited` once per credit; the new platform template (`free_reservation_credited`, 80a frame, the "See plans" accent button to the member `/account/plan`); `lib/templates.mjs` lists the key under the Free first class group (audience Members, feature `free_first`); `template_sample_context` extended for the preview. **Suite test:** a check-in on a reserved free seat writes the credit and queues exactly one `free_reservation_credited`; a no-show writes no credit and queues none. **Status:** pooled for the next build. **Reuses:** Decision 103 (the credit on check-in, `write_reservation_credit`, `tg_reservation_credit`), Decision 78e (per-email switch), Decision 80a (frame + accent button). Deanna, 15 Nov 2026.
+
 ### Note (recorded 14 Nov 2026) — the checkout Total shows the net
 
 On every checkout the Total shows the amount the member will actually pay after the reservation credit, with the gross price and the credit line above it. Today the Total line on the plan, pack and merchandise checkout pages shows the gross price while the applied/remaining lines sit above it; the Total becomes `price minus applied`, so the member reads what they pay. The ₱20 floor is unchanged: a credit never reduces the net below the processor minimum, so the net is `max(price minus applied, floor)` exactly as the begin functions compute. **Status:** settled. Deanna, 14 Nov 2026.
@@ -1863,6 +1869,10 @@ This does **not** contradict Decision 65's rule that *the commitment never affec
 
 **(b) Recorded 3 Nov 2026.** On the staff member page, when the member came in through a guest pass or a friend invite and has not claimed their account, the App account panel reads: "{first_name} was invited by {host_first_name} on {date}. Their link to set a password and sign the waiver is open until {expiry}." with the button "Resend invite", which re-sends the same guest invite (new token, old one revoked). After expiry: "{first_name}'s link expired on {expiry}." with the button "Send a new invite". Members staff added by hand keep today's wording. Once claimed, the panel shows "Signed in since {date}" as today.
 
+**(c) Only paying members invite a guest, when the studio chooses (recorded 15 Nov 2026).** Optional per studio, off by default: Settings → Memberships & payments → Guests gains a switch "Only members with a plan can invite a guest". When it is on, a member may invite a guest only if they hold an active or trialing membership, a pack or intro with at least one credit, or an unlimited plan; otherwise the invite control on the class and checkout pages reads "Guest invites are for members with a plan. Pick a plan to bring a friend." with a "See plans" button to the plans page, and `book_guest` refuses with `invite_needs_plan`. Staff invites are unaffected: a walk-in or staff-brought guest is never gated. When the switch is off, Decision 26 is unchanged and any member (a lead included) may invite.
+
+**Where:** `studio_settings.guest_invites_members_only`, default false, registered, at Settings → Memberships & payments → Guests; `book_guest` re-issued from newest with the active-plan check (reason `invite_needs_plan`) that fires only when the switch is on and the caller is the host (the staff path is unaffected); `member_bootstrap` carries `can_invite_guest` so the two invite surfaces (the class page `GuestInvite` and the checkout `GuestInvite`) swap the button for the "pick a plan" line without an extra round trip. **Status:** settled. **Reuses:** Decision 26 (guest passes), Decision 49 and 88 (the plan check and the See-plans link), Decision 71 (the Guests settings group). Off by default; a studio only gates guest invites when it turns the switch on. Deanna, 15 Nov 2026.
+
 ---
 
 ## 25 — A month is a draft until the studio publishes it, and instructors confirm their roster when it is
@@ -2088,6 +2098,12 @@ Attributed to the instructor of the member's **first ever class**, not their mos
 
 **Where:** migrations 079–085. **Status:** settled.
 
+### Amendment: core classes stand out on the timetable (recorded 15 Nov 2026)
+
+On every timetable a core class (effective tier core, or always-runs) sits on a pale accent tint (the studio accent at 0.12) with a small "Always runs" chip in the accent colour at the end of the first line. Flex and any other class keep a plain background and no chip. The tint follows the studio accent, so it is the studio's own colour rather than a fixed one. Shown only when the studio has guarantees on. Surfaces: the member Book tab (week and day), the member class page header, the staff Schedule, the instructor My schedule, and the instructor Open classes.
+
+**Where:** a shared `lib/tier-tint.mjs` (`isCore(row)` resolving the effective tier the same coalesce way `occurrence_guarantee_run` does, occurrence tier then occurrence flex then series tier then series flex then core, returning true for core or always and false for flex; plus the tint style derived from the studio accent) with node tests, used by the five surfaces. `member_bootstrap` carries `guarantees_enabled`, and the member Book and class readers carry the occurrence and series tier fields (the staff Schedule and both instructor readers already carry the tier). The tint and chip render only when `guarantees_enabled` and `isCore`. **Status:** settled. **Reuses:** Decision 22 (tiers, effective tier), Decision 85a (tier marks on the staff and instructor surfaces), the member app accent system. Deanna, 15 Nov 2026.
+
 ---
 
 ## 21 — Flex classes
@@ -2138,6 +2154,14 @@ A pg_cron sweep every fifteen minutes, per studio, in studio-local time. Fifteen
 ### Reporting
 
 `flex_report()` gives flex fill against core fill, per series. **Fill is measured on the classes that RAN** — a cancelled class has no fill rate, and averaging its zero in would make flex look emptier than it is and argue against the very slots that are working. A flex slot filling as well as the core one beside it has earned core status; that is the number this is for.
+
+### Amendment: "runs regardless" switch on the class sheet (recorded 15 Nov 2026)
+
+Staff can make a single flex class run regardless of bookings, from the class sheet on the staff Schedule. A per-occurrence switch "Runs regardless of bookings", manager-up, with the helper "The class runs and the instructor is paid even if nobody books." When on, it shows as Always runs on every timetable (accent tint and chip, core rules): excluded from the flex cut-off, never cancelled for low bookings, listed under Running in the instructor digest, and pay follows core. Switching it off before the cut-off returns the class to flex. One audit row each way. The Flex pending list (the staff Schedule's Flex pending page) offers the same switch per row.
+
+Implemented by setting the occurrence guarantee_tier to always (on) or back to null (off); the flex flag and minimum are never touched. The switch is offered only on a scheduled occurrence and is locked once the cut-off has passed (the sheet shows the state with the line "Decided at the cut-off"). The Flex pending row's "Run it anyway" button becomes this switch; set_occurrence_guaranteed stays in place, unchanged.
+
+**Where:** `set_occurrence_always_runs(p_occurrence_id, p_on)`, manager-up, sets `class_occurrences.guarantee_tier` to `'always'` (on) or `null` (off), with one `occurrence.always_runs_set` or `occurrence.always_runs_cleared` audit row. `occurrence_guarantee_run` already resolves an occurrence `guarantee_tier = 'always'` to an at-start commit that never reaches the unmet-minimum branch, so the flex sweep needs no change; the Decision 101 digest block is re-issued only if its Running list keys on `committed_at` alone and so misses an always-runs occurrence before start (reported in the build). The class sheet (`block-panel`) and the Flex pending row gain the switch; the Schedule and member readers carry the effective tier. **Status:** settled. **Reuses:** Decision 21 (flex), Decision 22 (tiers, at-start commit, core pay), Decision 101 (instructor digest Running and Cancelled), Decision 42a (the class sheet). Deanna, 15 Nov 2026.
 
 ---
 

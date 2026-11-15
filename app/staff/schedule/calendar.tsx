@@ -584,6 +584,16 @@ export default function ScheduleCalendar({
           </span>
         </>
       ) : null;
+      // Decision 22 amendment: a core (or always-runs) class carries an "Always
+      // runs" chip. The block keeps its class-type colour (staff colour carries
+      // staffing and type); the chip is the stand-out, beside the tier dot.
+      const alwaysRunsPill = showTier && (event.tier === "core" || event.tier === "always") ? (
+        <span className="shrink-0 rounded-full border px-1 text-[10.5px] font-medium leading-[14px]"
+              style={{ background: "var(--accent-chip)", color: "var(--ink)", borderColor: "var(--line-2)" }}
+              title="Runs regardless of bookings">
+          Always runs
+        </span>
+      ) : null;
 
       // THE NORMAL BLOCK: exactly two lines, and both carry what the old third
       // line did — nothing moves to a third row that a 50-minute block would clip.
@@ -609,6 +619,7 @@ export default function ScheduleCalendar({
               </span>
               <span className="wk-cls min-w-0 truncate text-ink-2">· {event.title}</span>
             </span>
+            {alwaysRunsPill}
             {hiddenPill}
             {trials}
           </div>
@@ -645,6 +656,7 @@ export default function ScheduleCalendar({
             <span className="min-w-0 flex-1 truncate text-ink-2">
               {bits.map((b, i) => <span key={i}>{i > 0 ? " · " : null}{b}</span>)}
             </span>
+            {alwaysRunsPill}
             {hiddenPill}
             {trials}
           </div>
@@ -824,6 +836,11 @@ export default function ScheduleCalendar({
             // series). A flex class does not warn — hiding it just means fewer
             // confirmations and it cancels at its cut-off through the normal path.
             isCore: (selected.tier ?? selected.effectiveTier ?? "core") === "core",
+            // Decision 21 amendment: the "Runs regardless of bookings" switch.
+            tier: selected.tier,
+            committed: selected.flexCommitted ?? false,
+            startsAtMs: new Date(selected.startsAt).getTime(),
+            showTier: coreEnabled || flexEnabled,
           }}
           onClose={() => setSelected(null)}
           onAssigned={(instructorId) => {

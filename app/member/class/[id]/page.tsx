@@ -21,7 +21,7 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
   const { ctx, supabase, studioName, logoUrl, preset, accent, settings, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
-  const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null);
+  const data = await loadClassDetail(supabase, ctx.memberId, ctx.studioId, params.id, settings.guestPassesEnabled, searchParams?.t ?? null, settings.canInviteGuest, settings.guaranteesEnabled);
   if (!data) notFound();
 
   // Decision 103: the reservation return states. After the Xendit return (?reserved=1)
@@ -77,7 +77,7 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
       )}
 
       <ClassDetailBody occ={data.occ} type={data.type} booking={data.booking}
-                       timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} freeFirst={data.freeFirst} pending={data.pending}
+                       timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} waitlistEnabled={settings.waitlistEnabled} guest={data.guest} alwaysRuns={data.alwaysRuns} freeFirst={data.freeFirst} pending={data.pending}
                        checkedIn={data.checkedIn} checkedInAt={data.checkedInAt} selfCheckinAvailable={data.selfCheckinAvailable}
                        opensBeforeMin={settings.checkinOpensBefore} closesAfterMin={settings.checkinClosesAfter}
                        unpaid={data.unpaid} group={data.group} covered={data.covered}

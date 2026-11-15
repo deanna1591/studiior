@@ -88,6 +88,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
         covered={covered}
         plans={plans}
         guestAvailable={settings.guestPassesEnabled && (activeGuests ?? 0) === 0}
+        canInviteGuest={settings.canInviteGuest}
         deskPayAvailable={ctx.bootstrap?.desk_pay_available ?? true}
         payeeNoticeName={settings.payeeNoticeName}
         studioName={studioName}

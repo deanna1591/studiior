@@ -60,6 +60,9 @@ export type Row = {
   instructor: string | null;
   room: string | null;
   isPeak: boolean;
+  /** Decision 22 amendment: a core (or always-runs) class, tinted with an
+   *  "Always runs" chip, only when the studio runs guarantees. */
+  alwaysRuns: boolean;
   /** The resolved state the server computed for this row. */
   base: "none" | "booked" | "waiting" | "holding" | "full" | "past" | "peakBlocked" | "future";
   spaces: number;
@@ -299,6 +302,7 @@ export default function DayClasses({
               action={action}
               booked={state === "booked"}
               dimmed={state === "past" || state === "peakBlocked"}
+              alwaysRuns={r.alwaysRuns}
             />
             {freeNote && (
               <li className="m-micro list-none px-3 pb-1 pt-0.5 text-ink-3" aria-hidden>

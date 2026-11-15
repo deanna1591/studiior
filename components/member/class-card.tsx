@@ -24,6 +24,7 @@ import Link from "next/link";
 export default function ClassCard({
   href, startLabel, endLabel, durationLabel, name, instructor, room,
   statusLabel, statusTone = "quiet", action, dimmed = false, booked = false, tag = null,
+  alwaysRuns = false,
 }: {
   href: string;
   /** "06:30" — the start alone, in the studio's zone. */
@@ -47,10 +48,15 @@ export default function ClassCard({
    * measured against the card, where the raw accent can be as low as 1.23.
    */
   tag?: React.ReactNode;
+  /** Decision 22 amendment: a core (or always-runs) class. Tints the card with
+   *  the studio accent at 0.12 and adds an "Always runs" chip at the end of the
+   *  first line. Only passed when the studio runs guarantees. */
+  alwaysRuns?: boolean;
 }) {
   const muted = dimmed || statusTone === "full";
   return (
-    <li className={`m-card relative flex items-stretch gap-3 py-4 pl-4 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}>
+    <li className={`m-card relative flex items-stretch gap-3 py-4 pl-4 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}
+        style={alwaysRuns ? { background: "var(--accent-chip)" } : undefined}>
       <Link href={href} className="absolute inset-0 rounded-[22px]" aria-label={`Open ${name}`}>
         <span className="sr-only">Open {name}</span>
       </Link>
@@ -66,7 +72,15 @@ export default function ClassCard({
       </div>
 
       <div className="pointer-events-none min-w-0 flex-1">
-        <p className={`m-name truncate ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
+        <div className="flex items-center gap-2">
+          <p className={`m-name truncate ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
+          {alwaysRuns && (
+            <span className="m-micro shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
+                  style={{ background: "var(--surface)", color: "var(--lime-text)" }}>
+              Always runs
+            </span>
+          )}
+        </div>
         <p className="m-subtle mt-0.5 truncate text-ink-3">
           {/* Absent, not "TBC". Decision 17: an open shift reads as a normal
               class to a member, and a row saying nobody has agreed to teach it

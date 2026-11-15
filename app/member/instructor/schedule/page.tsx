@@ -310,9 +310,13 @@ function ClassRow({ c, confirmationsOn, guaranteesEnabled, flexEnabled }: {
   c: Klass; confirmationsOn: boolean; guaranteesEnabled: boolean; flexEnabled: boolean;
 }) {
   const off = c.status === "cancelled";
+  // Decision 22 amendment: a core (or always-runs) class is tinted when the
+  // studio runs guarantees. The ClassTag beside it already names the tier.
+  const core = guaranteesEnabled && !off && (c.tier === "core" || c.tier === "always");
 
   return (
-    <li className={`m-card px-3 py-2.5 ${off ? "opacity-70" : ""}`}>
+    <li className={`m-card px-3 py-2.5 ${off ? "opacity-70" : ""}`}
+        style={core ? { background: "var(--accent-chip)" } : undefined}>
       <Link href={off ? "#" : `/instructor/roster/${c.occurrence_id}`}
             className={off ? "pointer-events-none block" : "block"}>
         <div className="flex items-baseline gap-3">

@@ -16,7 +16,7 @@ function Save() {
  * that friend's first class is free. Turning it back off never removes a guest
  * already booked — their seat is an ordinary booking that stands on its own.
  */
-export default function GuestPassesPanel({ enabled }: { enabled: boolean }) {
+export default function GuestPassesPanel({ enabled, membersOnly }: { enabled: boolean; membersOnly: boolean }) {
   const [state, action] = useFormState<PlainState, FormData>(saveGuestPasses, null);
 
   return (
@@ -33,6 +33,19 @@ export default function GuestPassesPanel({ enabled }: { enabled: boolean }) {
               One free class per person, ever. The guest signs the waiver in the app before
               the class, and becomes an ordinary member afterwards. A member can bring another
               guest once their current one has come.
+            </span>
+          </span>
+        </label>
+
+        {/* Decision 26(c): restrict invites to members who hold a plan. */}
+        <label className="mt-3 flex items-start gap-2.5 border-t border-line pt-3">
+          <input type="checkbox" name="guest_invites_members_only" defaultChecked={membersOnly} className="mt-1" />
+          <span className="text-[13px] leading-[19px] text-ink">
+            <span className="font-medium">Only members with a plan can invite a guest</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Off by default. When on, a member needs an active membership, pack or
+              intro with a class left, or an unlimited plan to bring a guest. A
+              member without one sees a prompt to pick a plan instead.
             </span>
           </span>
         </label>

@@ -7283,6 +7283,7 @@ export type Database = {
           free_first_reservation_from: string | null
           free_first_seats_per_class: number | null
           guarantees_enabled: boolean
+          guest_invites_members_only: boolean
           guest_passes_enabled: boolean
           hide_unstaffed_from_members: boolean
           how_to_buy: string | null
@@ -7423,6 +7424,7 @@ export type Database = {
           free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
           guarantees_enabled?: boolean
+          guest_invites_members_only?: boolean
           guest_passes_enabled?: boolean
           hide_unstaffed_from_members?: boolean
           how_to_buy?: string | null
@@ -7563,6 +7565,7 @@ export type Database = {
           free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
           guarantees_enabled?: boolean
+          guest_invites_members_only?: boolean
           guest_passes_enabled?: boolean
           hide_unstaffed_from_members?: boolean
           how_to_buy?: string | null
@@ -9802,6 +9805,7 @@ export type Database = {
           billing_status: Database["public"]["Enums"]["platform_status"]
           booking_cutoff_minutes: number
           booking_window_days: number
+          can_invite_guest: boolean
           cancellation_cutoff_minutes: number
           checkin_closes_minutes_after: number
           checkin_opens_minutes_before: number
@@ -9813,6 +9817,7 @@ export type Database = {
           first_name: string
           free_first_core_only: boolean
           free_first_reservation_fee_cents: number
+          guarantees_enabled: boolean
           guest_passes_enabled: boolean
           has_payment_provider: boolean
           has_phone: boolean
@@ -11030,6 +11035,10 @@ export type Database = {
           p_private_rate_cents?: number
           p_trio_rate_cents?: number
         }
+        Returns: Json
+      }
+      set_occurrence_always_runs: {
+        Args: { p_occurrence_id: string; p_on: boolean }
         Returns: Json
       }
       set_occurrence_guaranteed: {

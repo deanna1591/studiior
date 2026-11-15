@@ -51,7 +51,7 @@ export type DetailType = {
 export type DetailBooking = { id: string; status: string; waitlist_position: number | null } | null;
 
 export default function ClassDetailBody({
-  occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, freeFirst, pending,
+  occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, alwaysRuns = false, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
   seatKind = "unlimited", cutoffMinutes = 720, duplicateHold = false, holdTime = null,
@@ -64,6 +64,8 @@ export default function ClassDetailBody({
   timeFormat?: "24h" | "12h";
   waitlistEnabled: boolean;
   guest?: { enabled: boolean; canInvite: boolean };
+  /** Decision 22 amendment: a core (or always-runs) class, tinted in the header. */
+  alwaysRuns?: boolean;
   freeFirst?: FreeFirst;
   /** Decision 21 amendment: a flex class not yet decided — its confirmation
    *  deadline and how it is expressed. Null for core/always/decided classes. */
@@ -169,7 +171,15 @@ export default function ClassDetailBody({
              style={{ maxWidth: "100%", objectPosition: focalPoint(type.image_focus_x, type.image_focus_y) }} />
       )}
 
-      <h1 className="m-title text-ink">{occ.name}</h1>
+      <div className="flex items-start gap-2">
+        <h1 className="m-title text-ink">{occ.name}</h1>
+        {alwaysRuns && (
+          <span className="m-micro mt-1 shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
+                style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+            Always runs
+          </span>
+        )}
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="num text-[16px] font-semibold text-ink">
@@ -393,8 +403,8 @@ export default function ClassDetailBody({
         </Link>
       )}
 
-      {guest?.canInvite && !past && !isWaitlisted && (
-        <GuestInvite occurrenceId={occ.id} />
+      {guest?.enabled && !past && !isWaitlisted && (
+        <GuestInvite occurrenceId={occ.id} canInvite={guest.canInvite} />
       )}
 
       {type?.description && (
