@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { haptic } from "@/lib/haptics";
@@ -31,7 +32,7 @@ export default function ClassButton({
   waitlistPosition = null,
   full = false, waitlistEnabled = false, freeFirstEligible = false, confirmLast = false,
   selfCheckinAvailable = true, deskCodeHref = "/check-in",
-  tone = "tint", checkinOnly = false, checkinBlocked = false,
+  tone = "tint", checkinOnly = false, checkinBlocked = false, onTint = false,
   bookClass, bookFirstFree, selfCheckIn, onChange,
 }: {
   occurrenceId: string;
@@ -70,6 +71,9 @@ export default function ClassButton({
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   onChange?: (booked: boolean) => void;
+  /** Decision 22 amendment (b): the row is a tinted core row, so tint controls
+   *  switch to the ink-outline style. */
+  onTint?: boolean;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
@@ -151,10 +155,15 @@ export default function ClassButton({
   // --- styles ----------------------------------------------------------------
   const pill = "m-tap m-press inline-flex min-w-[84px] items-center justify-center rounded-full px-4 text-[13px] font-bold disabled:opacity-90";
   const chip = "inline-flex min-w-[84px] items-center justify-center rounded-full px-4 py-2 text-[13px] font-bold";
+  // Decision 22 amendment (b): on a tinted core row the accent-chip tint would
+  // blend into the row, so a tint control uses the ink-outline style there (ink
+  // text, ink border, no fill), never the tint colour. Plain rows keep the tint.
   const tint = tone === "scrim"
     ? { background: "color-mix(in srgb, #FFFFFF 22%, transparent)", color: "#FFFFFF" }
+    : onTint
+    ? { background: "transparent", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }
     : { background: "var(--accent-chip)", color: "var(--ink)" };
-  const solid = { background: "var(--accent-solid)", color: "var(--accent-on-solid)" };
+  const solid = accentSolid();
   const grey = tone === "scrim"
     ? { background: "color-mix(in srgb, #FFFFFF 18%, transparent)", color: "#FFFFFF" }
     : { background: "var(--line)", color: "var(--ink-2)" };

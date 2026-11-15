@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import { slugFromCheckinUrl } from "@/lib/checkin-scan";
 
@@ -106,7 +107,7 @@ export default function DoorScan() {
         ) : (
           <button type="button" onClick={go}
                   className="m-tap m-press shrink-0 rounded-full px-5 text-[13px] font-bold"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  style={accentSolid()}>
             Scan
           </button>
         )}

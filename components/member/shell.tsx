@@ -1,5 +1,7 @@
 import TabBar from "./tab-bar";
 import MemberHeader from "./header";
+import PullToRefresh from "./pull-to-refresh";
+import UpdatePrompt from "./update-prompt";
 import { getMemberContext } from "@/lib/auth";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 
@@ -49,9 +51,10 @@ export default async function MemberShell({
           hasUnreadMessage={mctx?.bootstrap?.has_unread_studio_message ?? false}
         />
       )}
+      {!bare && <UpdatePrompt />}
       <main className={`m-scroll mx-auto max-w-lg px-4 pb-24 ${bare ? "pt-4" : "pt-1"}`}>
         {title && <h1 className="m-head text-[24px] leading-8 mb-5 text-ink">{title}</h1>}
-        {children}
+        {bare ? children : <PullToRefresh>{children}</PullToRefresh>}
       </main>
       <TabBar badges={{ "/": openOffers }} />
     </div>

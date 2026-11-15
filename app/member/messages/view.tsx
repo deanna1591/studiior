@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState, useFormStatus } from "react-dom";
 import { sendMemberMessage } from "./actions";
 import MessageThread, { type ThreadMessage } from "@/components/messages/bubble";
@@ -13,7 +14,7 @@ function SendButton() {
   return (
     <button type="submit" disabled={pending}
             className="m-tap m-press shrink-0 rounded-xl px-5 text-[15px] font-semibold disabled:opacity-50"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            style={accentSolid()}>
       {pending ? "Sending…" : "Send"}
     </button>
   );

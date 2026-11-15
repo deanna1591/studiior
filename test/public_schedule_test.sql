@@ -394,4 +394,50 @@ select expect_true('...and the upcoming fallback is capped at <= 40',
 select expect_num('...exactly 40 of the 45 (the cap still bites)',
   jsonb_array_length(current_setting('t.fox')::jsonb -> 'classes'), 40);
 
+-- =============================================================================
+-- 11. TIER (Decision 22 c): public_schedule carries each class's effective tier,
+--     but only when the studio runs guarantees — guarantees off -> null. The
+--     embed draws core/always tinted; flex plain.
+-- =============================================================================
+-- Golf runs guarantees; Alpha (section 1) does not.
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('ec40ec40-0000-0000-0000-00000000f001','Golf','ec40-golf','Europe/Prague','CZK','active');
+insert into studio_settings (studio_id, guarantees_enabled) values
+  ('ec40ec40-0000-0000-0000-00000000f001', true);
+insert into locations (id, studio_id, name, is_primary) values
+  ('ec40ec40-0000-0000-0000-00000000f00a','ec40ec40-0000-0000-0000-00000000f001','Main',true);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
+  ('ec40ec40-0000-0000-0000-0000000c7f01','ec40ec40-0000-0000-0000-00000000f001','Reformer',50,10);
+-- Three classes 2 days out (inside the 7-day window): a core, an always, a flex.
+insert into class_occurrences
+  (id, studio_id, location_id, class_type_id, name, capacity, starts_at, ends_at, status, guarantee_tier, flex)
+values
+  ('ec40ec40-0000-0000-0000-00000000cf01','ec40ec40-0000-0000-0000-00000000f001','ec40ec40-0000-0000-0000-00000000f00a','ec40ec40-0000-0000-0000-0000000c7f01','Core One',10,
+    now() + interval '2 days', now() + interval '2 days' + interval '50 min','scheduled','core', false),
+  ('ec40ec40-0000-0000-0000-00000000cf02','ec40ec40-0000-0000-0000-00000000f001','ec40ec40-0000-0000-0000-00000000f00a','ec40ec40-0000-0000-0000-0000000c7f01','Always One',10,
+    now() + interval '2 days' + interval '1 hour', now() + interval '2 days' + interval '1 hour 50 min','scheduled','always', false),
+  ('ec40ec40-0000-0000-0000-00000000cf03','ec40ec40-0000-0000-0000-00000000f001','ec40ec40-0000-0000-0000-00000000f00a','ec40ec40-0000-0000-0000-0000000c7f01','Flex One',10,
+    now() + interval '2 days' + interval '2 hours', now() + interval '2 days' + interval '2 hours 50 min','scheduled', null, true);
+
+set role anon;
+select set_config('t.golf', public_schedule('ec40-golf', 7)::text, false);
+reset role;
+select expect_text('Golf (guarantees on) -> in_window',
+  current_setting('t.golf')::jsonb ->> 'state', 'in_window');
+select expect_true('Golf payload carries guarantees_enabled = true',
+  (current_setting('t.golf')::jsonb -> 'studio' ->> 'guarantees_enabled')::boolean);
+-- (class_name is the class-type name, so the three are told apart by tier.)
+select expect_num('exactly one Golf class carries tier = core',
+  (select count(*) from jsonb_array_elements(current_setting('t.golf')::jsonb -> 'classes') c where c->>'tier' = 'core')::bigint, 1);
+select expect_num('exactly one Golf class carries tier = always',
+  (select count(*) from jsonb_array_elements(current_setting('t.golf')::jsonb -> 'classes') c where c->>'tier' = 'always')::bigint, 1);
+select expect_num('exactly one Golf class carries tier = flex',
+  (select count(*) from jsonb_array_elements(current_setting('t.golf')::jsonb -> 'classes') c where c->>'tier' = 'flex')::bigint, 1);
+-- Alpha runs no guarantees -> every class's tier is null, and the flag is false.
+select set_config('t.a', public_schedule('ec40-alpha', 7)::text, false);
+select expect_false('Alpha (guarantees off) carries guarantees_enabled = false',
+  (current_setting('t.a')::jsonb -> 'studio' ->> 'guarantees_enabled')::boolean);
+select expect_true('Alpha (guarantees off) -> every class tier is null',
+  (select bool_and((c->>'tier') is null) from jsonb_array_elements(current_setting('t.a')::jsonb -> 'classes') c));
+
 select 'public_schedule_test: all assertions passed' as done;

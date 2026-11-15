@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState } from "react-dom";
 import Link from "next/link";
 import { claimClass, type ClaimState } from "@/app/member/instructor/actions";
@@ -154,7 +155,7 @@ export default function ClaimCalendar({
                     className="m-tap flex h-11 flex-col items-center pt-1">
               <span className="flex h-[27px] w-[27px] items-center justify-center rounded-full text-[15px] font-semibold"
                     style={isToday ? { background: "var(--ink)", color: "var(--surface)" }
-                      : isSel ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                      : isSel ? accentSolid()
                       : undefined}>
                 {d}
               </span>
@@ -218,7 +219,7 @@ export default function ClaimCalendar({
                     ) : (
                       <button type="button" onClick={() => setSheet({ row: c, over: false })}
                               className="m-tap shrink-0 rounded-full px-3.5 py-2 text-[11.5px] font-bold"
-                              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Commit</button>
+                              style={accentSolid()}>Commit</button>
                     )}
                   </li>
                 );
@@ -381,7 +382,7 @@ function ClaimSheet({
             <form action={action}>
               <input type="hidden" name="occurrence_id" value={row.id} />
               <button className="w-full rounded-2xl py-3.5 text-center text-[15px] font-bold"
-                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                      style={accentSolid()}>
                 Commit to this class
               </button>
             </form>

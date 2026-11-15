@@ -513,6 +513,24 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 107 — Pull to refresh, and an update prompt (recorded 15 Nov 2026, POOLED, not yet built)
+
+On the member and instructor apps, pulling down from the top of any main screen (Home, Book, My schedule, Open classes, Account, Me) reloads that screen's data with a small spinner, the native way on both phones; the page itself does not reload. When a new version of the app has been deployed, an open app shows a small bar "A new version is ready" with a button "Refresh" within a minute of the deployment; tapping it reloads once. The app never reloads on its own while a member is in checkout or mid-form.
+
+**Where:** a pull-to-refresh gesture on the main member and instructor screens re-fetches that screen's server data (a router refresh or a re-read, with a spinner, no full page reload); a deploy-version check (the build id polled or pushed to the open app) surfaces the "A new version is ready" bar with a one-tap "Refresh" within a minute, suppressed while a checkout or a form is in progress. **Status:** pooled for the next build. Deanna, 15 Nov 2026.
+
+---
+
+## 105 — Members list search and polish (recorded 15 Nov 2026, POOLED, not yet built)
+
+The staff Members list gains a search box at the top ("Search name, email or phone") that filters as you type on name, email and phone digits (any 4 or more digits match the stored E.164 number), and keeps the search, filter and sort in the page URL so refresh and Back return to the same view. Filter chips with live counts sit under the search: All, Active, Leads, Unpaid, Free class pending, Needs attention, Deleted. Needs attention collects members with an unpaid reservation fee due, a possible duplicate, or no signed waiver with a booking ahead. Each row shows the name, a status chip (Active, Lead, Unpaid, Deleted), the plan state in one line (plan name with credits left or expiry, or "No plan"), last visit as a relative day, the phone as a tap-to-call link, and small chips "Possible duplicate" and "Fee waived" where they apply. Sort by name, last visit or joined, newest first by default for joined. At phone width each row renders as a card. The list loads in one query per page with no per-row calls; paging stays as today.
+
+**The reader (settled from STEP 0).** A new staff-only `members_list(p_studio_id, p_search, p_filter, p_sort, p_page)` (desk-up, no new anon RPC) carries every row field in one call with no N+1: everything `member_plan_overview` carries, plus the phone, a possible-duplicate flag (set-based on the IMMUTABLE `normalise_name`/`normalise_phone`: a normalised name on two or more live members, or a normalised phone on two or more), an unpaid-reservation-fee-due flag (the studio-wide form of the `sweep_free_reservation_dues` predicate, since `member_reservation_dues` is self-scoped), and a waiver-missing-with-a-future-booking flag (the `member_waiver_current` logic inlined, plus an EXISTS future booking). It returns the chip counts over the whole studio set in the same call. A broader relative-day helper (Today, Yesterday, N days ago, N weeks ago, else the date) is node-tested. A member calling it is refused PT403.
+
+**Where:** `members_list` staff-only; the search box with URL state, the filter chips with counts, the sort control, the row and phone-width card with the status, "Possible duplicate" and "Fee waived" chips and the tap-to-call phone; the broader relative-day helper; `lib/members-list` for the filter and sort logic. **Status:** pooled for the next build. **Reuses:** Decision 49 (`member_plan_overview`, `StateChip`), Decision 98 and 102 (same-person duplicate), Decision 103 (fee due, fee waived), Decision 34 (waiver). Deanna, 15 Nov 2026.
+
+---
+
 ## 103 — Reservation fee for the free class (recorded 13 Nov 2026)
 
 A studio may charge a small reservation fee when a first-timer books their free class, to stop no-shows holding a seat and never turning up. The fee is not a charge for the class. Show up and it comes back as account credit; don't show up or cancel late and the studio keeps it. The fee is per studio, off by default, and touches only free first class bookings: paid bookings, plan bookings and drop-ins never carry it.
@@ -956,6 +974,14 @@ STEP-0 note (build): the ONE card renderer is `renderBody()` in `lib/email-body.
 
 ---
 
+### Amendment (e) continued — accent text uses accent_on on every surface (recorded 15 Nov 2026, POOLED, not yet built)
+
+Text on an accent-coloured surface always uses the studio's accent_on colour, never a hard-coded white or ink. One helper supplies the pair and every accent card, chip and button uses it.
+
+**Where (settled from STEP 0).** Today about thirty accent-solid surfaces already pair with `var(--accent-on-solid)` but as a repeated inline literal, and accent-tint surfaces use `var(--ink)` on `var(--accent-chip)`; the one genuine hard-code is `#fff` on the brand accent in `components/staff/schedule-post.tsx`. A new `lib/accent-pair.mjs` supplies the pair(s); the repeated inline accent literals route through it, and the `#fff` in `schedule-post.tsx` is fixed to the brand on-accent. **Status:** pooled for the next build. **Extends:** Decision 80e (the highlight card's `{accent}`/`{accent_on}` pairing, now generalised to every accent surface). Deanna, 15 Nov 2026.
+
+---
+
 ## 70 — Studio team access
 
 **Decision.** (a) **Settings → Studio → Team** (`/settings/team`, registered in the settings registry under the Studio group): the owner sees every `studio_staff` row (name, email, role, status, last sign-in), invites a person by email as **Manager** or **Front desk**, changes a role (including promoting to Owner), and removes access. A **Manager may invite and remove Front desk only** (Permissions §4 note 2) and may not touch Managers or Owners. The **last active Owner can never be removed or demoted**. Invites reuse the instructor-invite mechanism (claim link by email, same expiry); an invited person who is also an instructor keeps one login. (b) **Manager widened** (amends Permissions matrix §3): a Manager may now edit the studio profile, branding, location/coordinates, check-in code, opening hours, all Settings pages, and Store apps. **Owner-only stays:** connecting or disconnecting a payment provider (Stripe/Xendit pages and secrets), changing roles, inviting/removing Managers or Owners, the audit log, and immediate cancel-with-refund. Enforced in RLS and RPC, not only in the UI.
@@ -1217,6 +1243,12 @@ STEP-0 note (build): the ONE card renderer is `renderBody()` in `lib/email-body.
 ## 55 — Per-tenant 12-hour time format, and the free-class picker on the day strip
 
 (1) A studio chooses how times are shown: 24-hour (13:00) or 12-hour (1:00 PM). `studio_settings.time_format text not null default '24h' check in ('24h','12h')` — default keeps today's behaviour product-wide; Reform Collective uses 12h. One formatter honours it everywhere a member, instructor or staff user sees a clock time: member app, instructor portal, staff app, notification emails and .ics descriptions (never the .ics DTSTART itself), the website embed (`public_schedule` exposes the setting), the Install and login pages. Dates are unaffected. (2) The free-first-class picker (Decision 30 amendment) uses the same day strip as regular booking: the member picks a day and scrolls, sees only the classes they can book free, each with 'Book free' and a '{n} going' chip, chronological within the day; the strip opens on the first day with an eligible class and marks days that have one. The long flat list is removed. Deanna, 2 Oct 2026.
+
+### Amendment (b) — every published day is instant (recorded 15 Nov 2026, POOLED, not yet built)
+
+The member Book page loads every published, member-visible occurrence from the strip's first day through the studio's last visible day in one server render, capped at 120 days, and builds the per-day bundles for all of them. Tapping any day in that range, in the week strip or the month grid, switches on the client with no server call; the strip highlight and the class list always change together. Tapping a day beyond the loaded range (the only case left) shows a skeleton list immediately while the page re-renders; the previous day's rows are never shown under a new highlight. A day past the last visible day keeps the existing "The timetable is published through {date}" note.
+
+**Where (settled from STEP 0).** The Book page widens `winFrom`/`winTo` from the current 7-day week to the strip's first day through the studio's last visible occurrence (capped at 120 days) and builds a bundle per day across that range, so `pickDay` is client-only for every loaded day and the strip highlight and list move together. For an out-of-range tap (the only window-change case left), a loading state shows a skeleton list at once so the old rows never sit under a new highlight. **Measured context:** Reform has about 189 published, member-visible occurrences through its horizon (30 Nov), about 80 KB in one load; the lag today is an out-of-window `router.push` to a force-dynamic render over a Manila-to-US round trip with no loading state. **Status:** pooled for the next build. **Reuses:** Decision 55 (the day strip and the client switch), Decision 25 (published months). Deanna, 15 Nov 2026.
 
 **Mechanism — the setting.** `studio_settings.time_format` (default `'24h'`, CHECK in `('24h','12h')`). Set in **Settings → Branding** (not Timetable): it is a presentation choice about what members see — the same screen that carries the accent, theme preset, login tagline and the public instructor-name rule (Decision 51), all "how it looks to members". Exposed through `studio_by_slug` (the pre-login login / install pages), `member_bootstrap`, the staff ctx (`staff_bootstrap`), the instructor ctx, and `public_schedule` (as `time_format`) — **no new anon surface, still exactly twelve**.
 
@@ -2103,6 +2135,20 @@ Attributed to the instructor of the member's **first ever class**, not their mos
 On every timetable a core class (effective tier core, or always-runs) sits on a pale accent tint (the studio accent at 0.12) with a small "Always runs" chip in the accent colour at the end of the first line. Flex and any other class keep a plain background and no chip. The tint follows the studio accent, so it is the studio's own colour rather than a fixed one. Shown only when the studio has guarantees on. Surfaces: the member Book tab (week and day), the member class page header, the staff Schedule, the instructor My schedule, and the instructor Open classes.
 
 **Where:** a shared `lib/tier-tint.mjs` (`isCore(row)` resolving the effective tier the same coalesce way `occurrence_guarantee_run` does, occurrence tier then occurrence flex then series tier then series flex then core, returning true for core or always and false for flex; plus the tint style derived from the studio accent) with node tests, used by the five surfaces. `member_bootstrap` carries `guarantees_enabled`, and the member Book and class readers carry the occurrence and series tier fields (the staff Schedule and both instructor readers already carry the tier). The tint and chip render only when `guarantees_enabled` and `isCore`. **Status:** settled. **Reuses:** Decision 22 (tiers, effective tier), Decision 85a (tier marks on the staff and instructor surfaces), the member app accent system. Deanna, 15 Nov 2026.
+
+---
+
+### Amendment (b) — tint contrast (recorded 15 Nov 2026, POOLED, not yet built)
+
+On a tinted core row the Book button and every other control keep the same solid style as on a plain row: accent background with accent_on text, or the ink outline style, never the tint colour itself. Text on the tinted row stays ink. Both are checked at 390 px before shipping.
+
+**Status:** pooled for the next build. **Reuses:** Decision 22 amendment (a) (the core-row tint and "Always runs" chip), Decision 80e accent text (the accent_on pair). Deanna, 15 Nov 2026.
+
+### Amendment (c) — the public timetable carries the tier (recorded 15 Nov 2026, POOLED, not yet built)
+
+`public_schedule` carries tier (core, always, flex) per class. The Webflow timetable embed draws a core or always class on the studio accent at 0.12 opacity with the chip "Always runs" in the accent colour, matching the member Book tab, only when the studio has guarantees on. No other change to the embed. Members and instructors gain a read policy on `class_series` limited to the series tier fields so the effective tier never depends on the embed being visible.
+
+**Where.** `public_schedule` re-issued to return the effective tier per class and whether the studio runs guarantees; the website embed draws the accent-at-0.12 tint and the accent "Always runs" chip for a core or always class under guarantees, with no other change. A member-and-instructor SELECT policy on `class_series` exposing only the series tier fields so the member Book embed of `class_series(guarantee_tier, flex)` resolves (today a member reads zero `class_series` rows, so the embed is null and the effective tier depends on the occurrence carrying its own flag). **Status:** pooled for the next build. **Reuses:** the public timetable embed (migration 147), Decision 22 amendment (a) (the tint and chip). Deanna, 15 Nov 2026.
 
 ---
 

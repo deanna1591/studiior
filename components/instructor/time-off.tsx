@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import { blockTimeOff, unblockTimeOff, previewTimeOff } from "@/app/member/instructor/actions";
 
@@ -133,7 +134,7 @@ export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
                 } else setErr(res.error);
               })}
               className="rounded-lg px-3.5 py-2 text-[13px] font-medium disabled:opacity-60"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+              style={accentSolid()}>
               {pending ? "Saving…" : "Save"}
             </button>
             <button onClick={() => { setOpen(false); setErr(null); setWarn(null); }}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useTransition, type ReactNode } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/member/icons";
@@ -97,6 +98,21 @@ export default function BookWeek({
   const [sel, setSel] = useState(initialOffset);
   const [typeFilter, setTypeFilter] = useState(initialType);
   const [instFilter, setInstFilter] = useState(initialInstructor);
+  // Decision 55 amendment (b): a tap beyond the loaded range navigates, and while
+  // the server re-renders a skeleton shows instead of the old day's rows; the
+  // tapped day highlights at once (pendingSel). useTransition drives isPending for
+  // the whole RSC navigation.
+  const [isPending, startTransition] = useTransition();
+  const [pendingSel, setPendingSel] = useState<number | null>(null);
+  // Reset derived state DURING render when a navigation hands new props, so `sel`
+  // follows the server's selected day rather than persisting stale (and the
+  // pending skeleton clears). A render-time reset never commits the stale frame.
+  const [lastInitial, setLastInitial] = useState(initialOffset);
+  if (initialOffset !== lastInitial) {
+    setLastInitial(initialOffset);
+    setSel(initialOffset);
+    setPendingSel(null);
+  }
   const freeSet = new Set(freeEligibleIds);
   const windowOffsets = new Set(bundles.map((b) => b.offset));
 
@@ -126,7 +142,13 @@ export default function BookWeek({
   // changes, so the server refetches).
   const pickDay = useCallback((offset: number) => {
     if (!windowOffsets.has(offset)) {
-      router.push(hrefFor({ d: offset, type: typeFilter || undefined, instructor: instFilter || undefined, v: monthView ? "month" : undefined }), { scroll: false });
+      // Out of the loaded range: highlight the tapped day at once and show the
+      // skeleton while the server re-renders. The previous day's rows are never
+      // shown under the new highlight.
+      setPendingSel(offset);
+      startTransition(() => {
+        router.push(hrefFor({ d: offset, type: typeFilter || undefined, instructor: instFilter || undefined, v: monthView ? "month" : undefined }), { scroll: false });
+      });
       return;
     }
     setSel(offset);
@@ -144,6 +166,7 @@ export default function BookWeek({
   };
   const clearFilters = () => { setTypeFilter(""); setInstFilter(""); syncUrl(sel, "", ""); };
 
+  const selForStrip = pendingSel ?? sel;
   const bundle = bundles.find((b) => b.offset === sel) ?? bundles[0];
   const rows = (bundle?.rows ?? []).filter(
     (r) => (!typeFilter || r.classTypeId === typeFilter) &&
@@ -156,7 +179,7 @@ export default function BookWeek({
     <button type="button" onClick={onClick} aria-pressed={active}
       className="m-tap inline-flex shrink-0 items-center rounded-full px-3.5 text-[13px] font-semibold"
       style={active
-        ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+        ? accentSolid()
         : { background: "var(--surface)", color: "var(--ink-2)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
       {children}
     </button>
@@ -177,7 +200,7 @@ export default function BookWeek({
                 <Link key={v} href={hrefFor({ d: sel, type: typeFilter || undefined, instructor: instFilter || undefined, v: v === "week" ? undefined : v })}
                   aria-pressed={on}
                   className="m-press flex min-h-[44px] items-center rounded-full px-3.5 text-[12px] font-semibold leading-4"
-                  style={on ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" } : { color: "var(--ink-2)" }}>
+                  style={on ? accentSolid() : { color: "var(--ink-2)" }}>
                   {label}
                 </Link>
               );
@@ -198,10 +221,10 @@ export default function BookWeek({
         </div>
 
         {monthView
-          ? <MonthGrid days={monthDays.map((d) => ({ ...d, isSelected: d.offset === sel }))} hrefFor={(o) => hrefFor({ d: o, v: undefined })} />
+          ? <MonthGrid days={monthDays.map((d) => ({ ...d, isSelected: d.offset === selForStrip }))} hrefFor={(o) => hrefFor({ d: o, v: undefined })} onSelect={pickDay} windowOffsets={windowOffsets} />
           : <DateStrip
-              days={stripDays.map((d) => ({ ...d, isSelected: d.offset === sel }))}
-              selectedOffset={sel}
+              days={stripDays.map((d) => ({ ...d, isSelected: d.offset === selForStrip }))}
+              selectedOffset={selForStrip}
               onSelect={pickDay}
               windowOffsets={windowOffsets} />}
       </section>
@@ -233,6 +256,21 @@ export default function BookWeek({
 
       {horizon}
 
+      {isPending ? (
+        <div aria-live="polite" aria-busy="true" className="space-y-3" data-testid="book-skeleton">
+          <span className="sr-only">Loading classes</span>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="m-card flex items-stretch gap-3 py-4 pl-4 pr-4">
+              <div className="h-12 w-14 shrink-0 animate-pulse rounded-lg bg-line" />
+              <div className="min-w-0 flex-1 space-y-2 py-1">
+                <div className="h-4 w-1/2 animate-pulse rounded bg-line" />
+                <div className="h-3 w-3/4 animate-pulse rounded bg-line" />
+              </div>
+              <div className="h-9 w-16 shrink-0 animate-pulse rounded-full bg-line" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <DayView key={sel}
         prevHref={hrefFor({ d: sel - 1, type: typeFilter || undefined, instructor: instFilter || undefined })}
         nextHref={hrefFor({ d: sel + 1, type: typeFilter || undefined, instructor: instFilter || undefined })}
@@ -279,6 +317,7 @@ export default function BookWeek({
           />
         )}
       </DayView>
+      )}
     </>
   );
 }

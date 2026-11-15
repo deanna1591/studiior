@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import Avatar from "./avatar";
 import { Icon } from "./icons";
 
@@ -48,7 +49,7 @@ export default function MemberHeader({
                  decoding="async" width={32} height={32}
                  className="h-8 w-8 rounded-xl bg-white object-contain p-0.5" />
           ) : (
-            <span style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+            <span style={accentSolid()}
                   className="flex h-8 w-8 items-center justify-center rounded-xl text-[14px] font-semibold">
               {studioName.slice(0, 1)}
             </span>

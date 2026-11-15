@@ -27,7 +27,7 @@ export default function GuestPassesPanel({ enabled, membersOnly }: { enabled: bo
         <label className="flex items-start gap-2.5">
           <input type="checkbox" name="guest_passes_enabled" defaultChecked={enabled} className="mt-1" />
           <span className="text-[13px] leading-[19px] text-ink">
-            <span className="font-medium">Let members bring a guest</span> — a member invites
+            <span className="font-medium">Let members bring a guest.</span> A member invites
             a friend to the class they are booking, and the friend&rsquo;s first class is free.
             <span className="block text-[12px] leading-[18px] text-ink-3">
               One free class per person, ever. The guest signs the waiver in the app before
@@ -43,9 +43,9 @@ export default function GuestPassesPanel({ enabled, membersOnly }: { enabled: bo
           <span className="text-[13px] leading-[19px] text-ink">
             <span className="font-medium">Only members with a plan can invite a guest</span>
             <span className="block text-[12px] leading-[18px] text-ink-3">
-              Off by default. When on, a member needs an active membership, pack or
-              intro with a class left, or an unlimited plan to bring a guest. A
-              member without one sees a prompt to pick a plan instead.
+              When on, a member needs an active membership, pack or intro with a
+              class left, or an unlimited plan, to bring a guest. A member without
+              one sees a prompt to pick a plan instead.
             </span>
           </span>
         </label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState, useFormStatus } from "react-dom";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
@@ -149,7 +150,7 @@ export default function CheckoutBody({
             <button
               onClick={() => { haptic("tap"); setSheetOpen(true); }}
               disabled={!selected}
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+              style={accentSolid()}
               className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60">
               Continue to pay
             </button>
@@ -225,7 +226,7 @@ function PaySubmit({ amount }: { amount: string }) {
   const { pending } = useFormStatus();
   return (
     <button disabled={pending} onClick={() => haptic("tap")}
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+            style={accentSolid()}
             className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60">
       {pending ? "Opening…" : `Pay ${amount}`}
     </button>

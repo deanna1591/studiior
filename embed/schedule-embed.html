@@ -98,6 +98,15 @@
       P+".sd-row{display:flex;align-items:center;gap:14px;padding:16px 6px;border-bottom:1px solid #ece7e2;",
         "color:#161311;background:none;width:100%;text-align:left;cursor:pointer;}",
       P+".sd-row:hover{background:#faf7f4;}",
+      // Decision 22 (c): a core/always class stands out when the studio runs
+      // guarantees — the accent at 12% behind the row, and a small "Always runs"
+      // chip in the accent text colour. Flex keeps a plain row and no chip.
+      P+".sd-row.sd-core{background:color-mix(in srgb,var(--sd-accent) 12%,#fff);}",
+      P+".sd-row.sd-core:hover{background:color-mix(in srgb,var(--sd-accent) 18%,#fff);}",
+      P+".sd-runs{display:inline-flex;align-items:center;margin-top:5px;font-family:",FONT,";",
+        "font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:none;line-height:1.3;",
+        "color:var(--sd-accent-ink);border:1px solid color-mix(in srgb,var(--sd-accent) 45%,#fff);",
+        "border-radius:999px;padding:1px 8px;}",
       P+".sd-time{flex:0 0 auto;width:74px;}",
       P+".sd-time b{display:block;font-family:",FONT,";font-size:15px;font-weight:700;letter-spacing:-.01em;",
         "line-height:1.25;text-transform:none;}",
@@ -340,7 +349,10 @@
       var rows = byDay[selected] || [];
       if (!rows.length) { list.appendChild(el("div", "sd-empty", "No classes on this day.")); return; }
       rows.forEach(function (c) {
-        var row = el("button", "sd-row"); row.type = "button";
+        // Decision 22 (c): a core (or always-runs) class is tinted and chipped,
+        // but only when the studio runs guarantees. Flex stays plain.
+        var isCore = !!s.guarantees_enabled && (c.tier === "core" || c.tier === "always");
+        var row = el("button", "sd-row" + (isCore ? " sd-core" : "")); row.type = "button";
         (function (id) { row.addEventListener("click", function () { open(id); }); })(c.id);
 
         var t = el("div", "sd-time");
@@ -357,6 +369,7 @@
         if (c.instructor_first_name) sub.push(c.instructor_first_name);
         if (c.room) sub.push(c.room);          // shown here at narrow widths (sd-loc hidden)
         info.appendChild(el("div", "sd-csub", sub.join(" · ")));
+        if (isCore) info.appendChild(el("span", "sd-runs", "Always runs"));
         row.appendChild(info);
 
         var act = el("div", "sd-act");

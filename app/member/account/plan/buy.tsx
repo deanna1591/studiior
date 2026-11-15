@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState, useFormStatus } from "react-dom";
 import { buyPlan, type BuyState } from "./actions";
 
@@ -9,7 +10,7 @@ function BuyButton() {
   return (
     <button
       disabled={pending}
-      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+      style={accentSolid()}
       className="m-tap m-press shrink-0 rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
     >
       {pending ? "Opening…" : "Buy"}

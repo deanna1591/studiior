@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import ClassCard from "./class-card";
 import ClassButton from "./class-button";
@@ -209,7 +210,7 @@ export default function DayClasses({
                 <input type="hidden" name="kind" value="dropin" />
                 <input type="hidden" name="booking_id" value={r.bookingId ?? ""} />
                 <button className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
-                        style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                        style={accentSolid()}>
                   Pay now
                 </button>
               </form>
@@ -244,6 +245,7 @@ export default function DayClasses({
               bookClass={bookClass}
               bookFirstFree={bookFirstFree}
               selfCheckIn={selfCheckIn}
+              onTint={r.alwaysRuns}
             />
           );
         } else if (state === "full") {
@@ -251,7 +253,9 @@ export default function DayClasses({
             <button
               type="button"
               onClick={() => book(r, true)}
-              style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+              style={r.alwaysRuns
+                ? { background: "transparent", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }
+                : { background: "var(--accent-chip)", color: "var(--ink)" }}
               className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
             >
               Join waitlist
@@ -268,7 +272,9 @@ export default function DayClasses({
             <button
               type="button"
               onClick={() => book(r, false)}
-              style={{ background: "var(--accent-chip)", color: "var(--ink)" }}
+              style={r.alwaysRuns
+                ? { background: "transparent", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }
+                : { background: "var(--accent-chip)", color: "var(--ink)" }}
               className="m-tap m-press min-w-[84px] rounded-full px-4 text-[13px] font-bold"
             >
               {rowIsFree ? "Book free" : "Book"}

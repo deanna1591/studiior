@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import {
   bookingOptions, bookMemberAction, searchBookMembers, classPickerDays,
@@ -129,7 +130,7 @@ function Sheet({
                 disabled={pending || !chosen}
                 onClick={submit}
                 className="flex-1 rounded-lg px-4 py-2.5 text-[14px] font-semibold disabled:opacity-60"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                style={accentSolid()}>
                 {pending ? "Booking…" : `Book ${opts.member_first}`}
               </button>
               <button onClick={onClose}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
@@ -71,7 +72,7 @@ export default async function MilestonesPage() {
             {earned.map((r) => (
               <span key={r.target}
                     className="flex h-16 w-16 flex-col items-center justify-center rounded-2xl"
-                    style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                    style={accentSolid()}>
                 <span className="num text-[18px] font-bold leading-5">{r.target}</span>
                 <span className="text-[9px] font-semibold uppercase tracking-wide opacity-80">classes</span>
               </span>

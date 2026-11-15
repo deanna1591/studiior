@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { instructorScreen, studioToday, shiftDate } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import AnnounceStrip from "@/components/member/announce-strip";
@@ -350,7 +351,7 @@ export default async function InstructorHome() {
           <span className="block text-[15px] font-medium leading-5 text-ink">Marketing</span>
           <span className="m-sub mt-0.5 block text-ink-2">Make a post of your classes and share it on Instagram, Facebook or Threads.</span>
           <Link href="/instructor/posts" className="m-press mt-3 inline-block rounded-full px-4 py-2 text-[13px] font-semibold"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Make a post</Link>
+            style={accentSolid()}>Make a post</Link>
         </div>
       </div>
     </InstructorShell>

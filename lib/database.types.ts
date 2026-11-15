@@ -10002,6 +10002,16 @@ export type Database = {
         Returns: boolean
       }
       member_wallet: { Args: { p_studio_id: string }; Returns: Json }
+      members_list: {
+        Args: {
+          p_filter?: string
+          p_page?: number
+          p_search?: string
+          p_sort?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       membership_frozen_now: {
         Args: { p_membership_id: string }
         Returns: boolean

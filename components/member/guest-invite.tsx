@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { accentSolid } from "@/lib/accent-pair";
 import { bringGuest } from "@/app/member/actions";
 import type { BookResult } from "@/app/member/actions";
 
@@ -9,7 +10,7 @@ function Submit() {
   return (
     <button type="submit" disabled={pending}
             className="m-tap m-press w-full rounded-full py-3 text-[14px] font-bold"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            style={accentSolid()}>
       {pending ? "Booking your guest…" : "Book my guest"}
     </button>
   );
@@ -41,7 +42,7 @@ export default function GuestInvite({ occurrenceId, canInvite = true }: { occurr
           <p className="m-sub text-ink">Guest invites are for members with a plan. Pick a plan to bring a friend.</p>
           <a href="/account/plan"
              className="m-tap m-press mt-3 inline-block rounded-full px-5 py-2.5 text-[14px] font-bold"
-             style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+             style={accentSolid()}>
             See plans
           </a>
         </div>

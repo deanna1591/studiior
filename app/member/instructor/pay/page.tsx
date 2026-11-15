@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import PayStatementView, { type Statement } from "@/components/pay/statement";
@@ -112,7 +113,7 @@ export default async function PayPage({ searchParams }: { searchParams: { period
             <Link key={p.period_id} href={`/instructor/pay?period=${p.period_id}`}
                   className="rounded-full px-3 py-1.5 text-[12px] font-semibold leading-4"
                   style={on
-                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                    ? accentSolid()
                     : { background: "var(--surface)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>
               {chipLabel(p)} · {p.status === "paid" ? "Paid" : p.status === "closed" ? "Closed" : "Open"}
             </Link>

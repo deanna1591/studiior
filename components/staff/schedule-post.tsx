@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
@@ -345,7 +346,7 @@ export default function SchedulePosts({
           <div className="flex flex-wrap gap-3">
             <button onClick={download} disabled={empty || loading}
               className="rounded-xl px-4 py-2 text-[14px] font-semibold disabled:opacity-50"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+              style={accentSolid()}>
               Download PNG
             </button>
             <button onClick={copyCaption} disabled={empty || loading}
@@ -370,7 +371,7 @@ export default function SchedulePosts({
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <button onClick={sendEdit} disabled={empty || editing || !instruction.trim()}
                 className="rounded-lg px-3 py-1.5 text-[13px] font-semibold disabled:opacity-50"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                style={accentSolid()}>
                 {editing ? "Applying…" : "Send"}
               </button>
               <button type="button" onClick={() => fileRef.current?.click()} disabled={empty || editing}
@@ -904,7 +905,7 @@ function LockScreen({ t, page, format, coachFirst, footer, photo, logoData, show
           const body = parts.join(" · ");
           return (
             <div key={i} style={{ width: CARD_W, height: 108, borderRadius: 22, background: "rgba(255,255,255,0.8)", backdropFilter: "blur(11px)", WebkitBackdropFilter: "blur(11px)", display: "flex", alignItems: "center", gap: 20, padding: "0 26px", boxSizing: "border-box" }}>
-              <div style={{ width: 76, height: 76, borderRadius: 17, flex: "0 0 auto", background: core ? t.accent : t.surface, display: "flex", alignItems: "center", justifyContent: "center", color: core ? "#fff" : t.accent, fontSize: 38, lineHeight: 1 }}>{core ? "✦" : "○"}</div>
+              <div style={{ width: 76, height: 76, borderRadius: 17, flex: "0 0 auto", background: core ? t.accent : t.surface, display: "flex", alignItems: "center", justifyContent: "center", color: core ? t.onAccent : t.accent, fontSize: 38, lineHeight: 1 }}>{core ? "✦" : "○"}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 24, color: t.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titleCase(c.name)}</span>

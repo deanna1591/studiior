@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 
 /**
  * Decision 26/34 — a member (or a brought guest) holds a place confirmed only
@@ -35,7 +36,7 @@ export default function WaiverBanner({ published, resign }: { published: boolean
       </p>
       <Link href="/waiver"
             className="m-tap m-press mt-2 inline-flex rounded-full px-4 py-2.5 text-[13px] font-bold"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            style={accentSolid()}>
         {resign ? "Read & re-sign the waiver" : "Read & sign the waiver"}
       </Link>
     </div>

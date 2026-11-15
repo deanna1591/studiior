@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import type { Metadata } from "next";
 import { getMemberContext } from "@/lib/auth";
 import { memberScreen } from "@/lib/member";
@@ -101,7 +102,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
           <p className="m-body mt-2 text-ink-2">Sign in or create your account to buy this plan.</p>
           <div className="mt-6 w-full max-w-xs space-y-3">
             <Link href={`/login?next=${encodeURIComponent(next)}`}
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                  style={accentSolid()}
                   className="m-action m-press flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
               Sign in
             </Link>

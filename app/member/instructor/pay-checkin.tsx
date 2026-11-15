@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { accentSolid } from "@/lib/accent-pair";
 import { confirmClass, type InstructorState } from "./actions";
 
 function Btn() {
@@ -8,7 +9,7 @@ function Btn() {
   return (
     <button type="submit" disabled={pending}
             className="m-tap m-press mt-2 w-full rounded-xl py-2.5 text-[13px] font-bold"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            style={accentSolid()}>
       {pending ? "Checking in…" : "Check in — your pay depends on it"}
     </button>
   );

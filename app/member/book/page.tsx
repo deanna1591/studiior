@@ -4,6 +4,7 @@ import MemberShell from "@/components/member/shell";
 import { type MonthDay } from "@/components/member/week-strip";
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 import { showsAlwaysRuns } from "@/lib/tier-tint";
+import { loadLen, windowOffsets as windowOffsetsFor } from "@/lib/book-window";
 import { type Row } from "@/components/member/day-classes";
 import BookWeek, { type DayBundle } from "@/components/member/book-week";
 import FreeClassList from "@/components/member/free-class-list";
@@ -47,18 +48,6 @@ export default async function Book({
   const from = dayStart(new Date(), ctx.timeZone, offset);
   const to = addDays(from, 1);
   const now = Date.now();
-  const WEEKDAYS_ = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  // The visible WINDOW (1 Nov speed pass): the 7 days of the selected day's week
-  // (Mon-based), fetched in detail ONCE so switching days within it is an instant
-  // client swap rather than a server navigation. The strip still shows its full
-  // 84-day pip run; only these 7 switch without a refetch.
-  const selDow_ = Math.max(0, WEEKDAYS_.indexOf(
-    new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, weekday: "short" }).format(from)));
-  const windowStartOffset = offset - selDow_;
-  const windowOffsets = Array.from({ length: 7 }, (_, i) => windowStartOffset + i);
-  const winFrom = dayStart(new Date(), ctx.timeZone, windowStartOffset);
-  const winTo = addDays(winFrom, 7);
-
   // The visible week: Monday of whichever week the selected day falls in.
   // Derived from the selected day rather than from today, so paging forward
   // three weeks does not leave the strip behind on this one.
@@ -100,6 +89,19 @@ export default async function Book({
   // date on a wall calendar, so it is compared as one.
   const weekStartKey = zonedDateKey(weekStartDay.toISOString(), ctx.timeZone);
   const weekEndKey = zonedDateKey(weekEndDay.toISOString(), ctx.timeZone);
+
+  // Decision 55 amendment (b): the detailed window spans the whole visible strip
+  // (or the month grid) forward to the published horizon, capped at 120 days, and
+  // bundles are built for every day in it. So tapping any strip or month-grid day
+  // is an instant client swap, not a server navigation; only a tap beyond this
+  // range (far-future month paging) falls through to a router.push with a
+  // skeleton. The occurrence query naturally returns nothing past the horizon, so
+  // the empty tail days are free; next-class pointers come from the loaded data
+  // below, with no per-day query.
+  const loadWindowLen = loadLen(monthView, gridLength, STRIP_LEN);
+  const windowOffsets = windowOffsetsFor(gridFromOffset, loadWindowLen);
+  const winFrom = dayStart(new Date(), ctx.timeZone, gridFromOffset);
+  const winTo = addDays(winFrom, loadWindowLen);
 
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
          { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig },
@@ -442,23 +444,24 @@ export default async function Book({
     return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(d);
   };
 
-  // Decision 30: an empty day points at where the timetable next has a class.
-  // One member_next_class_day per EMPTY (not closed/draft) window day, batched.
+  // Decision 30 / 55(b): an empty FUTURE day points at the next day in the loaded
+  // window with classes, computed from the already-loaded occurrences with NO
+  // per-day query. The window reaches the published horizon, so the next class is
+  // in it or there is none to point at. Past empty days get no pointer.
   const emptyWindowDays = windowOffsets.filter((o) => {
     const key = keyByOffset.get(o)!;
-    return !(rowsByOffset.get(o)?.length) && !closureFor(key) && !draftFor(key);
+    return o >= 0 && !(rowsByOffset.get(o)?.length) && !closureFor(key) && !draftFor(key);
   });
+  const daysWithRows = windowOffsets
+    .filter((o) => (rowsByOffset.get(o)?.length ?? 0) > 0)
+    .sort((a, b) => a - b);
   const nextByOffset = new Map<number, { dateText: string; count: number; offset: number }>();
-  const nextResults = await Promise.all(emptyWindowDays.map((o) =>
-    supabase.rpc("member_next_class_day", { p_studio_id: ctx.studioId, p_from: keyByOffset.get(o)! })
-      .then(({ data }) => ({ o, data: data as { date: string; count: number } | null }))));
-  for (const { o, data } of nextResults) {
-    if (!data) continue;
-    const ndOffset = Math.round(
-      (new Date(`${data.date}T00:00:00Z`).getTime() - new Date(`${todayKey}T00:00:00Z`).getTime()) / 86_400_000);
+  for (const o of emptyWindowDays) {
+    const nd = daysWithRows.find((x) => x > o);
+    if (nd === undefined) continue;
     nextByOffset.set(o, {
-      dateText: dateWord(data.date, { weekday: "long", day: "numeric", month: "long" }),
-      count: data.count, offset: ndOffset,
+      dateText: dateWord(keyByOffset.get(nd)!, { weekday: "long", day: "numeric", month: "long" }),
+      count: rowsByOffset.get(nd)!.length, offset: nd,
     });
   }
 

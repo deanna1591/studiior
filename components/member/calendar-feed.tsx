@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 
 /**
  * Decision 33 Part B — the subscribe-to-your-calendar control, shared by the
@@ -81,7 +82,7 @@ export function CalendarFeedControl({
           </div>
           <button onClick={copy}
                   className="m-tap mt-2 inline-flex items-center rounded-full px-4 text-[13px] font-bold"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  style={accentSolid()}>
             {copied ? "Copied" : "Copy link"}
           </button>
         </div>
@@ -113,7 +114,7 @@ export function CalendarFeedControl({
         <div className="mt-3">
           <button onClick={mint} disabled={pending}
                   className="m-tap inline-flex items-center rounded-full px-4 text-[13px] font-bold disabled:opacity-60"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  style={accentSolid()}>
             {pending ? "One moment…" : "Create a feed link"}
           </button>
         </div>

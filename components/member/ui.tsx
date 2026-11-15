@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState, useFormStatus } from "react-dom";
 import type { ActionResult, BookResult } from "@/app/member/actions";
 import { haptic } from "@/lib/haptics";
@@ -29,7 +30,7 @@ export function Note({ ok, children }: { ok: boolean; children: React.ReactNode 
  * --accent-on-solid are derived together in lib/theme.ts and measured against
  * the preset, so they are always used together and never separately.
  */
-export const accentFill = { background: "var(--accent-solid)", color: "var(--accent-on-solid)" };
+export const accentFill = accentSolid();
 
 /** The one big button. 56px, accent-filled, and only ever one per screen. */
 export function PrimaryButton({ children, pending: pendingProp }: {

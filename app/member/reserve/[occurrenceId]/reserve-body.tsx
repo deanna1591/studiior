@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { startReservation } from "@/app/member/account/plan/actions";
 
 /**
@@ -27,7 +28,7 @@ export default function ReserveBody({ occId, feeLabel }: { occId: string; feeLab
       )}
       <button onClick={go} disabled={pending}
               className="m-press w-full rounded-full py-3.5 text-[15px] font-semibold disabled:opacity-60"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+              style={accentSolid()}>
         {pending ? "Opening checkout…" : `Continue to pay ${feeLabel}`}
       </button>
       <p className="m-micro mt-2 text-center text-ink-3">Card or GCash, on the next screen.</p>

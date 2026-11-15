@@ -1,4 +1,5 @@
 import { Icon } from "@/components/member/icons";
+import { accentSolid } from "@/lib/accent-pair";
 import { TABS, BUTTONS } from "@/lib/guide-ui-registry";
 import { splitGuideText } from "@/lib/instructor-guide";
 import type { GuideRef as Ref } from "@/lib/instructor-guide";
@@ -41,7 +42,7 @@ export function GuideRef({ refr, inline = true }: { refr: Ref; inline?: boolean 
   if (refr.kind === "button") {
     const variant = BUTTONS[refr.key] ?? "outline";
     if (variant === "solid") {
-      return <span className={BUTTON_CLASS + gap} style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>{refr.key}</span>;
+      return <span className={BUTTON_CLASS + gap} style={accentSolid()}>{refr.key}</span>;
     }
     if (variant === "tint") {
       return <span className={BUTTON_CLASS + gap} style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>{refr.key}</span>;
@@ -88,7 +89,7 @@ export function ImportantBox({ text }: { text: string }) {
 // classes so they look like the screen the instructor will actually open.
 
 function Chip({ children, tone }: { children: React.ReactNode; tone: "solid" | "amber" | "accent" }) {
-  const style = tone === "solid" ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+  const style = tone === "solid" ? accentSolid()
     : tone === "amber" ? { background: "var(--amber-tint)", color: "var(--ink)" }
     : { background: "var(--accent-chip)", color: "var(--ink)" };
   return <span className="rounded-full px-2.5 py-1 text-[12px] leading-4 font-medium" style={style}>{children}</span>;
@@ -120,7 +121,7 @@ function ScreenRoster() {
       <div className="flex items-center justify-between gap-2">
         <span className="m-sub text-ink-2">Mon 10:00 · 3/8 booked</span>
         <span className="rounded-full px-3 py-1 text-[11px] leading-4 font-bold"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Checked in for pay</span>
+              style={accentSolid()}>Checked in for pay</span>
       </div>
       <RosterRow name="Ana Reyes" sub="Here" />
       <RosterRow name="Bea Cruz" sub="Booked">
@@ -164,7 +165,7 @@ function ScreenAddWalkIn() {
           <FakeField placeholder="Mobile (optional)" />
         </div>
         <span className="mt-3 block w-full rounded-xl py-2.5 text-center text-[14px] font-semibold"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Add</span>
+              style={accentSolid()}>Add</span>
         <p className="mt-2 text-[12.5px] leading-5 text-ink-2">Added — free first class</p>
       </div>
     </div>
@@ -188,7 +189,7 @@ function ScreenPaidAtDesk() {
           <div className="mt-2"><FakeField placeholder="Amount" /></div>
           <div className="mt-2"><FakeField placeholder="Reference (optional)" /></div>
           <span className="mt-2 block w-full rounded-xl py-2 text-center text-[13px] font-semibold"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Record payment</span>
+                style={accentSolid()}>Record payment</span>
         </div>
       </RosterRow>
     </div>

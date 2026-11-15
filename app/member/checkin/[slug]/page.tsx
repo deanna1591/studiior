@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { getMemberContext } from "@/lib/auth";
 import { memberScreen } from "@/lib/member";
 import { anonStudio } from "@/lib/anon-studio";
@@ -44,7 +45,7 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
           <p className="m-body mt-2 text-ink-2">Sign in to check in to your class.</p>
           <div className="mt-6 w-full max-w-xs space-y-3">
             <Link href={`/login?next=${encodeURIComponent(next)}`}
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                  style={accentSolid()}
                   className="m-action m-press flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
               Sign in
             </Link>
@@ -131,7 +132,7 @@ export default async function Checkin({ params }: { params: { slug: string } }) 
       <p className="m-body text-ink">Please sign the waiver first before checking in.</p>
       <Link href={`/waiver?next=${encodeURIComponent(next)}`}
             className="m-press mt-2 inline-block rounded-lg px-3 py-1.5 text-[13px] font-semibold"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            style={accentSolid()}>
         Sign the waiver
       </Link>
     </div>

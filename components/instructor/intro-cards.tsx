@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { INTRO_CARDS, INTRO_DONE_LABEL, fillStudio } from "@/lib/instructor-guide";
 import { GuideText } from "@/components/instructor/guide-ui";
 
@@ -62,7 +63,7 @@ export default function IntroCards({
         )}
         <button type="button" onClick={() => (last ? finish() : go(i + 1))}
           className="m-tap rounded-full px-5 text-[13px] font-bold"
-          style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+          style={accentSolid()}>
           {last ? INTRO_DONE_LABEL : "Next"}
         </button>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import EmailComposer from "@/components/staff/email-composer";
 import { stateLine, SNOOZE_DAYS, snoozeLabel } from "@/lib/retention";
 import {
@@ -94,7 +95,7 @@ export default function RetentionPanel({
                                    : r.reason === "no_email" ? "No email on file." : "Could not send.");
                     })}
                     className="rounded-md px-3 py-1.5 text-[13px] font-medium"
-                    style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                    style={accentSolid()}>
                     {pending ? "Sending…" : "Send"}
                   </button>
                   {aiDrafts && (
@@ -163,7 +164,7 @@ export default function RetentionPanel({
             <div className="mt-4 flex flex-wrap gap-2">
               <button onClick={openEmail}
                 className="rounded-md px-3 py-1.5 text-[13px] font-medium"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                style={accentSolid()}>
                 Email
               </button>
               {row.suggested_message && <Copy value={row.suggested_message}>Copy Viber message</Copy>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import {
   BRAND_FONTS, LAYOUTS, RADII, LOGO_PLACEMENTS, BACKGROUND_TREATMENTS,
@@ -174,7 +175,7 @@ export default function BrandKit({
           <div className="flex items-center gap-3">
             <button onClick={onLearn} disabled={busy || refs.length === 0}
               className="rounded-xl px-4 py-2 text-[14px] font-semibold disabled:opacity-50"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+              style={accentSolid()}>
               {learning ? "Learning…" : "Learn my style"}
             </button>
             <span className="num text-[12px] text-ink-3">{runsUsed} of {initial.runsCap} this month</span>
@@ -272,7 +273,7 @@ export default function BrandKit({
           <div className="flex items-center gap-3">
             <button onClick={onSave} disabled={busy}
               className="rounded-xl px-4 py-2 text-[14px] font-semibold disabled:opacity-50"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Save</button>
+              style={accentSolid()}>Save</button>
             <button onClick={onReset} disabled={busy} className="text-[13px] text-ink-2 underline">Reset to studio defaults</button>
           </div>
         </section>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { fmtDayLong } from "@/lib/time";
 import { formatMoney } from "@/lib/plans";
 
@@ -36,7 +37,7 @@ export default function ReservationDueNotice({
             <div className="mt-3 flex items-center gap-3">
               <Link href={`/reserve/${d.occurrence_id}`}
                     className="m-press rounded-full px-3.5 py-2 text-[13px] font-semibold"
-                    style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                    style={accentSolid()}>
                 Pay {feeLabel} to keep my spot
               </Link>
               <Link href={`/class/${d.occurrence_id}`} className="text-[13px] text-ink-2 underline underline-offset-4">

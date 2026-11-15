@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState, useFormStatus } from "react-dom";
 import { validateGroupEmails } from "@/lib/group";
 import { bookGroupAction, swapGuestAction, cancelGroupAction, type GroupActionState } from "./actions";
@@ -9,7 +10,7 @@ function Submitting({ label, busy }: { label: string; busy: string }) {
   const { pending } = useFormStatus();
   return (
     <button disabled={pending}
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+            style={accentSolid()}
             className="m-action m-press flex w-full items-center justify-center rounded-xl text-[16px] font-semibold disabled:opacity-60">
       {pending ? busy : label}
     </button>

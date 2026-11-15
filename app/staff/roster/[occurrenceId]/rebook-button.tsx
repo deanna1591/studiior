@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import { fmtTime, fmtDayLong } from "@/lib/time";
 import {
@@ -107,7 +108,7 @@ export default function RebookButton({
                 {result && <p className="mt-3 text-[13px] text-coral">{result}</p>}
                 <button onClick={confirm} disabled={pending}
                   className="mt-4 w-full rounded-xl px-4 py-3 text-[15px] font-semibold disabled:opacity-60"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  style={accentSolid()}>
                   {pending ? "Rebooking…" : `Rebook ${opts?.firstName ?? ""}`}
                 </button>
                 <button onClick={() => { setChosen(null); setResult(null); }} className="mt-2 w-full py-2 text-[13px] text-ink-2">Back</button>

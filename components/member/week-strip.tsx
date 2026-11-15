@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { Icon } from "./icons";
 
 /**
@@ -117,10 +118,15 @@ export default function WeekStrip({
 export type MonthDay = WeekDay & { inMonth: boolean };
 
 export function MonthGrid({
-  days, hrefFor,
+  days, hrefFor, onSelect, windowOffsets,
 }: {
   days: MonthDay[];
   hrefFor: (offset: number) => string;
+  // Decision 55 amendment (b): a day inside the loaded window switches on the
+  // client; a day outside it navigates. When no onSelect is given every cell is
+  // a link (the prior behaviour).
+  onSelect?: (offset: number) => void;
+  windowOffsets?: Set<number>;
 }) {
   return (
     <div className="m-card p-3">
@@ -130,19 +136,14 @@ export function MonthGrid({
             {l}
           </li>
         ))}
-        {days.map((d) => (
-          <li key={d.offset}>
-            <Link
-              href={hrefFor(d.offset)}
-              aria-current={d.isSelected ? "date" : undefined}
-              aria-label={`${d.weekdayLabel} ${d.dayOfMonth}${d.hasClasses ? ", has classes" : ", no classes"}`}
-              className={`flex h-11 flex-col items-center justify-center gap-1 rounded-xl ${d.inMonth ? "" : "opacity-35"}`}
-              style={
-                d.isSelected
-                  ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
-                  : undefined
-              }
-            >
+        {days.map((d) => {
+          const inWindow = !!onSelect && !!windowOffsets && windowOffsets.has(d.offset);
+          const cellClass = `flex h-11 w-full flex-col items-center justify-center gap-1 rounded-xl ${d.inMonth ? "" : "opacity-35"}`;
+          const cellStyle = d.isSelected
+            ? accentSolid()
+            : undefined;
+          const inner = (
+            <>
               <span
                 className="num text-[13px] font-semibold leading-4"
                 style={
@@ -167,9 +168,26 @@ export function MonthGrid({
                   : "var(--lime-text)",
                 }}
               />
-            </Link>
-          </li>
-        ))}
+            </>
+          );
+          const aria = {
+            "aria-current": d.isSelected ? ("date" as const) : undefined,
+            "aria-label": `${d.weekdayLabel} ${d.dayOfMonth}${d.hasClasses ? ", has classes" : ", no classes"}`,
+          };
+          return (
+            <li key={d.offset}>
+              {inWindow ? (
+                <button type="button" onClick={() => onSelect!(d.offset)} className={cellClass} style={cellStyle} {...aria}>
+                  {inner}
+                </button>
+              ) : (
+                <Link href={hrefFor(d.offset)} className={cellClass} style={cellStyle} {...aria}>
+                  {inner}
+                </Link>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

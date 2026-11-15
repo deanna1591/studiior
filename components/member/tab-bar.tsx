@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./icons";
 
@@ -66,7 +67,7 @@ export default function TabBar({
                 className="flex min-h-[50px] flex-col items-center justify-center gap-1 rounded-[20px]"
                 style={
                   active
-                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                    ? accentSolid()
                     : { color: "var(--ink-2)" }
                 }
               >

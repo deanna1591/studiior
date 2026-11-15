@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { dismissAnnouncement } from "@/app/member/actions";
 import { Icon } from "@/components/member/icons";
 
@@ -56,7 +57,7 @@ export default function AnnounceStrip({
       {shown.map((a) => (
         <div key={a.id}
              className="flex items-center gap-2 rounded-2xl px-3.5 py-2.5"
-             style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+             style={accentSolid()}>
           {a.linkUrl ? (
             <button type="button" onClick={() => open(a.linkUrl!)}
                     className="m-press flex min-w-0 flex-1 items-center gap-1.5 text-left"

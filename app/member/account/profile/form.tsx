@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { accentSolid } from "@/lib/accent-pair";
 import { updateProfile, uploadAvatar } from "../../actions";
 import Avatar from "@/components/member/avatar";
 import IconChip from "@/components/member/icon-chip";
@@ -12,7 +13,7 @@ function Save({ label }: { label: string }) {
   return (
     <button
       disabled={pending}
-      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+      style={accentSolid()}
       className="m-action mt-5 w-full rounded-xl text-[16px] font-semibold disabled:opacity-60"
     >
       {pending ? "Saving…" : label}

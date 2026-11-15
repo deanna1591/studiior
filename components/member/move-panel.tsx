@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import Link from "next/link";
 import { spotsLine, type RescueCard } from "@/lib/flex-rescue";
 import type { MoveResult } from "@/app/member/actions";
@@ -80,7 +81,7 @@ export default function MovePanel({
                 <p className="m-micro mt-0.5 text-ink-3">{spotsLine(c)}</p>
                 <Link
                   href={`/move?booking=${encodeURIComponent(bookingId)}&target=${encodeURIComponent(c.occurrence_id)}`}
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                  style={accentSolid()}
                   className="m-tap m-press mt-3 inline-block rounded-full px-4 text-[13px] font-bold"
                 >
                   Move me to this class

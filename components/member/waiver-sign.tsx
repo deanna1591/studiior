@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useFormState, useFormStatus } from "react-dom";
 import { signWaiver, type SignResult } from "@/app/member/waiver/actions";
 
@@ -16,7 +17,7 @@ function SignButton({ enabled }: { enabled: boolean }) {
   return (
     <button type="submit" disabled={!enabled || pending}
             className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-50"
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+            style={accentSolid()}>
       {pending ? "Saving your signature…" : "Sign the waiver"}
     </button>
   );

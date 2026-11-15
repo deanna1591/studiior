@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { scanCheckIn } from "@/app/member/instructor/actions";
 
 /**
@@ -104,7 +105,7 @@ export default function ScanCheckIn({
         ) : (
           <button type="button" onClick={go} disabled={pending}
                   className="m-tap rounded-full px-4 text-[13px] font-bold disabled:opacity-90"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  style={accentSolid()}>
             {pending ? "Checking in…" : "Scan"}
           </button>
         )}

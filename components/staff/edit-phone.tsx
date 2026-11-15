@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setMemberPhoneAction, type PhoneTaken } from "@/app/staff/members/book-actions";
@@ -44,7 +45,7 @@ export default function EditPhone({
                 setEditing(false); setOk(true); router.refresh();
               })}
               className="rounded-lg px-3 py-1.5 text-[13px] font-semibold disabled:opacity-60"
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+              style={accentSolid()}>
         {pending ? "Saving…" : "Save"}
       </button>
       <button onClick={() => { setEditing(false); setVal(current ?? ""); setErr(null); setTaken(null); }}

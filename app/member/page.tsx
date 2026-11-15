@@ -1,4 +1,5 @@
 import { focalPoint } from "@/lib/focal";
+import { accentSolid } from "@/lib/accent-pair";
 import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
@@ -274,7 +275,7 @@ export default async function MemberHome() {
             <input type="hidden" name="offer_id" value={o.id} />
             <div className="mt-3 flex gap-2">
               <button name="accept" value="1"
-                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                      style={accentSolid()}
                       className="m-action flex-1 rounded-xl px-4 text-[16px] font-semibold">
                 Take it
               </button>
@@ -417,7 +418,7 @@ export default async function MemberHome() {
                 <BookForm action={bookClass} className="shrink-0">
                   <input type="hidden" name="occurrence_id" value={o.id} />
                   <button className="m-tap flex items-center rounded-full px-4 text-[13px] font-bold"
-                          style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                          style={accentSolid()}>
                     Book
                   </button>
                 </BookForm>

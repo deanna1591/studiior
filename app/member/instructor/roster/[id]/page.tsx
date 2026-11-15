@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { instructorScreen } from "@/lib/instructor";
 import InstructorShell from "@/components/instructor/shell";
 import { AskForCover, CheckIn } from "../../actions-ui";
@@ -173,7 +174,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
                   {m.first_timer && (
                     <span className="rounded-full px-2.5 py-1 text-[12px] font-semibold leading-4"
                           title="Their first class is on us — they're in their intro window. A warm welcome goes a long way."
-                          style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                          style={accentSolid()}>
                       First ever class
                     </span>
                   )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { accentSolid } from "@/lib/accent-pair";
 import { updateProfile } from "@/app/member/actions";
 import { Note } from "@/components/member/ui";
 
@@ -16,7 +17,7 @@ function Save() {
   return (
     <button
       disabled={pending}
-      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+      style={accentSolid()}
       className="m-action mt-4 w-full rounded-xl text-[16px] font-semibold disabled:opacity-60"
     >
       {pending ? "Saving…" : "Save"}

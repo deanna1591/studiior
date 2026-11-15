@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { StateChip } from "@/components/state-chip";
 import EmailComposer from "@/components/staff/email-composer";
 import { outcomeLine } from "@/lib/retention";
@@ -121,7 +122,7 @@ function BulkComposer({
                   onDone(`Emailed ${r.sent}. ${r.skipped.length ? `${r.skipped.length} skipped.` : ""}`);
                 })}
                 className="rounded-md px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                style={accentSolid()}>
                 {pending ? "Sending…" : `Send to ${memberIds.length}`}
               </button>
               {aiDrafts && (

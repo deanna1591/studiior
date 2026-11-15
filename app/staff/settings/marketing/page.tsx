@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { staffScreen } from "@/lib/screen";
 import { isDeskUp, isManagerUp } from "@/lib/auth";
 import { AppShell, Denied, SectionLabel } from "@/components/ui";
@@ -71,7 +72,7 @@ export default async function MarketingSettings() {
           </label>
           {canEdit
             ? <button className="rounded-xl px-4 py-2 text-[14px] font-semibold"
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>Save</button>
+                style={accentSolid()}>Save</button>
             : <p className="text-[12px] text-ink-3">Owners and managers edit these.</p>}
         </form>
       </div>

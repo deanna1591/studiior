@@ -31,6 +31,10 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   no_desk_pay: { label: "No desk pay" },
   // Decision 103a: the reservation fee is waived for this member.
   fee_waived: { label: "Fee waived" },
+  // Decision 105: the three "needs attention" signals the list surfaces.
+  duplicate: { label: "Possible duplicate", warn: true },
+  fee_due: { label: "Fee due", warn: true },
+  no_waiver: { label: "Waiver not signed", warn: true },
   // sale_status (sales_history)
   active: { label: "Active" },
   refunded: { label: "Refunded" },

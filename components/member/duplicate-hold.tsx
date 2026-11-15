@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 
 /**
  * Decision 98 — one free class per person. When a member's free first class is
@@ -23,7 +24,7 @@ export default function DuplicateHold({
         {holdTime ? ` Pay to keep your spot before ${holdTime}, or it will be released.` : " Pay to keep your spot, or it will be released."}
       </p>
       <Link href={`/checkout/${occurrenceId}`}
-            style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+            style={accentSolid()}
             className="m-action m-press mt-3 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
         Pay to keep my spot
       </Link>

@@ -1,13 +1,14 @@
 "use client";
 
 import { signIn } from "../actions";
+import { accentSolid } from "@/lib/accent-pair";
 import { useAuthAction } from "@/components/member/ui";
 
 function Submit({ pending }: { pending: boolean }) {
   return (
     <button
       disabled={pending}
-      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+      style={accentSolid()}
       className="m-action w-full rounded-xl text-[16px] font-semibold disabled:opacity-60"
     >
       {pending ? "Signing in…" : "Sign in"}

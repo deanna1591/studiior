@@ -1,4 +1,5 @@
 import { focalPoint } from "@/lib/focal";
+import { accentSolid } from "@/lib/accent-pair";
 import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
 import IconChip from "@/components/member/icon-chip";
@@ -233,7 +234,7 @@ export default function ClassDetailBody({
                 <p className="m-body text-ink">Please sign the waiver first before checking in.</p>
                 <Link href={`/waiver?next=${encodeURIComponent(`/class/${occ.id}`)}`}
                       className="m-press mt-2 inline-block rounded-lg px-3 py-1.5 text-[13px] font-semibold"
-                      style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                      style={accentSolid()}>
                   Sign the waiver
                 </Link>
               </div>
@@ -315,7 +316,7 @@ export default function ClassDetailBody({
             </p>
             <Link href={`/reserve/${occ.id}`}
                   className="m-press block w-full rounded-full py-3.5 text-center text-[15px] font-semibold"
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
+                  style={accentSolid()}>
               Book free, {reservationFeeLabel} to reserve
             </Link>
           </div>
@@ -351,7 +352,7 @@ export default function ClassDetailBody({
           // Decision 88: no plan covers this class — Book opens checkout, where
           // they pick a plan, see the cost, and pay (or pay at the desk there).
           <Link href={`/checkout/${occ.id}`}
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                style={accentSolid()}
                 className="m-action m-press flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
             Book this class
           </Link>
@@ -375,7 +376,7 @@ export default function ClassDetailBody({
             Pay now to settle it, or pay at the desk when you come in.
           </p>
           <Link href={`/checkout/${occ.id}`}
-                style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                style={accentSolid()}
                 className="m-action m-press mt-3 flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
             Pay now
           </Link>

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import TabBar, { type Tab } from "@/components/member/tab-bar";
+import PullToRefresh from "@/components/member/pull-to-refresh";
+import UpdatePrompt from "@/components/member/update-prompt";
 import { Icon } from "@/components/member/icons";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import type { InstructorContext } from "@/lib/instructor";
@@ -83,9 +85,10 @@ export default function InstructorShell({
           </div>
         </header>
       )}
+      {!bare && <UpdatePrompt />}
       <main className={`m-scroll mx-auto max-w-lg px-4 pb-24 ${bare ? "pt-4" : "pt-1"}`}>
         {title && <h1 className="m-head mb-5 text-[24px] leading-8 text-ink">{title}</h1>}
-        {children}
+        {bare ? children : <PullToRefresh>{children}</PullToRefresh>}
       </main>
       {!bare && (
         <TabBar

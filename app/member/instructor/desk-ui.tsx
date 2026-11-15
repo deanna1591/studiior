@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
@@ -68,7 +69,7 @@ export function AddWalkIn({ occurrenceId, currency, tz, timeFormat }: {
         <input className={field} placeholder="Mobile (optional)" value={mobile} onChange={(e) => setMobile(e.target.value)} />
       </div>
       <button disabled={busy || !name || !email} onClick={submit}
-              style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+              style={accentSolid()}
               className="m-action mt-3 w-full rounded-xl text-[15px] font-semibold disabled:opacity-60">
         {busy ? "Adding…" : "Add"}
       </button>
@@ -190,7 +191,7 @@ export function DeskPay({
           </div>
           <input className={`${field} mt-2`} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Reference (optional)" />
           <button disabled={busy || !amount} onClick={pay}
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                  style={accentSolid()}
                   className="m-action mt-2 w-full rounded-xl text-[14px] font-semibold disabled:opacity-60">
             {busy ? "Recording…" : "Record payment"}
           </button>
@@ -218,7 +219,7 @@ export function DeskPay({
             </label>
           )}
           <button disabled={busy || !planId} onClick={sell}
-                  style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}
+                  style={accentSolid()}
                   className="m-action mt-2 w-full rounded-xl text-[14px] font-semibold disabled:opacity-60">
             {busy ? "Recording…" : "Record sale"}
           </button>

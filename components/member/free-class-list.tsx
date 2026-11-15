@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { useMemo, useState, useTransition } from "react";
 import { fmtTime, zonedDateKey } from "@/lib/time";
 import { FREE_PICKER_HEADING, freePickerSubline } from "@/lib/free-picker";
@@ -106,7 +107,7 @@ export default function FreeClassList({
           <button type="button" onClick={() => setTypeFilter(null)}
                   className="m-press rounded-full px-3 py-1 text-[12px] font-semibold"
                   style={typeFilter === null
-                    ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                    ? accentSolid()
                     : { background: "var(--surface)", color: "var(--ink-2)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
             All
           </button>
@@ -114,7 +115,7 @@ export default function FreeClassList({
             <button key={n} type="button" onClick={() => setTypeFilter(n)}
                     className="m-press rounded-full px-3 py-1 text-[12px] font-semibold"
                     style={typeFilter === n
-                      ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                      ? accentSolid()
                       : { background: "var(--surface)", color: "var(--ink-2)", boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
               {n}
             </button>
@@ -130,7 +131,7 @@ export default function FreeClassList({
             <button key={d.key} role="tab" aria-selected={on} onClick={() => setSelected(d.key)}
                     className="m-press flex min-w-[46px] flex-col items-center rounded-2xl px-1 py-1.5"
                     style={on
-                      ? { background: "var(--accent-solid)", color: "var(--accent-on-solid)" }
+                      ? accentSolid()
                       : { background: "var(--surface)", color: "var(--ink-2)",
                           boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
               <span className="text-[10px] uppercase tracking-wide">{d.dow}</span>
