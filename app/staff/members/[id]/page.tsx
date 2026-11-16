@@ -253,13 +253,20 @@ export default async function MemberDetail({
   const resvCr = (resvCredits as { amount_cents: number; used_cents: number; currency: string }[] | null) ?? [];
   const resvAvail = resvCr.reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
   const resvCcy = resvCr[0]?.currency ?? resvFeeRows[0]?.currency ?? "PHP";
+  // d() returns JSX (monospaced numeral), so for this plain-string meta line we
+  // build the date as text — interpolating d() into a template literal yields
+  // "[object Object]".
+  const dStr = (iso: string) => {
+    const { day, month } = dayMonthParts(iso, ctx.timeZone);
+    return `${day} ${month}`;
+  };
   const resvStateLine = (f: ResvFee) => {
     switch (f.state) {
       case "held": return "held for this class";
-      case "credited": return f.state_at ? `credited back on ${d(f.state_at)}` : "credited back";
+      case "credited": return f.state_at ? `credited back on ${dStr(f.state_at)}` : "credited back";
       case "kept": return "kept (no-show or late cancel)";
       case "used": return "used as credit";
-      case "refunded": return f.state_at ? `refunded on ${d(f.state_at)}` : "refunded";
+      case "refunded": return f.state_at ? `refunded on ${dStr(f.state_at)}` : "refunded";
       default: return f.state;
     }
   };
