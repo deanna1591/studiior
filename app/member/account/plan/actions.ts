@@ -242,6 +242,7 @@ const FREE_RESERVE_REASONS: Record<string, string> = {
   not_found: "That class could not be found.",
   class_not_bookable: "That class is not open for booking.",
   class_in_past: "That class has already started.",
+  class_ended: "That class has already ended.",
   class_full: "That class is full.",
   not_first: "Your free first class has already been used.",
   already_had_free: "Your free first class has already been used.",

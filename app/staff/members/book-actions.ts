@@ -17,11 +17,20 @@ export type BookOption = {
   label: string;
   membership_id?: string;
   price_cents?: number | null;
+  // Decision 100 amendment (b): a free-first late add carries the waiver choice.
+  waive_fee?: boolean;
 };
 export type BookOptions = {
   member_first: string;
   class_name: string;
   starts_at: string;
+  // Decision 100 amendment (b): the late-add context for the roster sheet.
+  ends_at?: string;
+  late_add?: boolean;
+  ended?: boolean;
+  method?: "staff" | "instructor";
+  reservation_fee_cents?: number;
+  member_fee_waived?: boolean;
   options: BookOption[];
   preselect: number;
 } | null;

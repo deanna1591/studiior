@@ -478,6 +478,7 @@ const REBOOK_REASON: Record<string, string> = {
   already_in_class: "They are already in this class.",
   class_full: "That class is full.",
   class_in_past: "That class has already started.",
+  class_ended: "That class has already ended.",
   class_not_scheduled: "That class isn’t available.",
   no_such_class: "That class no longer exists.",
   no_such_booking: "That booking no longer exists.",

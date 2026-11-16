@@ -632,3 +632,67 @@ export async function unblockTimeOff(
   revalidatePath("/instructor");
   return { ok: "Removed. You are available on those days again." };
 }
+
+// ---------------------------------------------------------------------------
+// Decision 100 amendment (b): the instructor late-adds a member to the class
+// they are teaching. staff_booking_options / staff_book_member now allow the
+// class's own instructor; members are read under members_staff_read.
+// ---------------------------------------------------------------------------
+import type { BookOption, BookOptions, BookResult, MemberHit } from "@/app/staff/members/book-actions";
+import { REASONS } from "@/lib/booking-reasons";
+import { fullName } from "@/lib/full-name";
+import type { Json } from "@/lib/database.types";
+
+export async function instructorBookingOptions(
+  memberId: string, occurrenceId: string,
+): Promise<BookOptions> {
+  const supabase = createClient();
+  const { data } = await supabase.rpc("staff_booking_options", {
+    p_member_id: memberId, p_occurrence_id: occurrenceId,
+  });
+  return (data as unknown as BookOptions) ?? null;
+}
+
+export async function instructorBookMember(
+  memberId: string, occurrenceId: string, source: BookOption, note: string | null,
+): Promise<BookResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("staff_book_member", {
+    p_member_id: memberId, p_occurrence_id: occurrenceId,
+    p_source: source as unknown as Json, p_note: note ?? undefined,
+  });
+  if (error) {
+    return { error: /PT403/.test(error.message)
+      ? "You can only add a member to a class you are teaching."
+      : error.message };
+  }
+  const r = data as unknown as { ok: boolean; reason?: string; source?: string; member_first?: string };
+  if (!r.ok) {
+    const name = r.member_first ? `${r.member_first}: ` : "";
+    const sentence = (r.reason && REASONS[r.reason]) || "That could not be booked.";
+    return { error: `${name}${sentence}` };
+  }
+  revalidatePath(`/instructor/roster/${occurrenceId}`);
+  return { ok: true, source: r.source ?? "a booking" };
+}
+
+export async function instructorSearchMembers(
+  occurrenceId: string, term: string,
+): Promise<MemberHit[]> {
+  const t = term.trim();
+  if (t.length < 2) return [];
+  const supabase = createClient();
+  const { data: occ } = await supabase
+    .from("class_occurrences").select("studio_id").eq("id", occurrenceId).maybeSingle();
+  if (!occ) return [];
+  const { data } = await supabase
+    .from("members")
+    .select("id, first_name, last_name, email")
+    .eq("studio_id", occ.studio_id)
+    .is("deleted_at", null)
+    .or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%,email.ilike.%${t}%`)
+    .limit(20);
+  return (data ?? []).map((m) => ({
+    id: m.id, name: fullName(m.first_name, m.last_name), email: m.email,
+  }));
+}

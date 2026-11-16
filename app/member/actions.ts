@@ -154,6 +154,7 @@ const FREE_FIRST_REASONS: Record<string, string> = {
   class_full: "That class is full.",
   class_not_bookable: "That class can't be booked.",
   class_in_past: "That class has already started.",
+  class_ended: "That class has already ended.",
   month_not_published: "That month's timetable isn't published yet.",
   outside_booking_window: "That class is further ahead than you can book yet.",
   past_booking_cutoff: "Booking has closed for that class.",

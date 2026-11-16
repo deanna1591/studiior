@@ -19,10 +19,16 @@ function toast(msg: string) {
   window.dispatchEvent(new CustomEvent("studiior:toast", { detail: msg }));
 }
 
-/** The core sheet: a member and a class are fixed; pick how to pay and book. */
-function Sheet({
+/** The core sheet: a member and a class are fixed; pick how to pay and book.
+ *  optionsFn/bookFn are injected so the instructor portal can reuse it with its
+ *  own actions (Decision 100 amendment b). */
+export function Sheet({
   memberId, occurrenceId, onClose,
-}: { memberId: string; occurrenceId: string; onClose: () => void }) {
+  optionsFn = bookingOptions, bookFn = bookMemberAction,
+}: {
+  memberId: string; occurrenceId: string; onClose: () => void;
+  optionsFn?: typeof bookingOptions; bookFn?: typeof bookMemberAction;
+}) {
   const router = useRouter();
   const [opts, setOpts] = useState<BookOptions>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -30,12 +36,13 @@ function Sheet({
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState("");
+  const [waive, setWaive] = useState(true);  // Decision 100 (b): on by default for a late add
   const [result, setResult] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   useEffect(() => {
     let live = true;
-    bookingOptions(memberId, occurrenceId)
+    optionsFn(memberId, occurrenceId)
       .then((o) => { if (!live) return;
         if (!o || o.options.length === 0) { setLoadErr("Nothing can be booked for this class."); return; }
         setOpts(o); setIdx(o.preselect ?? 0);
@@ -47,6 +54,12 @@ function Sheet({
   }, [memberId, occurrenceId]);
 
   const chosen: BookOption | undefined = opts?.options[idx];
+  const isFree = !!chosen && (chosen.kind === "free_first" || chosen.kind === "free_first_override");
+  // Decision 100 (b): a free-first late add that owes the reservation fee shows a
+  // waiver switch to staff (on by default); an instructor sees no switch and the
+  // fee is due by the end of the studio day.
+  const feeLateAdd = !!opts?.late_add && isFree
+    && (opts?.reservation_fee_cents ?? 0) > 0 && !opts?.member_fee_waived;
 
   function submit() {
     if (!chosen) return;
@@ -55,8 +68,11 @@ function Sheet({
       (source as Record<string, unknown>).method = method;
       (source as Record<string, unknown>).amount_cents = Math.round(Number(amount || "0") * 100);
     }
+    if (opts?.late_add && isFree) {
+      (source as Record<string, unknown>).waive_fee = opts.method === "instructor" ? false : waive;
+    }
     start(async () => {
-      const r = await bookMemberAction(memberId, occurrenceId, source, note.trim() || null);
+      const r = await bookFn(memberId, occurrenceId, source, note.trim() || null);
       if ("error" in r) { setResult(r.error); return; }
       toast(`Booked ${opts?.member_first ?? "them"} with ${r.source}.`);
       onClose();
@@ -73,11 +89,19 @@ function Sheet({
           <p className="mt-3 text-[13px] text-coral-deep">{loadErr}</p>
         ) : !opts ? (
           <p className="mt-3 text-[13px] text-ink-3">Loading…</p>
+        ) : opts.ended ? (
+          <p className="mt-3 text-[13px] text-coral-deep">That class has already ended.</p>
         ) : (
           <>
             <p className="mt-1 text-[13px] text-ink-2">
               {opts.member_first} · {opts.class_name} · {fmtWhen(opts.starts_at)}
             </p>
+
+            {opts.late_add && (
+              <p className="mt-2 rounded-lg bg-paper px-3 py-2 text-[12px] text-ink-2">
+                This class is in progress. {opts.member_first} will be added and checked in.
+              </p>
+            )}
 
             <label className="mt-4 block text-[13px] text-ink-2">
               <span className="mb-1 block">Pay with</span>
@@ -97,6 +121,24 @@ function Sheet({
                 ))}
               </select>
             </label>
+
+            {feeLateAdd && opts.method === "staff" && (
+              <label className="mt-3 flex items-start gap-2 text-[13px] text-ink-2">
+                <input type="checkbox" className="mt-0.5" checked={waive}
+                       onChange={(e) => setWaive(e.target.checked)} />
+                <span>
+                  <span className="font-medium text-ink">Waive the reservation fee</span>
+                  <span className="mt-0.5 block text-[12px] text-ink-3">
+                    They are already in the room. Off means the fee is due by the end of today.
+                  </span>
+                </span>
+              </label>
+            )}
+            {feeLateAdd && opts.method === "instructor" && (
+              <p className="mt-3 text-[12px] text-ink-3">
+                The reservation fee is due by the end of today. The studio can waive it.
+              </p>
+            )}
 
             {chosen?.kind === "drop_in_paid" && (
               <div className="mt-3 flex gap-2">

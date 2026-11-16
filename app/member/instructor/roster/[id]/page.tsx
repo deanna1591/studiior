@@ -11,6 +11,7 @@ import ScanCheckIn from "@/components/instructor/scan-check-in";
 import CheckinBanner from "@/components/instructor/checkin-banner";
 import { coverRequestAllowed } from "@/lib/cover-window";
 import { AddWalkIn, DeskPay, type DeskPlan } from "../../desk-ui";
+import { InstructorAddMember } from "@/components/instructor/add-member";
 
 export const dynamic = "force-dynamic";
 
@@ -231,8 +232,15 @@ export default async function RosterPage({ params }: { params: { id: string } })
         </ul>
       )}
 
-      {/* Decision 81a: add a walk-in to this class. */}
-      {r.status === "scheduled" && <AddWalkIn occurrenceId={r.occurrence_id} currency={currency} tz={ctx.timezone} timeFormat={ctx.time_format} />}
+      {/* Decision 81a: add a walk-in to this class.
+          Decision 100 (b): add an existing member (the picker), which during the
+          class is a late add marked attended. */}
+      {r.status === "scheduled" && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          <AddWalkIn occurrenceId={r.occurrence_id} currency={currency} tz={ctx.timezone} timeFormat={ctx.time_format} />
+          <InstructorAddMember occurrenceId={r.occurrence_id} />
+        </div>
+      )}
 
       {r.status === "scheduled" && (coverOpen ? (
         <AskForCover occurrenceId={r.occurrence_id} colleagues={colleagues} autoAccept={autoAccept} />

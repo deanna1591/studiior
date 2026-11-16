@@ -19,6 +19,7 @@ export const REASONS: Record<string, string> = {
   class_cancelled: "That class has been cancelled.",
   class_completed: "That class has already finished.",
   class_in_past: "That class has already started.",
+  class_ended: "That class has already ended.",
   outside_booking_window: "That class is further ahead than you can book yet.",
   // Decision 25. The other "not yet": the MONTH is not on the timetable, which
   // is about the class rather than about how far ahead this member may book.

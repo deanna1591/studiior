@@ -200,7 +200,7 @@ select expect_num('front desk CAN resolve a check-in code while only in grace',
   (select count(*) from resolve_checkin_code(current_setting('t.code_ok'))), 1);
 reset role;
 
-update platform_subscriptions set grace_ends_at = now() - interval '1 minute'
+update platform_subscriptions set grace_ends_at = now() - interval '2 days'
  where studio_id = 'b111b111-0000-0000-0000-000000000001';
 select sweep_platform_billing();
 
