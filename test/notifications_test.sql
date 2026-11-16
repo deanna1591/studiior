@@ -262,16 +262,24 @@ select expect_num('the scheduled reminder was left alone — it is not due',
   (select count(*) from notifications where studio_id='13131313-0000-0000-0000-000000000001' and status='scheduled'), 1);
 
 -- It retries up to max_attempts and then stops, rather than for ever.
+-- Decision 113 raised the ceiling to six (the initial send plus five retries),
+-- so the worker picks it up five more times from attempt one and then stops.
+update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
+select send_due_notifications();  -- attempt 2
+update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
+select send_due_notifications();  -- attempt 3
+update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
+select send_due_notifications();  -- attempt 4
+update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
+select send_due_notifications();  -- attempt 5
+update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
+select send_due_notifications();  -- attempt 6
+select expect_num('after six attempts it has stopped being picked up',
+  (select attempts from notifications where id=current_setting('n.id')::uuid), 6);
 update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
 select send_due_notifications();
-update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
-select send_due_notifications();
-select expect_num('after three attempts it has stopped being picked up',
-  (select attempts from notifications where id=current_setting('n.id')::uuid), 3);
-update notifications set status='scheduled' where id=current_setting('n.id')::uuid;
-select send_due_notifications();
-select expect_num('a fourth run does not touch it',
-  (select attempts from notifications where id=current_setting('n.id')::uuid), 3);
+select expect_num('a seventh run does not touch it',
+  (select attempts from notifications where id=current_setting('n.id')::uuid), 6);
 
 -- =============================================================================
 -- 5. The worker claims, so two runs cannot send one row twice

@@ -26,12 +26,20 @@ export default async function RetentionScreen() {
     return <AppShell {...shell} title="Retention"><Denied what="retention" role={ctx.role} /></AppShell>;
   }
 
-  const [{ data }, { data: outcomesData }, { data: studio }, { data: aiSetting }] = await Promise.all([
+  const [{ data }, { data: outcomesData }, { data: studio }, { data: aiSetting },
+         { data: bounced }, { data: failures }] = await Promise.all([
     supabase.rpc("retention_board", { p_studio_id: ctx.studioId }),
     supabase.rpc("retention_outcomes", { p_studio_id: ctx.studioId }),
     supabase.from("studios").select("name").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("studio_settings").select("ai_drafts_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
+    // Decision 113: the Email bounced chip, and the daily delivery check.
+    supabase.from("members").select("id").eq("studio_id", ctx.studioId).neq("email_status", "valid"),
+    supabase.rpc("email_delivery_failures", { p_studio_id: ctx.studioId }),
   ]);
+  const bouncedSet = new Set(((bounced ?? []) as { id: string }[]).map((b) => b.id));
+  const failTotal = ((failures ?? []) as { n: number }[]).reduce((s, f) => s + (f.n ?? 0), 0);
+  const failParts = ((failures ?? []) as { reason: string; n: number }[])
+    .map((f) => `${f.n} ${f.reason}`);
   const aiDrafts = aiSetting?.ai_drafts_enabled ?? false;
   const outcomes = (outcomesData as { contacted: number; came_back: number } | null)
     ?? { contacted: 0, came_back: 0 };
@@ -63,6 +71,7 @@ export default async function RetentionScreen() {
     last_contact_method: r.last_contact_method ?? null,
     outcome: r.outcome ?? null,
     outcome_days: r.outcome_days ?? null,
+    email_bounced: bouncedSet.has(r.member_id),
   }));
 
   return (
@@ -71,6 +80,13 @@ export default async function RetentionScreen() {
         Who needs a nudge. Click a member to see them and reach out — email, Viber, a call —
         then watch whether they come back.
       </p>
+      {failTotal > 0 && (
+        <p className="mb-4 rounded-lg px-3 py-2 text-[13px] font-medium"
+           style={{ background: "var(--amber-tint)", color: "var(--ink)" }}>
+          In the last day, {failTotal} {failTotal === 1 ? "email" : "emails"} failed to send
+          {failParts.length > 0 ? ` (${failParts.join(", ")})` : ""}.
+        </p>
+      )}
       <RetentionBoard rows={rows} studioId={ctx.studioId}
         studioName={studio?.name ?? "your studio"} aiDrafts={aiDrafts} outcomes={outcomes} />
     </AppShell>

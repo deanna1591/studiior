@@ -27,6 +27,7 @@ export type RetentionRow = {
   last_contact_method: string | null;
   outcome: string | null;
   outcome_days: number | null;
+  email_bounced?: boolean;
 };
 
 const SITUATION: Record<RetentionRow["section"], PanelRow["situation"]> = {
@@ -67,6 +68,7 @@ function Row({ r, selecting, checked, onCheck, onOpen }: {
         <div className="flex items-center gap-2">
           <span className="font-medium text-ink">{r.member_name}</span>
           {r.task_status && <StateChip state={r.task_status === "contacted" ? "contacted" : "open"} />}
+          {r.email_bounced && <StateChip state="email_bounced" />}
         </div>
         <div className="mt-0.5 truncate text-[12.5px] text-ink-2">{secondary(r)}</div>
         {out && <div className="mt-0.5 text-[12px] text-ink-3">{out}</div>}

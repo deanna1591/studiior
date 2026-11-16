@@ -4,6 +4,7 @@ import MemberShell from "@/components/member/shell";
 import { CalendarFeedControl } from "@/components/member/calendar-feed";
 import { mintFeed, revokeFeed } from "@/lib/feed-actions";
 import PreferencesForm from "./form";
+import MarketingSwitch from "@/components/member/marketing-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +22,17 @@ export default async function Settings() {
 
   // Two independent reads, in one wave (1 Nov speed pass) — they shared no
   // dependency and were awaited on consecutive lines.
-  const [{ data: prefs }, { data: feed }] = await Promise.all([
+  const [{ data: prefs }, { data: feed }, { data: me }] = await Promise.all([
     supabase
       .from("notification_preferences")
       .select("booking_email, reminder_email, waitlist_email, credit_expiry_email, milestone_email")
       .eq("member_id", ctx.memberId)
       .maybeSingle(),
     supabase.rpc("calendar_feed_state", { p_studio_id: ctx.studioId, p_kind: "member" }),
+    supabase.from("members").select("marketing_opt_in, marketing_unsubscribed_at").eq("id", ctx.memberId).maybeSingle(),
   ]);
+  // Decision 114: opted in = opt_in true AND never (or no longer) unsubscribed.
+  const marketingOn = !!me?.marketing_opt_in && !me?.marketing_unsubscribed_at;
 
   // No row means defaults, and every default is on — the same reading
   // notification_wanted() takes in SQL. The screen must not show a member as
@@ -53,6 +57,11 @@ export default async function Settings() {
           milestone_email: on(prefs?.milestone_email),
         }}
       />
+
+      <section className="mt-8 border-t border-line pt-5">
+        <h2 className="section-label mb-1 text-ink-2">News and offers</h2>
+        <MarketingSwitch initial={marketingOn} />
+      </section>
 
       <section className="mt-8 border-t border-line pt-5">
         <h2 className="section-label mb-3 text-ink-2">Your calendar</h2>

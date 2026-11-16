@@ -7,6 +7,8 @@
  * initials on the accent's tint, in the accent's readable text colour. A grey
  * silhouette icon would say "missing" about a person who is simply new.
  */
+import { avatarInitials } from "@/lib/coach-avatar";
+
 export default function Avatar({
   name, url, size = 56,
 }: {
@@ -14,12 +16,7 @@ export default function Avatar({
   url: string | null;
   size?: number;
 }) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+  const initials = avatarInitials(name);
 
   if (url) {
     return (

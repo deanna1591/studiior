@@ -491,6 +491,13 @@ export async function finishSignup(_prev: ClaimState, fd: FormData): Promise<Cla
   if (error) return { error: error.message };
 
   const r = data as unknown as { failure_reason: string | null } | null;
+  if (!r?.failure_reason) {
+    // Decision 114: the marketing checkbox is ticked by default; set the new
+    // member's consent from it (the column default is false). RLS scopes the
+    // update to the caller's own row for this studio.
+    const marketing = String(fd.get("marketing_opt_in") ?? "") === "on";
+    await supabase.from("members").update({ marketing_opt_in: marketing }).eq("studio_id", studioId);
+  }
   if (r?.failure_reason) {
     const said: Record<string, string> = {
       email_not_verified: "Confirm your email first — we've sent you a link. Then come back and press this again.",
@@ -596,6 +603,18 @@ export async function completePasswordReset(_prev: ClaimState, fd: FormData): Pr
  * row at all, and notification_wanted() reads a missing row as "everything on".
  * The first save is therefore an insert, and every later one an update.
  */
+/**
+ * Decision 114: the Account -> Emails marketing switch. Turning it on opts in
+ * and clears any one-tap unsubscribe; turning it off opts out.
+ */
+export async function setMarketingConsent(on: boolean): Promise<{ ok: true } | { error: string }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("member_set_marketing", { p_on: on });
+  if (error) return { error: error.message };
+  revalidateMember();
+  return { ok: true };
+}
+
 export async function updateEmailPreferences(
   _prev: string | null, formData: FormData,
 ): Promise<string | null> {

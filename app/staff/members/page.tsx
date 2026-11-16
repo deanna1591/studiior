@@ -27,6 +27,7 @@ type Row = {
   plan_state: string; complimentary: boolean; free_stage: string | null;
   has_unpaid_booking: boolean; joined_on: string | null; reservation_fee_waived: boolean;
   has_duplicate: boolean; has_fee_due: boolean; needs_waiver: boolean;
+  email_status: string | null;
   deleted: boolean; deleted_at: string | null; merged_into: string | null;
 };
 type Counts = Record<string, number>;
@@ -203,6 +204,7 @@ export default async function Members({
                     {m.reservation_fee_waived && <StateChip state="fee_waived" />}
                     {m.has_fee_due && <StateChip state="fee_due" />}
                     {m.needs_waiver && <StateChip state="no_waiver" />}
+                    {m.email_status && m.email_status !== "valid" && <StateChip state="email_bounced" />}
                   </div>
                 )}
                 {loud && band != null && <HealthBand band={band} reason={m.health_reason ?? ""} />}

@@ -62,6 +62,7 @@ export type Row = {
   endLabel: string | null;
   durationLabel: string;
   instructor: string | null;
+  coachAvatar?: string | null;
   room: string | null;
   isPeak: boolean;
   /** Decision 22 amendment: a core (or always-runs) class, tinted with an
@@ -364,6 +365,7 @@ export default function DayClasses({
               durationLabel={r.durationLabel}
               name={r.name}
               instructor={r.instructor}
+              coachAvatar={r.coachAvatar}
               room={r.room}
               statusLabel={statusLabel}
               statusTone={statusTone}

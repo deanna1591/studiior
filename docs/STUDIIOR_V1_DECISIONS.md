@@ -513,6 +513,24 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 114 — Marketing consent (recorded 16 Nov 2026)
+
+The signup form shows 'Send me studio news and offers' ticked by default; unticking it sets marketing_opt_in false. Every marketing email carries the one-tap unsubscribe link, which sets marketing_unsubscribed_at and is final until the member turns it back on under Account → Emails. A member counts as opted in for campaigns and for the members export when marketing_opt_in is true and marketing_unsubscribed_at is null. Existing members who never ticked the box and never unsubscribed are set to opted in once by migration with an audit row, since they have been receiving the studio's sequence emails with the unsubscribe link throughout.
+
+---
+
+## 113 — Every email gets delivered (recorded 16 Nov 2026)
+
+The email worker never posts faster than 20 emails a second and never more than 1,000 in one run; the rest wait for the next run. A send refused with 429 or a network error is retried with backoff at 1, 5, 15, 60 and 240 minutes (five attempts) before it is marked failed with the reason; a send refused with 422 (bad address) fails at once and marks the member's email as invalid so no further email is attempted until the address is changed. The worker honours a retry-after header when Resend sends one, and a quota 429 (daily or monthly quota exceeded) is not retried; it fails with the reason and the daily check reports it. Resend delivery events are received at a webhook: delivered marks the row delivered; bounced marks the row and the member's email as bounced and stops further sends to it; complained marks the member as unsubscribed from marketing. The Retention and Members pages show an 'Email bounced' chip, and the daily check lists failures from the last day. The 61 sends dropped by the rate limit in the last 30 days are re-queued once where still relevant: day 3, day 7, last day, missed you, drifting, and book first for members who still have no booking; before class and after class are not re-sent.
+
+---
+
+## Coach photo on the Book rows and free class picker (no decision, 16 Nov 2026)
+
+Coach photo (no decision): the free class picker rows and the Book tab rows at phone width gain the coach photo, a 40 px circle at the top right of the card beside the time and class name, using the existing Avatar component with the initials fallback; the Book page already fetches avatar_url, and free_first_class_list and its _run twin are re-issued to return it.
+
+---
+
 ## 107 — Pull to refresh, and an update prompt (recorded 15 Nov 2026, POOLED, not yet built)
 
 On the member and instructor apps, pulling down from the top of any main screen (Home, Book, My schedule, Open classes, Account, Me) reloads that screen's data with a small spinner, the native way on both phones; the page itself does not reload. When a new version of the app has been deployed, an open app shows a small bar "A new version is ready" with a button "Refresh" within a minute of the deployment; tapping it reloads once. The app never reloads on its own while a member is in checkout or mid-form.

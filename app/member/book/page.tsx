@@ -197,7 +197,8 @@ export default async function Book({
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const freeList = ((freeListRaw ?? []) as unknown as {
     occurrence_id: string; name: string; starts_at: string; room_name: string | null;
-    instructor_first: string | null; headcount: number; capacity: number; free_bookable: boolean;
+    instructor_first: string | null; instructor_avatar: string | null;
+    headcount: number; capacity: number; free_bookable: boolean;
   }[]);
   // Decision 55 follow-up: the Book tab is the free-class picker while the member
   // is eligible and has eligible classes (unless they asked for the full
@@ -449,6 +450,7 @@ export default async function Book({
       endLabel: o.ends_at ? fmtTime(o.ends_at, ctx.timeZone, ctx.timeFormat) : null,
       durationLabel: mins ? `${mins} min` : "—",
       instructor: o.instructors?.display_name ?? null,
+      coachAvatar: o.instructors?.avatar_url ?? null,
       room: o.rooms?.name ?? null,
       isPeak,
       // Decision 22 amendment: a core (or always-runs) class is tinted with an

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Avatar from "@/components/member/avatar";
 
 /**
  * One class, as a card on the washed page.
@@ -24,7 +25,7 @@ import Link from "next/link";
 export default function ClassCard({
   href, startLabel, endLabel, durationLabel, name, instructor, room,
   statusLabel, statusTone = "quiet", action, dimmed = false, booked = false, tag = null,
-  alwaysRuns = false, stackAction = false, extraLine = null,
+  alwaysRuns = false, stackAction = false, extraLine = null, coachAvatar = null,
 }: {
   href: string;
   /** "06:30" — the start alone, in the studio's zone. */
@@ -60,6 +61,10 @@ export default function ClassCard({
   /** A second status line under the first (the flex "we'll confirm by" line on a
    *  pay-to-keep row), kept on its own line. */
   extraLine?: React.ReactNode;
+  /** The coach's photo (instructors.avatar_url), shown as a 40px circle at the
+   *  top right of the card beside the name; the Avatar component falls back to
+   *  the coach's initials when there is no photo. */
+  coachAvatar?: string | null;
 }) {
   const muted = dimmed || statusTone === "full";
   // Decision 103(c): stacked rows never truncate the name/coach; the time keeps
@@ -90,6 +95,11 @@ export default function ClassCard({
               <span className="m-micro shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
                     style={{ background: "var(--surface)", color: "var(--lime-text)" }}>
                 Always runs
+              </span>
+            )}
+            {instructor && (
+              <span className="ml-auto shrink-0">
+                <Avatar name={instructor} url={coachAvatar} size={40} />
               </span>
             )}
           </div>

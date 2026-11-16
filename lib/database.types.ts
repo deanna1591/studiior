@@ -4316,6 +4316,7 @@ export type Database = {
           desk_pay_restored_at: string | null
           desk_pay_restored_by: string | null
           email: string
+          email_status: string
           emergency_contact: Json | null
           first_name: string
           first_visit_at: string | null
@@ -4361,6 +4362,7 @@ export type Database = {
           desk_pay_restored_at?: string | null
           desk_pay_restored_by?: string | null
           email: string
+          email_status?: string
           emergency_contact?: Json | null
           first_name: string
           first_visit_at?: string | null
@@ -4406,6 +4408,7 @@ export type Database = {
           desk_pay_restored_at?: string | null
           desk_pay_restored_by?: string | null
           email?: string
+          email_status?: string
           emergency_contact?: Json | null
           first_name?: string
           first_visit_at?: string | null
@@ -5301,15 +5304,18 @@ export type Database = {
       notifications: {
         Row: {
           attempts: number
+          bounced_at: string | null
           channel: Database["public"]["Enums"]["notif_channel"]
           claimed_at: string | null
           created_at: string
           dedupe_key: string
+          delivered_at: string | null
           error: string | null
           failed_at: string | null
           id: string
           member_id: string | null
           net_request_id: number | null
+          next_attempt_at: string | null
           payload: Json
           provider_message_id: string | null
           read_at: string | null
@@ -5323,15 +5329,18 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          bounced_at?: string | null
           channel: Database["public"]["Enums"]["notif_channel"]
           claimed_at?: string | null
           created_at?: string
           dedupe_key: string
+          delivered_at?: string | null
           error?: string | null
           failed_at?: string | null
           id?: string
           member_id?: string | null
           net_request_id?: number | null
+          next_attempt_at?: string | null
           payload?: Json
           provider_message_id?: string | null
           read_at?: string | null
@@ -5345,15 +5354,18 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          bounced_at?: string | null
           channel?: Database["public"]["Enums"]["notif_channel"]
           claimed_at?: string | null
           created_at?: string
           dedupe_key?: string
+          delivered_at?: string | null
           error?: string | null
           failed_at?: string | null
           id?: string
           member_id?: string | null
           net_request_id?: number | null
+          next_attempt_at?: string | null
           payload?: Json
           provider_message_id?: string | null
           read_at?: string | null
@@ -6531,6 +6543,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      resend_webhook_inbox: {
+        Row: {
+          email: string | null
+          event_type: string
+          id: string
+          provider_message_id: string | null
+          raw: Json | null
+          received_at: string
+        }
+        Insert: {
+          email?: string | null
+          event_type: string
+          id?: string
+          provider_message_id?: string | null
+          raw?: Json | null
+          received_at?: string
+        }
+        Update: {
+          email?: string | null
+          event_type?: string
+          id?: string
+          provider_message_id?: string | null
+          raw?: Json | null
+          received_at?: string
+        }
+        Relationships: []
       }
       rooms: {
         Row: {
@@ -8646,6 +8685,7 @@ export type Database = {
         Returns: Json
       }
       backfill_all_timelines: { Args: never; Returns: Json }
+      backfill_marketing_optin: { Args: never; Returns: number }
       begin_stripe_connect: { Args: { p_studio_id: string }; Returns: string }
       book_class: {
         Args: {
@@ -9209,6 +9249,14 @@ export type Database = {
         Returns: number
       }
       effective_free_first: { Args: { p_occurrence_id: string }; Returns: Json }
+      email_delivery_failures: {
+        Args: { p_studio_id: string }
+        Returns: {
+          n: number
+          reason: string
+          template_key: string
+        }[]
+      }
       email_on_accent: { Args: { p_hex: string }; Returns: string }
       end_membership: {
         Args: {
@@ -9322,6 +9370,7 @@ export type Database = {
           duration_min: number
           free_bookable: boolean
           headcount: number
+          instructor_avatar: string
           instructor_first: string
           name: string
           occurrence_id: string
@@ -9356,6 +9405,7 @@ export type Database = {
           duration_min: number
           free_bookable: boolean
           headcount: number
+          instructor_avatar: string
           instructor_first: string
           name: string
           occurrence_id: string
@@ -10006,6 +10056,7 @@ export type Database = {
         }
         Returns: Json
       }
+      member_set_marketing: { Args: { p_on: boolean }; Returns: undefined }
       member_set_phone: {
         Args: { p_member_id: string; p_phone: string }
         Returns: Json
@@ -10663,6 +10714,7 @@ export type Database = {
         Args: { p_series_id: string }
         Returns: Json
       }
+      requeue_rate_limit_drops: { Args: never; Returns: Json }
       resend_guest_invite: { Args: { p_member_id: string }; Returns: Json }
       resend_month_roster: {
         Args: { p_month: string; p_studio_id: string }
@@ -11425,6 +11477,7 @@ export type Database = {
       sweep_no_shows: { Args: never; Returns: Json }
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }
       sweep_platform_billing: { Args: never; Returns: Json }
+      sweep_resend_webhooks: { Args: never; Returns: Json }
       sweep_roster_carry: { Args: never; Returns: Json }
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }

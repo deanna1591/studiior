@@ -35,6 +35,7 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   duplicate: { label: "Possible duplicate", warn: true },
   fee_due: { label: "Fee due", warn: true },
   no_waiver: { label: "Waiver not signed", warn: true },
+  email_bounced: { label: "Email bounced", warn: true },
   // sale_status (sales_history)
   active: { label: "Active" },
   refunded: { label: "Refunded" },

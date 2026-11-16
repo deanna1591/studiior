@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Avatar from "@/components/member/avatar";
 import { accentSolid } from "@/lib/accent-pair";
 import { useMemo, useState, useTransition } from "react";
 import { fmtTime, zonedDateKey } from "@/lib/time";
@@ -10,7 +11,8 @@ import type { TimeFormat } from "@/lib/time";
 
 type FreeClass = {
   occurrence_id: string; name: string; starts_at: string; room_name: string | null;
-  instructor_first: string | null; headcount: number; capacity: number; free_bookable: boolean;
+  instructor_first: string | null; instructor_avatar: string | null;
+  headcount: number; capacity: number; free_bookable: boolean;
 };
 
 /**
@@ -174,20 +176,25 @@ export default function FreeClassList({
                            opacity: muted && !isBooked ? 0.72 : 1 }}>
                 <Link href={`/class/${c.occurrence_id}`} className="absolute inset-0 rounded-2xl"
                       aria-label={`Open ${c.name}`} />
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="num whitespace-nowrap text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</span>
-                    <span className="m-body text-ink">{c.name}</span>
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="num whitespace-nowrap text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</span>
+                      <span className="m-body text-ink">{c.name}</span>
+                    </div>
+                    <div className="m-micro mt-0.5 flex flex-wrap items-center gap-1.5 text-ink-3">
+                      <span>{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
+                      {c.headcount > 0 && (
+                        <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                              style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+                          {c.headcount} going
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="m-micro mt-0.5 flex flex-wrap items-center gap-1.5 text-ink-3">
-                    <span>{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
-                    {c.headcount > 0 && (
-                      <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                            style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-                        {c.headcount} going
-                      </span>
-                    )}
-                  </div>
+                  {c.instructor_first && (
+                    <span className="shrink-0"><Avatar name={c.instructor_first} url={c.instructor_avatar} size={40} /></span>
+                  )}
                 </div>
                 {isBooked ? (
                   // Decision 21 amendment (20 Oct 2026): plain words. A free seat
