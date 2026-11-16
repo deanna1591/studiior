@@ -173,3 +173,31 @@ test("withRunningBalance recomputes balance_after from deltas (oldest first)", (
   assert.equal(byKind.late_cancelled, 10);
   assert.equal(byKind.credits_added, 12);
 });
+
+// Decision 103(e) — the reservation fee flow: eight Journey lines.
+const money = (c) => "P" + c;
+test("statementTitle: the reservation fee lines", () => {
+  assert.equal(statementTitle({ kind: "reservation_hold", title: "Payment pending for X" }), "Payment pending");
+  assert.equal(statementTitle({ kind: "hold_released", title: "Reservation hold released" }), "Hold released, not paid");
+  assert.equal(statementTitle({ kind: "reservation_fee_paid", title: "Reservation fee paid" }), "Reservation fee paid");
+  assert.equal(statementTitle({ kind: "reservation_fee_kept", title: "Reservation fee kept" }), "Fee kept");
+  assert.equal(statementTitle({ kind: "reservation_credit_back", title: "Fee credited back" }), "Fee credited back");
+  assert.equal(statementTitle({ kind: "reservation_credit_used", title: "Credit used for a reservation" }), "Credit used for a reservation");
+  assert.equal(statementTitle({ kind: "reservation_restored", title: "Seat restored after payment" }), "Seat restored after payment");
+});
+test("rowLine: money reservation rows show the fee; the rest say it in the title", () => {
+  assert.equal(rowLine({ kind: "reservation_fee_paid", amount_cents: 50000 }, money, "UTC"), "P50000");
+  assert.equal(rowLine({ kind: "reservation_fee_kept", amount_cents: 50000 }, money, "UTC"), "P50000");
+  assert.equal(rowLine({ kind: "reservation_credit_back", amount_cents: 50000 }, money, "UTC"), "P50000");
+  assert.equal(rowLine({ kind: "reservation_hold" }, money, "UTC"), null);
+  assert.equal(rowLine({ kind: "hold_released" }, money, "UTC"), null);
+  assert.equal(rowLine({ kind: "reservation_restored" }, money, "UTC"), null);
+  assert.equal(rowLine({ kind: "reservation_credit_used" }, money, "UTC"), null);
+});
+test("a hold never reads Booked; money rows are money rows, a hold is a class row", () => {
+  assert.notEqual(statementTitle({ kind: "reservation_hold", title: "Payment pending for X" }), "Booked X");
+  assert.equal(isMoneyRow({ kind: "reservation_fee_paid", credit_delta: 0, amount_cents: 50000 }), true);
+  assert.equal(isMoneyRow({ kind: "reservation_hold", credit_delta: 0, amount_cents: null }), false);
+  const cls = filterStatement([{ at: "2026-11-21T00:00:00Z", kind: "reservation_hold", credit_delta: 0, amount_cents: null }], "classes");
+  assert.equal(cls.length, 1);
+});

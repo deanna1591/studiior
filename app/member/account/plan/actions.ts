@@ -122,6 +122,12 @@ async function openXenditSession(
     metadata: opts.metadata,
     successUrl: opts.successUrl,
     cancelUrl: opts.cancelUrl,
+    // Decision 103(e): a reservation hold lasts 30 minutes; the Xendit session
+    // expires at the same moment as the DB hold_until. (The DB sweep is the
+    // authoritative control; the session expiry just stops a very late payment.)
+    ...(opts.metadata.kind === "reservation"
+      ? { expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() }
+      : {}),
   };
   const withCustomerId = (customerId: string) => createSession(secret, { ...common, customerId });
   const withCustomerObject = () => createSession(secret, {
@@ -200,9 +206,15 @@ export async function startReservation(occId: string): Promise<BuyState> {
     // A brand-new first-timer: hold a comp seat through the eligibility gate.
     const { data: held, error: hErr } = await supabase.rpc("reserve_free_first", { p_occurrence_id: occId });
     if (hErr) return { ok: false, message: hErr.message };
-    const h = held as { ok: boolean; reason?: string; booking_id?: string } | null;
+    const h = held as { ok: boolean; reason?: string; booking_id?: string; credit_covered?: boolean } | null;
     if (!h?.ok || !h.booking_id) {
       return { ok: false, message: FREE_RESERVE_REASONS[h?.reason ?? ""] ?? "That didn’t work — please try again." };
+    }
+    // Decision 103(e): reservation credit of at least the fee covered it directly
+    // — no Xendit. The seat is already booked; land on the class page's credit
+    // confirmation.
+    if (h.credit_covered) {
+      return { ok: true, url: `${origin}/class/${occId}?reserved=credit` };
     }
     bookingId = h.booking_id;
   }

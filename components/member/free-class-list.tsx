@@ -24,7 +24,7 @@ type FreeClass = {
  */
 export default function FreeClassList({
   classes, timeZone, timeFormat = "24h", bookFirstFree,
-  heading, fullTimetableHref, initialDayKey, reservationFeeLabel = null,
+  heading, fullTimetableHref, initialDayKey, reservationFeeLabel = null, creditCoversFee = false,
   coreOnly = false,
 }: {
   classes: FreeClass[]; timeZone: string; timeFormat?: TimeFormat;
@@ -37,6 +37,7 @@ export default function FreeClassList({
   // "Book free, {fee} to reserve" and routes to the reservation checkout instead
   // of booking directly.
   reservationFeeLabel?: string | null;
+  creditCoversFee?: boolean;
   // Decision 30 amendment: the studio limits the free first class to core
   // classes, so the line reads "These classes always run."
   coreOnly?: boolean;
@@ -198,7 +199,9 @@ export default function FreeClassList({
                   <Link href={`/reserve/${c.occurrence_id}`}
                         className="m-press relative z-10 w-full rounded-full px-3.5 py-2 text-center text-[13px] font-semibold"
                         style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-                    Book free, {reservationFeeLabel} to reserve
+                    {creditCoversFee
+                      ? <>Book free, your {reservationFeeLabel} credit covers the reservation</>
+                      : <>Book free, {reservationFeeLabel} to reserve</>}
                   </Link>
                 ) : c.free_bookable ? (
                   <button onClick={() => book(c.occurrence_id)} disabled={pending}

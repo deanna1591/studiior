@@ -40,6 +40,7 @@ type Sale = {
 type Totals = {
   count: number; gross_cents: number; refunded_cents: number;
   net_cents: number; studio_total_cents: number; currency: string;
+  reservation_fees?: { count: number; total_cents: number };
 };
 
 export default async function Sales({
@@ -175,6 +176,10 @@ export default async function Sales({
             <> · <span className="num">{formatMoney(totals.refunded_cents, totals.currency)}</span> refunded</>
           )}
           {" · "}<span className="num text-ink">{formatMoney(totals.net_cents, totals.currency)}</span> net
+          {totals.reservation_fees && totals.reservation_fees.count > 0 && (
+            <> · <span className="num text-ink">{formatMoney(totals.reservation_fees.total_cents, totals.currency)}</span>
+              {" "}reservation fees ({totals.reservation_fees.count})</>
+          )}
         </p>
       )}
 

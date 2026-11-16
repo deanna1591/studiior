@@ -166,8 +166,11 @@ select set_config('t.bk3', (reserve_free_first('d10c0000-0000-0000-0000-00000000
 select set_config('t.pur3', (select purchase_id::text from xendit_begin_reservation(
    'd10c0000-0000-0000-0000-000000000001', current_setting('t.bk3')::uuid)), false);
 select set_config('request.jwt.claim.sub','',false); reset role;
--- Age the hold past the 15-minute window, then run the sweep as the backend.
-update bookings set booked_at = now() - interval '30 min' where id = current_setting('t.bk3')::uuid;
+-- Decision 103(e): a reservation hold lasts until its hold_until (the 30-minute
+-- Xendit invoice window), not the 15-minute booked_at drop-in window, so the slow
+-- payment can still land. Age hold_until past now; the sweep cancels only then.
+update bookings set hold_until = now() - interval '1 min', booked_at = now() - interval '40 min'
+   where id = current_setting('t.bk3')::uuid;
 select set_config('t.sweep', sweep_unpaid_dropins()::text, false);
 select expect_text('sweep: the aged hold is cancelled',
   (select status::text from bookings where id = current_setting('t.bk3')::uuid), 'cancelled');

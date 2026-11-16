@@ -57,7 +57,7 @@ export default function ClassDetailBody({
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
   seatKind = "unlimited", cutoffMinutes = 720, duplicateHold = false, holdTime = null,
-  reservationFeeLabel = null, reservationHold = null, due = null,
+  reservationFeeLabel = null, creditCoversFee = false, reservationHold = null, due = null,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -89,6 +89,7 @@ export default function ClassDetailBody({
   /** Decision 103: the reservation fee label (e.g. "₱150"); null = no fee. When
    *  set, the free Book routes to the reservation checkout. */
   reservationFeeLabel?: string | null;
+  creditCoversFee?: boolean;
   /** Decision 73 (c): can this member still pay at the desk? When false, the
    *  page hides the pay-at-the-desk option and tells them to pay online. */
   deskPayAvailable?: boolean;
@@ -364,13 +365,17 @@ export default function ClassDetailBody({
           <div>
             <p className="mb-2.5 rounded-xl px-3 py-2 text-[13px] leading-[18px] text-ink"
                style={{ background: "var(--accent-chip)" }}>
-              <span className="font-semibold">Your first class is on us.</span> A {reservationFeeLabel} reservation
-              fee holds your spot and comes off your next purchase when you show up.
+              <span className="font-semibold">Your first class is on us.</span>{" "}
+              {creditCoversFee
+                ? <>Your {reservationFeeLabel} reservation credit covers the fee that holds your spot.</>
+                : <>A {reservationFeeLabel} reservation fee holds your spot and comes off your next purchase when you show up.</>}
             </p>
             <Link href={`/reserve/${occ.id}`}
                   className="m-press block w-full rounded-full py-3.5 text-center text-[15px] font-semibold"
                   style={accentSolid()}>
-              Book free, {reservationFeeLabel} to reserve
+              {creditCoversFee
+                ? <>Book free, your {reservationFeeLabel} credit covers the reservation</>
+                : <>Book free, {reservationFeeLabel} to reserve</>}
             </Link>
           </div>
         ) : route === "free" ? (

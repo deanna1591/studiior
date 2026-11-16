@@ -9981,6 +9981,19 @@ export type Database = {
           starts_at: string
         }[]
       }
+      member_reservation_fees: {
+        Args: { p_member_id: string }
+        Returns: {
+          class_name: string
+          currency: string
+          fee_cents: number
+          occurrence_start: string
+          paid_at: string
+          payment_id: string
+          state: string
+          state_at: string
+        }[]
+      }
       member_sees_ai_drafts: { Args: never; Returns: boolean }
       member_send_message: {
         Args: {
@@ -10679,6 +10692,10 @@ export type Database = {
       }
       restore_desk_pay: { Args: { p_member_id: string }; Returns: Json }
       restore_record: { Args: { p_id: string; p_kind: string }; Returns: Json }
+      restore_reservation_booking: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       restore_series: { Args: { p_series_id: string }; Returns: Json }
       retention_board: {
         Args: { p_studio_id: string }

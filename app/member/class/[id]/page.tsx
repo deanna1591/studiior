@@ -28,7 +28,8 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
   // the member sees one of three: "You're in" once the webhook confirmed, "Finishing
   // your payment..." while pending, or "Your spot wasn't held" if the window passed.
   let reserved: { state: "confirmed" | "pending" | "lost"; line: string } | null = null;
-  if (searchParams?.reserved === "1" && (settings.reservationFeeCents ?? 0) > 0) {
+  if ((searchParams?.reserved === "1" || searchParams?.reserved === "credit")
+      && (settings.reservationFeeCents ?? 0) > 0) {
     const [{ data: bk }, { data: pur }] = await Promise.all([
       supabase.from("bookings")
         .select("id, status, payment_source, payments(kind, status)")
@@ -42,7 +43,11 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
       .some((p) => p.kind === "reservation_fee" && (p.status === "succeeded" || p.status === "partially_refunded"));
     const feeLabel = formatMoney(settings.reservationFeeCents, settings.currency);
     const when = `${fmtDayLong(data.occ.starts_at, ctx.timeZone)} at ${fmtTime(data.occ.starts_at, ctx.timeZone, ctx.timeFormat)}`;
-    if (bk?.status === "booked" && bk.payment_source === "comp" && paid) {
+    if (searchParams?.reserved === "credit") {
+      // Decision 103(e): reservation credit covered the fee — no payment page.
+      reserved = { state: "confirmed",
+        line: `You're booked. ${data.occ.name}, ${when}. Your ${feeLabel} reservation credit was used for this class.` };
+    } else if (bk?.status === "booked" && bk.payment_source === "comp" && paid) {
       reserved = { state: "confirmed",
         line: `You're in. ${data.occ.name}, ${when}. Your ${feeLabel} reservation fee comes off your next purchase when you show up.` };
     } else if (bk?.status === "pending_payment" && pur?.status === "pending") {
@@ -85,7 +90,8 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
                        seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff} duplicateHold={data.duplicateHold} holdTime={data.holdTime}
                        deskPayAvailable={ctx.bootstrap?.desk_pay_available ?? true}
                        reservationHold={data.reservationHold} due={data.due}
-                       reservationFeeLabel={settings.reservationFeeCents > 0 ? formatMoney(settings.reservationFeeCents, settings.currency) : null} />
+                       reservationFeeLabel={settings.reservationFeeCents > 0 ? formatMoney(settings.reservationFeeCents, settings.currency) : null}
+                       creditCoversFee={settings.reservationFeeCents > 0 && settings.reservationCreditCents >= settings.reservationFeeCents} />
     </MemberShell>
   );
 }

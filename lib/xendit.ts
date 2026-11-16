@@ -45,6 +45,8 @@ export type CreateSessionInput = {
   customerReferenceId?: string; // the member id (hyphens stripped)
   customerGivenNames?: string;
   customerSurname?: string;
+  // Decision 103(e): ISO instant the session expires (reservation holds, 30 min).
+  expiresAt?: string;
   customerEmail?: string;
   metadata?: Record<string, string>;
   successUrl: string;
@@ -70,6 +72,7 @@ export function buildSessionBody(input: CreateSessionInput): Record<string, unkn
   };
   if (input.description) body.description = input.description;
   if (input.metadata) body.metadata = input.metadata;
+  if (input.expiresAt) body.expires_at = input.expiresAt;
 
   // An existing customer_id wins — a reference_id may create a customer only
   // once, so a returning member sends customer_id, not the customer object.

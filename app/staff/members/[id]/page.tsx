@@ -81,6 +81,7 @@ export default async function MemberDetail({
     { data: activity }, { data: notes }, { data: goals }, { data: tags },
     { data: docs }, { data: standing }, { data: infractions },
     { data: guestPass }, { data: lastInvite },
+    { data: resvFees }, { data: resvCredits },
   ] = await Promise.all([
     supabase.from("memberships")
       .select("id, plan_id, status, price_cents, currency, starts_on, expires_on, renews_on, credits_remaining, auto_renew, freeze_end, complimentary, membership_plans(name, type)")
@@ -125,7 +126,14 @@ export default async function MemberDetail({
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("member_invites")
       .select("expires_at, created_at, accepted_at")
-      .eq("member_id", params.id).order("created_at", { ascending: false }).limit(1).maybeSingle()
+      .eq("member_id", params.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    // Decision 103(e): the Reservation fee card (one row per fee with its state)
+    // and the Credits split (reservation credit, from member_credits, shown
+    // separately from class credits).
+    supabase.rpc("member_reservation_fees", { p_member_id: params.id }),
+    supabase.from("member_credits")
+      .select("amount_cents, used_cents, currency")
+      .eq("member_id", params.id).is("voided_at", null),
   ]);
 
   // Payments are the one thing on this screen decided here rather than by the
@@ -236,6 +244,25 @@ export default async function MemberDetail({
   } | null;
   const host = gp?.host_name_at_invite ?? gp?.members?.first_name ?? null;
   const hostGone = !!gp?.members && (!!gp.members.deleted_at || !!gp.members.merged_into);
+
+  // Decision 103(e): the Reservation fee card + Credits split.
+  type ResvFee = { payment_id: string; paid_at: string | null; fee_cents: number;
+    currency: string; class_name: string; occurrence_start: string | null;
+    state: string; state_at: string | null };
+  const resvFeeRows = (resvFees as ResvFee[] | null) ?? [];
+  const resvCr = (resvCredits as { amount_cents: number; used_cents: number; currency: string }[] | null) ?? [];
+  const resvAvail = resvCr.reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
+  const resvCcy = resvCr[0]?.currency ?? resvFeeRows[0]?.currency ?? "PHP";
+  const resvStateLine = (f: ResvFee) => {
+    switch (f.state) {
+      case "held": return "held for this class";
+      case "credited": return f.state_at ? `credited back on ${d(f.state_at)}` : "credited back";
+      case "kept": return "kept (no-show or late cancel)";
+      case "used": return "used as credit";
+      case "refunded": return f.state_at ? `refunded on ${d(f.state_at)}` : "refunded";
+      default: return f.state;
+    }
+  };
   const invExpIso = (lastInvite as { expires_at?: string | null } | null)?.expires_at ?? null;
   const invMadeIso = (lastInvite as { created_at?: string | null } | null)?.created_at
     ?? gp?.invited_at ?? gp?.created_at ?? null;
@@ -646,7 +673,34 @@ export default async function MemberDetail({
             <p className="mt-2 text-[11px] leading-4 text-ink-3">
               The balance is the ledger added up, never edited directly.
             </p>
+            {resvAvail > 0 && (
+              <p className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2 text-[12px] leading-4 text-ink-2">
+                <span>Reservation credit</span>
+                <span className="num text-ink">{formatMoney(resvAvail, resvCcy)}</span>
+              </p>
+            )}
           </section>
+
+          {(studioChargesReservationFee || resvFeeRows.length > 0) && (
+            <section className="s-card p-5">
+              <h2 className="s-head mb-3">Reservation fees</h2>
+              {resvFeeRows.length === 0 ? (
+                <Empty quiet>No reservation fees yet.</Empty>
+              ) : (
+                <Rows>
+                  {resvFeeRows.map((f) => (
+                    <div key={f.payment_id} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+                      <span className="min-w-0 truncate text-[12px] leading-4 text-ink-2">
+                        {f.class_name}
+                        <span className="ml-1.5 text-ink-3">{resvStateLine(f)}</span>
+                      </span>
+                      <span className="num shrink-0 text-[12px] text-ink">{formatMoney(f.fee_cents, f.currency)}</span>
+                    </div>
+                  ))}
+                </Rows>
+              )}
+            </section>
+          )}
 
           {/* Notes, goals and documents are now WRITTEN here rather than
               listed. All three tables have existed since migration 001 (or, for
