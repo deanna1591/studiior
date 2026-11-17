@@ -63,6 +63,11 @@ insert into studio_settings (studio_id, free_first_class_enabled, convert_sequen
    null, 14, true, 'owner_manager', '24h', 30),
   ('c0780000-0000-0000-0000-000000000002', true,  false,
    null, 14, false, 'owner_manager', '24h', 30);
+-- Pin the brief cap high for this fixture studio so the always-qualifying
+-- unconverted_free line (rank 3) is never crowded out of the top-N by the many
+-- unstaffed near-now occurrences, whose count straddles the clock. Clock-independent.
+insert into insight_config (studio_id, key, value) values
+  ('c0780000-0000-0000-0000-000000000001', 'max_insights', 50);
 insert into locations (id, studio_id, name, is_primary) values
   ('c0780000-0000-0000-0000-00000000000a','c0780000-0000-0000-0000-000000000001','Main',true),
   ('c0780000-0000-0000-0000-00000000000b','c0780000-0000-0000-0000-000000000002','Main',true);

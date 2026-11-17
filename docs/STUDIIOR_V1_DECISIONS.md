@@ -513,6 +513,36 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 115 — Pay period override (recorded 16 Nov 2026)
+
+When a pay period cannot close because classes have no check-in recorded, a manager or owner resolves each listed class with 'Ran as scheduled, pay the coach' (pay is computed as if the class ran with its bookings; bookings stay booked, neither attended nor no-show; no member email) or, only when the class has no live bookings, 'Did not run' (no pay; the held pay record is deleted; the occurrence is cancelled with the reason text 'not held' and no pay write and no member email); a class with live bookings offers only 'Ran as scheduled' and a link to the normal Cancel class, which refunds and notifies. There is also 'Resolve all as ran' to settle every listed class at once. Ran as scheduled uses confirm_class_for_pay with method manager. Each resolution writes an audit row pay.unrecorded_resolved with who and which choice; the class page and roster show 'Attendance not recorded. Resolved for pay by {name} on {date}'. The period closes once every listed class is resolved. The instructor's pay page shows the class as normal.
+
+---
+
+## 113 (a) — Webhook inbox is public surface (recorded 16 Nov 2026)
+
+The resend_webhook_inbox table is part of the public surface and is listed with the anon RPCs in every surface check (THIRTEEN functions plus this one table). Inserts are capped at 600 a minute per source; rows that match no send are deleted after one day; the sweep never reads anything from a row except the provider message id and the event type. The cap is a per-minute count on the inbox (one source); unmatched rows are kept and purged after one day; the sweep selects only id, provider message id and event type.
+
+---
+
+## 109 — Members export (recorded 16 Nov 2026)
+
+The staff Members page gains an Export button (owner and manager only) that downloads a CSV of every member matching the current search and filter, in the order shown. Columns: first name, last name, email, phone (E.164), status, plan, credits left or expiry, last visit, joined, free class state, marketing (yes when opted in under Decision 114, otherwise no). Under the button: 'Members marked no in the marketing column have unsubscribed or never opted in. Do not send them marketing.' The file is named {studio}-members-{date}.csv, UTF-8 with a header row, phone and dates as text so spreadsheets keep them. Each export writes an audit row members.exported with the filter and the row count.
+
+---
+
+## 108 — Daily money check (recorded 16 Nov 2026)
+
+Every morning at 7:00 studio time a service job runs read-only checks on the studio's data and emails the owner one message, 'Studiior daily check for {studio}: {n} items' or 'all clear', listing each item in one line with the member and the class or payment: a reservation fee paid with no seat and no credit, a hold older than its window, a succeeded payment attached to nothing, a member with an active plan still marked lead, a live booking in a cancelled or ended class, a member double-booked in one class, a notification unsent for more than an hour, an attended booking with no signed waiver, and emails that failed in the last day with the reason. Nothing is changed by the job. The owner can turn the email off per studio in Settings → Notifications.
+
+---
+
+## convert_test:347 pin (test fix, no decision, 16 Nov 2026)
+
+The morning-brief assertion (an unconverted_free line exists after generate_morning_brief) straddled the clock: the brief keeps only max_insights (default 5) by rank, and the fixture's many unstaffed near-now occurrences generate higher-rank time-sensitive insights that at some UTC hours fill the top 5 and crowd the rank-3 unconverted_free line out. Pinned by setting the fixture studio's max_insights to 50 via one insight_config row, so the always-qualifying line is never capped out and the assertion is clock-independent.
+
+---
+
 ## 114 — Marketing consent (recorded 16 Nov 2026)
 
 The signup form shows 'Send me studio news and offers' ticked by default; unticking it sets marketing_opt_in false. Every marketing email carries the one-tap unsubscribe link, which sets marketing_unsubscribed_at and is final until the member turns it back on under Account → Emails. A member counts as opted in for campaigns and for the members export when marketing_opt_in is true and marketing_unsubscribed_at is null. Existing members who never ticked the box and never unsubscribed are set to opted in once by migration with an audit row, since they have been receiving the studio's sequence emails with the unsubscribe link throughout.

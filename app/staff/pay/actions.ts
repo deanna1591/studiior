@@ -47,7 +47,8 @@ export async function markPaid(_prev: PayState, fd: FormData): Promise<PayState>
   return { ok: true, message: "Recorded. The instructor sees their statement marked paid." };
 }
 
-export type CloseState = { ok: boolean; message?: string; held?: { name: string; when: string; instructor: string }[] } | null;
+export type HeldClass = { occurrence_id: string; name: string; when: string; instructor: string; booked: number };
+export type CloseState = { ok: boolean; message?: string; held?: HeldClass[] } | null;
 
 /**
  * Decision 75b-2 (h): close a pay period. close_pay_period refuses while any
@@ -66,10 +67,41 @@ export async function closePeriod(_prev: CloseState, fd: FormData): Promise<Clos
     if (error.code === "PT409") return { ok: false, message: error.message };
     return { ok: false, message: error.message };
   }
-  const r = data as unknown as { ok: boolean; reason?: string; classes?: { name: string; when: string; instructor: string }[] } | null;
+  const r = data as unknown as { ok: boolean; reason?: string; classes?: HeldClass[] } | null;
   if (r && !r.ok && r.reason === "held_records") {
-    return { ok: false, message: "This period still has classes waiting on a check-in.", held: r.classes ?? [] };
+    return { ok: false, message: "This period still has classes with no check-in recorded. Resolve each, then close.", held: r.classes ?? [] };
   }
   revalidatePath(`/pay/${periodId}`);
   return { ok: true, message: "Period closed. Corrections from here are adjustments in the next period." };
+}
+
+/**
+ * Decision 115: resolve one unrecorded class — "Ran as scheduled" (pay the coach)
+ * or "Did not run" (empty classes only). A class with members booked offers only
+ * ran, plus a link to the normal Cancel class. Manager-up; the DB is the boundary.
+ */
+export async function resolveClass(occurrenceId: string, choice: "ran" | "did_not_run", periodId: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, error: "Not signed in." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resolve_unrecorded_class", { p_occurrence_id: occurrenceId, p_choice: choice });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, error: "Owners and managers only." };
+    if (error.code === "PT409") return { ok: false, error: "That class has members booked. Use Cancel class, which refunds and notifies." };
+    return { ok: false, error: error.message };
+  }
+  if (!(data as { ok?: boolean })?.ok) return { ok: false, error: "That could not be resolved." };
+  revalidatePath(`/pay/${periodId}`);
+  return { ok: true };
+}
+
+/** Decision 115: resolve every held class in the period as ran, at once. */
+export async function resolveAllRan(periodId: string): Promise<{ ok: boolean; error?: string; resolved?: number }> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, error: "Not signed in." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resolve_unrecorded_all_ran", { p_period_id: periodId });
+  if (error) return { ok: false, error: error.code === "PT403" ? "Owners and managers only." : error.message };
+  revalidatePath(`/pay/${periodId}`);
+  return { ok: true, resolved: (data as { resolved?: number })?.resolved ?? 0 };
 }

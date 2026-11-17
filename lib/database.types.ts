@@ -1398,6 +1398,9 @@ export type Database = {
           status: Database["public"]["Enums"]["occurrence_status"]
           studio_id: string
           substitute_for: string | null
+          unrecorded_resolved_at: string | null
+          unrecorded_resolved_by: string | null
+          unrecorded_resolved_choice: string | null
           updated_at: string
           waitlist_count: number
         }
@@ -1450,6 +1453,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["occurrence_status"]
           studio_id: string
           substitute_for?: string | null
+          unrecorded_resolved_at?: string | null
+          unrecorded_resolved_by?: string | null
+          unrecorded_resolved_choice?: string | null
           updated_at?: string
           waitlist_count?: number
         }
@@ -1502,6 +1508,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["occurrence_status"]
           studio_id?: string
           substitute_for?: string | null
+          unrecorded_resolved_at?: string | null
+          unrecorded_resolved_by?: string | null
+          unrecorded_resolved_choice?: string | null
           updated_at?: string
           waitlist_count?: number
         }
@@ -7301,6 +7310,7 @@ export type Database = {
           cover_auto_accept_enabled: boolean
           cover_escalation_hours: number
           created_at: string
+          daily_check_enabled: boolean
           desk_pay_mode: string
           disabled_templates: string[]
           dropin_payment_window_minutes: number
@@ -7442,6 +7452,7 @@ export type Database = {
           cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
+          daily_check_enabled?: boolean
           desk_pay_mode?: string
           disabled_templates?: string[]
           dropin_payment_window_minutes?: number
@@ -7583,6 +7594,7 @@ export type Database = {
           cover_auto_accept_enabled?: boolean
           cover_escalation_hours?: number
           created_at?: string
+          daily_check_enabled?: boolean
           desk_pay_mode?: string
           disabled_templates?: string[]
           dropin_payment_window_minutes?: number
@@ -8574,6 +8586,7 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: Json
       }
+      ago: { Args: { p_ts: string }; Returns: string }
       ai_draft_count: { Args: { p_studio_id: string }; Returns: number }
       ai_draft_gate: { Args: { p_studio_id: string }; Returns: Json }
       anthropic_api_key: { Args: never; Returns: string }
@@ -8950,6 +8963,7 @@ export type Database = {
           txt: string
         }[]
       }
+      cname: { Args: { p_occ: string }; Returns: string }
       commitment_pending: {
         Args: { p_studio_id: string }
         Returns: {
@@ -9108,6 +9122,7 @@ export type Database = {
         Returns: Json
       }
       current_waiver: { Args: { p_studio_id: string }; Returns: Json }
+      daily_money_check: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_absent_cards: { Args: { p_studio_id: string }; Returns: Json }
       dashboard_activity: {
         Args: { p_limit?: number; p_studio_id: string }
@@ -9295,6 +9310,18 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -10069,6 +10096,15 @@ export type Database = {
         Returns: boolean
       }
       member_wallet: { Args: { p_studio_id: string }; Returns: Json }
+      members_export: {
+        Args: {
+          p_filter?: string
+          p_search?: string
+          p_sort?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
       members_list: {
         Args: {
           p_filter?: string
@@ -10100,6 +10136,11 @@ export type Database = {
       milestone_visit_targets: { Args: never; Returns: number[] }
       mint_calendar_feed: {
         Args: { p_kind: string; p_studio_id: string }
+        Returns: string
+      }
+      mname: { Args: { p_member: string }; Returns: string }
+      money_txt: {
+        Args: { p_cents: number; p_currency: string }
         Returns: string
       }
       month_publication_facts: {
@@ -10737,6 +10778,14 @@ export type Database = {
           last_name: string
           member_id: string
         }[]
+      }
+      resolve_unrecorded_all_ran: {
+        Args: { p_period_id: string }
+        Returns: Json
+      }
+      resolve_unrecorded_class: {
+        Args: { p_choice: string; p_occurrence_id: string }
+        Returns: Json
       }
       respond_to_offer: {
         Args: { p_accept: boolean; p_offer_id: string }
@@ -11463,6 +11512,7 @@ export type Database = {
       sweep_class_ended_unmarked: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }
+      sweep_daily_money_checks: { Args: never; Returns: Json }
       sweep_flex_rescue: { Args: { p_now?: string }; Returns: Json }
       sweep_free_duplicate_holds: { Args: never; Returns: Json }
       sweep_free_reservation_dues: { Args: { p_now?: string }; Returns: Json }

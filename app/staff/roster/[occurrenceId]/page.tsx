@@ -36,7 +36,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
 
   const { data: occ } = await supabase
     .from("class_occurrences")
-    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, hidden_from_members, instructors!instructor_id(display_name), rooms(name)")
+    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, hidden_from_members, unrecorded_resolved_at, unrecorded_resolved_by, unrecorded_resolved_choice, instructors!instructor_id(display_name), rooms(name)")
     .eq("id", params.occurrenceId)
     .maybeSingle();
   if (!occ) notFound();
@@ -228,12 +228,26 @@ export default async function Roster({ params, searchParams }: { params: { occur
 
   const day = relativeDayName(occ.starts_at, ctx.timeZone) ?? fmtDayLong(occ.starts_at, ctx.timeZone);
 
+  // Decision 115: attendance was never recorded; a manager resolved it for pay.
+  let unrecordedNote: string | null = null;
+  if (occ.unrecorded_resolved_at) {
+    let who = "a manager";
+    if (occ.unrecorded_resolved_by) {
+      const { data: rp } = await supabase.from("profiles").select("full_name, email").eq("id", occ.unrecorded_resolved_by).maybeSingle();
+      who = rp?.full_name || rp?.email || who;
+    }
+    unrecordedNote = `Attendance not recorded. Resolved for pay by ${who} on ${fmtDayLong(occ.unrecorded_resolved_at, ctx.timeZone)}.`;
+  }
+
   return (
     <AppShell
       {...shell}
       title={occ.name}
       actions={<NavLink href="/">Back to the dashboard</NavLink>}
     >
+      {unrecordedNote && (
+        <p className="mb-4 rounded-lg px-3 py-2 text-[12.5px]" style={{ background: "var(--amber-tint)", color: "var(--ink)" }}>{unrecordedNote}</p>
+      )}
       {/* The facts of the class, as a line of text rather than a row of stat
           cards. Four numbers do not need four boxes. */}
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">

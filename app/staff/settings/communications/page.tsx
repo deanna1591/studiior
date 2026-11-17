@@ -4,6 +4,7 @@ import { AppShell, Denied } from "@/components/ui";
 import SettingsBack from "../back";
 import SettingsSection from "@/components/staff/settings-section";
 import SettingsSummaryRow from "@/components/staff/settings-summary";
+import DailyCheckPanel from "../daily-check";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function CommunicationsSettings() {
 
   const [{ data: studio }, { data: settings }] = await Promise.all([
     supabase.from("studios").select("theme_preset, logo_url, contact_email").eq("id", ctx.studioId).maybeSingle(),
-    supabase.from("studio_settings").select("public_instructor_name, time_format").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("public_instructor_name, time_format, daily_check_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
   const look = [
@@ -38,6 +39,10 @@ export default async function CommunicationsSettings() {
         <SettingsSummaryRow title="Member app appearance, names, times & contact"
           state={look}
           href="/branding" cta="Open member app" />
+      </SettingsSection>
+
+      <SettingsSection id="daily-check" title="Notifications">
+        <DailyCheckPanel enabled={settings?.daily_check_enabled ?? true} />
       </SettingsSection>
 
       <SettingsSection id="campaign" title="Campaign sending domain">

@@ -136,7 +136,10 @@ insert into resend_webhook_inbox (event_type, provider_message_id, email, raw)
 values ('email.bounced','pm-forged-xyz','nobody@example.com','{}');
 select sweep_resend_webhooks();
 select expect_text('a real bounce marks the member bounced', (select email_status from members where id='e1130000-0000-0000-0000-000000000013'), 'bounced');
-select expect_num('the inbox is emptied', (select count(*) from resend_webhook_inbox), 0);
+-- Decision 113(a): a MATCHED row is removed at once; a FORGED/unmatched row is
+-- kept (and purged after one day), not deleted immediately.
+select expect_num('the matched bounce row is removed', (select count(*) from resend_webhook_inbox where provider_message_id='pm-bounce-1'), 0);
+select expect_num('the forged unmatched row is kept until the daily purge', (select count(*) from resend_webhook_inbox where provider_message_id='pm-forged-xyz'), 1);
 -- a new scheduled row for MB is cancelled by the worker, never posted
 insert into notifications (id, studio_id, member_id, recipient_type, template_key, channel, payload, dedupe_key, scheduled_for, status)
 values ('e1130000-0000-0000-0000-000000000106','e1130000-0000-0000-0000-000000000001','e1130000-0000-0000-0000-000000000013','member','keep_drifting','email','{}','kd:106', now()-interval '1 min','scheduled');

@@ -1246,3 +1246,18 @@ export async function saveInvoiceDetails(_prev: PlainState, fd: FormData): Promi
     ? "Saved. Members now download a BIR service invoice."
     : "Saved. Leave the registered name blank to keep plain receipts." };
 }
+
+// Decision 108: the per-studio daily check email switch (Settings → Notifications).
+export async function saveDailyCheck(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("daily_check_enabled") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ daily_check_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return { ok: true, message: on ? "The owner gets the daily check email each morning." : "Daily check email turned off." };
+}

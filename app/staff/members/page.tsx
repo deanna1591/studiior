@@ -8,6 +8,7 @@ import { HealthBand, HealthChip, bandOf, isLoud } from "@/components/health-band
 import { StateChip } from "@/components/state-chip";
 import { MessageLink } from "@/components/message-link";
 import MembersSearch from "@/components/staff/members-search";
+import MembersExport from "@/components/staff/members-export";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,8 @@ export default async function Members({
   const { data } = await supabase.rpc("members_list", {
     p_studio_id: ctx.studioId, p_search: q, p_filter: filter, p_sort: sort, p_page: 1,
   });
+  const { data: studioRow } = await supabase.from("studios").select("slug").eq("id", ctx.studioId).maybeSingle();
+  const exportSlug = studioRow?.slug ?? ctx.studioName;
   const res = (data ?? { rows: [], counts: {}, total: 0 }) as Result;
   const rows = res.rows ?? [];
   const counts = res.counts ?? {};
@@ -93,6 +96,9 @@ export default async function Members({
           </span>
           <NavLink href="/members/invites">Invites</NavLink>
           <NavLink href="/members/new">Add a member</NavLink>
+          {isManagerUp(ctx.role) && (
+            <MembersExport slug={exportSlug} q={q} filter={filter} sort={sort} />
+          )}
         </>
       }
       filters={

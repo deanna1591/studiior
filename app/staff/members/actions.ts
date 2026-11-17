@@ -141,3 +141,19 @@ export async function inviteEveryone(_prev: InviteState, fd: FormData): Promise<
   }
   return { ok: r.invited > 0 || r.skipped_no_email.length === 0, message: `${bits.join(". ")}.` };
 }
+
+// Decision 109: the members export. Owner/manager only (the RPC enforces it);
+// returns the export rows for the client to turn into a CSV.
+export async function exportMembers(
+  q: string, filter: string, sort: string,
+): Promise<{ ok: true; rows: Record<string, string>[] } | { ok: false; error: string }> {
+  const supabase = createClient();
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, error: "Sign in again." };
+  const { data, error } = await supabase.rpc("members_export", {
+    p_studio_id: ctx.studioId, p_search: q ?? "", p_filter: filter ?? "all", p_sort: sort ?? "attention",
+  });
+  if (error) return { ok: false, error: say(error.message) };
+  const rows = ((data as { rows?: Record<string, string>[] })?.rows ?? []);
+  return { ok: true, rows };
+}
