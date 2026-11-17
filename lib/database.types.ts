@@ -778,6 +778,84 @@ export type Database = {
           },
         ]
       }
+      campaign_audiences: {
+        Row: {
+          cadence_weeks: number
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          is_demo: boolean
+          max_weekly: number | null
+          monthly_cap: number | null
+          monthly_key: string | null
+          monthly_mode: string
+          name: string
+          priority: number
+          send_dow: number
+          send_time: string
+          status: string
+          studio_id: string
+          template_keys: string[]
+          updated_at: string
+        }
+        Insert: {
+          cadence_weeks?: number
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_demo?: boolean
+          max_weekly?: number | null
+          monthly_cap?: number | null
+          monthly_key?: string | null
+          monthly_mode?: string
+          name: string
+          priority?: number
+          send_dow: number
+          send_time?: string
+          status?: string
+          studio_id: string
+          template_keys: string[]
+          updated_at?: string
+        }
+        Update: {
+          cadence_weeks?: number
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_demo?: boolean
+          max_weekly?: number | null
+          monthly_cap?: number | null
+          monthly_key?: string | null
+          monthly_mode?: string
+          name?: string
+          priority?: number
+          send_dow?: number
+          send_time?: string
+          status?: string
+          studio_id?: string
+          template_keys?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_audiences_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_audiences_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_recipients: {
         Row: {
           campaign_id: string
@@ -821,6 +899,81 @@ export type Database = {
             columns: ["notification_id"]
             isOneToOne: false
             referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_sends: {
+        Row: {
+          audience_id: string
+          booked_at: string | null
+          bought_at: string | null
+          created_at: string
+          id: string
+          member_id: string
+          notification_id: string | null
+          studio_id: string
+          template_key: string
+          week_index: number
+        }
+        Insert: {
+          audience_id: string
+          booked_at?: string | null
+          bought_at?: string | null
+          created_at?: string
+          id?: string
+          member_id: string
+          notification_id?: string | null
+          studio_id: string
+          template_key: string
+          week_index: number
+        }
+        Update: {
+          audience_id?: string
+          booked_at?: string | null
+          bought_at?: string | null
+          created_at?: string
+          id?: string
+          member_id?: string
+          notification_id?: string | null
+          studio_id?: string
+          template_key?: string
+          week_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sends_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_audiences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sends_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sends_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sends_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sends_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
             referencedColumns: ["id"]
           },
         ]
@@ -1373,6 +1526,7 @@ export type Database = {
           core_min_bookings: number | null
           core_reached_minimum_at: string | null
           created_at: string
+          day_tier_saved: Json | null
           description: string | null
           ends_at: string
           flex: boolean
@@ -1428,6 +1582,7 @@ export type Database = {
           core_min_bookings?: number | null
           core_reached_minimum_at?: string | null
           created_at?: string
+          day_tier_saved?: Json | null
           description?: string | null
           ends_at: string
           flex?: boolean
@@ -1483,6 +1638,7 @@ export type Database = {
           core_min_bookings?: number | null
           core_reached_minimum_at?: string | null
           created_at?: string
+          day_tier_saved?: Json | null
           description?: string | null
           ends_at?: string
           flex?: boolean
@@ -4327,6 +4483,7 @@ export type Database = {
           desk_pay_blocked_reason: string | null
           desk_pay_restored_at: string | null
           desk_pay_restored_by: string | null
+          do_not_chase: boolean
           email: string
           email_status: string
           emergency_contact: Json | null
@@ -4373,6 +4530,7 @@ export type Database = {
           desk_pay_blocked_reason?: string | null
           desk_pay_restored_at?: string | null
           desk_pay_restored_by?: string | null
+          do_not_chase?: boolean
           email: string
           email_status?: string
           emergency_contact?: Json | null
@@ -4419,6 +4577,7 @@ export type Database = {
           desk_pay_blocked_reason?: string | null
           desk_pay_restored_at?: string | null
           desk_pay_restored_by?: string | null
+          do_not_chase?: boolean
           email?: string
           email_status?: string
           emergency_contact?: Json | null
@@ -7514,6 +7673,7 @@ export type Database = {
           week_confirm_escalate_dow: number
           week_confirm_remind_dow: number
           week_starts_on: number
+          weekly_campaigns_enabled: boolean
         }
         Insert: {
           adjacency_minutes?: number
@@ -7656,6 +7816,7 @@ export type Database = {
           week_confirm_escalate_dow?: number
           week_confirm_remind_dow?: number
           week_starts_on?: number
+          weekly_campaigns_enabled?: boolean
         }
         Update: {
           adjacency_minutes?: number
@@ -7798,6 +7959,7 @@ export type Database = {
           week_confirm_escalate_dow?: number
           week_confirm_remind_dow?: number
           week_starts_on?: number
+          weekly_campaigns_enabled?: boolean
         }
         Relationships: [
           {
@@ -8867,6 +9029,18 @@ export type Database = {
         Args: { p_change: Json; p_preview: boolean; p_series_ids: string[] }
         Returns: Json
       }
+      c112_as: { Args: { p_user: string }; Returns: undefined }
+      c112_auth: { Args: { p_user: string }; Returns: undefined }
+      c112_member: {
+        Args: {
+          p_joined_days?: number
+          p_marketing?: boolean
+          p_status?: string
+          p_tag: string
+          p_with_plan?: boolean
+        }
+        Returns: string
+      }
       calendar_feed: { Args: { p_token: string }; Returns: string }
       calendar_feed_state: {
         Args: { p_kind: string; p_studio_id: string }
@@ -8881,6 +9055,17 @@ export type Database = {
           member_id: string
         }[]
       }
+      campaign_audience_for: {
+        Args: { p_member_id: string; p_now?: string; p_studio_id: string }
+        Returns: string
+      }
+      campaign_member_matches: {
+        Args: { p_conditions: Json; p_member_id: string }
+        Returns: boolean
+      }
+      campaign_preview: { Args: { p_studio_id: string }; Returns: Json }
+      campaign_results: { Args: { p_studio_id: string }; Returns: Json }
+      campaign_results_sweep: { Args: { p_now?: string }; Returns: number }
       campaign_status: { Args: { p_campaign_id: string }; Returns: Json }
       cancel_booking: {
         Args: { p_booking_id: string }
@@ -9388,6 +9573,10 @@ export type Database = {
         Args: { p_confirm?: boolean; p_ends_on?: string; p_series_id: string }
         Returns: Json
       }
+      ensure_campaign_defaults: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
       ensure_checkin_slug: { Args: { p_studio_id: string }; Returns: string }
       ensure_pay_period: {
         Args: { p_on: string; p_studio_id: string }
@@ -9413,6 +9602,26 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
+      }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raise: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -11299,6 +11508,10 @@ export type Database = {
         Args: { p_occurrence_id: string; p_on: boolean }
         Returns: Json
       }
+      set_occurrence_day_tier: {
+        Args: { p_occurrence_id: string; p_tier: string }
+        Returns: Json
+      }
       set_occurrence_guaranteed: {
         Args: { p_occurrence_id: string }
         Returns: Json
@@ -11667,6 +11880,11 @@ export type Database = {
       sweep_unpaid_dropins: { Args: never; Returns: Json }
       sweep_waitlist: { Args: never; Returns: Json }
       sweep_week_confirmations: { Args: never; Returns: Json }
+      sweep_weekly_campaigns: {
+        Args: { p_now?: string; p_studio_id: string }
+        Returns: number
+      }
+      sweep_weekly_campaigns_all: { Args: { p_now?: string }; Returns: number }
       template_sample_context: {
         Args: { p_first_name: string; p_studio_id: string; p_to_email: string }
         Returns: Json

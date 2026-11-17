@@ -37,6 +37,7 @@ export function Sheet({
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState("");
   const [waive, setWaive] = useState(true);  // Decision 100 (b): on by default for a late add
+  const [freeOnFlex, setFreeOnFlex] = useState(false);  // Decision 30(e)
   const [result, setResult] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -70,6 +71,9 @@ export function Sheet({
     }
     if (opts?.late_add && isFree) {
       (source as Record<string, unknown>).waive_fee = opts.method === "instructor" ? false : waive;
+    }
+    if (chosen.kind === "free_first" && freeOnFlex) {
+      (source as Record<string, unknown>).allow_free_on_flex = true;
     }
     start(async () => {
       const r = await bookFn(memberId, occurrenceId, source, note.trim() || null);
@@ -121,6 +125,19 @@ export function Sheet({
                 ))}
               </select>
             </label>
+
+            {chosen?.kind === "free_first" && (
+              <label className="mt-3 flex items-start gap-2 text-[13px] text-ink-2">
+                <input type="checkbox" className="mt-0.5" checked={freeOnFlex}
+                       onChange={(e) => setFreeOnFlex(e.target.checked)} />
+                <span>Allow this free class on a flex class
+                  <span className="block text-[12px] text-ink-3">
+                    Owners and managers only. Use it when the free first class is on a flex class your
+                    studio normally keeps for core classes.
+                  </span>
+                </span>
+              </label>
+            )}
 
             {feeLateAdd && opts.method === "staff" && (
               <label className="mt-3 flex items-start gap-2 text-[13px] text-ink-2">

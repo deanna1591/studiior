@@ -1248,6 +1248,26 @@ export async function saveInvoiceDetails(_prev: PlainState, fd: FormData): Promi
 }
 
 // Decision 108: the per-studio daily check email switch (Settings → Notifications).
+/** Decision 112 — weekly campaigns by audience. Off by default. Turning it on
+ *  creates the three starting audiences if the studio has none yet. */
+export async function saveWeeklyCampaigns(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("weekly_campaigns_enabled") ?? "") === "on";
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({ weekly_campaigns_enabled: on })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  if (on) await supabase.rpc("ensure_campaign_defaults", { p_studio_id: ctx.studioId });
+  revalidatePath("/settings");
+  revalidatePath("/campaigns");
+  return { ok: true, message: on
+    ? "Weekly campaigns are on. Review your audiences on the Campaigns page."
+    : "Weekly campaigns turned off." };
+}
+
 export async function saveDailyCheck(_prev: PlainState, fd: FormData): Promise<PlainState> {
   const ctx = await getStaffContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };

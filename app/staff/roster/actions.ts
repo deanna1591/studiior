@@ -583,6 +583,46 @@ export async function setAlwaysRuns(_prev: AlwaysRunsState, fd: FormData): Promi
   };
 }
 
+export type DayTierState = { ok: boolean; message: string } | null;
+
+/**
+ * Decision 21(b) — the day tier switch. A manager makes THIS class core (runs
+ * regardless) or flex (runs only if it reaches the minimum) for the day. Flipping
+ * back to the class's own tier restores the saved values exactly. The booked
+ * members are told when a class becomes flex. Locked once decided or started
+ * (PT409), surfaced as "Decided at the cut-off".
+ */
+export async function setDayTier(_prev: DayTierState, fd: FormData): Promise<DayTierState> {
+  const occurrenceId = String(fd.get("occurrence_id") ?? "");
+  const tier = String(fd.get("tier") ?? "");
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_occurrence_day_tier", {
+    p_occurrence_id: occurrenceId, p_tier: tier,
+  });
+  if (error) {
+    const m = error.message;
+    return {
+      ok: false,
+      message: /PT403/.test(m) ? "Only owners and managers change the timetable."
+        : /PT409/.test(m) ? "Decided at the cut-off — this class can no longer be changed."
+        : /PT422/.test(m) ? "Choose core or flex."
+        : m,
+    };
+  }
+  revalidatePath(`/roster/${occurrenceId}`);
+  revalidatePath("/schedule");
+  revalidatePath("/schedule/flex");
+  const restored = (data as { restored?: boolean } | null)?.restored;
+  return {
+    ok: true,
+    message: restored
+      ? "Back to its usual tier for this class."
+      : tier === "core"
+        ? "Core today — this class runs regardless of bookings."
+        : "Flex today — it runs only if it reaches its minimum. Booked members have been told.",
+  };
+}
+
 // Decision 26(e): the front desk and up release a payment hold at once.
 export async function releaseHold(
   bookingId: string,

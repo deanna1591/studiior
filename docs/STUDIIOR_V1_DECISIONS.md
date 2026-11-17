@@ -513,6 +513,58 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 112 — Weekly campaigns by audience (recorded 17 Nov 2026)
+
+Retention gains a Campaigns page where a manager or owner defines audiences from conditions (status, plan or no plan, free class done, class types attended and how many times, last visit, weeks since joining, credits left), gives each audience a weekly email or an ordered set that rotates, a send weekday and time, a limit (number of weekly sends, then monthly with a cap or stop) and a priority. Every week each eligible member lands in the first matching audience only and receives that audience's next email; a member who matches no audience receives nothing. Always excluded: unsubscribed, bounced, marked do not chase on the profile, or any studio email received in the last 3 days. A purchase removes a member from the no-plan audiences the same day; attending a second class type removes them from the one-format audience. The page shows a live preview of who gets each audience's email this week, and after each send who booked or bought within 7 days. Three audiences are created for a studio when campaigns are turned on, each with platform default copy: 'Free class done, no plan' (six weekly emails then monthly, capped at six monthly, Tuesday 10:00), 'Has a plan, tried one class type' (one email every two weeks until a second class type is attended or the plan ends, Thursday 10:00), 'Signed up, never booked, over 7 days' (four weekly emails, Wednesday 10:00). The email tokens add {top_class_type}, {top_class_count} and {untried_class_type}. Campaigns are off until the owner turns them on in Settings then Notifications. Audiences can be added, edited, paused or deleted without a build.
+
+**Campaign emails are gated by marketing consent (Decision 114), not by the sequence_email preference; a member who has unsubscribed never receives one.**
+
+**Where:** `campaign_audiences` and `campaign_sends` tables with RLS (manager-up read within the studio, writes via the definer only); a service-only audience matcher (first matching audience wins) and a weekly sweep on pg_cron per studio in studio time that queues through the existing `queue_notification` with per-audience dedupe and the 3-day quiet rule; the three starting audiences and the nine platform default templates (`convert_week_2` to `convert_week_6`, `convert_monthly`, `campaign_try_format`, `campaign_free_waiting`); `retention_email_context` re-issued with `{top_class_type}`, `{top_class_count}` and `{untried_class_type}` from `check_ins` grouped by class type; a do-not-chase switch on the profile; a Settings then Notifications switch Weekly campaigns, off by default. The Campaigns page carries the audience builder, the preview list, the schedule and the results. **Status:** settled, built in this gate. **Reuses:** Decision 50 (the campaign send path and `campaigns` composer), Decision 78 (the convert and keep queue and dedupe), Decision 114 (marketing consent), Decision 79a (the retention page). Deanna, 17 Nov 2026.
+
+---
+
+## 22 (d) — Phone layout for the member class surfaces (amendment, recorded 17 Nov 2026)
+
+On the member Book rows, the free class picker, the class page header, and the Home hero and next-class cards: the accent bar sits outside the card content; the start and end time sit on their own line that grows with the text; the class name wraps to two lines and is never truncated (this explicitly covers the Home hero and the next-class cards, whose class name wraps and is never truncated); the Always runs chip drops below the name when there is no room; the coach photo is a fixed 40 px circle at the top right; every member screen is checked at 360 px with Android large text (font scale 1.3) as well as at 390 px.
+
+**Where:** `components/member/class-card.tsx`, `components/member/free-class-list.tsx`, `components/member/class-detail-body.tsx`, and the Home heroes in `app/member/page.tsx`. **Status:** settled, built in this gate. **Extends:** Decision 22, Decision 68. Deanna, 17 Nov 2026.
+
+---
+
+## 21 (b) — Day tier switch (amendment, recorded 17 Nov 2026)
+
+On the class sheet, for one occurrence only and before its cut-off, a manager or owner picks Core today or Flex today. Flex today on a core class makes that day's class take the studio's flex minimum and cut-off, cancels it at the cut-off if short, pays the coach on the flex rules for that day, and tells members already booked 'This class now runs if it reaches {min} by {cut-off}' followed by the normal flex notices. Core today on a flex class is Runs regardless of bookings. Each flip writes an audit row; every timetable, the digest and pay follow it; the Flex pending list offers both directions; after the cut-off the sheet is locked. The sheet shows the coach's core count for that day.
+
+**set_occurrence_day_tier flipping core to flex sets flex true and minimum_bookings to the studio flex minimum for that occurrence only and queues the notice to booked members; flipping back before the cut-off restores the original values.** Core today on a flex class reuses the Runs regardless (always) path (Decision 21 amendment, `set_occurrence_always_runs`).
+
+**Where:** `set_occurrence_day_tier(p_occurrence_id, p_tier)` manager-up with an audit row, gated scheduled and not committed and before start; the flex sweep (`evaluate_commitment`, `sweep_commitments`), the digest (`instructor_digest_block`) and pay (`compute_class_pay_run`) follow the occurrence tier via `occurrence_guarantee_run`; the day tier control on the class sheet (`block-panel.tsx`) and the Flex pending panel (`flex/panel.tsx`). **Status:** settled, built in this gate. **Extends:** Decision 21, Decision 22. Deanna, 17 Nov 2026.
+
+---
+
+## 30 (e) — Free class on a flex class (amendment, recorded 17 Nov 2026)
+
+A manager or owner can allow one free first class booking on a flex class from the staff booking sheet with the switch 'Allow this free class on a flex class'. The class stays flex, the seat counts toward the minimum like any other, the member is told the class only runs if it reaches its minimum and gets the normal flex notices, and an audit row `booking.free_on_flex` is written. The reservation fee rules apply as on a core class.
+
+**Where:** the free-on-flex switch path in `staff_book_member` with the audit row; the switch on the staff booking sheet. **Status:** settled, built in this gate. **Extends:** Decision 30, Decision 21. Deanna, 17 Nov 2026.
+
+---
+
+## Refusal sentences for the staff booking sheet (no decision, recorded 17 Nov 2026)
+
+Every reason a booking function returns has a sentence; 'That could not be booked.' is never shown when a reason exists. `flex_not_allowed` 'Free first classes are core classes only. Pick a core class, or allow it on this flex class.'; `not_trial_class` 'This class is not open to first-timers.'; `free_seats_full` 'The free seats for this class are taken.'; `class_not_bookable` 'This class is not open for booking.'; `free_first_closed_here` 'Free first classes are closed on this class.'; `not_staffed_yet` 'No coach is assigned to this class yet.'; `class_hidden` 'This class is hidden from members.'; `peak_not_allowed` 'Their plan does not cover peak classes.'; `membership_frozen` 'Their membership is paused.'; `already_had_free` 'Their free first class has already been used.'; `already_member` 'They are already a member, so the free class does not apply.'; `not_first` 'The free class is for first-timers only.'; `missed` 'They missed their free class, so it counts as used.'; `late_cancel` 'They cancelled their free class late, so it counts as used.'; `not_enabled` 'Free first classes are off for this studio.' The convert override string maps to `not_trial_class`.
+
+**Where:** `lib/booking-reasons.ts` (the `REASONS` map) and `app/staff/members/book-actions.ts`. **Status:** settled, built in this gate.
+
+---
+
+## Housekeeping (no decision, recorded 17 Nov 2026)
+
+`template_sample_context` supplies method and reference for `payment_refunded`, and plan_link and button for `free_reservation_credited`, so the Templates preview and a test send render clean. Anon select and insert are revoked on `payment_refunds`. `member_activity` is re-issued so the reservation states render as Journey lines with the recorded wording: a returned reservation credit reads 'Credit returned', a kept one reads 'Credit kept', a staff-released hold reads 'Hold released by the studio' and a lapsed (unpaid, swept) hold reads 'Hold released, not paid'; `lib/statement.mjs` is updated to match.
+
+**Where:** `template_sample_context`, the `payment_refunds` grants, `member_activity`, `lib/statement.mjs`. **Status:** settled, built in this gate.
+
+---
+
 ## 111 — Refunds (recorded 17 Nov 2026)
 
 A manager or owner can refund a succeeded payment from the member profile (the Reservation fees card and the Payments list), in full or in part, as long as any credit that payment produced is still unused; when the credit has been spent the button is replaced by the line "This fee was used as credit on {date}, so it cannot be refunded." A payment made through Xendit is refunded through Xendit to the same card or wallet: the sheet shows the amount, a reason, and Refund; the payment reads "Refund pending" until Xendit confirms, then "Refunded {amount} on {date}" with the Xendit refund id; if Xendit rejects it the sheet says so and nothing changes. A payment taken at the studio (terminal, cash, bank, GCash in person) is refunded outside the app and recorded with the method, the amount, the reference number of the refund transaction (required), the date and a note; it reads "Refunded {amount} on {date}, {method}, ref {reference}". A refund removes the matching unused credit, writes the Journey line "Fee refunded, {amount}" (or "Payment refunded"), emails the member payment_refunded with the amount, method and reference, shows on Sales as "Refunds" for the period with each refund listed, and writes an audit row payment.refunded with who, why and the reference. Instructors and the front desk cannot refund.

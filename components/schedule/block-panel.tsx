@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { republishShift, openShift, setAlwaysRuns, type AlwaysRunsState } from "@/app/staff/roster/actions";
+import { republishShift, openShift, setAlwaysRuns, type AlwaysRunsState, setDayTier, type DayTierState } from "@/app/staff/roster/actions";
 import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
 import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
@@ -341,6 +341,13 @@ export default function BlockPanel({
                           locked={!!facts.committed || (facts.startsAtMs != null && facts.startsAtMs <= Date.now())} />
         )}
 
+        {/* Decision 21(b): the day tier switch (core today / flex today). Shown on
+            any schedulable class when the studio runs flex or guarantees. */}
+        {canManage && !facts.cancelled && facts.showTier
+          && !(facts.committed || (facts.startsAtMs != null && facts.startsAtMs <= Date.now())) && (
+          <DayTierCard occurrenceId={facts.id} isCore={!!facts.isCore} />
+        )}
+
         {/* Decision 91: take this class off the member side without cancelling. */}
         {canManage && !facts.cancelled && (
           <VisibilityCard occurrenceId={facts.id} hidden={!!facts.hidden}
@@ -417,6 +424,53 @@ function AlwaysRunsCard({ occurrenceId, on, locked }: {
         <p className="mt-1.5 text-[12px]" style={{ color: err ? "var(--coral-deep)" : "var(--ink-2)" }}>
           {msg}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Decision 21(b) — the day tier switch. Two one-tap buttons: make this class
+ * run regardless of bookings (core today) or run only if it reaches its minimum
+ * (flex today). The DB saves the original and a flip back restores it, so the
+ * buttons are symmetric and the SQL decides flip-vs-restore.
+ */
+function DayTierCard({ occurrenceId, isCore }: { occurrenceId: string; isCore: boolean }) {
+  const [pending, start] = useTransition();
+  const [core, setCore] = useState(isCore);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState(false);
+  function set(tier: "core" | "flex") {
+    const fd = new FormData();
+    fd.set("occurrence_id", occurrenceId);
+    fd.set("tier", tier);
+    start(async () => {
+      const r: DayTierState = await setDayTier(null, fd);
+      if (r?.ok) { setCore(tier === "core"); setErr(false); setMsg(r.message); }
+      else { setErr(true); setMsg(r?.message ?? "That could not be done."); }
+    });
+  }
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <p className="text-[13px] font-medium text-ink">Just for this class</p>
+      <p className="mt-0.5 text-[12px] leading-[18px] text-ink-3">
+        Core runs regardless of bookings. Flex runs only if it reaches its minimum.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <button type="button" disabled={pending || core} onClick={() => set("core")}
+          className="rounded-full border border-line px-3 py-1 text-[12px] font-medium disabled:opacity-50"
+          style={core ? { background: "var(--accent-chip)", color: "var(--ink)" } : undefined}>
+          Core today
+        </button>
+        <button type="button" disabled={pending || !core} onClick={() => set("flex")}
+          className="rounded-full border border-line px-3 py-1 text-[12px] font-medium disabled:opacity-50"
+          style={!core ? { background: "var(--accent-chip)", color: "var(--ink)" } : undefined}>
+          Flex today
+        </button>
+        {pending && <span className="self-center text-[12px] text-ink-3">Saving…</span>}
+      </div>
+      {msg && (
+        <p className="mt-1.5 text-[12px]" style={{ color: err ? "var(--coral-deep)" : "var(--ink-2)" }}>{msg}</p>
       )}
     </div>
   );

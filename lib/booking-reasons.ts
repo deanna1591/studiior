@@ -49,4 +49,25 @@ export const REASONS: Record<string, string> = {
   // Decision 100: staff pinned a plan in the "Pay with" dropdown that does not
   // cover this class type.
   plan_not_covering: "That plan does not cover this class.",
+  // Decision 48: a class with no instructor assigned yet.
+  not_staffed_yet: "No coach is assigned to this class yet.",
+  // Decision 91: a class hidden from members.
+  class_hidden: "This class is hidden from members.",
+  // Decision 24: a plan that does not cover peak classes.
+  peak_not_allowed: "Their plan does not cover peak classes.",
+  // Decision 49: a paused membership.
+  membership_frozen: "Their membership is paused.",
+  // Decision 30 free-first eligibility refusals (staff "free first class" path).
+  already_had_free: "Their free first class has already been used.",
+  already_member: "They are already a member, so the free class does not apply.",
+  not_first: "The free class is for first-timers only.",
+  missed: "They missed their free class, so it counts as used.",
+  late_cancel: "They cancelled their free class late, so it counts as used.",
+  not_enabled: "Free first classes are off for this studio.",
+  // Decision 30(e): free-first on a flex class is off (core-only), no override given.
+  flex_not_allowed: "This class isn't open for a free first class.",
+  not_trial_class: "This class isn't open for a free first class.",
+  free_first_closed_here: "This class isn't open for a free first class.",
+  free_seats_full: "The free first-class spots for this class are full.",
+  no_reservation_fee: "Free first classes don't carry a reservation fee here.",
 };

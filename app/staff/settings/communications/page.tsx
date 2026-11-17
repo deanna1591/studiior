@@ -5,6 +5,7 @@ import SettingsBack from "../back";
 import SettingsSection from "@/components/staff/settings-section";
 import SettingsSummaryRow from "@/components/staff/settings-summary";
 import DailyCheckPanel from "../daily-check";
+import WeeklyCampaignsPanel from "../weekly-campaigns";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function CommunicationsSettings() {
 
   const [{ data: studio }, { data: settings }] = await Promise.all([
     supabase.from("studios").select("theme_preset, logo_url, contact_email").eq("id", ctx.studioId).maybeSingle(),
-    supabase.from("studio_settings").select("public_instructor_name, time_format, daily_check_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("studio_settings").select("public_instructor_name, time_format, daily_check_enabled, weekly_campaigns_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
   ]);
 
   const look = [
@@ -43,6 +44,15 @@ export default async function CommunicationsSettings() {
 
       <SettingsSection id="daily-check" title="Notifications">
         <DailyCheckPanel enabled={settings?.daily_check_enabled ?? true} />
+      </SettingsSection>
+
+      <SettingsSection id="weekly-campaigns" title="Weekly campaigns">
+        <WeeklyCampaignsPanel enabled={settings?.weekly_campaigns_enabled ?? false} />
+        <div className="mt-2">
+          <a href="/campaigns" className="text-[13px] text-ink underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+            Open Campaigns →
+          </a>
+        </div>
       </SettingsSection>
 
       <SettingsSection id="campaign" title="Campaign sending domain">

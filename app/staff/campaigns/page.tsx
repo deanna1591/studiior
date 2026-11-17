@@ -1,93 +1,94 @@
-import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
-import { fmtClock } from "@/lib/time";
-import { AppShell, Denied, Empty } from "@/components/ui";
-import { StateChip } from "@/components/state-chip";
-import { createCampaign } from "./actions";
+import { AppShell, Denied } from "@/components/ui";
+import { conditionLabels, cadenceLine } from "@/lib/campaigns";
+import PreviewList from "./preview-list";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Decision 50 — the studio's email campaigns.
- *
- * Manager-up, like Sales: front desk and instructors never see Campaigns (a
- * campaign writes to members and is a selling decision). Every row's counts
- * come from the linked notifications via campaign_status; the list itself shows
- * the stored recipient_count and status.
- */
-type Row = {
-  id: string; subject: string; status: string;
-  recipient_count: number; scheduled_for: string | null; sent_at: string | null;
-  created_at: string;
+type Audience = {
+  id: string; name: string; conditions: Record<string, unknown>;
+  template_keys: string[]; cadence_weeks: number; max_weekly: number | null;
+  monthly_mode: string; status: string;
 };
+type Preview = { audience_id: string; name: string; status: string; count: number;
+  members: { id: string; first_name: string; last_name: string }[] };
+type Result = { audience_id: string; name: string; sent: number; booked: number; bought: number };
 
-export default async function Campaigns() {
+/**
+ * Decision 112 — weekly campaigns by audience. The studio sees each audience,
+ * who it reaches, who it emailed and who came back. Manager-up; the RPCs enforce
+ * the same gate. The sweep sends; this screen only shows.
+ */
+export default async function CampaignsScreen() {
   const screen = await staffScreen("/campaigns");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
-
   if (!isManagerUp(ctx.role)) {
     return <AppShell {...shell} title="Campaigns"><Denied what="campaigns" role={ctx.role} /></AppShell>;
   }
 
-  const { data } = await supabase
-    .from("campaigns")
-    .select("id, subject, status, recipient_count, scheduled_for, sent_at, created_at")
-    .order("created_at", { ascending: false });
-  const rows = (data ?? []) as Row[];
+  const [{ data: settings }, { data: audData }, { data: prevData }, { data: resData }] = await Promise.all([
+    supabase.from("studio_settings").select("weekly_campaigns_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.from("campaign_audiences").select("id, name, conditions, template_keys, cadence_weeks, max_weekly, monthly_mode, status")
+      .eq("studio_id", ctx.studioId).order("priority", { ascending: true }),
+    supabase.rpc("campaign_preview", { p_studio_id: ctx.studioId }),
+    supabase.rpc("campaign_results", { p_studio_id: ctx.studioId }),
+  ]);
 
-  const when = (iso: string | null) => {
-    if (!iso) return null;
-    const d = new Intl.DateTimeFormat("en-GB",
-      { timeZone: ctx.timeZone, day: "numeric", month: "short", year: "numeric" })
-      .format(new Date(iso));
-    return `${d} · ${fmtClock(iso, ctx.timeZone, ctx.timeFormat)}`;
-  };
+  const on = settings?.weekly_campaigns_enabled ?? false;
+  const audiences = (audData ?? []) as Audience[];
+  const preview = new Map(((prevData ?? []) as Preview[]).map((p) => [p.audience_id, p]));
+  const results = new Map(((resData ?? []) as Result[]).map((r) => [r.audience_id, r]));
 
   return (
-    <AppShell {...shell} title="Campaigns"
-      actions={
-        <form action={createCampaign}>
-          <button type="submit"
-            className="inline-flex items-center rounded bg-ink px-3.5 py-2 text-[13px] font-medium leading-[18px] text-paper hover:bg-ink-2">
-            New campaign
-          </button>
-        </form>
-      }>
-      <p className="mb-5 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
-        Write one email and send it to a filtered group of members. Only members
-        who said yes to news ever receive it, and every email carries a one-tap
-        unsubscribe — it never touches their booking or reminder mail.
-      </p>
+    <AppShell {...shell} title="Campaigns">
+      {!on && (
+        <div className="mb-4 rounded border border-line bg-amber-tint px-3.5 py-3">
+          <p className="text-[13px] text-ink">
+            Weekly campaigns are off, so nothing is being sent.{" "}
+            <a href="/settings/communications#weekly-campaigns" className="underline decoration-line-2 underline-offset-4 hover:decoration-ink">
+              Turn them on in Settings
+            </a>{" "}to start.
+          </p>
+        </div>
+      )}
 
-      {rows.length === 0 ? (
-        <Empty>No campaigns yet. “New campaign” writes one.</Empty>
+      {audiences.length === 0 ? (
+        <p className="text-[13px] text-ink-3">
+          No audiences yet. Turn weekly campaigns on in Settings and we'll set up three to start with.
+        </p>
       ) : (
-        <ul className="divide-y divide-line rounded border border-line bg-surface">
-          {rows.map((r) => (
-            <li key={r.id}>
-              <Link href={`/campaigns/${r.id}`}
-                className="flex items-baseline gap-3 px-3.5 py-3 hover:bg-paper">
-                <span className="min-w-0 flex-1">
-                  <span className="text-[14px] leading-5 text-ink">
-                    {r.subject || <span className="text-ink-3">Untitled</span>}
-                  </span>
-                  <span className="mt-0.5 block text-[12px] leading-4 text-ink-3">
-                    {r.status === "sent" && r.sent_at
-                      ? `Sent ${when(r.sent_at)} · ${r.recipient_count} recipient${r.recipient_count === 1 ? "" : "s"}`
-                      : r.status === "scheduled" && r.scheduled_for
-                        ? `Scheduled ${when(r.scheduled_for)} · ${r.recipient_count} recipient${r.recipient_count === 1 ? "" : "s"}`
-                        : r.status === "sending"
-                          ? `Sending · ${r.recipient_count} recipient${r.recipient_count === 1 ? "" : "s"}`
-                          : "Draft"}
-                  </span>
-                </span>
-                <StateChip state={r.status} />
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-4">
+          {audiences.map((a) => {
+            const p = preview.get(a.id);
+            const r = results.get(a.id);
+            return (
+              <section key={a.id} className="rounded border border-line bg-surface px-3.5 py-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-[15px] font-semibold text-ink">{a.name}</h2>
+                  {a.status !== "active" && (
+                    <span className="rounded-full bg-line px-2 py-0.5 text-[11px] text-ink-2">Paused</span>
+                  )}
+                </div>
+                <p className="mt-1 text-[12px] leading-[18px] text-ink-3">
+                  {conditionLabels(a.conditions).join(" · ") || "everyone"} · {cadenceLine(a)}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-ink-2">
+                  <span><span className="font-semibold text-ink">{p?.count ?? 0}</span> in this audience now</span>
+                  {r && (
+                    <>
+                      <span><span className="font-semibold text-ink">{r.sent}</span> emailed (8 wks)</span>
+                      <span><span className="font-semibold text-ink">{r.booked}</span> booked after</span>
+                      <span><span className="font-semibold text-ink">{r.bought}</span> bought after</span>
+                    </>
+                  )}
+                </div>
+                {p && p.count > 0 && <PreviewList members={p.members} count={p.count} />}
+              </section>
+            );
+          })}
+        </div>
       )}
     </AppShell>
   );

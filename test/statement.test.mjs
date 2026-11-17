@@ -141,6 +141,13 @@ test("83a statementTitle: reshapes per the table, no em dash", () => {
   assert.equal(statementTitle({ kind: "purchase", title: "Bought 10-Pack", membership_id: "m1" }), "Bought 10-Pack");
 });
 
+test("112 housekeeping: reservation titles + the staff-release distinction", () => {
+  assert.equal(statementTitle({ kind: "hold_released", title: "x" }), "Hold released, not paid");
+  assert.equal(statementTitle({ kind: "hold_released_staff", title: "x" }), "Hold released by the studio");
+  assert.equal(statementTitle({ kind: "reservation_fee_kept", title: "x" }), "Credit kept");
+  assert.equal(statementTitle({ kind: "reservation_credit_back", title: "x" }), "Credit returned");
+});
+
 test("83a: no helper output ever contains an em dash", () => {
   const kinds = ["booked", "free_first", "attended", "no_show", "cancelled", "late_cancelled",
     "studio_cancelled", "rescheduled", "purchase", "refund", "credits_added", "credit_adjustment",
@@ -180,8 +187,8 @@ test("statementTitle: the reservation fee lines", () => {
   assert.equal(statementTitle({ kind: "reservation_hold", title: "Payment pending for X" }), "Payment pending");
   assert.equal(statementTitle({ kind: "hold_released", title: "Reservation hold released" }), "Hold released, not paid");
   assert.equal(statementTitle({ kind: "reservation_fee_paid", title: "Reservation fee paid" }), "Reservation fee paid");
-  assert.equal(statementTitle({ kind: "reservation_fee_kept", title: "Reservation fee kept" }), "Fee kept");
-  assert.equal(statementTitle({ kind: "reservation_credit_back", title: "Fee credited back" }), "Fee credited back");
+  assert.equal(statementTitle({ kind: "reservation_fee_kept", title: "Reservation fee kept" }), "Credit kept");
+  assert.equal(statementTitle({ kind: "reservation_credit_back", title: "Fee credited back" }), "Credit returned");
   assert.equal(statementTitle({ kind: "reservation_credit_used", title: "Credit used for a reservation" }), "Credit used for a reservation");
   assert.equal(statementTitle({ kind: "reservation_restored", title: "Seat restored after payment" }), "Seat restored after payment");
 });
