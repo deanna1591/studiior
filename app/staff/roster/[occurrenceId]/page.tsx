@@ -17,6 +17,7 @@ import MakeFreeButton from "./make-free-button";
 import RebookButton from "./rebook-button";
 import RemoveBooking from "@/components/staff/remove-booking";
 import { BookMemberFromRoster } from "@/components/staff/book-member";
+import { HoldRows } from "@/components/staff/hold-rows";
 import ToastHost from "@/components/staff/toast-host";
 import { formatMoney } from "@/lib/plans";
 import ReleasePay from "./release-pay";
@@ -74,7 +75,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
       : Promise.resolve(null as { candidates: Awaited<ReturnType<typeof computeAssignCandidates>>; pendingApplications: number } | null),
     supabase
       .from("bookings")
-      .select("id, status, payment_source, waitlist_position, member_id, override_reason, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at, phone)")
+      .select("id, status, payment_source, waitlist_position, member_id, override_reason, hold_until, members(first_name, last_name, preferred_name, avatar_url, health_band, health_reason, waiver_signed_at, phone)")
       .eq("occurrence_id", params.occurrenceId)
       .order("waitlist_position", { ascending: true, nullsFirst: true })
       .order("booked_at"),
@@ -224,6 +225,17 @@ export default async function Roster({ params, searchParams }: { params: { occur
   };
   const booked = (bookings ?? []).filter((b) => ["booked", "attended", "no_show"].includes(b.status));
   const waitlisted = (bookings ?? []).filter((b) => b.status === "waitlisted");
+  // Decision 26(e): a payment hold (a pending_payment comp seat with a hold_until)
+  // shows as its own row with a live countdown and, for desk-up, a Release button.
+  // It is counted in the seat total (occurrence_seats_taken counts pending_payment)
+  // but never in the attendee list above.
+  const holds = (bookings ?? []).filter(
+    (b) => b.status === "pending_payment" && b.payment_source === "comp" && b.hold_until,
+  ).map((b) => ({
+    id: b.id,
+    holdUntil: b.hold_until as string,
+    name: nameOf.get(b.member_id) ?? "A member",
+  }));
   const inCount = booked.filter((b) => checkedIn.has(b.id) || b.status === "attended").length;
 
   const day = relativeDayName(occ.starts_at, ctx.timeZone) ?? fmtDayLong(occ.starts_at, ctx.timeZone);
@@ -438,6 +450,8 @@ export default async function Roster({ params, searchParams }: { params: { occur
           })}
         </Rows>
       )}
+
+      <HoldRows holds={holds} canRelease={desk} />
 
       {waitlisted.length > 0 && (
         <div className="mt-8">

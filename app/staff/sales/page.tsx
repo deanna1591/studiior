@@ -41,6 +41,12 @@ type Totals = {
   count: number; gross_cents: number; refunded_cents: number;
   net_cents: number; studio_total_cents: number; currency: string;
   reservation_fees?: { count: number; total_cents: number };
+  refunds?: { count: number; total_cents: number };
+};
+type Refund = {
+  refund_id: string; settled_at: string | null; member_name: string;
+  amount_cents: number; currency: string; method: string; reference: string | null;
+  reason: string | null; item: string; status: string;
 };
 
 export default async function Sales({
@@ -72,7 +78,7 @@ export default async function Sales({
   const planId = merchOnly ? null : (searchParams.plan || null);
   const status = searchParams.status || null;
 
-  const [{ data: plans }, salesRes, totalsRes, groupsRes] = await Promise.all([
+  const [{ data: plans }, salesRes, totalsRes, groupsRes, refundsRes] = await Promise.all([
     supabase.from("membership_plans").select("id, name").order("name"),
     supabase.rpc("sales_history", {
       p_studio_id: ctx.studioId, p_from: from, p_to: to,
@@ -91,7 +97,10 @@ export default async function Sales({
       .eq("studio_id", ctx.studioId)
       .gte("created_at", from).lte("created_at", to + "T23:59:59.999Z")
       .order("created_at", { ascending: false }),
+    // Decision 111: the refunds settled this period, their own list.
+    supabase.rpc("sales_refunds", { p_studio_id: ctx.studioId, p_from: from, p_to: to }),
   ]);
+  const refunds = (refundsRes.data ?? []) as Refund[];
   const groups = (groupsRes.data ?? []) as unknown as {
     id: string; status: string; group_size: number; created_at: string;
     membership_plans: { name: string } | null;
@@ -179,6 +188,10 @@ export default async function Sales({
           {totals.reservation_fees && totals.reservation_fees.count > 0 && (
             <> · <span className="num text-ink">{formatMoney(totals.reservation_fees.total_cents, totals.currency)}</span>
               {" "}reservation fees ({totals.reservation_fees.count})</>
+          )}
+          {totals.refunds && totals.refunds.count > 0 && (
+            <> · <span className="num text-ink">{formatMoney(totals.refunds.total_cents, totals.currency)}</span>
+              {" "}refunds ({totals.refunds.count})</>
           )}
         </p>
       )}
@@ -286,6 +299,43 @@ export default async function Sales({
                       {g.class_occurrences
                         ? <>{g.class_occurrences.name ?? "a class"} · {d(g.class_occurrences.starts_at.slice(0, 10))}</>
                         : <span className="text-ink-3">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {refunds.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-[13px] font-medium leading-5 text-ink">Refunds</h2>
+          <div className="overflow-x-auto border-y border-line bg-surface">
+            <table className="w-full min-w-[720px] border-collapse">
+              <thead>
+                <tr className="border-b border-line text-left text-[10px] uppercase leading-4 tracking-[0.06em] text-ink-3">
+                  <th className="px-3 py-2 font-medium">Member</th>
+                  <th className="px-3 py-2 font-medium">For</th>
+                  <th className="px-3 py-2 font-medium">Method</th>
+                  <th className="px-3 py-2 text-right font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Settled</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {refunds.map((r) => (
+                  <tr key={r.refund_id} className="border-b border-line text-[13px] leading-[18px] text-ink">
+                    <td className="px-3 py-2">{r.member_name}</td>
+                    <td className="px-3 py-2 text-ink-2">{r.item}</td>
+                    <td className="px-3 py-2 text-ink-2">
+                      {r.method.replace("_", " ")}
+                      {r.reference ? <span className="text-ink-3"> · ref {r.reference}</span> : null}
+                    </td>
+                    <td className="num px-3 py-2 text-right">{formatMoney(r.amount_cents, r.currency)}</td>
+                    <td className="px-3 py-2 text-ink-2">{d(r.settled_at)}</td>
+                    <td className="px-3 py-2">
+                      <StateChip state={r.status === "succeeded" ? "refunded" : r.status} />
                     </td>
                   </tr>
                 ))}

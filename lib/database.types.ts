@@ -560,6 +560,7 @@ export type Database = {
           release_reason:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
+          reservation_credit_covered: boolean
           reservation_fee_waived: boolean
           source: Database["public"]["Enums"]["booking_source"]
           status: Database["public"]["Enums"]["booking_status"]
@@ -593,6 +594,7 @@ export type Database = {
           release_reason?:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
+          reservation_credit_covered?: boolean
           reservation_fee_waived?: boolean
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
@@ -626,6 +628,7 @@ export type Database = {
           release_reason?:
             | Database["public"]["Enums"]["booking_release_reason"]
             | null
+          reservation_credit_covered?: boolean
           reservation_fee_waived?: boolean
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
@@ -5530,6 +5533,102 @@ export type Database = {
           },
         ]
       }
+      payment_refunds: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          failure_code: string | null
+          id: string
+          is_demo: boolean
+          member_id: string | null
+          method: string
+          note: string | null
+          payment_id: string
+          reason: string | null
+          reference: string | null
+          refunded_by: string | null
+          settled_at: string | null
+          status: string
+          studio_id: string
+          xendit_refund_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency: string
+          failure_code?: string | null
+          id?: string
+          is_demo?: boolean
+          member_id?: string | null
+          method: string
+          note?: string | null
+          payment_id: string
+          reason?: string | null
+          reference?: string | null
+          refunded_by?: string | null
+          settled_at?: string | null
+          status?: string
+          studio_id: string
+          xendit_refund_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          failure_code?: string | null
+          id?: string
+          is_demo?: boolean
+          member_id?: string | null
+          method?: string
+          note?: string | null
+          payment_id?: string
+          reason?: string | null
+          reference?: string | null
+          refunded_by?: string | null
+          settled_at?: string | null
+          status?: string
+          studio_id?: string
+          xendit_refund_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_refunds_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -8598,6 +8697,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_payment_refund: {
+        Args: { p_refund_id: string }
+        Returns: undefined
+      }
       apply_plan_to_unpaid: {
         Args: {
           p_member_id: string
@@ -9310,18 +9413,6 @@ export type Database = {
       excuse_infraction: {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
       }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
@@ -10064,9 +10155,11 @@ export type Database = {
           class_name: string
           currency: string
           fee_cents: number
+          method: string
           occurrence_start: string
           paid_at: string
           payment_id: string
+          reference: string
           state: string
           state_at: string
         }[]
@@ -10497,6 +10590,10 @@ export type Database = {
         Args: { p_day: number; p_studio_id: string }
         Returns: string
       }
+      queue_reservation_returned_email: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       queue_shift_notice: {
         Args: {
           p_dedupe: string
@@ -10685,6 +10782,17 @@ export type Database = {
         }
         Returns: Json
       }
+      refund_payment: {
+        Args: {
+          p_amount_cents?: number
+          p_method?: string
+          p_payment_id: string
+          p_reason?: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
+      release_hold: { Args: { p_booking_id: string }; Returns: Json }
       release_provisional_seats_run: {
         Args: { p_occurrence_id: string }
         Returns: number
@@ -10836,6 +10944,10 @@ export type Database = {
         Args: { p_studio_id: string }
         Returns: number
       }
+      return_reservation_credit: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       revoke_calendar_feed: {
         Args: { p_kind: string; p_studio_id: string }
         Returns: Json
@@ -10883,6 +10995,21 @@ export type Database = {
           plan_type: string
           sale_status: string
           starts_on: string
+        }[]
+      }
+      sales_refunds: {
+        Args: { p_from: string; p_studio_id: string; p_to: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          item: string
+          member_name: string
+          method: string
+          reason: string
+          reference: string
+          refund_id: string
+          settled_at: string
+          status: string
         }[]
       }
       sales_totals: {
@@ -11226,6 +11353,14 @@ export type Database = {
           p_studio_id: string
         }
         Returns: Json
+      }
+      settle_payment_refund: {
+        Args: {
+          p_failure_code?: string
+          p_refund_ref: string
+          p_status: string
+        }
+        Returns: undefined
       }
       sign_waiver: { Args: { p_member_id: string }; Returns: Json }
       sign_waiver_document: {
@@ -11696,6 +11831,17 @@ export type Database = {
         }[]
       }
       xendit_reconcile_sweep: { Args: { p_now?: string }; Returns: Json }
+      xendit_refund_context: {
+        Args: { p_payment_id: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          is_xendit: boolean
+          payment_ref: string
+          remaining_cents: number
+          secret_key_ciphertext: string
+        }[]
+      }
       xendit_reprocess_ignored: { Args: { p_studio_id: string }; Returns: Json }
       xendit_resolve_purchase: { Args: { p_data: Json }; Returns: string }
       xendit_return_check_apply: {

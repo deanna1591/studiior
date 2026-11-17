@@ -172,3 +172,30 @@ export async function getCustomerByReferenceId(secretKey: string, referenceId: s
   if (!res.ok) return null;
   return res.data?.data?.[0]?.id ?? null;
 }
+
+// Decision 111: create a refund. POST /v3/refunds with the api-version header.
+// amountCents omitted = full refund (whole-peso amount sent, like the session).
+export type CreateRefundInput = {
+  referenceId: string; // OUR refund reference
+  paymentId: string; // the Xendit py- id (payments.reference)
+  amountCents?: number; // omit for a full refund
+  reason?: string; // REQUESTED_BY_CUSTOMER by default
+};
+export type RefundResult = {
+  refund_id: string;
+  status: string; // PENDING | SUCCEEDED | FAILED
+  failure_code?: string | null;
+};
+export function createRefund(secretKey: string, input: CreateRefundInput) {
+  const body: Record<string, unknown> = {
+    reference_id: input.referenceId,
+    payment_id: input.paymentId,
+    reason: input.reason ?? "REQUESTED_BY_CUSTOMER",
+  };
+  if (input.amountCents != null) body.amount = pesosFromCents(input.amountCents);
+  return call<RefundResult>(secretKey, "/v3/refunds", {
+    method: "POST",
+    headers: { "api-version": "2024-11-11" },
+    body: JSON.stringify(body),
+  });
+}

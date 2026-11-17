@@ -40,6 +40,9 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   active: { label: "Active" },
   refunded: { label: "Refunded" },
   unpaid: { label: "Unpaid" },
+  // Decision 111: a refund's own status on the Sales Refunds list.
+  pending: { label: "Pending", warn: true },
+  failed: { label: "Failed", warn: true },
   frozen: { label: "Paused" },
   // retention task status (Decision 78)
   open: { label: "To contact", warn: true },

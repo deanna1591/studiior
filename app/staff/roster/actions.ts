@@ -582,3 +582,18 @@ export async function setAlwaysRuns(_prev: AlwaysRunsState, fd: FormData): Promi
       : "Back to flex — it runs only if it reaches its minimum.",
   };
 }
+
+// Decision 26(e): the front desk and up release a payment hold at once.
+export async function releaseHold(
+  bookingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("release_hold", { p_booking_id: bookingId });
+  if (error) {
+    if (error.code === "PT403") return { ok: false, error: "Only the front desk and up release a hold." };
+    if (error.code === "PT409") return { ok: false, error: "That is not a payment hold." };
+    return { ok: false, error: "Could not release the hold." };
+  }
+  revalidatePath("/roster/[occurrenceId]", "page");
+  return { ok: true };
+}

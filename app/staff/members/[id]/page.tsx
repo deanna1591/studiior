@@ -27,6 +27,7 @@ import MemberDangerZone from "./danger";
 import EditPhone from "@/components/staff/edit-phone";
 import { BookClassFromProfile } from "@/components/staff/book-member";
 import ToastHost from "@/components/staff/toast-host";
+import { RefundSheet } from "@/components/staff/refund-sheet";
 import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
@@ -246,9 +247,9 @@ export default async function MemberDetail({
   const hostGone = !!gp?.members && (!!gp.members.deleted_at || !!gp.members.merged_into);
 
   // Decision 103(e): the Reservation fee card + Credits split.
-  type ResvFee = { payment_id: string; paid_at: string | null; fee_cents: number;
+  type ResvFee = { payment_id: string | null; paid_at: string | null; fee_cents: number;
     currency: string; class_name: string; occurrence_start: string | null;
-    state: string; state_at: string | null };
+    state: string; state_at: string | null; method: string | null; reference: string | null };
   const resvFeeRows = (resvFees as ResvFee[] | null) ?? [];
   const resvCr = (resvCredits as { amount_cents: number; used_cents: number; currency: string }[] | null) ?? [];
   const resvAvail = resvCr.reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
@@ -263,10 +264,14 @@ export default async function MemberDetail({
   const resvStateLine = (f: ResvFee) => {
     switch (f.state) {
       case "held": return "held for this class";
+      case "covering": return "covered by credit";
       case "credited": return f.state_at ? `credited back on ${dStr(f.state_at)}` : "credited back";
+      case "returned": return f.state_at ? `credit returned on ${dStr(f.state_at)}` : "credit returned";
       case "kept": return "kept (no-show or late cancel)";
       case "used": return "used as credit";
-      case "refunded": return f.state_at ? `refunded on ${dStr(f.state_at)}` : "refunded";
+      case "refunded":
+        return (f.state_at ? `refunded on ${dStr(f.state_at)}` : "refunded")
+          + (f.reference ? ` · ref ${f.reference}` : "");
       default: return f.state;
     }
   };
@@ -522,41 +527,56 @@ export default async function MemberDetail({
                 </Empty>
               ) : (
                 <Rows>
-                  {(payments ?? []).map((p) => (
-                    <div key={p.id} className="flex items-start justify-between gap-4 px-3 py-2">
-                      <span className="min-w-0">
-                        <span className="block truncate text-[13px] leading-[18px] text-ink">
-                          {p.description ?? "Payment"}
-                        </span>
-                        <span className="block text-[11px] leading-4 text-ink-3">
-                          {d(p.paid_at ?? p.created_at)}
-                          {/* How the money arrived, which is the whole point of
-                              recording it: this is what the studio reconciles
-                              against their own books. */}
-                          {p.provider === "manual" && p.method && (
-                            <> · {p.method.replace("_", " ")}
-                              {p.method_note ? ` (${p.method_note})` : ""}</>
-                          )}
-                          {p.card_brand && <> · {p.card_brand} ····{p.card_last4}</>}
-                          {p.provider === "xendit" && <> · Xendit</>}
-                          {p.reference && <> · ref {p.reference}</>}
-                          {p.status !== "succeeded" && <> · {p.status.replace("_", " ")}</>}
-                          {p.refunded_cents > 0 && p.status === "partially_refunded" && (
-                            <> · {formatMoney(p.refunded_cents, p.currency)} back</>
-                          )}
-                        </span>
-                        {p.failure_message && (
-                          <span className="mt-0.5 block text-[11px] leading-4 text-ink">
-                            {p.failure_message}
+                  {(payments ?? []).map((p) => {
+                    // Decision 111: a succeeded or partly-refunded payment with
+                    // money still on it can be refunded from here.
+                    const remaining = p.amount_cents - (p.refunded_cents ?? 0);
+                    const refundable = manager
+                      && (p.status === "succeeded" || p.status === "partially_refunded")
+                      && remaining > 0;
+                    return (
+                    <div key={p.id} className="px-3 py-2">
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] leading-[18px] text-ink">
+                            {p.description ?? "Payment"}
                           </span>
-                        )}
-                      </span>
-                      <span className={`num shrink-0 text-[13px] ${
-                        p.status === "succeeded" ? "text-ink" : "text-ink-3 line-through"}`}>
-                        {formatMoney(p.amount_cents, p.currency)}
-                      </span>
+                          <span className="block text-[11px] leading-4 text-ink-3">
+                            {d(p.paid_at ?? p.created_at)}
+                            {/* How the money arrived, which is the whole point of
+                                recording it: this is what the studio reconciles
+                                against their own books. */}
+                            {p.provider === "manual" && p.method && (
+                              <> · {p.method.replace("_", " ")}
+                                {p.method_note ? ` (${p.method_note})` : ""}</>
+                            )}
+                            {p.card_brand && <> · {p.card_brand} ····{p.card_last4}</>}
+                            {p.provider === "xendit" && <> · Xendit</>}
+                            {p.reference && <> · ref {p.reference}</>}
+                            {p.status !== "succeeded" && <> · {p.status.replace("_", " ")}</>}
+                            {p.refunded_cents > 0 && p.status === "partially_refunded" && (
+                              <> · {formatMoney(p.refunded_cents, p.currency)} back</>
+                            )}
+                          </span>
+                          {p.failure_message && (
+                            <span className="mt-0.5 block text-[11px] leading-4 text-ink">
+                              {p.failure_message}
+                            </span>
+                          )}
+                        </span>
+                        <span className={`num shrink-0 text-[13px] ${
+                          p.status === "succeeded" ? "text-ink" : "text-ink-3 line-through"}`}>
+                          {formatMoney(p.amount_cents, p.currency)}
+                        </span>
+                      </div>
+                      {refundable && (
+                        <RefundSheet memberId={params.id} paymentId={p.id}
+                          remainingCents={remaining} currency={p.currency}
+                          isXendit={p.provider === "xendit"} />
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </Rows>
               )}
             </section>
@@ -695,15 +715,29 @@ export default async function MemberDetail({
                 <Empty quiet>No reservation fees yet.</Empty>
               ) : (
                 <Rows>
-                  {resvFeeRows.map((f) => (
-                    <div key={f.payment_id} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
-                      <span className="min-w-0 truncate text-[12px] leading-4 text-ink-2">
-                        {f.class_name}
-                        <span className="ml-1.5 text-ink-3">{resvStateLine(f)}</span>
-                      </span>
-                      <span className="num shrink-0 text-[12px] text-ink">{formatMoney(f.fee_cents, f.currency)}</span>
+                  {resvFeeRows.map((f, i) => {
+                    // Decision 111: a paid fee still holding its money (held, kept
+                    // or credited-not-used) can be refunded. A fee is collected
+                    // through Xendit by construction of Decision 103's flow, so
+                    // that is the default; the sheet lets staff switch.
+                    const refundable = manager && !!f.payment_id
+                      && (f.state === "held" || f.state === "kept" || f.state === "credited");
+                    return (
+                    <div key={f.payment_id ?? `cov:${i}`} className="px-3 py-1.5">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 truncate text-[12px] leading-4 text-ink-2">
+                          {f.class_name}
+                          <span className="ml-1.5 text-ink-3">{resvStateLine(f)}</span>
+                        </span>
+                        <span className="num shrink-0 text-[12px] text-ink">{formatMoney(f.fee_cents, f.currency)}</span>
+                      </div>
+                      {refundable && (
+                        <RefundSheet memberId={params.id} paymentId={f.payment_id!}
+                          remainingCents={f.fee_cents} currency={f.currency} isXendit={true} />
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </Rows>
               )}
             </section>
