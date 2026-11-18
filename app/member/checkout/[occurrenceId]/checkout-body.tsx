@@ -29,7 +29,7 @@ export type CheckoutPlanRow = {
 export default function CheckoutBody({
   occId, className, whenLabel, instructorFirst, costLine, covered,
   plans, guestAvailable, canInviteGuest, deskPayAvailable, payeeNoticeName, studioName,
-  creditCents,
+  creditCents, creditSource,
 }: {
   occId: string;
   className: string;
@@ -44,6 +44,7 @@ export default function CheckoutBody({
   payeeNoticeName: string | null;
   studioName: string;
   creditCents: number;
+  creditSource?: "gift" | "reservation" | "both";
 }) {
   // Decision 67(b): when online payments settle to an account under a different
   // legal name, say so before the member leaves for Xendit. Blank = no line.
@@ -70,6 +71,11 @@ export default function CheckoutBody({
   }
 
   const deskSelected = selected?.type === "drop_in";
+  // Decision 106 polish: when credit covers the whole price the total is zero;
+  // the primary action completes the purchase (103f: a source-credit payment,
+  // no Xendit) and the desk option has nothing to pay for.
+  const net = selected ? netTotalCents(creditCents, selected.price_cents) : null;
+  const fullyCovered = net === 0;
 
   return (
     <>
@@ -136,7 +142,7 @@ export default function CheckoutBody({
                 <span className="m-sub text-ink-2">{selected.name}</span>
                 <span className="num text-[15px] text-ink">{formatMoney(selected.price_cents, selected.currency)}</span>
               </div>
-              <CreditApplied creditCents={creditCents} priceCents={selected.price_cents} currency={selected.currency} />
+              <CreditApplied creditCents={creditCents} priceCents={selected.price_cents} currency={selected.currency} creditSource={creditSource} />
               <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2">
                 <span className="text-[15px] font-semibold text-ink">Total</span>
                 <span className="num text-[17px] font-semibold text-ink">{formatMoney(netTotalCents(creditCents, selected.price_cents), selected.currency)}</span>
@@ -146,34 +152,50 @@ export default function CheckoutBody({
 
           {/* 5. Buttons */}
           <div className="mt-5">
-            {payeeLine && <p className="m-sub mb-3 text-ink-3">{payeeLine}</p>}
-            <button
-              onClick={() => { haptic("tap"); setSheetOpen(true); }}
-              disabled={!selected}
-              style={accentSolid()}
-              className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60">
-              Continue to pay
-            </button>
-
-            {deskSelected && deskPayAvailable ? (
+            {!fullyCovered && payeeLine && <p className="m-sub mb-3 text-ink-3">{payeeLine}</p>}
+            {fullyCovered ? (
+              // Credit covers the whole total: no card, no desk — just finish.
+              <form action={pay}>
+                <input type="hidden" name="occurrence_id" value={occId} />
+                <input type="hidden" name="plan_id" value={selected?.id ?? ""} />
+                <CompleteSubmit />
+                {payState && !payState.ok && (
+                  <p className="m-sub mt-2 text-center text-coral">
+                    {payState.message ?? "That didn’t go through. Please try again."}
+                  </p>
+                )}
+              </form>
+            ) : (
               <>
-                <button onClick={onPayAtDesk} disabled={deskPending}
-                        className="m-press mt-3 w-full rounded-xl px-4 py-3 text-[15px] font-semibold text-ink disabled:opacity-60"
-                        style={{ background: "var(--accent-chip)" }}>
-                  {deskPending ? "One moment…" : "Pay at the desk"}
+                <button
+                  onClick={() => { haptic("tap"); setSheetOpen(true); }}
+                  disabled={!selected}
+                  style={accentSolid()}
+                  className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60">
+                  Continue to pay
                 </button>
-                {deskState && "error" in deskState && (
-                  <p className="m-sub mt-2 text-center text-coral">{deskState.error}</p>
+
+                {deskSelected && deskPayAvailable ? (
+                  <>
+                    <button onClick={onPayAtDesk} disabled={deskPending}
+                            className="m-press mt-3 w-full rounded-xl px-4 py-3 text-[15px] font-semibold text-ink disabled:opacity-60"
+                            style={{ background: "var(--accent-chip)" }}>
+                      {deskPending ? "One moment…" : "Pay at the desk"}
+                    </button>
+                    {deskState && "error" in deskState && (
+                      <p className="m-sub mt-2 text-center text-coral">{deskState.error}</p>
+                    )}
+                  </>
+                ) : (
+                  // Decision 73c: desk pay off for this member (or a non-drop-in is
+                  // selected, which is never a desk payment) — tell them to pay online.
+                  !deskPayAvailable && (
+                    <p className="m-sub mt-3 text-center text-ink-3">
+                      Pay online to book. Paying at the desk is not available on this account.
+                    </p>
+                  )
                 )}
               </>
-            ) : (
-              // Decision 73c: desk pay off for this member (or a non-drop-in is
-              // selected, which is never a desk payment) — tell them to pay online.
-              !deskPayAvailable && (
-                <p className="m-sub mt-3 text-center text-ink-3">
-                  Pay online to book. Paying at the desk is not available on this account.
-                </p>
-              )
             )}
           </div>
 
@@ -229,6 +251,17 @@ function PaySubmit({ amount }: { amount: string }) {
             style={accentSolid()}
             className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60">
       {pending ? "Opening…" : `Pay ${amount}`}
+    </button>
+  );
+}
+
+function CompleteSubmit() {
+  const { pending } = useFormStatus();
+  return (
+    <button disabled={pending} onClick={() => haptic("tap")}
+            style={accentSolid()}
+            className="m-action m-press w-full rounded-xl px-4 text-[16px] font-semibold disabled:opacity-60">
+      {pending ? "One moment…" : "Complete"}
     </button>
   );
 }

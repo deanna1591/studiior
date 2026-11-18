@@ -24,7 +24,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
     await memberScreen();
   const occId = params.occurrenceId;
 
-  const [{ data: occ }, { data: covers }, { data: catalogue }, { count: activeGuests }, { data: introCfg }, { data: introWin }] =
+  const [{ data: occ }, { data: covers }, { data: catalogue }, { count: activeGuests }, { data: introCfg }, { data: introWin }, { data: credits }] =
     await Promise.all([
       // RLS occ_member_read: a scheduled, visible class only — notFound otherwise,
       // the same answer the class page gives.
@@ -45,9 +45,26 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
       supabase.from("studio_settings").select("intro_offer_plan_id, intro_offer_exclusive")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
+      // Decision 106 polish: the member's own credit, split by source, so the
+      // checkout line can read "gift credit" or "reservation credit" by name.
+      // member_credits_self_read scopes this to the signed-in member.
+      supabase.from("member_credits").select("reason, amount_cents, used_cents")
+        .eq("member_id", ctx.memberId).is("voided_at", null),
     ]);
 
   if (!occ || occ.status !== "scheduled") notFound();
+
+  // Which source(s) make up the member's credit. Gift is consumed first (103f),
+  // but the label only reflects which balances exist: gift only, reservation
+  // only, or both.
+  const creditRows = (credits ?? []) as { reason: string; amount_cents: number; used_cents: number }[];
+  const giftCents = creditRows.filter((c) => c.reason === "gift_credit").reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
+  const reservationCents = creditRows.filter((c) => c.reason !== "gift_credit").reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
+  const creditSource: "gift" | "reservation" | "both" | undefined =
+    giftCents > 0 && reservationCents > 0 ? "both"
+    : giftCents > 0 ? "gift"
+    : reservationCents > 0 ? "reservation"
+    : undefined;
 
   const covered = covers === true;
   const introActive = ((introWin as { active?: boolean } | null)?.active) === true;
@@ -93,6 +110,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
         payeeNoticeName={settings.payeeNoticeName}
         studioName={studioName}
         creditCents={settings.reservationCreditCents}
+        creditSource={creditSource}
       />
     </MemberShell>
   );

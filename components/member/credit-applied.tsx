@@ -12,16 +12,19 @@ import { creditOnCheckout, creditLines, netTotalCents } from "@/lib/reservation-
  * append "You pay {net}." so the member reads the net after the credit.
  */
 export default function CreditApplied({
-  creditCents, priceCents, currency, className, showNet = false,
+  creditCents, priceCents, currency, className, showNet = false, creditSource,
 }: {
   creditCents: number;
   priceCents: number;
   currency: string;
   className?: string;
   showNet?: boolean;
+  // Decision 106: name the credit by source on the checkout. Omitted elsewhere,
+  // so the plan/shop/buy surfaces keep the plain "reservation credit" wording.
+  creditSource?: "gift" | "reservation" | "both";
 }) {
   const { applied, remaining } = creditOnCheckout(creditCents, priceCents);
-  const lines = creditLines(applied, remaining, (c: number) => formatMoney(c, currency));
+  const lines = creditLines(applied, remaining, (c: number) => formatMoney(c, currency), creditSource);
   if (lines.length === 0) return null;
   return (
     <div className={className ?? "mt-2 text-[13px] text-lime-text"}>

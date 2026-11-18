@@ -7,5 +7,6 @@ export function netTotalCents(creditCents: number, priceCents: number): number;
 export function creditLines(
   applied: number,
   remaining: number,
-  fmt: (cents: number) => string
+  fmt: (cents: number) => string,
+  source?: "gift" | "reservation" | "both"
 ): string[];

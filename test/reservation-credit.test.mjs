@@ -39,6 +39,21 @@ test("lines: applied + remainder (full cover with leftover)", () => {
   ]);
 });
 
+test("lines: Decision 106 — named by source", () => {
+  const { applied, remaining } = creditOnCheckout(1500, 14000);
+  // Omitted source keeps the original wording (the non-checkout callers).
+  assert.deepEqual(creditLines(applied, remaining, peso), ["₱15 reservation credit applied."]);
+  assert.deepEqual(creditLines(applied, remaining, peso, "reservation"), ["₱15 reservation credit applied."]);
+  assert.deepEqual(creditLines(applied, remaining, peso, "gift"), ["₱15 gift credit applied."]);
+  assert.deepEqual(creditLines(applied, remaining, peso, "both"), ["₱15 credit applied."]);
+  // The remainder line is source-agnostic.
+  const full = creditOnCheckout(15000, 14000);
+  assert.deepEqual(creditLines(full.applied, full.remaining, peso, "gift"), [
+    "₱140 gift credit applied.",
+    "₱10 stays on your account.",
+  ]);
+});
+
 test("netTotalCents", () => {
   // Partial: price 14000, credit 5000 -> applied 5000, net 9000.
   assert.equal(netTotalCents(5000, 14000), 9000);

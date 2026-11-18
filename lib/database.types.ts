@@ -3465,6 +3465,7 @@ export type Database = {
           bio: string | null
           certifications: Json
           color: string | null
+          core_classes_per_day: number | null
           core_weekly_cap: number | null
           created_at: string
           display_name: string
@@ -3482,6 +3483,7 @@ export type Database = {
           bio?: string | null
           certifications?: Json
           color?: string | null
+          core_classes_per_day?: number | null
           core_weekly_cap?: number | null
           created_at?: string
           display_name: string
@@ -3499,6 +3501,7 @@ export type Database = {
           bio?: string | null
           certifications?: Json
           color?: string | null
+          core_classes_per_day?: number | null
           core_weekly_cap?: number | null
           created_at?: string
           display_name?: string
@@ -9697,6 +9700,26 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_false: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raise: {
+        Args: { code: string; label: string; sql: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9819,6 +9842,14 @@ export type Database = {
         Args: { p_membership_id: string; p_until: string }
         Returns: Json
       }
+      g106: { Args: { studio: string }; Returns: Json }
+      g106_coach: { Args: { gi: Json; instr: string }; Returns: Json }
+      g106_day: {
+        Args: { dow: number; gi: Json; instr: string }
+        Returns: Json
+      }
+      g106_slot: { Args: { gi: Json; series: string }; Returns: Json }
+      g106_week: { Args: never; Returns: string }
       generate_all_occurrences: { Args: never; Returns: Json }
       generate_all_occurrences_for: {
         Args: { p_studio_id: string }
@@ -9866,6 +9897,14 @@ export type Database = {
           p_plan_id: string
           p_reason?: string
         }
+        Returns: Json
+      }
+      growth_apply: {
+        Args: { p_occurrence_id: string; p_scope: string; p_tier: string }
+        Returns: Json
+      }
+      growth_insights: {
+        Args: { p_studio_id: string; p_week: string }
         Returns: Json
       }
       guarantee_report: {
@@ -11388,6 +11427,10 @@ export type Database = {
           starts_at: string
         }[]
       }
+      seed_instructor_core_budgets: {
+        Args: { p_studio_id?: string }
+        Returns: Json
+      }
       self_check_in: {
         Args: {
           p_accuracy_m?: number
@@ -11587,6 +11630,10 @@ export type Database = {
       set_instructor_class_types: {
         Args: { p_class_type_ids: string[]; p_instructor_id: string }
         Returns: number
+      }
+      set_instructor_core_budget: {
+        Args: { p_instructor_id: string; p_n: number }
+        Returns: Json
       }
       set_instructor_rate: {
         Args: {
@@ -11967,6 +12014,11 @@ export type Database = {
       sweep_flex_rescue: { Args: { p_now?: string }; Returns: Json }
       sweep_free_duplicate_holds: { Args: never; Returns: Json }
       sweep_free_reservation_dues: { Args: { p_now?: string }; Returns: Json }
+      sweep_growth_insights: {
+        Args: { p_studio_id: string; p_week: string }
+        Returns: Json
+      }
+      sweep_growth_insights_all: { Args: { p_now?: string }; Returns: Json }
       sweep_guest_waivers: { Args: never; Returns: Json }
       sweep_instructor_class_reminders: {
         Args: { p_now?: string }

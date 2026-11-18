@@ -260,6 +260,55 @@ export type TierSuggestion = {
   sentence: string;
 };
 
+/**
+ * Decision 106. Growth insights for the week — the coaches -> days -> slots tree
+ * the card and the Retention page both read, produced weekly by growth_insights
+ * and stored on the week's ai_insights row (action_payload). The page only reads
+ * the row; the service-only function is never called from here.
+ */
+export type GrowthSlot = {
+  series_id: string; occurrence_id: string; class_name: string; time: string;
+  weeks: number; collecting: boolean; collecting_label: string | null;
+  score: number; avg_booked: number; capacity: number;
+  attended_rate: number | null; waitlist: number; no_shows: number; late_cancels: number;
+  qualifies: boolean; wanted: boolean;
+  current_tier: "core" | "flex"; proposed_tier: "core" | "flex" | null;
+  action: "make_core" | "make_flex" | null;
+};
+export type GrowthDay = { dow: number; day_name: string; budget: number; unfilled: number; slots: GrowthSlot[] };
+export type GrowthCoach = { instructor_id: string; name: string; budget: number; raise_to: number | null; days: GrowthDay[] };
+export type GrowthWanted = { series_id: string; occurrence_id: string; class_name: string; instructor_name: string; time: string; day_name: string; reason: string };
+export type GrowthNudge = { member_id: string; name: string; phone: string | null; email: string | null; last_visit: string | null };
+export type GrowthPayload = {
+  week: string; flex_min: number; coaches: GrowthCoach[];
+  wanted: GrowthWanted[]; nudge: GrowthNudge[];
+  summary: { text: string; figures: unknown; allowed: string[] };
+};
+
+// This week's Monday, in the studio's own clock — the key the weekly growth
+// row is stored under and the dashboard_narrative is written for.
+export function growthMonday(timeZone: string): string {
+  const today = studioToday(timeZone); // YYYY-MM-DD, studio-local
+  const d = new Date(today + "T00:00:00Z");
+  const dow = d.getUTCDay(); // 0 Sun .. 6 Sat
+  d.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+  return d.toISOString().slice(0, 10);
+}
+
+export async function growthProposals(
+  supabase: SupabaseClient<Database>, studioId: string, monday: string,
+) {
+  const [row, narr] = await Promise.all([
+    supabase.from("ai_insights").select("action_payload")
+      .eq("studio_id", studioId).eq("type", "growth").is("subject_id", null).eq("for_date", monday)
+      .maybeSingle(),
+    supabase.rpc("dashboard_narrative", { p_studio_id: studioId, p_kind: "growth", p_for_date: monday }),
+  ]);
+  const payload = (row.data?.action_payload ?? null) as GrowthPayload | null;
+  const narrative = (narr.data ?? null) as Narrative | null;
+  return { payload, narrative, error: row.error?.message ?? null };
+}
+
 export type RevenueBlock = {
   from: string; to: string; days: number; currency: string;
   state: "ok" | "empty";

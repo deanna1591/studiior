@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { todaysBrief } from "@/lib/brief";
-import { dashboardData, narrativeFor, recentBookings, revenueWindow, studioToday } from "@/lib/dashboard";
+import { dashboardData, narrativeFor, recentBookings, revenueWindow, studioToday, growthProposals, growthMonday } from "@/lib/dashboard";
 import { searchStudio } from "@/app/staff/search-actions";
 import MorningBrief from "@/components/morning-brief";
 import InsightsPanel from "@/components/dashboard/insights-panel";
@@ -14,6 +14,7 @@ import HealthWidget from "@/components/dashboard/health-widget";
 import ActivityFeed from "@/components/dashboard/activity-feed";
 import RecentBookings from "@/components/dashboard/recent-bookings";
 import TierSuggestions from "@/components/dashboard/tier-suggestions";
+import GrowthCard from "@/components/dashboard/growth-card";
 import Tasks from "@/components/dashboard/tasks";
 import MonthSnapshot from "@/components/dashboard/month-snapshot";
 import { Block, BlockEmpty } from "@/components/dashboard/block";
@@ -63,7 +64,7 @@ export default async function Dashboard({
 
   // Two hops for the whole screen. staffScreen() is the first; everything
   // below is one batch that waits on nothing else in it.
-  const [brief, data, todays, settings, deskRecent, lowStockRes] = await Promise.all([
+  const [brief, data, todays, settings, deskRecent, lowStockRes, growth] = await Promise.all([
     manager ? todaysBrief(supabase, ctx.studioId, ctx.timeZone) : Promise.resolve(null),
     manager
       ? dashboardData(supabase, ctx.studioId, ctx.timeZone, {
@@ -94,11 +95,19 @@ export default async function Dashboard({
     !manager && deskUp ? recentBookings(supabase, ctx.studioId) : Promise.resolve(null),
     // Decision 63: products running low (desk-up; empty when nothing tracked is low).
     deskUp ? supabase.rpc("product_low_stock", { p_studio_id: ctx.studioId }) : Promise.resolve(null),
+    // Decision 106: the week's growth proposals (the weekly ai_insights row).
+    manager ? growthProposals(supabase, ctx.studioId, growthMonday(ctx.timeZone)) : Promise.resolve(null),
   ]);
   const lowStock = ((lowStockRes?.data ?? []) as { product_id: string; name: string; stock: number }[]);
 
   const showTierBlock = manager
     && ((settings?.data?.guarantees_enabled ?? false) || (settings?.data?.flex_enabled ?? false));
+
+  // Decision 106 — the growth summary: the AI paragraph when one was written,
+  // else the deterministic one, else nothing.
+  const growthSummary = growth
+    ? (growth.narrative?.state === "ok" ? growth.narrative.text : (growth.payload?.summary.text ?? null))
+    : null;
 
   const dayLabel = relativeDayName(`${today}T12:00:00Z`, ctx.timeZone)
     ?? fmtDayLong(`${today}T12:00:00Z`, ctx.timeZone);
@@ -239,6 +248,13 @@ export default async function Dashboard({
             <RecentBookings rows={data.recent} error={data.recentError} />
             {showTierBlock && <TierSuggestions rows={data.tiers} error={data.tiersError} />}
           </div>
+
+          {/* Decision 106 — grow your week (shown where the studio uses tiers). */}
+          {showTierBlock && (
+            <div className="mb-6">
+              <GrowthCard payload={growth?.payload ?? null} summary={growthSummary} error={growth?.error ?? null} />
+            </div>
+          )}
 
           {/* Decision 63 — merchandise running low. */}
           {lowStock.length > 0 && (

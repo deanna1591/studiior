@@ -2,7 +2,9 @@ import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { dayMonthParts } from "@/lib/time";
 import { AppShell, Denied } from "@/components/ui";
+import { growthProposals, growthMonday } from "@/lib/dashboard";
 import RetentionBoard, { type RetentionRow } from "./board";
+import GrowthSection from "./growth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +29,7 @@ export default async function RetentionScreen() {
   }
 
   const [{ data }, { data: outcomesData }, { data: studio }, { data: aiSetting },
-         { data: bounced }, { data: failures }] = await Promise.all([
+         { data: bounced }, { data: failures }, growth] = await Promise.all([
     supabase.rpc("retention_board", { p_studio_id: ctx.studioId }),
     supabase.rpc("retention_outcomes", { p_studio_id: ctx.studioId }),
     supabase.from("studios").select("name").eq("id", ctx.studioId).maybeSingle(),
@@ -35,6 +37,8 @@ export default async function RetentionScreen() {
     // Decision 113: the Email bounced chip, and the daily delivery check.
     supabase.from("members").select("id").eq("studio_id", ctx.studioId).neq("email_status", "valid"),
     supabase.rpc("email_delivery_failures", { p_studio_id: ctx.studioId }),
+    // Decision 106: the week's growth proposals (manager-up; applies are manager-up).
+    manager ? growthProposals(supabase, ctx.studioId, growthMonday(ctx.timeZone)) : Promise.resolve(null),
   ]);
   const bouncedSet = new Set(((bounced ?? []) as { id: string }[]).map((b) => b.id));
   const failTotal = ((failures ?? []) as { n: number }[]).reduce((s, f) => s + (f.n ?? 0), 0);
@@ -87,6 +91,7 @@ export default async function RetentionScreen() {
           {failParts.length > 0 ? ` (${failParts.join(", ")})` : ""}.
         </p>
       )}
+      {manager && <GrowthSection payload={growth?.payload ?? null} />}
       <RetentionBoard rows={rows} studioId={ctx.studioId}
         studioName={studio?.name ?? "your studio"} aiDrafts={aiDrafts} outcomes={outcomes} />
     </AppShell>
