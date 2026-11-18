@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonQuietClass } from "@/components/ui";
+import { DayTierCard } from "@/components/schedule/block-panel";
 import { guarantee, type FlexState } from "./actions";
 
 function Go() {
@@ -22,6 +23,10 @@ export default function Guarantee({ occurrenceId }: { occurrenceId: string }) {
         <input type="hidden" name="occurrence_id" value={occurrenceId} />
         <Go />
       </form>
+      {/* Decision 21(b): the Flex pending row offers both directions — Core today
+          (runs regardless) or Flex today — via set_occurrence_day_tier. These
+          rows are flex-pending, so the card starts on Flex. */}
+      <DayTierCard occurrenceId={occurrenceId} isCore={false} />
     </div>
   );
 }

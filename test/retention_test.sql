@@ -290,9 +290,9 @@ select expect_num('member cannot read ai_draft_usage (RLS)', (select count(*) fr
 reset role; select login('');
 
 -- Anon surface unchanged: none of the new RPCs are anon.
-select expect_num('anon surface stays THIRTEEN',
+select expect_num('anon surface stays FOURTEEN',
   (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon',p.oid,'execute')
-      and p.proname not like 'expect_%' and p.proname not in ('login')), 13);
+      and p.proname not like 'expect_%' and p.proname not in ('login')), 14);
 
 select 'retention_test: all assertions passed' as result;

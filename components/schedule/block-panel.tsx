@@ -435,7 +435,7 @@ function AlwaysRunsCard({ occurrenceId, on, locked }: {
  * (flex today). The DB saves the original and a flip back restores it, so the
  * buttons are symmetric and the SQL decides flip-vs-restore.
  */
-function DayTierCard({ occurrenceId, isCore }: { occurrenceId: string; isCore: boolean }) {
+export function DayTierCard({ occurrenceId, isCore }: { occurrenceId: string; isCore: boolean }) {
   const [pending, start] = useTransition();
   const [core, setCore] = useState(isCore);
   const [msg, setMsg] = useState<string | null>(null);

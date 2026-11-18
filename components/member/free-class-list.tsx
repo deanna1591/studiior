@@ -176,14 +176,15 @@ export default function FreeClassList({
                            opacity: muted && !isBooked ? 0.72 : 1 }}>
                 <Link href={`/class/${c.occurrence_id}`} className="absolute inset-0 rounded-2xl"
                       aria-label={`Open ${c.name}`} />
+                {/* Decision 22(d): the time on its own line, the class name
+                    wrapping (never truncated), the coach photo a fixed 40px
+                    circle at the top right. Checked at 360px font scale 1.3. */}
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="num whitespace-nowrap text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</span>
-                      <span className="m-body text-ink">{c.name}</span>
-                    </div>
+                    <p className="num text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</p>
+                    <p className="m-body mt-0.5 break-words text-ink">{c.name}</p>
                     <div className="m-micro mt-0.5 flex flex-wrap items-center gap-1.5 text-ink-3">
-                      <span>{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
+                      <span className="break-words">{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
                       {c.headcount > 0 && (
                         <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                               style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>

@@ -11,7 +11,7 @@
 -- on-time cancel -> credit; the credit applied at the next checkout (capped) and
 -- not twice; a refund voids the unused credit; the fee is an invoiceable payment;
 -- the existing-booking dues flow (ask once, release past the cut-off, stays
--- eligible, past-cut-off left alone). Guards + anon THIRTEEN.
+-- eligible, past-cut-off left alone). Guards + anon FOURTEEN.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -568,11 +568,11 @@ select expect_true('sample context: class_list_html is a card',
           like '%border:1px solid #E7E5E4;border-radius:8px%'));
 
 -- =============================================================================
--- 12. Anon surface EXACTLY THIRTEEN.
+-- 12. Anon surface EXACTLY FOURTEEN.
 -- =============================================================================
-select expect_num('anon surface is exactly thirteen',
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','d103_complete')), 13);
+      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','d103_complete')), 14);
 
 select 'reservation_fee_test: all assertions passed' as result;

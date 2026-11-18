@@ -192,8 +192,10 @@ export default function ClassDetailBody({
              style={{ maxWidth: "100%", objectPosition: focalPoint(type.image_focus_x, type.image_focus_y) }} />
       )}
 
-      <div className="flex items-start gap-2">
-        <h1 className="m-title text-ink">{occ.name}</h1>
+      {/* Decision 22(d): the name wraps and is never truncated; the Always runs
+          chip drops below it when there is no room (flex-wrap). */}
+      <div className="flex flex-wrap items-start gap-2">
+        <h1 className="m-title break-words text-ink">{occ.name}</h1>
         {alwaysRuns && (
           <span className="m-micro mt-1 shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
                 style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>

@@ -64,6 +64,13 @@ export async function beginXenditCheckout(
     return { ok: false, message: m || "Could not start the purchase." };
   }
 
+  // Decision 103(f): credit covered the whole total — the begin function already
+  // completed the purchase (a source-credit payment, no Xendit). Land on the
+  // success/return screen with no payment page.
+  if (purchase.amount_cents === 0) {
+    return { ok: true, url: returnTo && returnTo !== "/" ? returnTo : "/account/plan?paid=credit" };
+  }
+
   const { data: plan } = await supabase.from("membership_plans")
     .select("name").eq("id", planId).maybeSingle();
 

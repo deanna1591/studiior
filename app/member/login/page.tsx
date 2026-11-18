@@ -166,6 +166,15 @@ export default async function MemberLogin({
             Instructor? Sign in here
           </Link>
 
+          {/* Decision 110: a public way to the gift-card page, when the studio
+              sells them. No account needed to buy one. */}
+          {studio?.gift_enabled && (
+            <Link href="/gift" className="m-micro mt-3 block text-center underline underline-offset-4"
+                  style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>
+              Give a gift card
+            </Link>
+          )}
+
           {process.env.NODE_ENV === "development" && (
             <p className="m-micro mt-4 text-center"
                style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>

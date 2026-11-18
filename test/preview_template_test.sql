@@ -110,7 +110,7 @@ select expect((select r->>'html' from _n) like '%Here are the next ones%'
 select expect((select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
                 where ns.nspname = 'public'
                   and has_function_privilege('anon', p.oid, 'execute')
-                  and p.proname not like 'expect%') = 13,
-  '5 anon surface is exactly THIRTEEN');
+                  and p.proname not like 'expect%') = 14,
+  '5 anon surface is exactly FOURTEEN');
 
 rollback;

@@ -42,6 +42,8 @@ type Totals = {
   net_cents: number; studio_total_cents: number; currency: string;
   reservation_fees?: { count: number; total_cents: number };
   refunds?: { count: number; total_cents: number };
+  gift_sold?: { count: number; total_cents: number };
+  gift_redeemed?: { count: number; total_cents: number };
 };
 type Refund = {
   refund_id: string; settled_at: string | null; member_name: string;
@@ -192,6 +194,16 @@ export default async function Sales({
           {totals.refunds && totals.refunds.count > 0 && (
             <> · <span className="num text-ink">{formatMoney(totals.refunds.total_cents, totals.currency)}</span>
               {" "}refunds ({totals.refunds.count})</>
+          )}
+          {/* Decision 110: gift cards sold (cash, counted here) and gift credit
+              redeemed (not new cash — shown so the two reconcile). */}
+          {totals.gift_sold && totals.gift_sold.count > 0 && (
+            <> · <span className="num text-ink">{formatMoney(totals.gift_sold.total_cents, totals.currency)}</span>
+              {" "}gift cards sold ({totals.gift_sold.count})</>
+          )}
+          {totals.gift_redeemed && totals.gift_redeemed.count > 0 && (
+            <> · <span className="num text-ink">{formatMoney(totals.gift_redeemed.total_cents, totals.currency)}</span>
+              {" "}gift credit redeemed ({totals.gift_redeemed.count})</>
           )}
         </p>
       )}

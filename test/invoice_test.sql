@@ -125,11 +125,11 @@ select expect_text('other member PT403', as_err('88c00000-0000-0000-0000-0000000
   'select assign_invoice_no(''88c00000-0000-0000-0000-0000000000a7'')'), 'PT403');
 reset role;
 
-\echo '--- 12. anon surface is THIRTEEN ---'
-select expect_num('anon surface is thirteen',
+\echo '--- 12. anon surface is FOURTEEN ---'
+select expect_num('anon surface is fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('login','as_err','expect_text','expect_null','expect_num','inv','nextno')), 13);
+      and p.proname not in ('login','as_err','expect_text','expect_null','expect_num','inv','nextno')), 14);
 
 reset role;
 drop function login(text); drop function as_err(text,text); drop function inv(text); drop function nextno(text);

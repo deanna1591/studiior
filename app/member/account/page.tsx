@@ -34,6 +34,8 @@ export default async function Account() {
   const rows: { href: string; label: string; sub: string }[] = [
     { href: "/account/classes", label: "Your classes", sub: "Every class you have booked, and what happened" },
     { href: "/account/plan", label: "Your plan", sub: "Membership, credits, guest passes and peak classes" },
+    // Decision 110: anyone can have a gift code; the redeem screen is always here.
+    { href: "/account/redeem", label: "Redeem a gift card", sub: "Have a gift code? Add its credit to your account" },
     ...(hasProducts ? [{ href: "/shop", label: "Shop", sub: "Things the studio sells, picked up at the front desk" }] : []),
     ...(hasOrders ? [{ href: "/account/orders", label: "My orders", sub: "What you have bought, and whether it is ready" }] : []),
     // Decision 89: only when the studio has turned messages on.

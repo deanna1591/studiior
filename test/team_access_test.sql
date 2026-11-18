@@ -189,7 +189,7 @@ select expect_true('owner reads the team', :'teamok'::boolean);
 reset role;
 
 -- ===========================================================================
--- anon refused on all three write RPCs, and the surface is EXACTLY THIRTEEN
+-- anon refused on all three write RPCs, and the surface is EXACTLY FOURTEEN
 -- ===========================================================================
 do $$
 declare got text;
@@ -225,7 +225,7 @@ begin
   select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not like 'expect%';
-  perform expect_num('anon surface is exactly thirteen', n::bigint, 13);
+  perform expect_num('anon surface is exactly fourteen', n::bigint, 14);
 end $$;
 
 \echo 'team_access_test: all assertions passed'

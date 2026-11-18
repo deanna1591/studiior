@@ -186,10 +186,10 @@ begin
   perform expect_text('74 unique: two live plans cannot share a sort_order', st, 'UNIQUE');
 end $$;
 
--- ---- 9. Anon surface stays EXACTLY THIRTEEN ----------------------------------
-select expect_num('74: anon surface is exactly thirteen',
+-- ---- 9. Anon surface stays EXACTLY FOURTEEN ----------------------------------
+select expect_num('74: anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
      where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 13);
+       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 14);
 
 do $$ begin raise notice 'ALL DECISION 74 ASSERTIONS PASSED'; end $$;

@@ -146,7 +146,7 @@ const FREE_FIRST_REASONS: Record<string, string> = {
   // Decision 98: one free class per person (a same-person twin already had free).
   duplicate: "It looks like you've had a free class with us before. You can still book this one by paying.",
   peak_not_allowed: "Free classes aren't offered at peak times. You can still book this one paying.",
-  flex_not_allowed: "Your free class is for our core classes — pick one of those.",
+  flex_not_allowed: "Free first classes are core classes only. Pick a core class.",
   not_trial_class: "This class isn't open for free first classes. Pick another one.",
   free_first_closed_here: "This class isn't open to free first classes. Pick another one.",
   free_seats_full: "This class is full for free classes. Pick another one.",
@@ -497,6 +497,11 @@ export async function finishSignup(_prev: ClaimState, fd: FormData): Promise<Cla
     // update to the caller's own row for this studio.
     const marketing = String(fd.get("marketing_opt_in") ?? "") === "on";
     await supabase.from("members").update({ marketing_opt_in: marketing }).eq("studio_id", studioId);
+    // Decision 110: an optional gift code entered at signup is redeemed now the
+    // member exists. Best-effort — a bad code never blocks entry; they can redeem
+    // it later under Account.
+    const giftCode = String(fd.get("gift_code") ?? "").trim();
+    if (giftCode) await supabase.rpc("gift_card_redeem", { p_code: giftCode });
   }
   if (r?.failure_reason) {
     const said: Record<string, string> = {

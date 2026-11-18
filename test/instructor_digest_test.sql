@@ -167,10 +167,10 @@ select sweep_commitments();
 select expect_num('still exactly ONE daily digest after a second sweep',
   (select count(*) from notifications where recipient_type = 'staff' and user_id = 'd101d101-0000-0000-0000-0000000000b1' and template_key = 'instructor_daily_digest'), 1);
 
--- --- Anon surface EXACTLY THIRTEEN (suite helpers excluded) -------------------
-select expect_num('anon surface is exactly thirteen',
+-- --- Anon surface EXACTLY FOURTEEN (suite helpers excluded) -------------------
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%'), 13);
+      and p.proname not like 'expect\_%'), 14);
 
 \echo 'instructor_digest_test: all assertions passed'

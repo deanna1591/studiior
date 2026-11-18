@@ -419,11 +419,11 @@ select expect_text('83a comp: a money row has null payment_source and is_paid',
 reset role;
 
 -- =============================================================================
--- D. Anon surface stays EXACTLY THIRTEEN
+-- D. Anon surface stays EXACTLY FOURTEEN
 -- =============================================================================
-select expect_num('75a: anon surface is exactly thirteen',
+select expect_num('75a: anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
      where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 13);
+       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 14);
 
 do $$ begin raise notice 'ALL DECISION 75a ASSERTIONS PASSED'; end $$;

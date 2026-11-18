@@ -236,10 +236,10 @@ select expect_num('73b non-covering: the pack keeps all 5 credits (none consumed
 select expect_num('73b non-covering: no booking ledger row written',
   (select count(*) from credit_ledger where booking_id='d73b0000-0000-0000-0000-0000000b7001' and reason='booking'), 0);
 
--- ---- 9. Anon surface stays EXACTLY THIRTEEN ----------------------------------
-select expect_num('73b: anon surface is exactly thirteen',
+-- ---- 9. Anon surface stays EXACTLY FOURTEEN ----------------------------------
+select expect_num('73b: anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
      where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 13);
+       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 14);
 
 do $$ begin raise notice 'ALL DECISION 73b ASSERTIONS PASSED'; end $$;

@@ -45,6 +45,12 @@ export async function buyProduct(_prev: BuyState, fd: FormData): Promise<BuyStat
     return { ok: false, message: m || "Could not start the purchase." };
   }
 
+  // Decision 103(f): credit covered the whole order — the begin function already
+  // completed it (source-credit payment, no Xendit). Land on the order screen.
+  if (purchase.amount_cents === 0) {
+    return { ok: true, url: `${origin}/purchase/${purchase.purchase_id}` };
+  }
+
   const { data: cctx, error: cErr } = await supabase.rpc("xendit_checkout_context", {
     p_studio_id: ctx.studioId,
   });

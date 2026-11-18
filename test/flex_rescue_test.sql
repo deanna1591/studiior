@@ -208,10 +208,10 @@ select expect_num('the member statement carries a rescue_email row',
   (select count(*) from member_activity('95f10000-0000-0000-0000-0000000000b1', current_date - 1, current_date + 30)
     where kind = 'rescue_email'), 1);
 
--- anon stays THIRTEEN
-select expect_num('anon surface is exactly thirteen',
+-- anon stays FOURTEEN
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('login','expect_text','expect_true','expect_num','move_reason')), 13);
+      and p.proname not in ('login','expect_text','expect_true','expect_num','move_reason')), 14);
 
 select 'ALL FLEX RESCUE TESTS PASSED' as result;

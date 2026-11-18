@@ -134,7 +134,7 @@ export default async function MemberDetail({
     // separately from class credits).
     supabase.rpc("member_reservation_fees", { p_member_id: params.id }),
     supabase.from("member_credits")
-      .select("amount_cents, used_cents, currency")
+      .select("amount_cents, used_cents, currency, reason")
       .eq("member_id", params.id).is("voided_at", null),
   ]);
 
@@ -252,8 +252,11 @@ export default async function MemberDetail({
     currency: string; class_name: string; occurrence_start: string | null;
     state: string; state_at: string | null; method: string | null; reference: string | null };
   const resvFeeRows = (resvFees as ResvFee[] | null) ?? [];
-  const resvCr = (resvCredits as { amount_cents: number; used_cents: number; currency: string }[] | null) ?? [];
-  const resvAvail = resvCr.reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
+  const resvCr = (resvCredits as { amount_cents: number; used_cents: number; currency: string; reason: string }[] | null) ?? [];
+  // Decision 110: gift credit is its own member_credits reason; split it out so
+  // the profile Credits card shows reservation credit and gift credit apart.
+  const resvAvail = resvCr.filter((c) => c.reason !== "gift_credit").reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
+  const giftAvail = resvCr.filter((c) => c.reason === "gift_credit").reduce((s, c) => s + (c.amount_cents - c.used_cents), 0);
   const resvCcy = resvCr[0]?.currency ?? resvFeeRows[0]?.currency ?? "PHP";
   // d() returns JSX (monospaced numeral), so for this plain-string meta line we
   // build the date as text — interpolating d() into a template literal yields
@@ -705,6 +708,12 @@ export default async function MemberDetail({
               <p className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2 text-[12px] leading-4 text-ink-2">
                 <span>Reservation credit</span>
                 <span className="num text-ink">{formatMoney(resvAvail, resvCcy)}</span>
+              </p>
+            )}
+            {giftAvail > 0 && (
+              <p className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2 text-[12px] leading-4 text-ink-2">
+                <span>Gift credit</span>
+                <span className="num text-ink">{formatMoney(giftAvail, resvCcy)}</span>
               </p>
             )}
           </section>

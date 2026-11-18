@@ -200,9 +200,9 @@ select expect_raise('a member cannot run the backfill', '42501', 'select backfil
 select expect_raise('a member cannot run the re-queue', '42501', 'select requeue_rate_limit_drops()');
 reset role;
 
-\echo '==== 9. anon stays EXACTLY THIRTEEN ===='
-select expect_num('anon surface is thirteen', (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
+\echo '==== 9. anon stays EXACTLY FOURTEEN ===='
+select expect_num('anon surface is fourteen', (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
    where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-     and p.proname not like 'expect_%' and p.proname not in ('fake_resp')), 13);
+     and p.proname not like 'expect_%' and p.proname not in ('fake_resp')), 14);
 
 \echo 'email_delivery_test: all assertions passed'

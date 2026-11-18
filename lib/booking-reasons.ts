@@ -65,7 +65,7 @@ export const REASONS: Record<string, string> = {
   late_cancel: "They cancelled their free class late, so it counts as used.",
   not_enabled: "Free first classes are off for this studio.",
   // Decision 30(e): free-first on a flex class is off (core-only), no override given.
-  flex_not_allowed: "This class isn't open for a free first class.",
+  flex_not_allowed: "Free first classes are core classes only. Pick a core class, or allow it on this flex class.",
   not_trial_class: "This class isn't open for a free first class.",
   free_first_closed_here: "This class isn't open for a free first class.",
   free_seats_full: "The free first-class spots for this class are full.",

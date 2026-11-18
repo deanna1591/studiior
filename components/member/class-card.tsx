@@ -67,43 +67,42 @@ export default function ClassCard({
   coachAvatar?: string | null;
 }) {
   const muted = dimmed || statusTone === "full";
-  // Decision 103(c): stacked rows never truncate the name/coach; the time keeps
-  // its own fixed column.
-  const nameTrunc = stackAction ? "" : "truncate";
+  // Decision 22(d): the accent bar sits OUTSIDE the content (flush at the card's
+  // left edge), the time is its own line that grows with the text, the class
+  // name wraps to two lines and is NEVER truncated, the Always runs chip drops
+  // below the name when there is no room (flex-wrap), and the coach photo is a
+  // fixed 40px circle at the top right. Checked at 360px with font scale 1.3.
   return (
-    <li className={`m-card relative py-4 pl-4 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}
+    <li className={`m-card relative overflow-hidden py-4 pl-5 pr-4 ${booked ? "m-card-booked" : ""} ${dimmed ? "opacity-90" : ""}`}
         style={alwaysRuns ? { background: "var(--accent-chip)" } : undefined}>
-      <Link href={href} className="absolute inset-0 rounded-[22px]" aria-label={`Open ${name}`}>
+      {/* The accent bar, flush outside the content. */}
+      <span aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1 rounded-r"
+            style={{ background: muted ? "var(--line-2)" : "var(--accent-solid)" }} />
+      <Link href={href} className="absolute inset-0" aria-label={`Open ${name}`}>
         <span className="sr-only">Open {name}</span>
       </Link>
 
-      <div className="relative flex items-stretch gap-3">
-        <span aria-hidden className={`m-stripe ${muted ? "m-stripe-muted" : ""}`} />
-
-        {/* A fixed column, so six cards line their times up on one edge, and the
-            time always stays on one line. */}
-        <div className="pointer-events-none w-[56px] shrink-0 pt-0.5">
-          <p className="num m-time-lg whitespace-nowrap text-ink">{startLabel}</p>
-          {tag}
-          {endLabel && <p className="num m-dur mt-0.5 whitespace-nowrap text-ink-3">{endLabel}</p>}
-        </div>
-
+      <div className="relative flex items-start gap-3">
         <div className="pointer-events-none min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className={`m-name ${nameTrunc} ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
+          {/* The time on its own line, growing with the text. */}
+          <p className="num m-time-lg text-ink">
+            {startLabel}{endLabel ? <span className="text-ink-3"> – {endLabel}</span> : null}
+            {tag ? <span className="ml-2 align-middle">{tag}</span> : null}
+          </p>
+
+          {/* The name wraps and is never truncated; the chip drops below it. */}
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className={`m-name break-words ${muted ? "text-ink-3" : "text-ink"}`}>{name}</p>
             {alwaysRuns && (
-              <span className="m-micro shrink-0 whitespace-nowrap rounded-full px-2 py-0.5"
+              <span className="m-micro whitespace-nowrap rounded-full px-2 py-0.5"
                     style={{ background: "var(--surface)", color: "var(--lime-text)" }}>
                 Always runs
               </span>
             )}
-            {instructor && (
-              <span className="ml-auto shrink-0">
-                <Avatar name={instructor} url={coachAvatar} size={40} />
-              </span>
-            )}
           </div>
-          <p className={`m-subtle mt-0.5 ${nameTrunc} text-ink-3`}>
+
+          <p className="m-subtle mt-0.5 break-words text-ink-3">
             {/* Absent, not "TBC". Decision 17: an open shift reads as a normal
                 class to a member, and a row saying nobody has agreed to teach it
                 is a doubt they can do nothing with. */}
@@ -123,22 +122,25 @@ export default function ClassCard({
               {statusLabel}
             </span>
           </p>
-          {/* Decision 103(c): the flex "we'll confirm by" line keeps its OWN
-              line under the status on a pay-to-keep row. */}
-          {extraLine && <p className="m-subtle mt-0.5 text-ink-3">{extraLine}</p>}
+          {extraLine && <p className="m-subtle mt-0.5 break-words text-ink-3">{extraLine}</p>}
         </div>
 
-        {/* Beside the text for a short, single-word action (Book). relative z-10
-            lifts it above the overlay Link so the tap fires. */}
+        {/* The coach photo: a fixed 40px circle at the top right. */}
+        {instructor && (
+          <span className="pointer-events-none shrink-0">
+            <Avatar name={instructor} url={coachAvatar} size={40} />
+          </span>
+        )}
+
+        {/* A short single-word action (Book) sits beside the text. */}
         {!stackAction && (
           <div className="pointer-events-auto relative z-10 flex shrink-0 items-center">{action}</div>
         )}
       </div>
 
-      {/* Decision 103(c): a multi-word or booked/held action sits on its own
-          full-width line below the text, so nothing above it is squeezed. */}
+      {/* A multi-word or booked/held action sits full-width below the text. */}
       {stackAction && action && (
-        <div className="pointer-events-auto relative z-10 mt-3 pl-[68px]">{action}</div>
+        <div className="pointer-events-auto relative z-10 mt-3">{action}</div>
       )}
     </li>
   );

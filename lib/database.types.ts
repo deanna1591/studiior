@@ -2320,54 +2320,117 @@ export type Database = {
       }
       gift_cards: {
         Row: {
-          balance_cents: number
-          code_hash: string
-          code_last4: string
+          amount_cents: number | null
+          balance_cents: number | null
+          buyer_email: string | null
+          buyer_member_id: string | null
+          buyer_name: string | null
+          code: string | null
+          code_hash: string | null
+          code_last4: string | null
           created_at: string
+          credit_id: string | null
+          currency: string | null
+          delivery_date: string | null
           expires_on: string | null
           id: string
-          initial_amount_cents: number
+          initial_amount_cents: number | null
+          issued_at: string | null
           message: string | null
           purchaser_member_id: string | null
           recipient_email: string | null
           recipient_name: string | null
+          redeemed_at: string | null
+          redeemed_by_member_id: string | null
           status: string
           studio_id: string
           updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
-          balance_cents: number
-          code_hash: string
-          code_last4: string
+          amount_cents?: number | null
+          balance_cents?: number | null
+          buyer_email?: string | null
+          buyer_member_id?: string | null
+          buyer_name?: string | null
+          code?: string | null
+          code_hash?: string | null
+          code_last4?: string | null
           created_at?: string
+          credit_id?: string | null
+          currency?: string | null
+          delivery_date?: string | null
           expires_on?: string | null
           id?: string
-          initial_amount_cents: number
+          initial_amount_cents?: number | null
+          issued_at?: string | null
           message?: string | null
           purchaser_member_id?: string | null
           recipient_email?: string | null
           recipient_name?: string | null
+          redeemed_at?: string | null
+          redeemed_by_member_id?: string | null
           status?: string
           studio_id: string
           updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
-          balance_cents?: number
-          code_hash?: string
-          code_last4?: string
+          amount_cents?: number | null
+          balance_cents?: number | null
+          buyer_email?: string | null
+          buyer_member_id?: string | null
+          buyer_name?: string | null
+          code?: string | null
+          code_hash?: string | null
+          code_last4?: string | null
           created_at?: string
+          credit_id?: string | null
+          currency?: string | null
+          delivery_date?: string | null
           expires_on?: string | null
           id?: string
-          initial_amount_cents?: number
+          initial_amount_cents?: number | null
+          issued_at?: string | null
           message?: string | null
           purchaser_member_id?: string | null
           recipient_email?: string | null
           recipient_name?: string | null
+          redeemed_at?: string | null
+          redeemed_by_member_id?: string | null
           status?: string
           studio_id?: string
           updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "gift_cards_buyer_member_id_fkey"
+            columns: ["buyer_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_buyer_member_id_fkey"
+            columns: ["buyer_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_credit_id_fkey"
+            columns: ["credit_id"]
+            isOneToOne: false
+            referencedRelation: "member_credits"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "gift_cards_purchaser_member_id_fkey"
             columns: ["purchaser_member_id"]
@@ -2378,6 +2441,20 @@ export type Database = {
           {
             foreignKeyName: "gift_cards_purchaser_member_id_fkey"
             columns: ["purchaser_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_redeemed_by_member_id_fkey"
+            columns: ["redeemed_by_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_redeemed_by_member_id_fkey"
+            columns: ["redeemed_by_member_id"]
             isOneToOne: false
             referencedRelation: "members"
             referencedColumns: ["id"]
@@ -2394,6 +2471,13 @@ export type Database = {
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_cards_voided_by_fkey"
+            columns: ["voided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5821,6 +5905,7 @@ export type Database = {
           refund_reason: string | null
           refunded_at: string | null
           refunded_cents: number
+          source: string | null
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id: string | null
           stripe_invoice_id: string | null
@@ -5860,6 +5945,7 @@ export type Database = {
           refund_reason?: string | null
           refunded_at?: string | null
           refunded_cents?: number
+          source?: string | null
           status: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_invoice_id?: string | null
@@ -5899,6 +5985,7 @@ export type Database = {
           refund_reason?: string | null
           refunded_at?: string | null
           refunded_cents?: number
+          source?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_charge_id?: string | null
           stripe_invoice_id?: string | null
@@ -7589,6 +7676,9 @@ export type Database = {
           free_first_reservation_fee_cents: number
           free_first_reservation_from: string | null
           free_first_seats_per_class: number | null
+          gift_enabled: boolean
+          gift_min_cents: number
+          gift_presets: number[]
           guarantees_enabled: boolean
           guest_invites_members_only: boolean
           guest_passes_enabled: boolean
@@ -7732,6 +7822,9 @@ export type Database = {
           free_first_reservation_fee_cents?: number
           free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
+          gift_enabled?: boolean
+          gift_min_cents?: number
+          gift_presets?: number[]
           guarantees_enabled?: boolean
           guest_invites_members_only?: boolean
           guest_passes_enabled?: boolean
@@ -7875,6 +7968,9 @@ export type Database = {
           free_first_reservation_fee_cents?: number
           free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
+          gift_enabled?: boolean
+          gift_min_cents?: number
+          gift_presets?: number[]
           guarantees_enabled?: boolean
           guest_invites_members_only?: boolean
           guest_passes_enabled?: boolean
@@ -8577,10 +8673,11 @@ export type Database = {
           credit_applied_cents: number
           currency: string
           failure_reason: string | null
+          gift_card_id: string | null
           id: string
           last_return_check_at: string | null
           last_return_check_result: string | null
-          member_id: string
+          member_id: string | null
           payment_link_url: string | null
           payment_session_id: string | null
           plan_id: string | null
@@ -8599,10 +8696,11 @@ export type Database = {
           credit_applied_cents?: number
           currency: string
           failure_reason?: string | null
+          gift_card_id?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
-          member_id: string
+          member_id?: string | null
           payment_link_url?: string | null
           payment_session_id?: string | null
           plan_id?: string | null
@@ -8621,10 +8719,11 @@ export type Database = {
           credit_applied_cents?: number
           currency?: string
           failure_reason?: string | null
+          gift_card_id?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
-          member_id?: string
+          member_id?: string | null
           payment_link_url?: string | null
           payment_session_id?: string | null
           plan_id?: string | null
@@ -8641,6 +8740,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_gift_card_id_fkey"
+            columns: ["gift_card_id"]
+            isOneToOne: false
+            referencedRelation: "gift_cards"
             referencedColumns: ["id"]
           },
           {
@@ -9028,18 +9134,6 @@ export type Database = {
       bulk_update_series_run: {
         Args: { p_change: Json; p_preview: boolean; p_series_ids: string[] }
         Returns: Json
-      }
-      c112_as: { Args: { p_user: string }; Returns: undefined }
-      c112_auth: { Args: { p_user: string }; Returns: undefined }
-      c112_member: {
-        Args: {
-          p_joined_days?: number
-          p_marketing?: boolean
-          p_status?: string
-          p_tag: string
-          p_with_plan?: boolean
-        }
-        Returns: string
       }
       calendar_feed: { Args: { p_token: string }; Returns: string }
       calendar_feed_state: {
@@ -9603,26 +9697,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raise: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9759,6 +9833,32 @@ export type Database = {
         Args: { p_from?: string; p_horizon_days?: number; p_series_id: string }
         Returns: Json
       }
+      gift_card_begin: {
+        Args: {
+          p_amount_cents: number
+          p_buyer_email?: string
+          p_buyer_name?: string
+          p_delivery_date?: string
+          p_message?: string
+          p_recipient_email?: string
+          p_recipient_name?: string
+          p_studio_id: string
+        }
+        Returns: {
+          amount_cents: number
+          currency: string
+          purchase_id: string
+          secret_key_ciphertext: string
+          test_mode: boolean
+        }[]
+      }
+      gift_card_redeem: { Args: { p_code: string }; Returns: Json }
+      gift_card_resend: { Args: { p_gift_card_id: string }; Returns: Json }
+      gift_card_void: {
+        Args: { p_gift_card_id: string; p_reason: string }
+        Returns: Json
+      }
+      gift_code: { Args: { p_studio_id: string }; Returns: string }
       grant_complimentary_membership: {
         Args: {
           p_ends_on?: string
@@ -11727,6 +11827,9 @@ export type Database = {
           android_sha256_fingerprints: string
           currency: string
           free_first_class_enabled: boolean
+          gift_enabled: boolean
+          gift_min_cents: number
+          gift_presets: number[]
           id: string
           install_welcome: string
           ios_bundle_id: string
@@ -11982,7 +12085,7 @@ export type Database = {
         Returns: undefined
       }
       xendit_activate_success_internal: {
-        Args: { p_payment_id: string; p_purchase_id: string }
+        Args: { p_payment_id: string; p_purchase_id: string; p_source?: string }
         Returns: string
       }
       xendit_apply_session: {

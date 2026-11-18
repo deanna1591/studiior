@@ -364,7 +364,7 @@ export default async function MemberHome() {
 
             <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="m-head truncate text-[19px] leading-6 text-white">{occ.name}</h1>
+                <h1 className="m-head break-words line-clamp-2 text-[19px] leading-6 text-white">{occ.name}</h1>
                 <p className="mt-0.5 truncate text-[12px] leading-4 text-white/90">
                   {/* Decision 17: an unstaffed class reads as a normal class.
                       Telling a member nobody has agreed to teach it advertises
@@ -452,7 +452,7 @@ export default async function MemberHome() {
               </span>
               <div className="flex items-end justify-between gap-3">
                 <div className="min-w-0">
-                  <h1 className="m-head truncate text-[19px] leading-6 text-white">{o.name}</h1>
+                  <h1 className="m-head break-words line-clamp-2 text-[19px] leading-6 text-white">{o.name}</h1>
                   <p className="mt-0.5 truncate text-[12px] leading-4 text-white/90">
                     <span className="num">{fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
                     {o.instructors?.display_name ? ` \u00b7 ${o.instructors.display_name}` : ""}
@@ -502,7 +502,7 @@ export default async function MemberHome() {
                                                                o.class_types.image_focus_y) }} />
                     )}
                   </span>
-                  <span className="m-name block truncate text-ink">{o.name}</span>
+                  <span className="m-name block break-words line-clamp-2 text-ink">{o.name}</span>
                   <span className="m-subtle block truncate text-ink-2">
                     {day(o.starts_at)} · <span className="num">{fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
                   </span>

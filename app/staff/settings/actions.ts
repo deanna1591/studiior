@@ -1281,3 +1281,29 @@ export async function saveDailyCheck(_prev: PlainState, fd: FormData): Promise<P
   revalidatePath("/settings");
   return { ok: true, message: on ? "The owner gets the daily check email each morning." : "Daily check email turned off." };
 }
+
+// Decision 110: gift cards — the on/off switch, the suggested amounts (major
+// units in the form, stored as minor-unit presets), and the minimum.
+export async function saveGift(_prev: PlainState, fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const on = String(fd.get("gift_enabled") ?? "") === "on";
+  const presets = String(fd.get("gift_presets") ?? "")
+    .split(",")
+    .map((s) => Math.round(Number(s.trim()) * 100))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const minMajor = Number(String(fd.get("gift_min") ?? "").trim());
+  const minCents = Number.isFinite(minMajor) && minMajor > 0 ? Math.round(minMajor * 100) : 50000;
+  const supabase = createClient();
+  const { data, error } = await supabase.from("studio_settings")
+    .update({
+      gift_enabled: on,
+      gift_min_cents: minCents,
+      ...(presets.length ? { gift_presets: presets } : {}),
+    })
+    .eq("studio_id", ctx.studioId).select("studio_id");
+  if (error) return { ok: false, message: error.message };
+  if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
+  revalidatePath("/settings");
+  return { ok: true, message: on ? "Gift cards are on. The public page is at your member site under /gift." : "Gift cards turned off." };
+}

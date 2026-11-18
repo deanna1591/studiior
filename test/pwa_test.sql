@@ -1,6 +1,6 @@
 -- =============================================================================
 -- Decision 51 — studio_by_slug returns the two new branding fields, and the
--- anon surface is still correct (now THIRTEEN after Decision 50). UUID space 9a51, checked free.
+-- anon surface is still correct (now FOURTEEN after Decision 50). UUID space 9a51, checked free.
 -- Run after `supabase db reset`.
 -- =============================================================================
 \set ON_ERROR_STOP on
@@ -44,20 +44,20 @@ select expect_text('studio_by_slug still returns name',
 -- 55's time_format (migration 20260832130000), then 52a's four store columns
 -- (migration 20260832380000): android_package, android_sha256_fingerprints,
 -- ios_team_id, ios_bundle_id. 15 + 4 = 19, and nothing else new.
-select expect_num('studio_by_slug returns exactly 19 columns',
+select expect_num('studio_by_slug returns exactly 22 columns',
   (select count(*) from pg_proc p
      cross join lateral unnest(coalesce(p.proargnames, '{}'::text[])) as a
     join pg_namespace n on n.oid = p.pronamespace
    where n.nspname='public' and p.proname='studio_by_slug'
-     and a <> 'p_slug')::bigint, 19);
+     and a <> 'p_slug')::bigint, 22);
 
--- THE ANON SURFACE IS EXACTLY THIRTEEN (Decision 50 added unsubscribe_marketing) — the drop+recreate of studio_by_slug (one
+-- THE ANON SURFACE IS EXACTLY FOURTEEN (Decision 50 added unsubscribe_marketing) — the drop+recreate of studio_by_slug (one
 -- of them) must not have lost or widened its anon grant. The suite's own
 -- expect_* helpers are anon-executable on LOCAL (the documented local tell), so
 -- they are excluded here; the migration asserts the clean 12 at apply.
-select expect_num('anon surface is exactly thirteen (suite helpers excluded)',
+select expect_num('anon surface is exactly fourteen (suite helpers excluded)',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect%')::bigint, 13);
+      and p.proname not like 'expect%')::bigint, 14);
 
 select 'pwa suite finished' as done;

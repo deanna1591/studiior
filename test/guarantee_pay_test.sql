@@ -1227,17 +1227,17 @@ select expect_true('(d) the unpaid no-show has no succeeded payment -- owes noth
                  and b.member_id='9a179a17-0000-0000-0000-0000810b0003'
                  and p.status in ('succeeded','partially_refunded')));
 
--- Anon: force_commit is not reachable, and the anon surface stays EXACTLY THIRTEEN.
+-- Anon: force_commit is not reachable, and the anon surface stays EXACTLY FOURTEEN.
 select expect_true('force_commit_occurrence is not anon-executable',
   not has_function_privilege('anon', 'force_commit_occurrence(uuid, text)'::regprocedure, 'execute'));
 set role anon;
 select expect_raises('anon cannot call force_commit_occurrence',
   $$select force_commit_occurrence('9a179a17-0000-0000-0000-0000000000fd','x')$$, '42501');
 reset role;
-select expect_num('the anon surface is EXACTLY THIRTEEN',
+select expect_num('the anon surface is EXACTLY FOURTEEN',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%')::bigint, 13);
+      and p.proname not like 'expect\_%')::bigint, 14);
 
 reset role;
 select set_config('request.jwt.claim.sub', null, false);

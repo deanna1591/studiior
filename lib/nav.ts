@@ -136,6 +136,8 @@ export function railGroups(
               { href: "/plans", label: "Plans" },
               // Decision 49. Every plan purchase, with the membership actions.
               { href: "/sales", label: "Sales" },
+              // Decision 110. The studio's gift cards — resend, void.
+              { href: "/gift-cards", label: "Gift cards" },
               // Decision 50. Write to a filtered, consented group of members.
               { href: "/campaigns", label: "Campaigns" },
               // §9 challenges — shown once the studio turns the switch on in

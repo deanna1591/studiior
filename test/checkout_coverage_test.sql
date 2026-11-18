@@ -113,11 +113,11 @@ select expect_text('a frozen membership does not cover it',
 select expect_text('a stranger (no member at this studio) is refused PT403',
   cov('c0880000-0000-0000-0000-000000009999', :OCC)->>'err', 'PT403');
 
--- Anon surface EXACTLY THIRTEEN (the suite helpers excluded by name).
-select expect_num('anon surface is thirteen',
+-- Anon surface EXACTLY FOURTEEN (the suite helpers excluded by name).
+select expect_num('anon surface is fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
      where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-       and p.proname not in ('login','expect_text','expect_num','cov')), 13);
+       and p.proname not in ('login','expect_text','expect_num','cov')), 14);
 
 drop function login(text); drop function expect_text(text,text,text);
 drop function expect_num(text,bigint,bigint); drop function cov(text,uuid);

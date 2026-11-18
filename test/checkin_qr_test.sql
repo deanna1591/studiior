@@ -12,7 +12,7 @@
 -- found; another instructor → PT403; window closed → PT409; manager-up allowed;
 -- the resulting check_in has method 'instructor'; the waiver gate still fires at
 -- the instructor door (PT422). The slug page reuses self_check_in (no new
--- writer). Anon stays EXACTLY THIRTEEN, named; the four new functions are not anon.
+-- writer). Anon stays EXACTLY FOURTEEN, named; the four new functions are not anon.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -237,20 +237,20 @@ select expect_true('self_check_in (the reused writer) is authenticated, not anon
     where n.nspname = 'public' and p.proname = 'self_check_in'));
 
 -- =============================================================================
--- Anon surface — EXACTLY THIRTEEN, named; the four new functions are NOT anon.
+-- Anon surface — EXACTLY FOURTEEN, named; the four new functions are NOT anon.
 -- =============================================================================
-select expect_num('the thirteen pre-login surfaces are all anon-executable',
+select expect_num('the fourteen pre-login surfaces are all anon-executable',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname in ('accept_studio_invite','claim_instructor_account','claim_member_account',
         'instructor_invite_preview','member_invite_preview','public_schedule',
         'stripe_platform_webhook','stripe_webhook','studio_by_slug','studio_invite_preview',
-        'calendar_feed','xendit_webhook','unsubscribe_marketing'))::bigint, 13);
+        'calendar_feed','xendit_webhook','unsubscribe_marketing','gift_card_begin'))::bigint, 14);
 
-select expect_num('the anon surface is EXACTLY thirteen (suite helpers excluded)',
+select expect_num('the anon surface is EXACTLY fourteen (suite helpers excluded)',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect%' and p.proname not like 'c35\_%')::bigint, 13);
+      and p.proname not like 'expect%' and p.proname not like 'c35\_%')::bigint, 14);
 
 select expect_num('the four new functions are NOT anon',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
