@@ -78,3 +78,12 @@ test("card layout: the default card ink reads at 4.5:1 on any accent", () => {
   assert.equal(img.background, null);
   assert.equal(img.ink, "#FFFFFF");
 });
+
+test("a replacement start keyed as PostgREST returns it still matches groupGaps' keys once normalised", async () => {
+  const { groupGaps } = await import("../lib/private-sessions.mjs");
+  const raw = ["2026-11-23T13:00:00+00:00", "2026-11-23T14:00:00+00:00"];
+  const keys = groupGaps(raw).flatMap((g) => g.starts);
+  // the raw form never matches (the bug); the normalised form does (the fix)
+  assert.equal(keys.includes(raw[1]), false);
+  assert.equal(keys.includes(new Date(raw[1]).toISOString()), true);
+});

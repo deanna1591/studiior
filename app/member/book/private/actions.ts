@@ -17,9 +17,12 @@ export async function privateSlots(typeId: string, coachId: string | null, fromI
   if (error) return { starts: [], replaces: [], error: error.message };
   // Decision 116(a): a start that replaces an empty class is labelled as such.
   const rows = (data ?? []) as { starts_at: string; replaces_occurrence_id: string | null }[];
+  // Normalised to toISOString(): groupGaps re-keys every start that way, so a
+  // raw PostgREST "+00:00" string would never match and the label would vanish.
+  const iso = (s: string) => new Date(s).toISOString();
   return {
-    starts: rows.map((r) => r.starts_at),
-    replaces: rows.filter((r) => r.replaces_occurrence_id).map((r) => r.starts_at),
+    starts: rows.map((r) => iso(r.starts_at)),
+    replaces: rows.filter((r) => r.replaces_occurrence_id).map((r) => iso(r.starts_at)),
   };
 }
 
