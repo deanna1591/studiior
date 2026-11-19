@@ -1,5 +1,6 @@
 "use client";
 
+import { flexStateChip } from "@/lib/flex-state";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Views, dateFnsLocalizer, type View } from "react-big-calendar";
@@ -102,6 +103,11 @@ export type CalEvent = {
   /** Decision 22: a flex class that has been committed to run (e.g. via "Run
    *  anyway"). Draws a small "Runs" badge so staff see which were pushed through. */
   flexCommitted?: boolean;
+  /** Decision 22(e): the running latch, and the paid / unpaid seats it counts. */
+  reachedMinimum?: boolean;
+  paidCount?: number;
+  unpaidCount?: number;
+  effectiveFlex?: boolean;
   tier: string | null;
   effectiveTier?: string | null;
   minimum?: number | null;
@@ -509,7 +515,8 @@ export default function ScheduleCalendar({
       // so the slot still reads at a glance.
       if (event.cancelled || event.notRunning) {
         const reason = event.cancelled
-          ? (event.cancellationCause === "no_instructor" ? "cancelled, no instructor"
+          ? (event.cancellationCause === "replaced_by_private" ? "Replaced by a private session"
+             : event.cancellationCause === "no_instructor" ? "cancelled, no instructor"
              : event.cancellationCause === "force_majeure" ? "cancelled, beyond anyone's control"
              : "cancelled, studio's reason")
           : (event.bookedCount === 0 ? "not running, nobody booked"
@@ -646,10 +653,23 @@ export default function ScheduleCalendar({
         if (event.waitlistCount === 0 && f === "quiet" && !event.flexPending) bits.push("Quiet");
         if (event.standalone)
           bits.push(<span key="alone" title="Nothing else of this instructor's within 90 minutes">On its own</span>);
-        if (event.flexPending)
-          bits.push(<span key="flex" title="Runs only if it reaches its minimum">Flex{event.minimum ? <> · <span className="num">{event.minimum}</span>+</> : null}</span>);
-        if (event.flexCommitted)
-          bits.push(<span key="runs" title="Committed to run, even below its minimum">Runs</span>);
+        // Decision 22(e): the flex state chip. "{paid} of {min}" (", n unpaid") in
+        // grey until the minimum is reached, then a green "Running". The block
+        // colour stays staffing.
+        if (event.effectiveFlex && !event.isPrivate) {
+          const chip = flexStateChip({
+            flex: true, status: "scheduled", committed: !!event.flexCommitted,
+            reachedMinimum: !!event.reachedMinimum, paid: event.paidCount ?? 0,
+            unpaid: event.unpaidCount ?? 0, minimum: event.minimum ?? null,
+          });
+          if (chip.kind === "running")
+            bits.push(<span key="flexstate" className="rounded-full px-1.5 font-semibold"
+              style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}
+              title="Reached its minimum, so it runs">Running</span>);
+          else if (chip.kind === "count")
+            bits.push(<span key="flexstate" className="num text-ink-2"
+              title="Paid seats towards the flex minimum">{chip.text}</span>);
+        }
         if (assignmentConfirmations && event.assignmentConfirmed)
           bits.push(<span key="ok" title="The instructor confirmed">✓</span>);
         if (assignmentConfirmations && event.assignmentAwaiting)

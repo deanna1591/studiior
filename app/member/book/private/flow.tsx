@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { accentSolid, accentChip } from "@/lib/accent-pair";
 import { fmtClock } from "@/lib/clock";
-import { groupGaps, privateReasonSentence } from "@/lib/private-sessions";
+import { groupGaps, privateReasonSentence, REPLACES_LABEL } from "@/lib/private-sessions";
 import { privateSlots } from "./actions";
 import { startPrivate } from "../../account/plan/actions";
 
@@ -36,6 +36,7 @@ export default function PrivateFlow({
   const [coachId, setCoachId] = useState<string | null>(null);
   const [day, setDay] = useState(0);
   const [starts, setStarts] = useState<string[]>([]);
+  const [replaces, setReplaces] = useState<Set<string>>(new Set());
   const [loading, startLoad] = useTransition();
   const [chosen, setChosen] = useState<string | null>(null);
   const [comps, setComps] = useState<{ name: string; email: string }[]>([]);
@@ -53,6 +54,7 @@ export default function PrivateFlow({
       const from = localMidnight(timeZone, day), to = localMidnight(timeZone, day + 1);
       const r = await privateSlots(t.id, coachId, from.toISOString(), to.toISOString());
       setStarts(r.starts);
+      setReplaces(new Set(r.replaces));
     });
   }, [t, coachId, day, timeZone]);
 
@@ -141,6 +143,9 @@ export default function PrivateFlow({
                       className="m-press rounded-full px-3.5 py-1.5 text-[14px] font-semibold"
                       style={chosen === s ? accentSolid() : accentChip()}>
                       {fmtClock(s, timeZone, timeFormat)}
+                      {replaces.has(s) && (
+                        <span className="block text-[11.5px] font-medium">{REPLACES_LABEL}</span>
+                      )}
                     </button>
                   ))}
                 </div>

@@ -39,8 +39,13 @@ export default async function Availability({ params }: { params: { id: string } 
     );
   }
 
+  // Decision 18(b): next month's submission is shown apart, read-only. It is never
+  // part of the weekly pattern below and a pattern save never touches it.
+  const todayYmd = new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone }).format(new Date());
+  const [ty, tm] = todayYmd.split("-").map(Number);
+  const nextPeriod = `${tm === 12 ? ty + 1 : ty}-${String(tm === 12 ? 1 : tm + 1).padStart(2, "0")}-01`;
   const [{ data: week }, { data: commitment }, { data: load },
-         { data: types }, { data: quals }, { data: scfg }] = await Promise.all([
+         { data: types }, { data: quals }, { data: scfg }, { data: nextSub }] = await Promise.all([
     supabase.rpc("instructor_availability_week", { p_instructor_id: i.id }),
     supabase.from("instructor_commitments")
       .select("id, starts_on, ends_on, min_per_week, target_per_week, shift_preference")
@@ -52,7 +57,18 @@ export default async function Availability({ params }: { params: { id: string } 
       .eq("instructor_id", i.id),
     supabase.from("studio_settings").select("assign_requires_availability")
       .eq("studio_id", ctx.studioId).maybeSingle(),
+    supabase.rpc("availability_submission_week", { p_instructor_id: i.id, p_period_start: nextPeriod }),
   ]);
+  const ns = (nextSub ?? {}) as {
+    source?: string; status?: string; days?: { day: number; ranges: { from: string; to: string }[] }[];
+  };
+  const nextMonthName = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${nextPeriod}T12:00:00Z`));
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const STATUS_WORD: Record<string, string> = {
+    draft: "Draft, not sent yet", submitted: "Submitted, waiting for review",
+    approved: "Approved", changes_requested: "Sent back for changes",
+  };
   const requireEndDate = scfg?.assign_requires_availability ?? false;
 
   const w = (week ?? {}) as {
@@ -86,6 +102,27 @@ export default async function Availability({ params }: { params: { id: string } 
             canEdit={manager || isThem}
             requireEndDate={requireEndDate}
           />
+
+          {ns.source === "submission" && (
+            <div className="mt-6 rounded-xl border border-line bg-surface px-3.5 py-3">
+              <p className="text-[13px] font-medium text-ink">{nextMonthName} submission</p>
+              <p className="text-[12px] leading-[18px] text-ink-2">
+                {STATUS_WORD[ns.status ?? ""] ?? ns.status}. Read-only here: it applies to {nextMonthName} only
+                and is not part of the weekly pattern above.
+              </p>
+              <ul className="mt-2 space-y-0.5 text-[13px] text-ink">
+                {(ns.days ?? []).filter((d) => d.ranges.length > 0).map((d) => (
+                  <li key={d.day}>
+                    <span className="inline-block w-10 text-ink-2">{DAY_NAMES[d.day]}</span>
+                    <span className="num">{d.ranges.map((r) => `${r.from} to ${r.to}`).join(", ")}</span>
+                  </li>
+                ))}
+                {(ns.days ?? []).every((d) => d.ranges.length === 0) && (
+                  <li className="text-ink-2">No times in it.</li>
+                )}
+              </ul>
+            </div>
+          )}
         </section>
 
         <div className="space-y-8">

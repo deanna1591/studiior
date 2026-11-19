@@ -30,7 +30,7 @@ export default async function MembershipSettings() {
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }, { data: tplOverrides }, { count: waivedCount }, { data: privTypes }, { data: coaches }] = await Promise.all([
     supabase.from("studio_settings")
-      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, free_first_reservation_fee_cents, free_first_reservation_from, guest_passes_enabled, guest_invites_members_only, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates, payee_notice_name, gift_enabled, gift_presets, gift_min_cents, gift_apple_pay_verified, gift_card_image_path, private_sessions_enabled, private_lead_time_hours, private_buffer_minutes")
+      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, free_first_reservation_fee_cents, free_first_reservation_from, guest_passes_enabled, guest_invites_members_only, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates, payee_notice_name, gift_enabled, gift_presets, gift_min_cents, gift_apple_pay_verified, gift_card_image_path, private_sessions_enabled, private_lead_time_hours, private_buffer_minutes, private_replace_core_hours")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("studios").select("currency").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("pay_periods").select("starts_on, ends_on, status").lte("starts_on", today).gte("ends_on", today).maybeSingle(),
@@ -109,6 +109,7 @@ export default async function MembershipSettings() {
       <SettingsSection id="private-sessions" title="Private sessions">
         <PrivateSessionsPanel enabled={s?.private_sessions_enabled ?? false}
           leadHours={s?.private_lead_time_hours ?? 24} bufferMin={s?.private_buffer_minutes ?? 10}
+          replaceCoreHours={s?.private_replace_core_hours ?? 48}
           types={(privTypes ?? []) as never} coaches={(coaches ?? []) as never} currency={currency} />
         <p className="mt-3 max-w-xl text-[13px] leading-[20px] text-ink-2">
           Private packs (for example 5 or 10 privates) are class pack plans marked as private packs on

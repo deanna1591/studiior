@@ -1309,3 +1309,24 @@ export async function saveGift(_prev: PlainState, fd: FormData): Promise<PlainSt
   revalidatePath("/settings");
   return { ok: true, message: on ? "Gift cards are on. The public page is at your member site under /gift." : "Gift cards turned off." };
 }
+
+/** Decision 21(c): set the studio's flex minimum on every active flex series and
+ *  every future flex class not committed and not past its cut-off. One audit row. */
+export async function applyFlexMinimum(_prev: PlainState, _fd: FormData): Promise<PlainState> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "Sign in again." };
+  const supabase = createClient();
+  const { data: st } = await supabase.from("studio_settings").select("flex_min_bookings")
+    .eq("studio_id", ctx.studioId).maybeSingle();
+  const min = st?.flex_min_bookings ?? 1;
+  const { data, error } = await supabase.rpc("apply_flex_minimum_to_future", {
+    p_studio_id: ctx.studioId, p_min: min,
+  });
+  if (error) return { ok: false, message: error.message.replace(/^.*?:\s*/, "") };
+  const r = data as { classes_updated: number; series_updated: number };
+  revalidatePath("/settings/classes"); revalidatePath("/schedule"); revalidatePath("/series");
+  return {
+    ok: true,
+    message: `Set ${min} on ${r.classes_updated} future flex ${r.classes_updated === 1 ? "class" : "classes"} and ${r.series_updated} recurring ${r.series_updated === 1 ? "class" : "classes"}.`,
+  };
+}

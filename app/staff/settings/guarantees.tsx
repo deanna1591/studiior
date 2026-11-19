@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonQuietClass, inputClass } from "@/components/ui";
-import { saveGuarantees, type PlainState } from "./actions";
+import { saveGuarantees, applyFlexMinimum, type PlainState } from "./actions";
 
 function Save() {
   const { pending } = useFormStatus();
@@ -35,7 +35,7 @@ function Num({ name, label, value, min, max, suffix, w = "w-24", req = true, pla
  * Each tier's settings are only shown when its own switch is on — a number that
  * does nothing is worse than one that is missing.
  */
-export default function GuaranteesPanel({ s, currency }: {
+export default function GuaranteesPanel({ s, currency, mismatch = 0 }: {
   s: {
     guarantees_enabled: boolean; flex_enabled: boolean;
     core_min_bookings: number; core_cutoff_hours: number; core_unmet_pay_pct: number | null;
@@ -46,8 +46,11 @@ export default function GuaranteesPanel({ s, currency }: {
     adjacency_minutes: number;
   };
   currency: string;
+  /** Decision 21(c): future flex classes whose minimum differs from the setting. */
+  mismatch?: number;
 }) {
   const [state, action] = useFormState<PlainState, FormData>(saveGuarantees, null);
+  const [applyState, applyAction] = useFormState<PlainState, FormData>(applyFlexMinimum, null);
   const [core, setCore] = useState(s.guarantees_enabled);
   const [flex, setFlex] = useState(s.flex_enabled);
   const [mode, setMode] = useState(s.flex_deadline_mode ?? "previous_day_at");
@@ -126,8 +129,24 @@ export default function GuaranteesPanel({ s, currency }: {
         </label>
         {flex && (
           <div className="mt-3 flex flex-wrap items-end gap-4 border-t border-line pt-3">
-            <Num name="flex_min_bookings" label="Runs at" value={s.flex_min_bookings}
-                 min={0} max={99} suffix="bookings or more" />
+            <div>
+              <Num name="flex_min_bookings" label="Runs at" value={s.flex_min_bookings}
+                   min={0} max={99} suffix="bookings or more" />
+              {/* Decision 21(c): the setting applies to new classes; this applies it
+                  to the future flex classes that still carry another minimum. */}
+              <p className="mt-1 max-w-[40ch] text-[12px] leading-[18px] text-ink-2">
+                Applies to new classes.{mismatch > 0 && <> <span className="num">{mismatch}</span> future flex{" "}
+                {mismatch === 1 ? "class still carries" : "classes still carry"} a different minimum.</>}
+              </p>
+              {mismatch > 0 && (
+                <div className="mt-1.5">
+                  <button formAction={applyAction} className={buttonQuietClass}>
+                    Apply to all future flex classes
+                  </button>
+                  {applyState && <p className="mt-1 text-[12px] text-ink-2">{applyState.message}</p>}
+                </div>
+              )}
+            </div>
             <label className="text-[13px] leading-[20px] text-ink-2">
               <span className="mb-1 block">Decided</span>
               <select name="flex_deadline_mode" defaultValue={mode}

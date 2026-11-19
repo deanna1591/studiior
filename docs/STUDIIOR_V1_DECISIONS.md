@@ -533,6 +533,38 @@ Every Monday at 7:00 studio time a card on the staff dashboard and a page under 
 
 ---
 
+## 116 (a) — An empty class is down-time (amendment, recorded 19 Nov 2026)
+
+A private slot is offered when the hour is empty, or when the only class in that hour is empty: no seats counted in booked_count, no live payment hold, no held waitlist offer, not committed, not private, still scheduled. An empty flex class can be replaced at any time. An empty core or always-runs class can be replaced only when the private starts within the studio's replace window (setting private_replace_core_hours, Reform 48 hours), so core classes keep their chance to fill. A pending private records the class it replaces (replaces_occurrence_id) and takes no room until it is confirmed; while pending it holds that class's slot so nobody else can target it, and the group class stays bookable by members. At confirm, under a row lock, the class is checked again: if it is still empty it is cancelled with the cause replaced_by_private and the private takes the room; if a member booked it or it committed in the meantime, the private is refused, the payment comes back as credit (or the pack session is returned), and the member is told 'That time was just taken. Pick another time.' on their return screen and by email (template private_time_taken). A replaced class sends no member emails; its coach is told (template private_replaced_class) unless that coach is the one teaching the private. The replaced class's coach, when they teach privates and are free, is offered first in the coach picker, and their own empty class never counts as them being busy. Pay for a replaced class: the core holding fee (core_unmet_pay_cents) when the class was core or always-runs, the flex standby amount (flex_unmet_pay_cents) when it was flex, and nothing when the displaced coach teaches the private. The cause never follows the not-confirmed path and reads 'Replaced by a private session' on staff screens and in the digest. Every replacement and every refusal writes an audit row.
+
+**Status:** settled, to build. **Extends:** Decision 116, Decision 22. Deanna, 19 Nov 2026.
+
+---
+
+## 22 (e) — Flex state at a glance (amendment, recorded 19 Nov 2026)
+
+On the staff Schedule and the Flex pending list a flex class shows its state using the same count the running latch uses: '{paid} of {min}' in grey until the minimum is reached, with ', {n} unpaid' added when unpaid seats are booked, a green chip 'Running' from the moment it reaches the minimum or is committed, and the existing 'not running' after a cut-off that cancels it. Core classes keep the Always runs chip. The block colour continues to mean staffing.
+
+**Status:** settled, to build. **Extends:** Decision 22, Decision 21, Decision 81(b). Deanna, 19 Nov 2026.
+
+---
+
+## 21 (c) — Apply the minimum to future classes (amendment, recorded 19 Nov 2026)
+
+Settings → Guarantees shows, under the flex minimum, the line 'Applies to new classes. {n} future flex classes still carry a different minimum.' with a button 'Apply to all future flex classes' (manager up). It sets the minimum on every active flex series and on every future flex class that is not committed and not yet past its cut-off, in one filtered pass with one audit row listing the counts. Classes inside their cut-off and committed classes are never touched. Saving the setting itself writes an audit row with before and after.
+
+**Status:** settled, to build. **Extends:** Decision 21. Deanna, 19 Nov 2026.
+
+---
+
+## 18 (b) — A month's submission is not the weekly pattern (amendment, recorded 19 Nov 2026)
+
+Rows that belong to a month's availability submission are never read as part of the weekly pattern and never deleted by a weekly pattern save: the staff editor, its save, and the availability function all restrict pattern reads and writes to rows with no submission. A submission applies only to its own month; the current month keeps its own pattern and approved submission until it ends. The staff editor shows next month's submission in a separate read-only card. Saving the staff editor writes an audit row with the before and after ranges.
+
+**Status:** settled, to build. **Extends:** Decision 18, Decision 46. Deanna, 19 Nov 2026.
+
+---
+
 ## 116 — Private sessions (recorded 18 Nov 2026)
 
 A studio can offer private sessions in its down time. Settings → Memberships & payments → Private sessions: on or off; up to three session types, each with a name, price, number of people, duration and coach pay (Reform: Private 1:1 ₱2,200 for 1, Duo ₱3,000 for 2, Trio ₱3,600 for 3, 50 minutes, coach pay ₱1,000, ₱1,400, ₱1,600); the buffer (default 10 minutes; Reform 10 minutes), the minimum lead time (default 24 hours; Reform 12 hours, so a slot freed by a flex cancellation at the cut-off is bookable), and which coaches teach privates. Members see 'Private sessions' on Book: they pick a type, a coach or any coach, and a time from the free gaps only: inside studio hours, no group class or private in the room for the duration plus the buffer either side, the coach available under their submitted availability and not on time off, at least the lead time ahead. Duo and Trio ask for the companions' names and emails; companions are invited by email to create or use an account and sign the waiver before the session, and appear on the roster. The booker pays the full price through Xendit, or with a 1:1 pack credit for a 1:1; staff can book a private for a member from the profile and record a desk payment. On payment the session is confirmed at once as a private occurrence: hidden from other members, the public timetable and the embed; capacity equal to the type; the coach assigned. The booker and companions receive private_confirmed; the coach receives private_booked. Cancel or move at least the lead time before and the payment returns as credit or the pack credit is returned; later than that the fee is kept and the coach is paid; one free reschedule inside the rule. If the studio cancels, the member chooses a full refund or a free rebook and the coach is not paid. The coach's My schedule, roster, digest (under Running) and pay page show the private with the client's first name; pay is the type's coach pay, recorded as a private pay record in the normal period. Sales shows a 'Private sessions' line with price, after VAT (12 percent inclusive), coach pay and studio keeps per session, and private packs under packs. Packs: 5 privates and 10 privates as packs (class pack plans valid for the 1:1 type only; Reform ₱10,500 and ₱20,000), no expiry unless set, redeemed at the private booking step. Every private booking, move, cancel and refund writes an audit row.

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { accentSolid } from "@/lib/accent-pair";
 import { notFound } from "next/navigation";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
@@ -23,7 +24,7 @@ export default async function PrivatePage({ params, searchParams }: {
 
   const [{ data: occ }, { data: mine }, guard] = await Promise.all([
     supabase.from("class_occurrences")
-      .select("id, name, starts_at, ends_at, status, committed_at, is_private, private_type_id, instructor_id, capacity, rooms(name), instructors!instructor_id(display_name)")
+      .select("id, name, starts_at, ends_at, status, committed_at, is_private, private_type_id, instructor_id, capacity, cancellation_reason, rooms(name), instructors!instructor_id(display_name)")
       .eq("id", params.id).maybeSingle(),
     supabase.from("bookings").select("id, status").eq("occurrence_id", params.id).eq("member_id", ctx.memberId).maybeSingle(),
     supabase.rpc("private_guard_booker", { p_occurrence_id: params.id }),
@@ -37,6 +38,9 @@ export default async function PrivatePage({ params, searchParams }: {
   const when = `${fmtDayLong(occ.starts_at, ctx.timeZone)}, ${fmtClock(occ.starts_at, ctx.timeZone, ctx.timeFormat)}`;
   const confirmed = occ.committed_at != null;
   const cancelled = occ.status === "cancelled" || mine.status === "cancelled" || mine.status === "late_cancelled";
+  // Decision 116(a): the class this private replaced was booked first, so the
+  // private was refused at confirm and the money came back.
+  const timeTaken = occ.status === "cancelled" && occ.cancellation_reason === "time_taken";
   // the lead time arrives with the member (member_bootstrap); members cannot read studio_settings.
   const leadHours = settings.privateLeadHours;
 
@@ -54,10 +58,18 @@ export default async function PrivatePage({ params, searchParams }: {
           {[coach && `with ${coach}`, room, occ.capacity > 1 ? `${occ.capacity} people` : "Just you"].filter(Boolean).join(" · ")}
         </p>
         <p className="m-sub mt-3 font-semibold text-ink">
-          {cancelled ? (mine.status === "late_cancelled" ? "Cancelled. The fee was kept." : "Cancelled.")
+          {timeTaken ? "That time was just taken. Pick another time."
+            : cancelled ? (mine.status === "late_cancelled" ? "Cancelled. The fee was kept." : "Cancelled.")
             : confirmed ? "You're booked in." : "Finishing your payment…"}
         </p>
       </div>
+
+      {timeTaken && (
+        <Link href="/book/private" className="m-press mt-4 flex h-12 w-full items-center justify-center rounded-full text-[15px] font-semibold"
+              style={accentSolid()}>
+          Pick another time
+        </Link>
+      )}
 
       {!cancelled && (
         <PrivateManage

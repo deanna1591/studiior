@@ -26,9 +26,9 @@ const input = "mt-1 w-full rounded border border-line bg-surface px-3 py-2 text-
  * three session types, and which coaches teach privates. Off by default.
  */
 export default function PrivateSessionsPanel({
-  enabled, leadHours, bufferMin, types, coaches, currency,
+  enabled, leadHours, bufferMin, replaceCoreHours = 48, types, coaches, currency,
 }: {
-  enabled: boolean; leadHours: number; bufferMin: number;
+  enabled: boolean; leadHours: number; bufferMin: number; replaceCoreHours?: number;
   types: PrivateType[]; coaches: Coach[]; currency: string;
 }) {
   const [st, act] = useFormState<PrivState, FormData>(savePrivateSettings, null);
@@ -59,6 +59,14 @@ export default function PrivateSessionsPanel({
             <span className="font-medium">Buffer (minutes)</span>
             <span className="block text-[12px] leading-[18px] text-ink-3">Kept free before and after, for the room.</span>
             <input name="private_buffer_minutes" type="number" min={0} max={120} defaultValue={bufferMin} className={input} />
+          </label>
+          <label className="block text-[13px] text-ink sm:col-span-2">
+            <span className="font-medium">Replace an empty core class within (hours)</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              A private can take the hour of a class nobody has booked. An empty flex class can be
+              replaced any time; an empty core class only this close to it, so it keeps its chance to fill.
+            </span>
+            <input name="private_replace_core_hours" type="number" min={0} max={336} defaultValue={replaceCoreHours} className={input} />
           </label>
         </div>
         <div className="mt-3"><Save /></div>

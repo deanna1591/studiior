@@ -27,13 +27,17 @@ export default async function ClassesSettings() {
   const { data: s } = await supabase.from("studio_settings")
     .select("guarantees_enabled, flex_enabled, core_min_bookings, core_cutoff_hours, core_unmet_pay_pct, core_unmet_pay_cents, flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, flex_unmet_pay_cents, flex_standby_pay_cents, flex_rescue_hours_before, adjacency_minutes, auto_assign_open_classes, assign_requires_availability, claiming_enabled, core_claim_default_cap, cover_auto_accept_enabled, cover_escalation_hours, availability_due_day, week_confirm_escalate_days, week_confirm_enabled, availability_reminders_enabled, carry_forward_enabled, roster_confirm_days, instructor_booking_alerts, assignment_confirmations, instructor_class_reminders")
     .eq("studio_id", ctx.studioId).maybeSingle();
+  // Decision 21(c): future flex classes still carrying another minimum.
+  const { data: mismatch } = s?.flex_enabled
+    ? await supabase.rpc("flex_minimum_mismatch_count", { p_studio_id: ctx.studioId })
+    : { data: 0 };
 
   return (
     <AppShell {...shell} title="Classes & instructors">
       <SettingsBack />
 
       <SettingsSection id="core" title="Guarantees & flex">
-        <GuaranteesPanel currency={ctx.currency ?? "CZK"} s={{
+        <GuaranteesPanel currency={ctx.currency ?? "CZK"} mismatch={(mismatch as number | null) ?? 0} s={{
           guarantees_enabled: s?.guarantees_enabled ?? false,
           flex_enabled: s?.flex_enabled ?? false,
           core_min_bookings: s?.core_min_bookings ?? 1,

@@ -1,3 +1,4 @@
+import { flexStateChip } from "@/lib/flex-state";
 import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
@@ -11,7 +12,24 @@ type Pending = {
   occ_id: string; occ_name: string; local_when: string;
   booked: number; minimum: number; short_by: number;
   due_at: string; past_due: boolean;
+  reached_minimum: boolean | null; paid_count: number | null; unpaid_count: number | null;
 };
+
+// Decision 22(e): the same state chip the Schedule block shows.
+function StateChip({ p }: { p: Pending }) {
+  const chip = flexStateChip({
+    flex: true, status: "scheduled", committed: false,
+    reachedMinimum: !!p.reached_minimum, paid: p.paid_count ?? 0,
+    unpaid: p.unpaid_count ?? 0, minimum: p.minimum,
+  });
+  if (chip.kind === "running") {
+    return (
+      <span className="rounded-full px-1.5 text-[12px] font-semibold"
+            style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>Running</span>
+    );
+  }
+  return <span className="num text-ink-2">{chip.text}</span>;
+}
 
 /**
  * Tonight's decisions, in one place.
@@ -122,11 +140,7 @@ export default async function FlexDecisions() {
                     {p.occ_name}
                   </Link>
                   <div className="text-[12px] leading-4 text-ink-3">
-                    {p.local_when} · <span className="num">{p.booked}</span>/
-                    <span className="num">{p.minimum}</span> —{" "}
-                    <span style={{ color: "var(--coral)" }}>
-                      {p.short_by} short
-                    </span>
+                    {p.local_when} · <StateChip p={p} />
                     {p.past_due && <> · decision is due now</>}
                   </div>
                 </div>
@@ -145,8 +159,7 @@ export default async function FlexDecisions() {
               <li key={p.occ_id} className="px-3.5 py-2.5">
                 <span className="text-[14px] leading-5 text-ink-2">{p.occ_name}</span>
                 <span className="text-[12px] leading-4 text-ink-3">
-                  {" "}· {p.local_when} · <span className="num">{p.booked}</span>/
-                  <span className="num">{p.minimum}</span>
+                  {" "}· {p.local_when} · <StateChip p={p} />
                 </span>
               </li>
             ))}

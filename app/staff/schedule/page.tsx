@@ -167,6 +167,7 @@ export default async function Schedule({
     } | null;
     occ_hidden: boolean | null;
     occ_is_private: boolean | null;
+    occ_reached_minimum: boolean | null; occ_paid_count: number | null; occ_unpaid_count: number | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -195,6 +196,11 @@ export default async function Schedule({
     // Decision 22: a committed flex class that is still scheduled was pushed
     // through (naturally at the cutoff, or via "Run anyway"). "Runs" badge.
     flexCommitted: o.occ_flex && o.occ_confirmed && o.occ_status === "scheduled",
+    // Decision 22(e): the latch and the count it uses, for the state chip.
+    reachedMinimum: o.occ_reached_minimum ?? false,
+    paidCount: o.occ_paid_count ?? 0,
+    unpaidCount: o.occ_unpaid_count ?? 0,
+    effectiveFlex: o.occ_tier === "flex",
     // TWO FACTS, kept apart. `tier` is what the class IS — what the studio
     // configured, and what the series list beside this screen shows. `effective`
     // is what it will DO once the studio's switches are applied. They differ
@@ -216,7 +222,7 @@ export default async function Schedule({
     // Decision 47: a staff cancellation. schedule_range keeps these visible; the
     // calendar draws them cancelled and the panel is read-only.
     cancelled: o.occ_status === "cancelled"
-      && ["no_instructor", "studio_fault", "force_majeure"].includes(o.occ_cancellation_cause ?? ""),
+      && ["no_instructor", "studio_fault", "force_majeure", "replaced_by_private"].includes(o.occ_cancellation_cause ?? ""),
     cancellationCause: o.occ_cancellation_cause,
     // Decision 38: the assigned-class confirmation state (only when asked).
     assignmentConfirmed: o.occ_assignment_confirmed,

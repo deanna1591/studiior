@@ -1547,6 +1547,7 @@ export type Database = {
           minimum_bookings: number | null
           name: string
           private_type_id: string | null
+          replaces_occurrence_id: string | null
           room_id: string | null
           series_id: string | null
           series_slot_at: string | null
@@ -1605,6 +1606,7 @@ export type Database = {
           minimum_bookings?: number | null
           name: string
           private_type_id?: string | null
+          replaces_occurrence_id?: string | null
           room_id?: string | null
           series_id?: string | null
           series_slot_at?: string | null
@@ -1663,6 +1665,7 @@ export type Database = {
           minimum_bookings?: number | null
           name?: string
           private_type_id?: string | null
+          replaces_occurrence_id?: string | null
           room_id?: string | null
           series_id?: string | null
           series_slot_at?: string | null
@@ -1713,6 +1716,13 @@ export type Database = {
             columns: ["private_type_id"]
             isOneToOne: false
             referencedRelation: "private_session_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_replaces_occurrence_id_fkey"
+            columns: ["replaces_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
             referencedColumns: ["id"]
           },
           {
@@ -7813,6 +7823,7 @@ export type Database = {
           post_style: string
           private_buffer_minutes: number
           private_lead_time_hours: number
+          private_replace_core_hours: number
           private_sessions_enabled: boolean
           public_instructor_name: string
           publication_enabled: boolean
@@ -7964,6 +7975,7 @@ export type Database = {
           post_style?: string
           private_buffer_minutes?: number
           private_lead_time_hours?: number
+          private_replace_core_hours?: number
           private_sessions_enabled?: boolean
           public_instructor_name?: string
           publication_enabled?: boolean
@@ -8115,6 +8127,7 @@ export type Database = {
           post_style?: string
           private_buffer_minutes?: number
           private_lead_time_hours?: number
+          private_replace_core_hours?: number
           private_sessions_enabled?: boolean
           public_instructor_name?: string
           publication_enabled?: boolean
@@ -9061,6 +9074,10 @@ export type Database = {
       ai_draft_count: { Args: { p_studio_id: string }; Returns: number }
       ai_draft_gate: { Args: { p_studio_id: string }; Returns: Json }
       anthropic_api_key: { Args: never; Returns: string }
+      apply_flex_minimum_to_future: {
+        Args: { p_min: number; p_studio_id: string }
+        Returns: Json
+      }
       apply_for_shift: {
         Args: {
           p_note?: string
@@ -9801,6 +9818,22 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
+      expect_num: {
+        Args: { actual: number; label: string; want: number }
+        Returns: undefined
+      }
+      expect_raises: {
+        Args: { label: string; stmt: string; want_sqlstate: string }
+        Returns: undefined
+      }
+      expect_text: {
+        Args: { actual: string; label: string; want: string }
+        Returns: undefined
+      }
+      expect_true: {
+        Args: { actual: boolean; label: string }
+        Returns: undefined
+      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9830,6 +9863,10 @@ export type Database = {
           mode: string
         }[]
       }
+      flex_minimum_mismatch_count: {
+        Args: { p_studio_id: string }
+        Returns: number
+      }
       flex_pending: {
         Args: { p_studio_id: string }
         Returns: {
@@ -9839,9 +9876,12 @@ export type Database = {
           minimum: number
           occ_id: string
           occ_name: string
+          paid_count: number
           past_due: boolean
+          reached_minimum: boolean
           short_by: number
           starts_at: string
+          unpaid_count: number
         }[]
       }
       flex_report: {
@@ -10772,6 +10812,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: string
       }
+      occurrence_empty_run: {
+        Args: { p_occurrence_id: string }
+        Returns: boolean
+      }
       occurrence_guarantee: {
         Args: { p_occurrence_id: string }
         Returns: {
@@ -10967,6 +11011,7 @@ export type Database = {
           minimum_bookings: number | null
           name: string
           private_type_id: string | null
+          replaces_occurrence_id: string | null
           room_id: string | null
           series_id: string | null
           series_slot_at: string | null
@@ -11006,6 +11051,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: undefined
       }
+      private_replace_ok: {
+        Args: { p_occurrence_id: string; p_starts_at: string }
+        Returns: boolean
+      }
       private_session_types_for: {
         Args: { p_studio_id: string }
         Returns: {
@@ -11028,6 +11077,7 @@ export type Database = {
         Returns: {
           coach_ids: string[]
           ends_at: string
+          replaces_occurrence_id: string
           room_id: string
           starts_at: string
         }[]
@@ -11665,11 +11715,14 @@ export type Database = {
           occ_is_private: boolean
           occ_minimum: number
           occ_name: string
+          occ_paid_count: number
+          occ_reached_minimum: boolean
           occ_series_tier: string
           occ_staffing: string
           occ_standalone: boolean
           occ_status: string
           occ_tier: string
+          occ_unpaid_count: number
           occ_waitlist: number
           room_name: string
           start_minutes: number
@@ -12514,6 +12567,7 @@ export type Database = {
         | "force_majeure"
         | "closure"
         | "no_instructor"
+        | "replaced_by_private"
       challenge_audience: "member" | "instructor"
       challenge_status: "draft" | "scheduled" | "active" | "ended" | "archived"
       challenge_type: "class_count" | "streak" | "class_type_count"
@@ -12783,6 +12837,7 @@ export const Constants = {
         "force_majeure",
         "closure",
         "no_instructor",
+        "replaced_by_private",
       ],
       challenge_audience: ["member", "instructor"],
       challenge_status: ["draft", "scheduled", "active", "ended", "archived"],

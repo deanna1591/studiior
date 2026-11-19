@@ -199,7 +199,9 @@ begin
   insert into rooms (id, studio_id, location_id, name, capacity) values
     (gen_random_uuid(), gb, loc, 'B3', 8) returning id into r3;
   for k in 2 .. 5 loop
-    st := now() + (k * interval '7 days');  -- future, within this month + next
+    -- Anchored to studio-local midnight so +7h..+12h stay on one Manila day
+    -- whatever the wall clock (now()+k*7d crossed midnight at some hours).
+    st := (date_trunc('day', now() at time zone 'Asia/Manila') + k * interval '7 days') at time zone 'Asia/Manila';
     -- Cara: 2 core (default tier) + 1 flex, so the day's core count is 2.
     insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
       capacity, starts_at, ends_at, status, instructor_id) values

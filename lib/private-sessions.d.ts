@@ -12,3 +12,6 @@ export function cancelNoticeLine(a: {
 export const PRIVATE_REASONS: Record<string, string>;
 export function privateReasonSentence(reason: string | null | undefined): string;
 export function vatSplit(totalCents: number): { netCents: number; vatCents: number };
+export const REPLACES_LABEL: string;
+export function slotLabel(replacesOccurrenceId: string | null | undefined): string | null;
+export function replaceAllowed(a: { empty: boolean; targeted?: boolean; tier: string; hoursUntilStart: number; windowHours?: number | null }): boolean;

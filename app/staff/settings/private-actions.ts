@@ -18,9 +18,11 @@ export async function savePrivateSettings(_p: PrivState, fd: FormData): Promise<
   const on = String(fd.get("private_sessions_enabled") ?? "") === "on";
   const lead = Math.min(336, clampInt(fd.get("private_lead_time_hours"), 24));
   const buffer = Math.min(120, clampInt(fd.get("private_buffer_minutes"), 10));
+  const replaceCore = Math.min(336, clampInt(fd.get("private_replace_core_hours"), 48));
   const supabase = createClient();
   const { data, error } = await supabase.from("studio_settings")
-    .update({ private_sessions_enabled: on, private_lead_time_hours: lead, private_buffer_minutes: buffer })
+    .update({ private_sessions_enabled: on, private_lead_time_hours: lead, private_buffer_minutes: buffer,
+              private_replace_core_hours: replaceCore })
     .eq("studio_id", ctx.studioId).select("studio_id");
   if (error) return { ok: false, message: error.message };
   if (!data?.length) return { ok: false, message: "Nothing was saved. Owners and managers only." };
