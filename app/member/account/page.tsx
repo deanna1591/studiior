@@ -21,12 +21,29 @@ export default async function Account() {
   // it), so Account is one round trip after the context rather than two.
   // Decision 63: the Shop entry appears only when the studio has products, and
   // My orders only when this member has ordered something.
-  const [membership, { data: shop }, { data: orders }, { data: aiDrafts }] = await Promise.all([
+  const [membership, { data: shop }, { data: orders }, { data: aiDrafts }, { data: credits }, { data: creditPays }] = await Promise.all([
     membershipState(supabase, ctx.memberId),
     supabase.rpc("member_shop", { p_studio_id: ctx.studioId }),
     supabase.rpc("member_orders"),
     supabase.rpc("member_sees_ai_drafts"),
+    // Decision 110(a): the Credits card — each credit received (own rows, RLS)
+    // and each purchase credit paid for (source credit, own payments).
+    supabase.from("member_credits").select("id, amount_cents, used_cents, currency, reason, created_at, voided_at")
+      .eq("member_id", ctx.memberId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("payments").select("id, amount_cents, currency, description, paid_at, created_at")
+      .eq("member_id", ctx.memberId).eq("source", "credit").order("created_at", { ascending: false }).limit(10),
   ]);
+  const creditRows = (credits ?? []).filter((c) => !c.voided_at);
+  const giftLeft = settings.giftCreditCents;
+  const otherLeft = Math.max(0, settings.reservationCreditCents - settings.giftCreditCents);
+  const creditWord = (r: string) => r === "gift_credit" ? "Gift card"
+    : r === "private_refund" ? "Private session returned"
+    : r.startsWith("reservation") ? "Reservation fee returned" : "Credit";
+  const dShort = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: ctx.timeZone, day: "numeric", month: "short" }).format(new Date(iso));
+  const history = [
+    ...creditRows.map((c) => ({ at: c.created_at as string, line: `${creditWord(c.reason as string)} · received`, amt: `+${formatMoney(c.amount_cents as number, (c.currency as string) ?? settings.currency)}` })),
+    ...(creditPays ?? []).map((p) => ({ at: (p.paid_at ?? p.created_at) as string, line: `Used on ${p.description ?? "a purchase"}`, amt: `−${formatMoney(p.amount_cents as number, (p.currency as string) ?? settings.currency)}` })),
+  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8);
   const { live } = membership;
   const hasProducts = Array.isArray(shop) && shop.length > 0;
   const hasOrders = Array.isArray(orders) && orders.length > 0;
@@ -70,6 +87,35 @@ export default async function Account() {
           </span>
           <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
         </Link>
+      )}
+
+      {/* Decision 110(a): Credits — gift credit named apart from reservation and
+          refund credit, with what came in and what it paid for. Absent when none. */}
+      {(settings.reservationCreditCents > 0 || history.length > 0) && (
+        <div className="m-card mb-4 px-4 py-4">
+          <p className="m-name text-ink">Credits</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="rounded-xl px-3 py-2" style={{ background: "var(--accent-chip)" }}>
+              <span className="m-micro block text-ink-2">Gift credit</span>
+              <span className="m-body num font-semibold text-ink">{formatMoney(giftLeft, settings.currency)}</span>
+            </div>
+            <div className="rounded-xl px-3 py-2" style={{ background: "var(--accent-chip)" }}>
+              <span className="m-micro block text-ink-2">Reservation and returned</span>
+              <span className="m-body num font-semibold text-ink">{formatMoney(otherLeft, settings.currency)}</span>
+            </div>
+          </div>
+          <p className="m-micro mt-2 text-ink-2">Used at checkout before any payment. Gift credit never expires.</p>
+          {history.length > 0 && (
+            <ul className="mt-3 divide-y divide-line">
+              {history.map((h, i) => (
+                <li key={i} className="flex items-center justify-between py-2">
+                  <span className="m-sub text-ink">{h.line}<span className="text-ink-2"> · {dShort(h.at)}</span></span>
+                  <span className="m-sub num text-ink">{h.amt}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <ul className="m-card divide-y divide-line overflow-hidden">

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { memberScreen } from "@/lib/member";
 import { seatKindOf } from "@/lib/cancel-notice";
 import type { SeatKind } from "@/lib/cancel-notice";
@@ -48,7 +49,7 @@ export async function loadClassDetail(
 
   const occQuery = supabase
     .from("class_occurrences")
-    .select("id, studio_id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, status, class_type_id, instructor_id, guarantee_tier, flex, rooms(name), instructors!instructor_id(display_name, bio, avatar_url, certifications), class_series(guarantee_tier, flex), locations(latitude, longitude, self_checkin_requires_location)")
+    .select("id, studio_id, name, starts_at, ends_at, capacity, booked_count, waitlist_count, status, class_type_id, instructor_id, guarantee_tier, flex, is_private, rooms(name), instructors!instructor_id(display_name, bio, avatar_url, certifications), class_series(guarantee_tier, flex), locations(latitude, longitude, self_checkin_requires_location)")
     .eq("id", id).maybeSingle();
   const typeQuery = (ctid: string) => supabase.from("class_types")
     .select("name, description, image_url, image_focus_x, image_focus_y").eq("id", ctid).maybeSingle();
@@ -118,6 +119,9 @@ export async function loadClassDetail(
                   pendRows: { occurrence_id: string; booking_id: string | null; status: string; hold_until: string | null }[] | null,
                   dueRows: { occurrence_id: string; fee_cents: number }[] | null) => {
     if (!occ) return null;
+    // Decision 116: a private session has its own page (its cancel and move are
+    // the private ones, never a single-seat cancel_booking).
+    if (occ.is_private) redirect(`/private/${id}`);
     const holdRow = (pendRows ?? []).find((r) => r.occurrence_id === id && r.status === "pending_payment") ?? null;
     const dueRow = (dueRows ?? []).find((r) => r.occurrence_id === id) ?? null;
     const gr = groupRow as { is_host: boolean; group_purchases: {

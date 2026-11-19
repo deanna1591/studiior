@@ -4,6 +4,7 @@ import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { formatMoney } from "@/lib/plans";
 import type { Database } from "@/lib/database.types";
 import GiftForm from "./form";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,20 @@ export default async function GiftPage() {
   const currency = studio?.currency ?? "PHP";
   const presets = (studio?.gift_presets ?? [100000, 250000, 500000]) as number[];
   const minCents = studio?.gift_min_cents ?? 50000;
+
+  // Decision 110(a): a signed-in member of this studio (from the Plans page) is
+  // filled in as the buyer, read from their own session — never from the URL.
+  let buyerName = "", buyerEmail = "";
+  if (studio) {
+    const sb = createClient();
+    const { data: claims } = await sb.auth.getClaims();
+    const uid = claims?.claims?.sub;
+    if (uid) {
+      const { data: me } = await sb.from("members").select("first_name, last_name, email")
+        .eq("studio_id", studio.id).eq("user_id", uid).maybeSingle();
+      if (me) { buyerName = [me.first_name, me.last_name].filter(Boolean).join(" "); buyerEmail = me.email ?? ""; }
+    }
+  }
 
   if (!studio || !studio.gift_enabled) {
     return (
@@ -59,7 +74,8 @@ export default async function GiftPage() {
 
         <p className="m-body mb-5 text-ink-2">
           A gift card for {studio.name}, sent to whoever you choose. They redeem it in their
-          account and it is theirs to spend on classes — it never expires.
+          account and it is theirs to spend on classes. The card is exactly the amount you choose,
+          and it never expires.
         </p>
 
         <GiftForm
@@ -68,6 +84,8 @@ export default async function GiftPage() {
           currencyLabels={presets.map((c) => formatMoney(c, currency))}
           minLabel={formatMoney(minCents, currency)}
           currency={currency}
+          buyerName={buyerName}
+          buyerEmail={buyerEmail}
         />
       </main>
     </div>

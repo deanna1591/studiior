@@ -288,3 +288,16 @@ export async function cancelOccurrencesForPeriod(_prev: PeriodCancelResult, fd: 
   revalidatePath("/");
   return { ok: true, message: parts.join(" ") };
 }
+
+/** Decision 116: the studio cancels a private (manager-up in the function). The
+ *  member's payment returns as account credit (or the pack credit) so they can
+ *  rebook free, or the studio refunds it from Payments; the coach is not paid. */
+export async function studioCancelPrivate(occurrenceId: string, reason: string): Promise<{ ok: boolean; message: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("private_studio_cancel", { p_occurrence_id: occurrenceId, p_reason: reason || undefined });
+  if (error) return { ok: false, message: error.message.replace(/^.*?:\s*/, "") };
+  const r = data as { ok: boolean; reason?: string };
+  if (!r.ok) return { ok: false, message: r.reason === "already_cancelled" ? "It is already cancelled." : "That didn't work." };
+  revalidatePath("/schedule");
+  return { ok: true, message: "Cancelled. The client's payment is back on their account as credit, and they have been emailed." };
+}

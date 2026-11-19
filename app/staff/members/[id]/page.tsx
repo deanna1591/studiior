@@ -27,6 +27,7 @@ import { ResendGuestInvite } from "./resend-guest";
 import MemberDangerZone from "./danger";
 import EditPhone from "@/components/staff/edit-phone";
 import { BookClassFromProfile } from "@/components/staff/book-member";
+import { BookPrivateFromProfile } from "@/components/staff/book-private";
 import ToastHost from "@/components/staff/toast-host";
 import { RefundSheet } from "@/components/staff/refund-sheet";
 import { fullName } from "@/lib/full-name";
@@ -444,6 +445,7 @@ export default async function MemberDetail({
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <EditPhone memberId={m.id} current={m.phone} />
           <BookClassFromProfile memberId={m.id} />
+          <BookPrivateFromProfile memberId={m.id} />
         </div>
       )}
       {/* Whether they can actually use the app they are being messaged about. */}

@@ -392,6 +392,13 @@
     });
 
     wrap.appendChild(strip); wrap.appendChild(daybar); wrap.appendChild(list);
+    // Decision 110(a): a link to the studio's gift page when gift cards are on.
+    if (DATA.studio && DATA.studio.gift_enabled && DATA.studio.gift_url) {
+      var gift = el("a", "sd-note", "Give a gift card \u203a");
+      gift.href = DATA.studio.gift_url; gift.target = "_top";
+      gift.style.display = "block"; gift.style.marginTop = "14px"; gift.style.textDecoration = "underline";
+      wrap.appendChild(gift);
+    }
     paintCells(); paintDay();
     mountNode(wrap);
   }

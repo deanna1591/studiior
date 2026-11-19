@@ -89,6 +89,13 @@ export async function memberScreen() {
       // directly), and their unused reservation credit (applied at checkout).
       feeWaived: b?.fee_waived ?? false,
       reservationCreditCents: b?.reservation_credit_cents ?? 0,
+      // Decision 110(a): the gift part of that credit, named apart on Account.
+      giftCreditCents: b?.gift_credit_cents ?? 0,
+      // Decision 116: Private sessions on Book; the 1:1 pack credits left.
+      privateSessionsEnabled: b?.private_sessions_enabled ?? false,
+      privatePackCredits: b?.private_pack_credits ?? 0,
+      privateLeadHours: b?.private_lead_time_hours ?? 24,
+      giftEnabled: b?.gift_enabled ?? false,
       // Decision 30 amendment: the studio limits the free first class to core
       // classes, so the picker chooses its line (the eligible-classes reader
       // already excludes flex).

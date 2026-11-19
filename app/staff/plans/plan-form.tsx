@@ -32,6 +32,7 @@ export type PlanDraft = {
   max_bookings_per_day: number | null;
   restrictions: { class_type_ids?: string[] } | null;
   counts_for_conversion: boolean;
+  private_pack?: boolean;
   group_size: number | null;
   group_book_within_days: number;
   max_active_members: number | null;
@@ -235,6 +236,19 @@ export default function PlanForm({
                    className={inputClass} placeholder={type === "trial" ? "1" : "10"} />
           </Field>
         ) : null}
+        {type === "class_pack" && (
+          // Decision 116: a private pack is spent only at the private booking
+          // step (1:1 sessions), never on a group class.
+          <Field label="Private pack">
+            <label className="flex items-center gap-2 pt-2 text-sm">
+              <input type="checkbox" name="private_pack" defaultChecked={draft.private_pack ?? false} />
+              These credits are for 1:1 private sessions only
+            </label>
+            <p className="mt-1 text-xs text-ink-3">
+              Members redeem them when they book a private, never on a group class.
+            </p>
+          </Field>
+        )}
         {f.validity && (
           <Field label="Valid for (days)">
             <input name="validity_days" type="number" min={1} defaultValue={num(draft.validity_days)}

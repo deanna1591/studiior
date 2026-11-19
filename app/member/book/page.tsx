@@ -548,6 +548,16 @@ export default async function Book({
           built-in banner (Decision 27 amendment); the "Book — first class free"
           row buttons still carry it while this member is eligible. */}
       <AnnounceStrip items={bannerAnnouncements} />
+      {/* Decision 116: private sessions in the studio's free gaps. */}
+      {settings.privateSessionsEnabled && (
+        <Link href="/book/private" className="m-card m-press mb-4 flex items-center justify-between px-4 py-3">
+          <span>
+            <span className="m-body block font-semibold text-ink">Private sessions</span>
+            <span className="m-sub text-ink-2">1:1, Duo or Trio, at a time the studio is free</span>
+          </span>
+          <span className="m-sub font-semibold text-ink" aria-hidden>›</span>
+        </Link>
+      )}
       {/* Decision 55 follow-up: while eligible and unpicked, the Book tab IS the
           free-class picker (the primary view); ?all=1 shows the full timetable,
           where "Book free" appears only on the rows it works on. */}

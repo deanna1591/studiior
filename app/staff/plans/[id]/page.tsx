@@ -91,6 +91,7 @@ export default async function EditPlan({
     max_bookings_per_day: plan.max_bookings_per_day,
     restrictions: (plan.restrictions as PlanDraft["restrictions"]) ?? null,
     counts_for_conversion: plan.counts_for_conversion ?? false,
+    private_pack: plan.private_pack ?? false,
     group_size: plan.group_size,
     group_book_within_days: plan.group_book_within_days,
     peak_allowance: plan.peak_allowance,

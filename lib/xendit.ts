@@ -49,6 +49,10 @@ export type CreateSessionInput = {
   expiresAt?: string;
   customerEmail?: string;
   metadata?: Record<string, string>;
+  // Decision 110(a): an explicit channel list. A gift session passes this when
+  // the studio has not switched "Apple Pay verified" on, so Xendit never offers
+  // an unverified Apple Pay (cards and e-wallets only).
+  allowedChannels?: string[];
   successUrl: string;
   cancelUrl: string;
 };
@@ -59,6 +63,10 @@ export type CreateSessionInput = {
  * reference_id and given_names Xendit requires; reference_id is stripped to
  * alphanumeric (a member UUID's hyphens are "special characters" Xendit rejects).
  */
+/** Decision 110(a): cards and e-wallets, never Apple Pay — used for a gift session
+ *  until the studio has Apple Pay enabled and verified for its host. */
+export const CHANNELS_WITHOUT_APPLE_PAY = ["CARDS", "GCASH", "PAYMAYA", "GRABPAY", "SHOPEEPAY"];
+
 export function buildSessionBody(input: CreateSessionInput): Record<string, unknown> {
   const body: Record<string, unknown> = {
     reference_id: input.referenceId,
@@ -73,6 +81,9 @@ export function buildSessionBody(input: CreateSessionInput): Record<string, unkn
   if (input.description) body.description = input.description;
   if (input.metadata) body.metadata = input.metadata;
   if (input.expiresAt) body.expires_at = input.expiresAt;
+  if (input.allowedChannels && input.allowedChannels.length > 0) {
+    body.allowed_payment_channels = input.allowedChannels;
+  }
 
   // An existing customer_id wins — a reference_id may create a customer only
   // once, so a returning member sends customer_id, not the customer object.

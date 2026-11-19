@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { accentSolid } from "@/lib/accent-pair";
 import { buyGift, type GiftState } from "./actions";
+import { giftAmountProblem } from "@/lib/gift-card";
 
 /**
  * Decision 110: the gift purchase form. Pick a preset or a custom amount, the
@@ -10,9 +11,10 @@ import { buyGift, type GiftState } from "./actions";
  * the Xendit session and we navigate there. Phone-first.
  */
 export default function GiftForm({
-  presets, minCents, currencyLabels, minLabel, currency,
+  presets, minCents, currencyLabels, minLabel, currency, buyerName = "", buyerEmail = "",
 }: {
   presets: number[]; minCents: number; currencyLabels: string[]; minLabel: string; currency: string;
+  buyerName?: string; buyerEmail?: string;
 }) {
   const [amount, setAmount] = useState<number>(presets[0] ?? minCents);
   const [custom, setCustom] = useState("");
@@ -21,6 +23,9 @@ export default function GiftForm({
   const [err, setErr] = useState<string | null>(null);
 
   const effectiveCents = customOn ? Math.round((Number(custom) || 0) * 100) : amount;
+  // Decision 110(a): a custom amount is whole hundreds from the minimum, and the
+  // card is issued at exactly that amount.
+  const amountProblem = customOn && custom ? giftAmountProblem(effectiveCents, minCents) : null;
 
   function submit(fd: FormData) {
     setErr(null);
@@ -58,10 +63,11 @@ export default function GiftForm({
         </div>
         {customOn && (
           <div className="mt-2">
-            <input type="number" inputMode="decimal" min={minCents / 100} step="1" value={custom}
+            <input type="number" inputMode="numeric" min={minCents / 100} step="100" value={custom}
               onChange={(e) => setCustom(e.target.value)} placeholder={`At least ${minLabel}`}
               className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink" />
-            <p className="m-micro mt-1 text-ink-3">At least {minLabel}.</p>
+            <p className="m-micro mt-1 text-ink-3">At least {minLabel}, in whole hundreds.</p>
+            {amountProblem && <p className="m-micro mt-1 text-ink">{amountProblem}</p>}
           </div>
         )}
       </fieldset>
@@ -82,9 +88,9 @@ export default function GiftForm({
       </div>
 
       <div className="border-t border-line pt-4">
-        <Field name="buyer_name" label="Your name" placeholder="Your name" required />
+        <Field name="buyer_name" label="Your name" placeholder="Your name" required defaultValue={buyerName} />
         <div className="mt-4">
-          <Field name="buyer_email" label="Your email (for the receipt)" type="email" placeholder="you@example.com" required />
+          <Field name="buyer_email" label="Your email (for the receipt)" type="email" placeholder="you@example.com" required defaultValue={buyerEmail} />
         </div>
       </div>
 
@@ -93,7 +99,7 @@ export default function GiftForm({
            style={{ background: "var(--coral-tint)", color: "var(--ink)" }}>{err}</p>
       )}
 
-      <button type="submit" disabled={pending || effectiveCents < minCents}
+      <button type="submit" disabled={pending || effectiveCents < minCents || !!amountProblem}
         className="m-press w-full rounded-full py-3.5 text-center text-[16px] font-semibold disabled:opacity-60"
         style={accentSolid()}>
         {pending ? "Opening checkout…" : "Continue to payment"}
@@ -104,12 +110,12 @@ export default function GiftForm({
 }
 
 function Field({
-  name, label, placeholder, type = "text", required = false,
-}: { name: string; label: string; placeholder?: string; type?: string; required?: boolean }) {
+  name, label, placeholder, type = "text", required = false, defaultValue,
+}: { name: string; label: string; placeholder?: string; type?: string; required?: boolean; defaultValue?: string }) {
   return (
     <div>
       <label className="m-label mb-1 block text-ink">{label}</label>
-      <input name={name} type={type} placeholder={placeholder} required={required}
+      <input name={name} type={type} placeholder={placeholder} required={required} defaultValue={defaultValue}
         className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink" />
     </div>
   );

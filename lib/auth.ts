@@ -202,6 +202,16 @@ export type MemberBootstrap = {
   guarantees_enabled: boolean;
   /** Decision 26(c): the member may invite a guest (switch off, or holds a plan). */
   can_invite_guest: boolean;
+  /** Decision 110(a): the gift credit part of the account credit (minor units). */
+  gift_credit_cents: number;
+  /** Decision 116: the studio offers private sessions (on, with an active type). */
+  private_sessions_enabled: boolean;
+  /** Decision 110: the studio sells gift cards (the Plans page gift section). */
+  gift_enabled: boolean;
+  /** Decision 116: unused 1:1 private pack credits. */
+  private_pack_credits: number;
+  /** Decision 116: the free-cancel and move cut-off (and the booking lead time). */
+  private_lead_time_hours: number;
 };
 
 /** Who is making this request, on the member PWA. */

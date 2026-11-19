@@ -143,7 +143,12 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
 
       // {class_type_ids: []} is "covers everything" to book_class(), so an
       // empty selection stores an empty object rather than an empty array.
-      restrictions: classTypeIds.length > 0 ? { class_type_ids: classTypeIds } : {},
+      // Decision 116: a private pack carries a sentinel restriction no class type
+      // matches, so every coverage reader treats it as covering no group class.
+      private_pack: type === "class_pack" && fd.get("private_pack") === "on",
+      restrictions: type === "class_pack" && fd.get("private_pack") === "on"
+        ? { class_type_ids: ["private-only"] }
+        : classTypeIds.length > 0 ? { class_type_ids: classTypeIds } : {},
 
       // No Stripe wiring in this step.
       stripe_product_id: null,

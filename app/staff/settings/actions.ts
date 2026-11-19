@@ -1299,6 +1299,8 @@ export async function saveGift(_prev: PlainState, fd: FormData): Promise<PlainSt
     .update({
       gift_enabled: on,
       gift_min_cents: minCents,
+      // Decision 110(a): Apple Pay on the gift session only once verified.
+      gift_apple_pay_verified: String(fd.get("gift_apple_pay_verified") ?? "") === "on",
       ...(presets.length ? { gift_presets: presets } : {}),
     })
     .eq("studio_id", ctx.studioId).select("studio_id");

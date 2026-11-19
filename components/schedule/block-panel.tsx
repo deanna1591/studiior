@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { republishShift, openShift, setAlwaysRuns, type AlwaysRunsState, setDayTier, type DayTierState } from "@/app/staff/roster/actions";
 import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
-import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod } from "@/app/staff/schedule/actions";
+import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod, studioCancelPrivate } from "@/app/staff/schedule/actions";
 import type { AssignCandidate } from "@/lib/assign";
 import FreeFirstCard, { type FreeFirstCardState } from "@/components/schedule/free-first";
 import VisibilityCard from "@/components/schedule/visibility";
@@ -31,6 +31,8 @@ export type BlockFacts = {
   freeFirst?: FreeFirstCardState | null;
   /** Decision 91: hidden from the member side (set_occurrence_visibility). */
   hidden?: boolean;
+  /** Decision 116: a private session (always hidden; cancelled with the private tools). */
+  isPrivate?: boolean;
   /** Decision 91: whether this class is core, for the hide-confirm warning. */
   isCore?: boolean;
   /** Decision 21 amendment: the effective tier ('core'|'flex'|'always'), for the
@@ -237,7 +239,7 @@ export default function BlockPanel({
           </p>
         )}
 
-        {canManage && !facts.cancelled && (
+        {canManage && !facts.cancelled && !facts.isPrivate && (
           <div className="mt-3 border-t border-line pt-3">
             {msg && (
               <p className={`mb-2 text-[12.5px] leading-[18px] ${msg.ok ? "text-ink-2" : "text-coral-deep"}`}>
@@ -349,7 +351,7 @@ export default function BlockPanel({
         )}
 
         {/* Decision 91: take this class off the member side without cancelling. */}
-        {canManage && !facts.cancelled && (
+        {canManage && !facts.cancelled && !facts.isPrivate && (
           <VisibilityCard occurrenceId={facts.id} hidden={!!facts.hidden}
                           isCore={!!facts.isCore} onChange={onVisibilityChange} />
         )}
@@ -361,9 +363,12 @@ export default function BlockPanel({
         </div>
 
         {/* Decision 47: cancel this class (or the rest of its weekday this month). */}
-        {canManage && !facts.cancelled && (
+        {canManage && !facts.cancelled && !facts.isPrivate && (
           <CancelClass facts={{ ...facts, instructorId: eff.instructorId, bookedCount: eff.bookedCount }}
                        onCancelled={onUnassigned} onClose={onClose} />
+        )}
+        {canManage && !facts.cancelled && facts.isPrivate && (
+          <CancelPrivate occurrenceId={facts.id} onDone={onClose} />
         )}
       </div>
     </div>
@@ -481,6 +486,38 @@ export function DayTierCard({ occurrenceId, isCore }: { occurrenceId: string; is
  * month. Goes through cancel_occurrences_for_period → cancel_occurrence, so
  * booked members get the §3.2 treatment and the instructor, if any, is told.
  */
+/** Decision 116: the studio cancels a private — refund as credit, coach not paid. */
+function CancelPrivate({ occurrenceId, onDone }: { occurrenceId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      {!open ? (
+        <button type="button" onClick={() => setOpen(true)} className="text-[13px] text-ink underline underline-offset-4">
+          Cancel this private
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[13px] leading-[19px] text-ink-2">
+            The client gets their payment back as account credit (or their pack credit) and can rebook
+            free, or you can refund them from Payments. The coach is not paid.
+          </p>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (shown in the email)"
+                 className="w-full rounded border border-line bg-surface px-3 py-2 text-[13px] text-ink" />
+          <button type="button" disabled={pending}
+            onClick={() => start(async () => { const r = await studioCancelPrivate(occurrenceId, reason); setMsg(r); if (r.ok) setTimeout(onDone, 1200); })}
+            className="rounded px-3 py-1.5 text-[13px] font-semibold text-white" style={{ background: "var(--coral-deep)" }}>
+            {pending ? "Cancelling…" : "Cancel the private"}
+          </button>
+          {msg && <p className="text-[13px] text-ink">{msg.message}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CancelClass({ facts, onCancelled, onClose }: {
   facts: BlockFacts; onCancelled: () => void; onClose: () => void;
 }) {

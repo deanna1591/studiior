@@ -1083,3 +1083,31 @@ begin
   select count(*) into v_n from challenge_participants where challenge_id = v_ch;
   raise notice 'seed: 1 active challenge, % participants enrolled', v_n;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Decision 116 — private sessions, configured the way Reform runs them (the
+-- migration configures the hosted studio by slug; locally the studio is created
+-- here, after the migrations, so the same settings are applied here). Opening
+-- hours are needed for any private slot to exist. Synthetic data only.
+-- ---------------------------------------------------------------------------
+do $$
+declare v_studio uuid := '11111111-0000-0000-0000-000000000001'; v_ccy char(3);
+begin
+  select currency into v_ccy from studios where id = v_studio;
+  update studio_settings set private_sessions_enabled = true, private_lead_time_hours = 12,
+         private_buffer_minutes = 10,
+         open_time = coalesce(open_time, '06:00'), close_time = coalesce(close_time, '22:00')
+   where studio_id = v_studio;
+  insert into private_session_types (studio_id, name, price_cents, people, duration_min, coach_pay_cents, sort) values
+    (v_studio, 'Private 1:1', 220000, 1, 50, 100000, 1),
+    (v_studio, 'Duo',         300000, 2, 50, 140000, 2),
+    (v_studio, 'Trio',        360000, 3, 50, 160000, 3);
+  insert into membership_plans (studio_id, name, type, price_cents, currency, credits, validity_days,
+                                visibility, status, private_pack, restrictions, description)
+  values
+    (v_studio, '5 Privates',  'class_pack', 1050000, v_ccy, 5,  null, 'public', 'active', true,
+     '{"class_type_ids": ["private-only"]}'::jsonb, 'Five 1:1 private sessions. No expiry.'),
+    (v_studio, '10 Privates', 'class_pack', 2000000, v_ccy, 10, null, 'public', 'active', true,
+     '{"class_type_ids": ["private-only"]}'::jsonb, 'Ten 1:1 private sessions. No expiry.');
+  update instructors set teaches_privates = true where studio_id = v_studio and status = 'active';
+end $$;

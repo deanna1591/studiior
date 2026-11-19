@@ -122,6 +122,8 @@ export type CalEvent = {
   /** Decision 91: hidden from the member side (set_occurrence_visibility). Staff
    *  still see the class; a "Hidden" chip marks it. */
   hidden?: boolean;
+  /** Decision 116: a private session (hidden by definition) — labelled Private. */
+  isPrivate?: boolean;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -562,7 +564,14 @@ export default function ScheduleCalendar({
       // Decision 91: a muted "Hidden" pill when the class is off the member side.
       // Staff still see the block; the pill says it is not on the member app or
       // the public timetable. --ink-2 on --surface (well above the 4.5 floor).
-      const hiddenPill = event.hidden ? (
+      // Decision 116: a private is hidden by definition; its pill says Private.
+      const hiddenPill = event.isPrivate ? (
+        <span className="shrink-0 rounded-full border px-1 text-[10.5px] font-semibold leading-[14px]"
+              style={{ background: "var(--surface)", color: "var(--ink)", borderColor: "var(--ink-2)" }}
+              title="A private session — only the client and their companions see it">
+          Private
+        </span>
+      ) : event.hidden ? (
         <span className="shrink-0 rounded-full border px-1 text-[10.5px] font-medium leading-[14px]"
               style={{ background: "var(--surface)", color: "var(--ink-2)", borderColor: "var(--line-2)" }}
               title="Hidden from members — still on your calendar">
@@ -831,6 +840,7 @@ export default function ScheduleCalendar({
             staffing: selected.staffing,
             pendingApplications: selected.pendingApplications,
             hidden: selected.hidden ?? false,
+            isPrivate: selected.isPrivate ?? false,
             // The core warning fires for a class that runs regardless of bookings
             // (core; a one-off carries its tier on effectiveTier when there is no
             // series). A flex class does not warn — hiding it just means fewer

@@ -1,6 +1,7 @@
 import { focalPoint } from "@/lib/focal";
 import { accentSolid } from "@/lib/accent-pair";
 import Link from "next/link";
+import { formatMoney } from "@/lib/plans";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { ActionForm, BookForm, QuietButton } from "@/components/member/ui";
@@ -267,6 +268,15 @@ export default async function MemberHome() {
       {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
       {/* Decision 103: a free booking that now needs the reservation fee. */}
       <ReservationDueNotice dues={reservationDues} currency={settings.currency} timeZone={ctx.timeZone} />
+      {/* Decision 110(a): a member holding gift credit is told, with a way to spend it. */}
+      {settings.giftCreditCents > 0 && (
+        <Link href="/account/plan" className="m-card m-press mb-4 flex items-center justify-between px-4 py-3">
+          <span className="m-body text-ink">
+            You have <span className="num font-semibold">{formatMoney(settings.giftCreditCents, settings.currency)}</span> gift credit
+          </span>
+          <span className="m-sub font-semibold text-ink">See plans ›</span>
+        </Link>
+      )}
       {/* Decision 98: a free class re-flagged as a duplicate — pay or lose it. */}
       {holdItems.map((h) => (
         <DuplicateHold key={h.occurrenceId} occurrenceId={h.occurrenceId}

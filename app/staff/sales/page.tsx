@@ -44,6 +44,8 @@ type Totals = {
   refunds?: { count: number; total_cents: number };
   gift_sold?: { count: number; total_cents: number };
   gift_redeemed?: { count: number; total_cents: number };
+  private?: { count: number; total_cents: number; after_vat_cents: number; vat_cents: number;
+              coach_pay_cents: number; studio_keeps_cents: number };
 };
 type Refund = {
   refund_id: string; settled_at: string | null; member_name: string;
@@ -206,6 +208,22 @@ export default async function Sales({
               {" "}gift credit redeemed ({totals.gift_redeemed.count})</>
           )}
         </p>
+      )}
+
+      {/* Decision 116: the Private sessions line — price, after VAT (12 percent
+          inclusive), coach pay from each session's pay record, and what the studio keeps. */}
+      {totals?.private && totals.private.count > 0 && (
+        <div className="mb-4 max-w-2xl rounded border border-line bg-surface px-3.5 py-3">
+          <p className="text-[13px] font-medium text-ink">
+            Private sessions <span className="font-normal text-ink-2">({totals.private.count})</span>
+          </p>
+          <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px] sm:grid-cols-4">
+            <div><dt className="text-ink-3">Price</dt><dd className="num text-ink">{formatMoney(totals.private.total_cents, totals.currency)}</dd></div>
+            <div><dt className="text-ink-3">After VAT</dt><dd className="num text-ink">{formatMoney(totals.private.after_vat_cents, totals.currency)}</dd></div>
+            <div><dt className="text-ink-3">Coach pay</dt><dd className="num text-ink">{formatMoney(totals.private.coach_pay_cents, totals.currency)}</dd></div>
+            <div><dt className="text-ink-3">Studio keeps</dt><dd className="num text-ink">{formatMoney(totals.private.studio_keeps_cents, totals.currency)}</dd></div>
+          </dl>
+        </div>
       )}
 
       {error ? (

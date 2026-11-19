@@ -1,3 +1,4 @@
+import { accentSolid } from "@/lib/accent-pair";
 import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
@@ -314,6 +315,19 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                 </a>.
               </p>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* Decision 110(a): give a gift card — one line and a button to the gift
+          page, which fills in this member as the buyer. Only when gift cards are on. */}
+      {settings.giftEnabled && (
+        <section className="mt-6">
+          <h2 className="m-label mb-2 text-ink">Give a gift card</h2>
+          <div className="m-card flex items-center justify-between gap-3 p-4">
+            <p className="m-sub text-ink-2">Send a friend credit for {studioName}. It never expires.</p>
+            <Link href="/gift?from=plans" className="m-press shrink-0 rounded-full px-4 py-2 text-[14px] font-semibold"
+                  style={accentSolid()}>Give a gift</Link>
           </div>
         </section>
       )}

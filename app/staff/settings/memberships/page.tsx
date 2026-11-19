@@ -11,6 +11,7 @@ import FreeFirstPanel from "../free-first";
 import GuestPassesPanel from "../guest-passes";
 import ChallengesPanel from "../challenges";
 import GiftCardsPanel from "../gift-cards";
+import PrivateSessionsPanel, { GiftCardImagePanel } from "../private-sessions";
 import SettingsBack from "../back";
 import SettingsSection from "@/components/staff/settings-section";
 import SettingsSummaryRow from "@/components/staff/settings-summary";
@@ -27,9 +28,9 @@ export default async function MembershipSettings() {
   if (!isManagerUp(ctx.role)) return <AppShell {...shell} title="Memberships & payments"><Denied what="Studio settings" role={ctx.role} /></AppShell>;
 
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }, { data: tplOverrides }, { count: waivedCount }] = await Promise.all([
+  const [{ data: s }, { data: studio }, { data: period }, { count: capped }, { count: challengeCount }, { data: activePlans }, { data: tplOverrides }, { count: waivedCount }, { data: privTypes }, { data: coaches }] = await Promise.all([
     supabase.from("studio_settings")
-      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, free_first_reservation_fee_cents, free_first_reservation_from, guest_passes_enabled, guest_invites_members_only, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates, payee_notice_name, gift_enabled, gift_presets, gift_min_cents")
+      .select("pay_period_mode, pay_period_second_day, pay_period_anchor, pay_settle_dow, pay_settle_offset_days, conversion_bonus_enabled, conversion_bonus_cents, conversion_window_days, seat_caps_enabled, how_to_buy, free_first_class_enabled, free_first_peak_allowed, free_first_core_only, free_first_seats_per_class, free_first_confirm_at, free_first_reservation_fee_cents, free_first_reservation_from, guest_passes_enabled, guest_invites_members_only, challenges_enabled, convert_sequence_enabled, keep_sequence_enabled, retention_tasks_enabled, intro_offer_plan_id, intro_offer_days, intro_offer_exclusive, retention_tasks_to, ai_drafts_enabled, studio_voice, convert_book_first_daily_cap, disabled_templates, payee_notice_name, gift_enabled, gift_presets, gift_min_cents, gift_apple_pay_verified, gift_card_image_path, private_sessions_enabled, private_lead_time_hours, private_buffer_minutes")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("studios").select("currency").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("pay_periods").select("starts_on, ends_on, status").lte("starts_on", today).gte("ends_on", today).maybeSingle(),
@@ -40,6 +41,11 @@ export default async function MembershipSettings() {
     // Decision 103a: how many members have the reservation fee waived.
     supabase.from("members").select("id", { count: "exact", head: true })
       .eq("studio_id", ctx.studioId).not("reservation_fee_waived_at", "is", null),
+    // Decision 116: private session types and the coaches who teach them.
+    supabase.from("private_session_types").select("id, name, price_cents, people, duration_min, coach_pay_cents, active")
+      .eq("studio_id", ctx.studioId).order("sort").order("people"),
+    supabase.from("instructors").select("id, display_name, teaches_privates")
+      .eq("studio_id", ctx.studioId).eq("status", "active").order("display_name"),
   ]);
 
   const fmtDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -95,7 +101,19 @@ export default async function MembershipSettings() {
       <SettingsSection id="gift-cards" title="Gift cards">
         <GiftCardsPanel enabled={s?.gift_enabled ?? false}
           presetsMajor={((s?.gift_presets ?? [100000, 250000, 500000]) as number[]).map((c) => Math.round(c / 100))}
-          minMajor={Math.round((s?.gift_min_cents ?? 50000) / 100)} currency={currency} />
+          minMajor={Math.round((s?.gift_min_cents ?? 50000) / 100)} currency={currency}
+          applePayVerified={s?.gift_apple_pay_verified ?? false} />
+        <GiftCardImagePanel imageUrl={s?.gift_card_image_path ?? null} />
+      </SettingsSection>
+
+      <SettingsSection id="private-sessions" title="Private sessions">
+        <PrivateSessionsPanel enabled={s?.private_sessions_enabled ?? false}
+          leadHours={s?.private_lead_time_hours ?? 24} bufferMin={s?.private_buffer_minutes ?? 10}
+          types={(privTypes ?? []) as never} coaches={(coaches ?? []) as never} currency={currency} />
+        <p className="mt-3 max-w-xl text-[13px] leading-[20px] text-ink-2">
+          Private packs (for example 5 or 10 privates) are class pack plans marked as private packs on
+          the Plans screen. A private pack is spent only at the private booking step, never on a group class.
+        </p>
       </SettingsSection>
 
       <SettingsSection id="convert-keep" title="Convert and keep">

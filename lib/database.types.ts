@@ -1542,9 +1542,11 @@ export type Database = {
           instructor_notes: string | null
           is_demo: boolean
           is_exception: boolean
+          is_private: boolean
           location_id: string
           minimum_bookings: number | null
           name: string
+          private_type_id: string | null
           room_id: string | null
           series_id: string | null
           series_slot_at: string | null
@@ -1598,9 +1600,11 @@ export type Database = {
           instructor_notes?: string | null
           is_demo?: boolean
           is_exception?: boolean
+          is_private?: boolean
           location_id: string
           minimum_bookings?: number | null
           name: string
+          private_type_id?: string | null
           room_id?: string | null
           series_id?: string | null
           series_slot_at?: string | null
@@ -1654,9 +1658,11 @@ export type Database = {
           instructor_notes?: string | null
           is_demo?: boolean
           is_exception?: boolean
+          is_private?: boolean
           location_id?: string
           minimum_bookings?: number | null
           name?: string
+          private_type_id?: string | null
           room_id?: string | null
           series_id?: string | null
           series_slot_at?: string | null
@@ -1700,6 +1706,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_occurrences_private_type_id_fkey"
+            columns: ["private_type_id"]
+            isOneToOne: false
+            referencedRelation: "private_session_types"
             referencedColumns: ["id"]
           },
           {
@@ -2325,6 +2338,7 @@ export type Database = {
           buyer_email: string | null
           buyer_member_id: string | null
           buyer_name: string | null
+          card_image_path: string | null
           code: string | null
           code_hash: string | null
           code_last4: string | null
@@ -2355,6 +2369,7 @@ export type Database = {
           buyer_email?: string | null
           buyer_member_id?: string | null
           buyer_name?: string | null
+          card_image_path?: string | null
           code?: string | null
           code_hash?: string | null
           code_last4?: string | null
@@ -2385,6 +2400,7 @@ export type Database = {
           buyer_email?: string | null
           buyer_member_id?: string | null
           buyer_name?: string | null
+          card_image_path?: string | null
           code?: string | null
           code_hash?: string | null
           code_last4?: string | null
@@ -3476,6 +3492,7 @@ export type Database = {
           staff_id: string | null
           status: string
           studio_id: string
+          teaches_privates: boolean
           updated_at: string
         }
         Insert: {
@@ -3494,6 +3511,7 @@ export type Database = {
           staff_id?: string | null
           status?: string
           studio_id: string
+          teaches_privates?: boolean
           updated_at?: string
         }
         Update: {
@@ -3512,6 +3530,7 @@ export type Database = {
           staff_id?: string | null
           status?: string
           studio_id?: string
+          teaches_privates?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -4842,6 +4861,7 @@ export type Database = {
           peak_allowance: number | null
           peak_allowance_period: string
           price_cents: number
+          private_pack: boolean
           restrictions: Json
           show_remaining_below: number | null
           signup_fee_cents: number
@@ -4884,6 +4904,7 @@ export type Database = {
           peak_allowance?: number | null
           peak_allowance_period?: string
           price_cents: number
+          private_pack?: boolean
           restrictions?: Json
           show_remaining_below?: number | null
           signup_fee_cents?: number
@@ -4926,6 +4947,7 @@ export type Database = {
           peak_allowance?: number | null
           peak_allowance_period?: string
           price_cents?: number
+          private_pack?: boolean
           restrictions?: Json
           show_remaining_below?: number | null
           signup_fee_cents?: number
@@ -6404,6 +6426,60 @@ export type Database = {
           },
         ]
       }
+      private_session_types: {
+        Row: {
+          active: boolean
+          coach_pay_cents: number
+          created_at: string
+          duration_min: number
+          id: string
+          name: string
+          people: number
+          price_cents: number
+          sort: number
+          studio_id: string
+        }
+        Insert: {
+          active?: boolean
+          coach_pay_cents: number
+          created_at?: string
+          duration_min: number
+          id?: string
+          name: string
+          people: number
+          price_cents: number
+          sort?: number
+          studio_id: string
+        }
+        Update: {
+          active?: boolean
+          coach_pay_cents?: number
+          created_at?: string
+          duration_min?: number
+          id?: string
+          name?: string
+          people?: number
+          price_cents?: number
+          sort?: number
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_session_types_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "private_session_types_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_orders: {
         Row: {
           channel: string
@@ -7679,6 +7755,8 @@ export type Database = {
           free_first_reservation_fee_cents: number
           free_first_reservation_from: string | null
           free_first_seats_per_class: number | null
+          gift_apple_pay_verified: boolean
+          gift_card_image_path: string | null
           gift_enabled: boolean
           gift_min_cents: number
           gift_presets: number[]
@@ -7733,6 +7811,9 @@ export type Database = {
           post_footer_line: string
           post_hashtags: string | null
           post_style: string
+          private_buffer_minutes: number
+          private_lead_time_hours: number
+          private_sessions_enabled: boolean
           public_instructor_name: string
           publication_enabled: boolean
           reminder_hours_before: number
@@ -7825,6 +7906,8 @@ export type Database = {
           free_first_reservation_fee_cents?: number
           free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
+          gift_apple_pay_verified?: boolean
+          gift_card_image_path?: string | null
           gift_enabled?: boolean
           gift_min_cents?: number
           gift_presets?: number[]
@@ -7879,6 +7962,9 @@ export type Database = {
           post_footer_line?: string
           post_hashtags?: string | null
           post_style?: string
+          private_buffer_minutes?: number
+          private_lead_time_hours?: number
+          private_sessions_enabled?: boolean
           public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
@@ -7971,6 +8057,8 @@ export type Database = {
           free_first_reservation_fee_cents?: number
           free_first_reservation_from?: string | null
           free_first_seats_per_class?: number | null
+          gift_apple_pay_verified?: boolean
+          gift_card_image_path?: string | null
           gift_enabled?: boolean
           gift_min_cents?: number
           gift_presets?: number[]
@@ -8025,6 +8113,9 @@ export type Database = {
           post_footer_line?: string
           post_hashtags?: string | null
           post_style?: string
+          private_buffer_minutes?: number
+          private_lead_time_hours?: number
+          private_sessions_enabled?: boolean
           public_instructor_name?: string
           publication_enabled?: boolean
           reminder_hours_before?: number
@@ -8684,6 +8775,7 @@ export type Database = {
           payment_link_url: string | null
           payment_session_id: string | null
           plan_id: string | null
+          private_occurrence_id: string | null
           product_order_id: string | null
           renews_membership_id: string | null
           status: string
@@ -8707,6 +8799,7 @@ export type Database = {
           payment_link_url?: string | null
           payment_session_id?: string | null
           plan_id?: string | null
+          private_occurrence_id?: string | null
           product_order_id?: string | null
           renews_membership_id?: string | null
           status?: string
@@ -8730,6 +8823,7 @@ export type Database = {
           payment_link_url?: string | null
           payment_session_id?: string | null
           plan_id?: string | null
+          private_occurrence_id?: string | null
           product_order_id?: string | null
           renews_membership_id?: string | null
           status?: string
@@ -8771,6 +8865,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_private_occurrence_id_fkey"
+            columns: ["private_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
             referencedColumns: ["id"]
           },
           {
@@ -9700,26 +9801,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_false: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raise: {
-        Args: { code: string; label: string; sql: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -9842,14 +9923,6 @@ export type Database = {
         Args: { p_membership_id: string; p_until: string }
         Returns: Json
       }
-      g106: { Args: { studio: string }; Returns: Json }
-      g106_coach: { Args: { gi: Json; instr: string }; Returns: Json }
-      g106_day: {
-        Args: { dow: number; gi: Json; instr: string }
-        Returns: Json
-      }
-      g106_slot: { Args: { gi: Json; series: string }; Returns: Json }
-      g106_week: { Args: never; Returns: string }
       generate_all_occurrences: { Args: never; Returns: Json }
       generate_all_occurrences_for: {
         Args: { p_studio_id: string }
@@ -9877,6 +9950,7 @@ export type Database = {
         }
         Returns: {
           amount_cents: number
+          apple_pay_verified: boolean
           currency: string
           purchase_id: string
           secret_key_ciphertext: string
@@ -10333,6 +10407,8 @@ export type Database = {
           first_name: string
           free_first_core_only: boolean
           free_first_reservation_fee_cents: number
+          gift_credit_cents: number
+          gift_enabled: boolean
           guarantees_enabled: boolean
           guest_passes_enabled: boolean
           has_payment_provider: boolean
@@ -10347,6 +10423,9 @@ export type Database = {
           open_offers: number
           payee_notice_name: string
           preferred_name: string
+          private_lead_time_hours: number
+          private_pack_credits: number
+          private_sessions_enabled: boolean
           reservation_credit_cents: number
           status: Database["public"]["Enums"]["member_status"]
           studio_contact_email: string
@@ -10802,6 +10881,175 @@ export type Database = {
           p_studio_id: string
           p_subject: string
         }
+        Returns: Json
+      }
+      private_book: {
+        Args: {
+          p_companions?: Json
+          p_instructor_id: string
+          p_pay_mode?: string
+          p_starts_at: string
+          p_type_id: string
+        }
+        Returns: Json
+      }
+      private_book_desk: {
+        Args: {
+          p_companions?: Json
+          p_instructor_id: string
+          p_member_id: string
+          p_method?: string
+          p_reference?: string
+          p_starts_at: string
+          p_type_id: string
+        }
+        Returns: Json
+      }
+      private_book_run: {
+        Args: {
+          p_companions: Json
+          p_instructor_id: string
+          p_member_id: string
+          p_method?: string
+          p_mode: string
+          p_reference?: string
+          p_starts_at: string
+          p_type_id: string
+        }
+        Returns: Json
+      }
+      private_cancel: { Args: { p_occurrence_id: string }; Returns: Json }
+      private_confirm_run: {
+        Args: { p_occurrence_id: string }
+        Returns: undefined
+      }
+      private_guard_booker: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          assigned_by: string | null
+          assignment_confirmed_at: string | null
+          assignment_confirmed_by: string | null
+          assignment_requested_at: string | null
+          attendance_finalised_at: string | null
+          booked_at_cutoff: number | null
+          booked_at_start: number | null
+          booked_count: number
+          cancellation_cause:
+            | Database["public"]["Enums"]["cancellation_cause"]
+            | null
+          cancellation_pays: boolean | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          capacity: number
+          class_type_id: string | null
+          committed_at: string | null
+          core_min_bookings: number | null
+          core_reached_minimum_at: string | null
+          created_at: string
+          day_tier_saved: Json | null
+          description: string | null
+          ends_at: string
+          flex: boolean
+          flex_reached_minimum_at: string | null
+          free_first_override: string | null
+          guarantee_tier: Database["public"]["Enums"]["guarantee_tier"] | null
+          hidden_from_members: boolean
+          id: string
+          instructor_checked_in_at: string | null
+          instructor_checked_in_by: string | null
+          instructor_confirmed_at: string | null
+          instructor_id: string | null
+          instructor_notes: string | null
+          is_demo: boolean
+          is_exception: boolean
+          is_private: boolean
+          location_id: string
+          minimum_bookings: number | null
+          name: string
+          private_type_id: string | null
+          room_id: string | null
+          series_id: string | null
+          series_slot_at: string | null
+          shift_alert_sent_at: string | null
+          shift_opened_at: string | null
+          staffing: Database["public"]["Enums"]["staffing_state"]
+          starts_at: string
+          status: Database["public"]["Enums"]["occurrence_status"]
+          studio_id: string
+          substitute_for: string | null
+          unrecorded_resolved_at: string | null
+          unrecorded_resolved_by: string | null
+          unrecorded_resolved_choice: string | null
+          updated_at: string
+          waitlist_count: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "class_occurrences"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      private_move: {
+        Args: { p_new_start: string; p_occurrence_id: string }
+        Returns: Json
+      }
+      private_pack_consume: {
+        Args: { p_member_id: string; p_studio_id: string }
+        Returns: string
+      }
+      private_refund_run: {
+        Args: { p_occurrence_id: string }
+        Returns: undefined
+      }
+      private_release_run: {
+        Args: { p_occurrence_id: string }
+        Returns: undefined
+      }
+      private_session_types_for: {
+        Args: { p_studio_id: string }
+        Returns: {
+          coach_pay_cents: number
+          duration_min: number
+          id: string
+          name: string
+          people: number
+          price_cents: number
+        }[]
+      }
+      private_slots: {
+        Args: {
+          p_from: string
+          p_instructor_id: string
+          p_studio_id: string
+          p_to: string
+          p_type_id: string
+        }
+        Returns: {
+          coach_ids: string[]
+          ends_at: string
+          room_id: string
+          starts_at: string
+        }[]
+      }
+      private_studio_cancel: {
+        Args: { p_occurrence_id: string; p_reason?: string }
+        Returns: Json
+      }
+      private_type_save: {
+        Args: {
+          p_coach_pay_cents: number
+          p_duration_min: number
+          p_id: string
+          p_name: string
+          p_people: number
+          p_price_cents: number
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      private_type_toggle: {
+        Args: { p_active: boolean; p_id: string }
         Returns: Json
       }
       product_low_stock: {
@@ -11414,6 +11662,7 @@ export type Database = {
           occ_hidden: boolean
           occ_id: string
           occ_instructor_id: string
+          occ_is_private: boolean
           occ_minimum: number
           occ_name: string
           occ_series_tier: string
@@ -11874,6 +12123,7 @@ export type Database = {
           android_sha256_fingerprints: string
           currency: string
           free_first_class_enabled: boolean
+          gift_card_image_url: string
           gift_enabled: boolean
           gift_min_cents: number
           gift_presets: number[]
@@ -12322,6 +12572,7 @@ export type Database = {
         | "comp"
         | "gift_card"
         | "group"
+        | "private"
       payment_status:
         | "pending"
         | "succeeded"
@@ -12589,6 +12840,7 @@ export const Constants = {
         "comp",
         "gift_card",
         "group",
+        "private",
       ],
       payment_status: [
         "pending",

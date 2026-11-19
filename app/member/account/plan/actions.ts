@@ -268,3 +268,38 @@ const FREE_RESERVE_REASONS: Record<string, string> = {
   peak_not_allowed: "Free classes aren’t available at peak times.",
   month_not_published: "That class isn’t open for booking yet.",
 };
+
+/**
+ * Decision 116: book a private. private_book holds the seats (pending) and
+ * returns a purchase for Xendit, or confirms at once from a 1:1 pack credit or
+ * from account credit that covers the whole price. The Xendit success returns to
+ * the private's page, which polls until the webhook confirms it.
+ */
+export async function startPrivate(input: {
+  typeId: string; coachId: string | null; startsAt: string;
+  companions: { name: string; email: string }[]; payMode: "xendit" | "pack";
+}): Promise<{ ok: boolean; url?: string; message?: string; occurrenceId?: string; reason?: string }> {
+  const ctx = await getMemberContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const origin = currentMemberOrigin();
+  if (!origin) return { ok: false, message: "Could not work out the studio address." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("private_book", {
+    p_type_id: input.typeId, p_instructor_id: (input.coachId ?? null) as string,
+    p_starts_at: input.startsAt, p_companions: input.companions, p_pay_mode: input.payMode,
+  });
+  if (error) return { ok: false, message: error.message.replace(/^.*?:\s*/, "") };
+  const r = data as { ok: boolean; reason?: string; occurrence_id?: string; confirmed?: boolean;
+    purchase_id?: string; amount_cents?: number; currency?: string } | null;
+  if (!r?.ok) return { ok: false, reason: r?.reason ?? "unknown" };
+  if (r.confirmed) return { ok: true, url: `${origin}/private/${r.occurrence_id}?booked=1`, occurrenceId: r.occurrence_id };
+  const opened = await openXenditSession(ctx, {
+    purchaseId: r.purchase_id!, amountCents: r.amount_cents!, currency: r.currency!,
+    description: `${ctx.studioName} — private session`,
+    metadata: { purchase_id: r.purchase_id!, studio_id: ctx.studioId, member_id: ctx.memberId,
+                kind: "private", occurrence_id: r.occurrence_id! },
+    successUrl: `${origin}/private/${r.occurrence_id}?paid=1`,
+    cancelUrl: `${origin}/book/private`,
+  });
+  return opened ?? { ok: false, message: "Could not open checkout." };
+}

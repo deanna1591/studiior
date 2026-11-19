@@ -43,13 +43,14 @@ select expect_text('studio_by_slug still returns name',
 -- The function returns EXACTLY 15 output columns — the PWA two, plus Decision
 -- 55's time_format (migration 20260832130000), then 52a's four store columns
 -- (migration 20260832380000): android_package, android_sha256_fingerprints,
--- ios_team_id, ios_bundle_id. 15 + 4 = 19, and nothing else new.
-select expect_num('studio_by_slug returns exactly 22 columns',
+-- ios_team_id, ios_bundle_id. 15 + 4 = 19; later releases took it to 22, and Decision 110(a)
+-- (migration 20260833580000) adds gift_card_image_url: 23, nothing else new.
+select expect_num('studio_by_slug returns exactly 23 columns',
   (select count(*) from pg_proc p
      cross join lateral unnest(coalesce(p.proargnames, '{}'::text[])) as a
     join pg_namespace n on n.oid = p.pronamespace
    where n.nspname='public' and p.proname='studio_by_slug'
-     and a <> 'p_slug')::bigint, 22);
+     and a <> 'p_slug')::bigint, 23);
 
 -- THE ANON SURFACE IS EXACTLY FOURTEEN (Decision 50 added unsubscribe_marketing) — the drop+recreate of studio_by_slug (one
 -- of them) must not have lost or widened its anon grant. The suite's own

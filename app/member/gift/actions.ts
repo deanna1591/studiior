@@ -3,7 +3,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { currentSlug, currentMemberOrigin } from "@/lib/tenant";
 import { decryptSecret } from "@/lib/integrations-crypto";
-import { createSession } from "@/lib/xendit";
+import { createSession, CHANNELS_WITHOUT_APPLE_PAY } from "@/lib/xendit";
+import { giftAmountProblem } from "@/lib/gift-card";
 import type { Database } from "@/lib/database.types";
 
 export type GiftState = { ok: boolean; url?: string; message?: string } | null;
@@ -39,6 +40,8 @@ export async function buyGift(_prev: GiftState, fd: FormData): Promise<GiftState
   const deliveryDate = deliveryRaw || null;
 
   if (!amountCents) return { ok: false, message: "Choose an amount." };
+  const amountProblem = giftAmountProblem(amountCents);
+  if (amountProblem) return { ok: false, message: amountProblem };
   if (!buyerEmail.includes("@") || !recipientEmail.includes("@")) {
     return { ok: false, message: "A buyer and a recipient email are needed." };
   }
@@ -85,6 +88,8 @@ export async function buyGift(_prev: GiftState, fd: FormData): Promise<GiftState
     customerGivenNames: buyerName || "Gift buyer",
     customerEmail: buyerEmail,
     metadata: { purchase_id: g.purchase_id, studio_id: studio.id, kind: "gift" },
+    // Decision 110(a): offer Apple Pay only once the studio has it verified.
+    ...(g.apple_pay_verified ? {} : { allowedChannels: CHANNELS_WITHOUT_APPLE_PAY }),
     successUrl: `${origin}/gift/thanks`,
     cancelUrl: `${origin}/gift`,
   });

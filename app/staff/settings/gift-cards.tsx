@@ -14,8 +14,8 @@ function Save() {
  * the minimum. Off by default. Presets are entered in whole units.
  */
 export default function GiftCardsPanel({
-  enabled, presetsMajor, minMajor, currency,
-}: { enabled: boolean; presetsMajor: number[]; minMajor: number; currency: string }) {
+  enabled, presetsMajor, minMajor, currency, applePayVerified = false,
+}: { enabled: boolean; presetsMajor: number[]; minMajor: number; currency: string; applePayVerified?: boolean }) {
   const [state, action] = useFormState<PlainState, FormData>(saveGift, null);
   return (
     <form action={action} className="max-w-2xl">
@@ -46,6 +46,17 @@ export default function GiftCardsPanel({
               className="mt-1 w-full rounded border border-line bg-surface px-3 py-2 text-[13px] text-ink" />
           </label>
         </div>
+
+        <label className="mt-3 flex items-start gap-2.5 text-[13px] leading-[19px] text-ink">
+          <input type="checkbox" name="gift_apple_pay_verified" defaultChecked={applePayVerified} className="mt-0.5" />
+          <span>
+            <span className="font-medium">Apple Pay verified</span>
+            <span className="block text-[12px] leading-[18px] text-ink-3">
+              Turn on only once Apple Pay is enabled and the member site&apos;s domain is verified in
+              your Xendit account. Until then the gift checkout offers cards and e-wallets only.
+            </span>
+          </span>
+        </label>
 
         <div className="mt-3"><Save /></div>
       </div>
