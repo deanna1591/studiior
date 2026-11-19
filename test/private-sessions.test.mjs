@@ -87,3 +87,54 @@ test("a replacement start keyed as PostgREST returns it still matches groupGaps'
   assert.equal(keys.includes(raw[1]), false);
   assert.equal(keys.includes(new Date(raw[1]).toISOString()), true);
 });
+
+// Decision 116(b): a private keeps the class's coach.
+const ROWS = [
+  // 09:00 a free hour: two coaches available
+  { starts_at: "2026-11-23T01:00:00+00:00", coach_ids: ["hub", "kai"], replaces_occurrence_id: null },
+  // 10:00 an empty class: only its own coach
+  { starts_at: "2026-11-23T02:00:00+00:00", coach_ids: ["hub"], replaces_occurrence_id: "occ-1" },
+  // 11:00 two rooms, two empty classes, two different coaches
+  { starts_at: "2026-11-23T03:00:00+00:00", coach_ids: ["kai"], replaces_occurrence_id: "occ-2" },
+  { starts_at: "2026-11-23T03:00:00+00:00", coach_ids: ["ada"], replaces_occurrence_id: "occ-3" },
+];
+
+test("mergeSlots: one entry per start, coaches carried, replacement marked, keys normalised", async () => {
+  const { mergeSlots, slotReplaces } = await import("../lib/private-sessions.mjs");
+  const s = mergeSlots(ROWS);
+  assert.deepEqual(s.map((x) => x.start), ["2026-11-23T01:00:00.000Z", "2026-11-23T02:00:00.000Z", "2026-11-23T03:00:00.000Z"]);
+  assert.deepEqual(s[0].coaches.map((c) => c.id), ["hub", "kai"]);
+  assert.equal(slotReplaces(s[0]), false);
+  assert.equal(slotReplaces(s[1]), true);
+  assert.deepEqual(s[2].coaches.map((c) => c.id), ["kai", "ada"]);
+});
+
+test("the coach filter: all coaches shows every time; one coach only theirs, narrowed to them", async () => {
+  const { mergeSlots, slotsForCoach } = await import("../lib/private-sessions.mjs");
+  const s = mergeSlots(ROWS);
+  assert.equal(slotsForCoach(s, null).length, 3);
+  const hub = slotsForCoach(s, "hub");
+  assert.deepEqual(hub.map((x) => x.start), ["2026-11-23T01:00:00.000Z", "2026-11-23T02:00:00.000Z"]);
+  assert.ok(hub.every((x) => x.coaches.length === 1 && x.coaches[0].id === "hub"));
+  const ada = slotsForCoach(s, "ada");
+  assert.deepEqual(ada.map((x) => x.start), ["2026-11-23T03:00:00.000Z"]);
+  assert.equal(slotsForCoach(s, "nobody").length, 0);
+});
+
+test("the coach step is skipped when the time has one coach, asked when it has several", async () => {
+  const { mergeSlots, slotsForCoach, coachStep } = await import("../lib/private-sessions.mjs");
+  const s = mergeSlots(ROWS);
+  assert.deepEqual(coachStep(s[1]), { skip: true, coachId: "hub", choices: [] });
+  assert.deepEqual(coachStep(s[0]), { skip: false, coachId: null, choices: ["hub", "kai"] });
+  assert.deepEqual(coachStep(s[2]), { skip: false, coachId: null, choices: ["kai", "ada"] });
+  // with a coach filter set, every time has one coach, so the step is always skipped
+  for (const x of slotsForCoach(s, "kai")) assert.equal(coachStep(x).skip, true);
+  assert.equal(coachStep(null).skip, false);
+});
+
+test("no 'any coach' wording is left in the member flow", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../app/member/book/private/flow.tsx", import.meta.url), "utf8");
+  assert.ok(!/Any coach/.test(src));
+  assert.ok(/All coaches/.test(src));
+});

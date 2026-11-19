@@ -15,3 +15,9 @@ export function vatSplit(totalCents: number): { netCents: number; vatCents: numb
 export const REPLACES_LABEL: string;
 export function slotLabel(replacesOccurrenceId: string | null | undefined): string | null;
 export function replaceAllowed(a: { empty: boolean; targeted?: boolean; tier: string; hoursUntilStart: number; windowHours?: number | null }): boolean;
+export type SlotCoach = { id: string; replaces: boolean };
+export type Slot = { start: string; coaches: SlotCoach[] };
+export function mergeSlots(rows: { starts_at: string; coach_ids: string[] | null; replaces_occurrence_id: string | null }[] | null | undefined): Slot[];
+export function slotsForCoach(slots: Slot[], coachId: string | null): Slot[];
+export function coachStep(slot: Slot | null | undefined): { skip: boolean; coachId: string | null; choices: string[] };
+export function slotReplaces(slot: Slot | null | undefined, coachId?: string | null): boolean;

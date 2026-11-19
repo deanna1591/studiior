@@ -3,6 +3,13 @@
 -- 21(c) apply the minimum to future classes, 18(b) a month's submission is not
 -- the weekly pattern (migrations 20260833585000 + 20260833590000). UUID space
 -- d16a, checked free.
+-- Decision 116 amendment (b) (migration 20260833600000) "a private keeps the
+-- class's coach": a replacement slot carries only the replaced class's coach; a
+-- free hour every available private coach; a coach filter; another coach on an
+-- empty class refused PT409 private_coach_mismatch naming the class's coach; a
+-- replaced class pays nothing in every case and sends no coach email; the coach's
+-- private_booked carries "This replaces your empty {class} at {time}." only on a
+-- replacement; a hidden empty class offered; a non-private coach's empty class not.
 -- =============================================================================
 -- Covers: an empty hour offered; an empty flex class offered at any distance; an
 -- empty core class offered inside the replace window and not outside it; a class
@@ -143,6 +150,17 @@ insert into bookings (studio_id, occurrence_id, member_id, status, source, payme
 update class_occurrences set booked_count = 1 where id in ('d16a0000-0000-0000-0000-00000000c004','d16a0000-0000-0000-0000-00000000c005');
 update class_occurrences set committed_at = now() where id = 'd16a0000-0000-0000-0000-00000000c006';
 
+-- 116(b) fixtures on day 3: a hidden empty flex class (Gus) and an empty flex class
+-- taught by Pat, who does not teach privates.
+insert into class_occurrences (id, studio_id, class_type_id, room_id, location_id, name, instructor_id,
+     starts_at, ends_at, capacity, status, staffing, guarantee_tier, flex, minimum_bookings, hidden_from_members) values
+  ('d16a0000-0000-0000-0000-00000000c0b1','d16a0000-0000-0000-0000-000000000001','d16a0000-0000-0000-0000-0000000cf001',
+   'd16a0000-0000-0000-0000-00000000b001','d16a0000-0000-0000-0000-00000000000a','Hidden Flow',
+   'd16a0000-0000-0000-0000-0000000001c2', d16a_at(3,'10:00'), d16a_at(3,'10:50'), 8,'scheduled','assigned','flex',true,2,true),
+  ('d16a0000-0000-0000-0000-00000000c0b2','d16a0000-0000-0000-0000-000000000001','d16a0000-0000-0000-0000-0000000cf001',
+   'd16a0000-0000-0000-0000-00000000b001','d16a0000-0000-0000-0000-00000000000a','Pat Flow',
+   'd16a0000-0000-0000-0000-0000000001c3', d16a_at(3,'12:00'), d16a_at(3,'12:50'), 8,'scheduled','assigned','flex',true,2,false);
+
 create or replace function d16a_slots(p_day int) returns table(starts_at timestamptz, replaces uuid, coach_ids uuid[])
 language sql as $$
   select s.starts_at, s.replaces_occurrence_id, s.coach_ids
@@ -168,9 +186,25 @@ select expect_true('a committed class is not offered (day 2, 16:00)',
   not exists (select 1 from d16a_slots(2) where starts_at = d16a_at(2,'16:00')));
 select expect_true('a replacement starts with the class: 10:30 on the core class is not offered',
   not exists (select 1 from d16a_slots(2) where starts_at = d16a_at(2,'10:30')));
-select expect_text('the displaced coach (Gus) is offered first and is not busy',
-  (select coach_ids[1]::text from d16a_slots(2) where starts_at = d16a_at(2,'10:00')),
-  'd16a0000-0000-0000-0000-0000000001c2');
+select expect_text('116(b): the empty class is offered only with its own coach (Gus)',
+  (select coach_ids::text from d16a_slots(2) where starts_at = d16a_at(2,'10:00')),
+  '{d16a0000-0000-0000-0000-0000000001c2}');
+select expect_text('116(b): a free hour is offered with every available private coach (Gus, Ines)',
+  (select coach_ids::text from d16a_slots(2) where starts_at = d16a_at(2,'08:00')),
+  '{d16a0000-0000-0000-0000-0000000001c2,d16a0000-0000-0000-0000-0000000001c1}');
+select expect_true('116(b): filtered to Ines, the free hour is there and Gus''s empty class is not',
+  exists (select 1 from private_slots('d16a0000-0000-0000-0000-000000000001','d16a0000-0000-0000-0000-0000000007a1',
+            'd16a0000-0000-0000-0000-0000000001c1', d16a_at(2,'00:00'), d16a_at(3,'00:00')) s
+           where s.starts_at = d16a_at(2,'08:00'))
+  and not exists (select 1 from private_slots('d16a0000-0000-0000-0000-000000000001','d16a0000-0000-0000-0000-0000000007a1',
+            'd16a0000-0000-0000-0000-0000000001c1', d16a_at(2,'00:00'), d16a_at(3,'00:00')) s
+           where s.starts_at = d16a_at(2,'10:00')));
+select expect_true('116(b): a hidden empty class is offered like any other, with its coach',
+  exists (select 1 from d16a_slots(3) where starts_at = d16a_at(3,'10:00')
+            and replaces = 'd16a0000-0000-0000-0000-00000000c0b1'
+            and coach_ids = array['d16a0000-0000-0000-0000-0000000001c2']::uuid[]));
+select expect_true('116(b): a coach who does not teach privates keeps their empty class out',
+  not exists (select 1 from d16a_slots(3) where starts_at = d16a_at(3,'12:00')));
 
 \echo '==== 2. replace a core class; the displaced coach teaches it, so nothing is paid ===='
 set role authenticated; select set_config('request.jwt.claim.sub','d16a0000-0000-0000-0000-0000000000e1',false);
@@ -197,26 +231,75 @@ select expect_num('replace: the displaced coach is paid nothing for the replaced
   (select amount_cents from instructor_pay_records where occurrence_id = d16a_cid('core_in')), 0);
 select expect_num('replace: one audit row',
   (select count(*) from audit_logs where action = 'private.replaced_class' and entity_id = d16a_cid('core_in')), 1);
+select expect_true('116(b): the coach''s private_booked says it replaces their empty class',
+  (select payload ->> 'replaces_line' = E'\n\nThis replaces your empty Reformer Flow at 10:00.'
+          and payload ->> 'replaces_html' like '%This replaces your empty <strong>Reformer Flow</strong> at 10:00.%'
+     from notifications where template_key = 'private_booked'
+      and payload ->> 'occurrence_id' = current_setting('t.p1')));
+select expect_true('116(b): it renders with the line and nothing stripped',
+  (select coalesce(array_length(r.stripped, 1), 0) = 0
+          and r.text_body like '%This replaces your empty Reformer Flow at 10:00.%'
+          and r.html_body like '%This replaces your empty <strong>Reformer Flow</strong> at 10:00.%'
+     from notifications n cross join lateral render_notification(n.id) r
+    where n.template_key = 'private_booked' and n.payload ->> 'occurrence_id' = current_setting('t.p1')));
 
-\echo '==== 3. replace with another coach: core pays the holding fee, flex the standby amount ===='
+\echo '==== 2b. a free hour: no replacement line ===='
 set role authenticated; select set_config('request.jwt.claim.sub','d16a0000-0000-0000-0000-0000000000e1',false);
-select set_config('t.r2', private_book('d16a0000-0000-0000-0000-0000000007a1', 'd16a0000-0000-0000-0000-0000000001c1',
+select set_config('t.rf', private_book('d16a0000-0000-0000-0000-0000000007a1', 'd16a0000-0000-0000-0000-0000000001c1',
+  d16a_at(2,'08:00'), '[]'::jsonb, 'pack')::text, false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('free hour: booked with the chosen coach (Ines)',
+  (select instructor_id::text || '/' || (replaces_occurrence_id is null)::text from class_occurrences
+    where id = (current_setting('t.rf')::jsonb ->> 'occurrence_id')::uuid),
+  'd16a0000-0000-0000-0000-0000000001c1/true');
+select expect_true('free hour: the private_booked has no replacement line and renders without one',
+  (select n.payload ->> 'replaces_line' = '' and r.text_body not like '%replaces your empty%'
+          and coalesce(array_length(r.stripped, 1), 0) = 0
+     from notifications n cross join lateral render_notification(n.id) r
+    where n.template_key = 'private_booked'
+      and n.payload ->> 'occurrence_id' = current_setting('t.rf')::jsonb ->> 'occurrence_id'));
+
+\echo '==== 3. 116(b): another coach is refused; a replaced class pays nothing ===='
+do $m$ declare v text; begin
+  perform set_config('request.jwt.claim.sub','d16a0000-0000-0000-0000-0000000000e1',true);
+  perform set_config('role','authenticated',true);
+  begin
+    perform private_book('d16a0000-0000-0000-0000-0000000007a1', 'd16a0000-0000-0000-0000-0000000001c1',
+      d16a_at(2,'18:00'), '[]'::jsonb, 'pack');
+    v := 'no error';
+  exception when others then v := sqlstate || ' ' || sqlerrm;
+  end;
+  perform set_config('role','none',true); perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('t.mm', v, false);
+end $m$;
+select expect_text('mismatch: Ines on Gus''s empty class is refused PT409, naming Gus',
+  current_setting('t.mm'), 'PT409 That time is with Gus. Pick that coach or another time.');
+select expect_text('mismatch: nothing was written and the pack credit is untouched',
+  (select status::text from class_occurrences where id = d16a_cid('core_paid')) || '/'
+  || (select credits_remaining::text from memberships where id = 'd16a0000-0000-0000-0000-0000000009a1'),
+  'scheduled/3');
+set role authenticated; select set_config('request.jwt.claim.sub','d16a0000-0000-0000-0000-0000000000e1',false);
+select set_config('t.r2', private_book('d16a0000-0000-0000-0000-0000000007a1', 'd16a0000-0000-0000-0000-0000000001c2',
   d16a_at(2,'18:00'), '[]'::jsonb, 'pack')::text, false);
-select set_config('t.r3', private_book('d16a0000-0000-0000-0000-0000000007a1', 'd16a0000-0000-0000-0000-0000000001c1',
+select set_config('t.r3', private_book('d16a0000-0000-0000-0000-0000000007a1', null,
   d16a_at(4,'10:00'), '[]'::jsonb, 'pack')::text, false);
 select set_config('request.jwt.claim.sub','',false); reset role;
-select expect_text('core paid: the class is replaced', (select cancellation_cause::text from class_occurrences where id = d16a_cid('core_paid')), 'replaced_by_private');
-select expect_num('core paid: the displaced coach is paid the core holding fee',
-  (select amount_cents from instructor_pay_records where occurrence_id = d16a_cid('core_paid')), 40000);
-select expect_num('flex paid: the displaced coach is paid the flex standby amount',
-  (select amount_cents from instructor_pay_records where occurrence_id = d16a_cid('flex_paid')), 5000);
-select expect_num('another coach: the displaced coach is told (private_replaced_class)',
-  (select count(*) from notifications where template_key = 'private_replaced_class'
-     and payload ->> 'occurrence_id' = d16a_cid('core_paid')::text), 1);
-select expect_true('the coach notice renders with nothing stripped and no token left',
-  (select coalesce(array_length(r.stripped, 1), 0) = 0 and r.html_body !~ '\{[a-z_]+\}'
-     from notifications n cross join lateral render_notification(n.id) r
-    where n.template_key = 'private_replaced_class' and n.payload ->> 'occurrence_id' = d16a_cid('core_paid')::text));
+select expect_text('core: the class is replaced, with its own coach teaching the private',
+  (select cancellation_cause::text from class_occurrences where id = d16a_cid('core_paid')) || '/'
+  || (select instructor_id::text from class_occurrences where id = (current_setting('t.r2')::jsonb ->> 'occurrence_id')::uuid),
+  'replaced_by_private/d16a0000-0000-0000-0000-0000000001c2');
+select expect_num('core: a replaced class pays nothing',
+  (select amount_cents from instructor_pay_records where occurrence_id = d16a_cid('core_paid')), 0);
+select expect_num('flex: a replaced class pays nothing',
+  (select amount_cents from instructor_pay_records where occurrence_id = d16a_cid('flex_paid')), 0);
+select expect_num('compute_class_pay_run: replaced_by_private is zero on every replaced class',
+  (select count(*) from class_occurrences o
+    where o.studio_id = 'd16a0000-0000-0000-0000-000000000001' and o.cancellation_cause = 'replaced_by_private'
+      and (compute_class_pay_run(o.id) ->> 'amount_cents')::int <> 0), 0);
+select expect_num('no coach email for any replaced class',
+  (select count(*) from notifications where template_key = 'private_replaced_class'), 0);
+select expect_true('the private_replaced_class template is gone',
+  not exists (select 1 from notification_templates where key = 'private_replaced_class'));
 
 \echo '==== 4. the race: a pending replacement holds the slot; a member books the class; refusal ===='
 set role authenticated; select set_config('request.jwt.claim.sub','d16a0000-0000-0000-0000-0000000000e2',false);

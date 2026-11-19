@@ -8,7 +8,8 @@ import PrivateFlow from "./flow";
 export const dynamic = "force-dynamic";
 
 /**
- * Decision 116: book a private session. Pick a type, a coach or any coach, a time
+ * Decision 116: book a private session. Pick a type, a time (each names its coach;
+ * Decision 116(b): a coach filter, no "any coach")
  * from the free gaps only (private_slots), the companions for a Duo or Trio, then
  * pay through Xendit or with a 1:1 pack credit. The session is hidden from every
  * other member and the public timetable.

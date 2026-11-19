@@ -3,26 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberContext } from "@/lib/auth";
+import { mergeSlots, slotReplaces, type Slot } from "@/lib/private-sessions";
 
-/** Decision 116: the free starts for one studio-local day (private_slots). */
+/**
+ * Decision 116: the free starts for one studio-local day (private_slots).
+ * Decision 116(b): each start carries its coaches; an empty class only its own.
+ */
 export async function privateSlots(typeId: string, coachId: string | null, fromIso: string, toIso: string)
-  : Promise<{ starts: string[]; replaces: string[]; error?: string }> {
+  : Promise<{ starts: string[]; replaces: string[]; slots: Slot[]; error?: string }> {
   const ctx = await getMemberContext();
-  if (!ctx) return { starts: [], replaces: [], error: "You are not signed in." };
+  if (!ctx) return { starts: [], replaces: [], slots: [], error: "You are not signed in." };
   const supabase = createClient();
   const { data, error } = await supabase.rpc("private_slots", {
     p_studio_id: ctx.studioId, p_type_id: typeId, p_instructor_id: (coachId ?? null) as string,
     p_from: fromIso, p_to: toIso,
   });
-  if (error) return { starts: [], replaces: [], error: error.message };
-  // Decision 116(a): a start that replaces an empty class is labelled as such.
-  const rows = (data ?? []) as { starts_at: string; replaces_occurrence_id: string | null }[];
-  // Normalised to toISOString(): groupGaps re-keys every start that way, so a
-  // raw PostgREST "+00:00" string would never match and the label would vanish.
-  const iso = (s: string) => new Date(s).toISOString();
+  if (error) return { starts: [], replaces: [], slots: [], error: error.message };
+  // mergeSlots normalises every start to toISOString(): groupGaps keys that way,
+  // so a raw PostgREST "+00:00" string would never match.
+  const slots = mergeSlots((data ?? []) as { starts_at: string; coach_ids: string[] | null; replaces_occurrence_id: string | null }[]);
   return {
-    starts: rows.map((r) => iso(r.starts_at)),
-    replaces: rows.filter((r) => r.replaces_occurrence_id).map((r) => iso(r.starts_at)),
+    starts: slots.map((s) => s.start),
+    replaces: slots.filter((s) => slotReplaces(s)).map((s) => s.start),
+    slots,
   };
 }
 

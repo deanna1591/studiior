@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { accentSolid, accentChip } from "@/lib/accent-pair";
 import { fmtClock } from "@/lib/clock";
-import { groupGaps, privateReasonSentence, REPLACES_LABEL } from "@/lib/private-sessions";
+import { coachStep, groupGaps, privateReasonSentence, REPLACES_LABEL, slotReplaces, slotsForCoach, type Slot } from "@/lib/private-sessions";
 import { privateSlots } from "./actions";
 import { startPrivate } from "../../account/plan/actions";
 
@@ -33,10 +33,12 @@ export default function PrivateFlow({
   packCredits: number; creditCents: number;
 }) {
   const [typeId, setTypeId] = useState<string>(types[0]?.id ?? "");
+  // Decision 116(b): the coach filter (null = all coaches) and the coach the
+  // chosen time is with. There is no "any coach": a time names its coach.
+  const [filter, setFilter] = useState<string | null>(null);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [day, setDay] = useState(0);
-  const [starts, setStarts] = useState<string[]>([]);
-  const [replaces, setReplaces] = useState<Set<string>>(new Set());
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, startLoad] = useTransition();
   const [chosen, setChosen] = useState<string | null>(null);
   const [comps, setComps] = useState<{ name: string; email: string }[]>([]);
@@ -49,16 +51,28 @@ export default function PrivateFlow({
 
   useEffect(() => {
     if (!t) return;
-    setChosen(null);
+    setChosen(null); setCoachId(null);
     startLoad(async () => {
       const from = localMidnight(timeZone, day), to = localMidnight(timeZone, day + 1);
-      const r = await privateSlots(t.id, coachId, from.toISOString(), to.toISOString());
-      setStarts(r.starts);
-      setReplaces(new Set(r.replaces));
+      const r = await privateSlots(t.id, null, from.toISOString(), to.toISOString());
+      setSlots(r.slots);
     });
-  }, [t, coachId, day, timeZone]);
+  }, [t, day, timeZone]);
 
-  const gaps = useMemo(() => groupGaps(starts), [starts]);
+  const visible = useMemo(() => slotsForCoach(slots, filter), [slots, filter]);
+  const byStart = useMemo(() => new Map(visible.map((s) => [s.start, s])), [visible]);
+  const gaps = useMemo(() => groupGaps(visible.map((s) => s.start)), [visible]);
+  const coachName = (id: string) => coaches.find((c) => c.id === id)?.name ?? "Coach";
+  const chosenSlot = chosen ? byStart.get(chosen) ?? null : null;
+  const step = coachStep(chosenSlot);
+  function pick(s: string) {
+    setChosen(s);
+    const st = coachStep(byStart.get(s));
+    setCoachId(st.skip ? st.coachId : null);
+  }
+  function pickFilter(id: string | null) {
+    setFilter(id); setChosen(null); setCoachId(null);
+  }
   const dayLabels = useMemo(() => Array.from({ length: DAYS }, (_, d) => {
     const at = localMidnight(timeZone, d);
     const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone, ...o }).format(new Date(at.getTime() + 12 * 3600e3));
@@ -70,7 +84,7 @@ export default function PrivateFlow({
   const compsOk = comps.every((c) => c.name.trim() && /.+@.+\..+/.test(c.email.trim()));
 
   function pay(mode: "xendit" | "pack") {
-    if (!t || !chosen) return;
+    if (!t || !chosen || !coachId) return;
     setErr(null);
     startPay(async () => {
       const r = await startPrivate({ typeId: t.id, coachId, startsAt: chosen, companions: comps, payMode: mode });
@@ -101,16 +115,6 @@ export default function PrivateFlow({
       </section>
 
       <section>
-        <p className="m-label mb-2 text-ink">Coach</p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setCoachId(null)} className="m-press rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(coachId === null)}>Any coach</button>
-          {coaches.map((c) => (
-            <button key={c.id} type="button" onClick={() => setCoachId(c.id)} className="m-press rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(coachId === c.id)}>{c.name}</button>
-          ))}
-        </div>
-      </section>
-
-      <section>
         <p className="m-label mb-2 text-ink">Day</p>
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           {dayLabels.map((l, d) => (
@@ -126,10 +130,18 @@ export default function PrivateFlow({
 
       <section>
         <p className="m-label mb-2 text-ink">Free times</p>
+        <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1" data-testid="coach-filter">
+          <button type="button" onClick={() => pickFilter(null)}
+            className="m-press shrink-0 rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(filter === null)}>All coaches</button>
+          {coaches.map((c) => (
+            <button key={c.id} type="button" onClick={() => pickFilter(c.id)}
+              className="m-press shrink-0 rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(filter === c.id)}>{c.name}</button>
+          ))}
+        </div>
         {loading ? (
           <p className="m-sub text-ink-2">Looking for free times…</p>
         ) : gaps.length === 0 ? (
-          <p className="m-sub text-ink-2">No free times this day. Try another day or any coach.</p>
+          <p className="m-sub text-ink-2">{filter ? `No free times with ${coachName(filter)} this day. Try another day or all coaches.` : "No free times this day. Try another day."}</p>
         ) : (
           <div className="space-y-3">
             {gaps.map((g) => (
@@ -138,22 +150,40 @@ export default function PrivateFlow({
                   Free {fmtClock(g.from, timeZone, timeFormat)} to {fmtClock(new Date(new Date(g.to).getTime() + (t?.duration_min ?? 50) * 60000).toISOString(), timeZone, timeFormat)}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {g.starts.map((s) => (
-                    <button key={s} type="button" onClick={() => setChosen(s)}
-                      className="m-press rounded-full px-3.5 py-1.5 text-[14px] font-semibold"
-                      style={chosen === s ? accentSolid() : accentChip()}>
-                      {fmtClock(s, timeZone, timeFormat)}
-                      {replaces.has(s) && (
-                        <span className="block text-[11.5px] font-medium">{REPLACES_LABEL}</span>
-                      )}
-                    </button>
-                  ))}
+                  {g.starts.map((s) => {
+                    const sl = byStart.get(s);
+                    return (
+                      <button key={s} type="button" onClick={() => pick(s)}
+                        className="m-press rounded-2xl px-3.5 py-1.5 text-left text-[14px] font-semibold"
+                        style={chosen === s ? accentSolid() : accentChip()}>
+                        {fmtClock(s, timeZone, timeFormat)}
+                        <span className="block text-[12px] font-medium">
+                          {(sl?.coaches ?? []).map((c) => coachName(c.id)).join(", ")}
+                        </span>
+                        {slotReplaces(sl) && (
+                          <span className="block text-[11.5px] font-medium">{REPLACES_LABEL}</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {chosenSlot && !step.skip && (
+        <section>
+          <p className="m-label mb-2 text-ink">Coach</p>
+          <div className="flex flex-wrap gap-2">
+            {step.choices.map((id) => (
+              <button key={id} type="button" onClick={() => setCoachId(id)}
+                className="m-press rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(coachId === id)}>{coachName(id)}</button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {need > 0 && (
         <section>
@@ -180,12 +210,12 @@ export default function PrivateFlow({
 
       <div className="space-y-2">
         {usePack && (
-          <button type="button" disabled={pending || !chosen || !compsOk} onClick={() => pay("pack")}
+          <button type="button" disabled={pending || !chosen || !coachId || !compsOk} onClick={() => pay("pack")}
             className="m-press w-full rounded-full py-3.5 text-[16px] font-semibold disabled:opacity-60" style={accentSolid()}>
             {pending ? "Booking…" : `Use a pack credit (${packCredits} left)`}
           </button>
         )}
-        <button type="button" disabled={pending || !chosen || !compsOk} onClick={() => pay("xendit")}
+        <button type="button" disabled={pending || !chosen || !coachId || !compsOk} onClick={() => pay("xendit")}
           className="m-press w-full rounded-full py-3.5 text-[16px] font-semibold disabled:opacity-60"
           style={usePack ? { background: "var(--surface)", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" } : accentSolid()}>
           {pending ? "Opening checkout…" : creditCovers ? `Book with your account credit` : `Pay ${t?.priceLabel ?? ""} and book`}

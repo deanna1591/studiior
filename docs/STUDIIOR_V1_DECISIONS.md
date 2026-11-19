@@ -533,6 +533,14 @@ Every Monday at 7:00 studio time a card on the staff dashboard and a page under 
 
 ---
 
+## 116 (b) — A private keeps the class's coach (amendment, recorded 19 Nov 2026)
+
+An empty class is offered as a private slot only with the coach assigned to that class. A true free hour, with no class in the room, is offered with every private coach who is available then. The slot list shows the coach against each time; a coach filter shows one coach's open times; there is no 'any coach' choice. Because no coach is ever displaced, a replaced class pays nothing and sends no coach email; the coach's private confirmation says it replaces their empty class. A coach not ticked as teaching privates keeps their own empty hours out of private booking. A hidden empty class is offered like any other. Nothing else in 116(a) changes: the 48 hour core window, the pending hold, the race refusal and the audit rows stand.
+
+**Status:** settled, to build. **Amends:** Decision 116 (a). Deanna, 19 Nov 2026.
+
+---
+
 ## 116 (a) — An empty class is down-time (amendment, recorded 19 Nov 2026)
 
 A private slot is offered when the hour is empty, or when the only class in that hour is empty: no seats counted in booked_count, no live payment hold, no held waitlist offer, not committed, not private, still scheduled. An empty flex class can be replaced at any time. An empty core or always-runs class can be replaced only when the private starts within the studio's replace window (setting private_replace_core_hours, Reform 48 hours), so core classes keep their chance to fill. A pending private records the class it replaces (replaces_occurrence_id) and takes no room until it is confirmed; while pending it holds that class's slot so nobody else can target it, and the group class stays bookable by members. At confirm, under a row lock, the class is checked again: if it is still empty it is cancelled with the cause replaced_by_private and the private takes the room; if a member booked it or it committed in the meantime, the private is refused, the payment comes back as credit (or the pack session is returned), and the member is told 'That time was just taken. Pick another time.' on their return screen and by email (template private_time_taken). A replaced class sends no member emails; its coach is told (template private_replaced_class) unless that coach is the one teaching the private. The replaced class's coach, when they teach privates and are free, is offered first in the coach picker, and their own empty class never counts as them being busy. Pay for a replaced class: the core holding fee (core_unmet_pay_cents) when the class was core or always-runs, the flex standby amount (flex_unmet_pay_cents) when it was flex, and nothing when the displaced coach teaches the private. The cause never follows the not-confirmed path and reads 'Replaced by a private session' on staff screens and in the digest. Every replacement and every refusal writes an audit row.
