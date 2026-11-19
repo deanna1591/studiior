@@ -16,6 +16,7 @@ const nextConfig = {
     // to fetching them from the CDN, but the bundled copy avoids a round trip).
     outputFileTracingIncludes: {
       "/member/receipts/[id]": ["./public/fonts/invoice/**/*"],
+      "/member/giftcard/[id]/[code]/[amount]": ["./public/fonts/invoice/SpaceGrotesk-*.ttf"],
     },
   },
 };

@@ -1,8 +1,13 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { anonStudio } from "@/lib/anon-studio";
 import { neutralAccent, type PresetKey } from "@/lib/theme";
 import { formatMoney } from "@/lib/plans";
-import { cardLayout, giftAmountProblem, isGiftCode } from "@/lib/gift-card";
+import {
+  cardAmountLabel, cardLayout, giftAmountProblem, isGiftCode,
+  GIFT_CARD_FONT_FAMILY, GIFT_CARD_FONTS,
+} from "@/lib/gift-card";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,8 +28,35 @@ export const runtime = "nodejs";
  * Extension-less because the middleware matcher excludes .png. Immutable: the
  * path IS the card.
  */
+// The card font (it carries ₱; next/og's built-in one does not). The bundled
+// copy first (outputFileTracingIncludes), else the public file — the receipt
+// route's pattern. Null when neither loads; the card then writes the ISO code.
+async function loadCardFonts(reqUrl: string) {
+  const dir = join(process.cwd(), "public", "fonts", "invoice");
+  const out: { name: string; data: ArrayBuffer; weight: 400 | 500 | 700; style: "normal" }[] = [];
+  for (const f of GIFT_CARD_FONTS) {
+    let data: ArrayBuffer | null = null;
+    try {
+      const b = await readFile(join(dir, f.file));
+      data = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+    } catch { /* not bundled */ }
+    if (!data) {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), 6000);
+        const res = await fetch(new URL(`/fonts/invoice/${f.file}`, reqUrl), { signal: ctl.signal });
+        clearTimeout(t);
+        if (res.ok) data = await res.arrayBuffer();
+      } catch { /* unreachable */ }
+    }
+    if (!data) return null;
+    out.push({ name: GIFT_CARD_FONT_FAMILY, data, weight: f.weight, style: "normal" });
+  }
+  return out;
+}
+
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: { id: string; code: string; amount: string } },
 ) {
   const studio = await anonStudio();
@@ -42,14 +74,16 @@ export async function GET(
   const accent = studio.accent_color ?? neutralAccent(preset);
   const image = studio.gift_card_image_url ?? null;
   const L = cardLayout({ accent, hasImage: !!image });
-  const amountLabel = formatMoney(amount, studio.currency ?? "PHP");
+  const currency = studio.currency ?? "PHP";
+  const fonts = await loadCardFonts(req.url);
+  const amountLabel = cardAmountLabel(formatMoney(amount, currency), currency, !!fonts);
 
   return new ImageResponse(
     (
       <div style={{
         width: L.width, height: L.height, display: "flex", position: "relative",
         background: L.background ?? "#14170E", overflow: "hidden",
-        fontFamily: "sans-serif",
+        fontFamily: fonts ? `"${GIFT_CARD_FONT_FAMILY}"` : "sans-serif",
       }}>
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -79,6 +113,7 @@ export async function GET(
     ),
     {
       width: L.width, height: L.height,
+      ...(fonts ? { fonts } : {}),
       headers: { "Cache-Control": "public, max-age=31536000, immutable" },
     },
   );
