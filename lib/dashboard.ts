@@ -274,9 +274,12 @@ export type GrowthSlot = {
   qualifies: boolean; wanted: boolean;
   current_tier: "core" | "flex"; proposed_tier: "core" | "flex" | null;
   action: "make_core" | "make_flex" | null;
+  // Decision 106(a): the weekly budget informs, it never drops a proposal.
+  dow?: number; occ_in_week?: number;
+  would_hold?: number | null; over_budget?: boolean; dismissed?: boolean; line?: string | null;
 };
-export type GrowthDay = { dow: number; day_name: string; budget: number; unfilled: number; slots: GrowthSlot[] };
-export type GrowthCoach = { instructor_id: string; name: string; budget: number; raise_to: number | null; days: GrowthDay[] };
+export type GrowthDay = { dow: number; day_name: string; slots: GrowthSlot[] };
+export type GrowthCoach = { instructor_id: string; name: string; budget: number; core_now?: number; raise_to: number | null; days: GrowthDay[] };
 export type GrowthWanted = { series_id: string; occurrence_id: string; class_name: string; instructor_name: string; time: string; day_name: string; reason: string };
 export type GrowthNudge = { member_id: string; name: string; phone: string | null; email: string | null; last_visit: string | null };
 export type GrowthPayload = {

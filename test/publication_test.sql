@@ -138,7 +138,12 @@ insert into studio_staff (id, studio_id, user_id, email, role) values
 insert into rooms (id, studio_id, location_id, name, capacity) values
   ('9b159b15-0000-0000-0000-00000000ee01','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a','Studio 1',10),
   ('9b159b15-0000-0000-0000-00000000ee02','9b159b15-0000-0000-0000-000000000002','9b159b15-0000-0000-0000-00000000000b','Studio 1',10),
-  ('9b159b15-0000-0000-0000-00000000ee03','9b159b15-0000-0000-0000-000000000003','9b159b15-0000-0000-0000-00000000000c','Studio 1',10);
+  ('9b159b15-0000-0000-0000-00000000ee03','9b159b15-0000-0000-0000-000000000003','9b159b15-0000-0000-0000-00000000000c','Studio 1',10),
+  -- Studio A's open shift (a107) gets its own room, so the filler's Decision 19
+  -- adjacency rule (the coach before or after in the same room that day) never
+  -- reaches it: on a run date where Ana's 07:00 falls on the same day it would
+  -- go to her, and this suite measures the publication rules, not the filler.
+  ('9b159b15-0000-0000-0000-00000000ee04','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a','Studio 2',10);
 
 insert into class_types (id, studio_id, name, duration_minutes, default_capacity) values
   ('9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-000000000001','Reformer',50,10),
@@ -223,7 +228,7 @@ values
    t_at('Europe/Prague', current_setting('t.a_m1')::date + 8, '12:00'), t_at('Europe/Prague', current_setting('t.a_m1')::date + 8, '12:50'), 'scheduled'),
   -- an open shift, for the engine
   ('9b159b15-0000-0000-0000-00000000a107','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a',
-   '9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-00000000ee01','Reformer Open',10,null,
+   '9b159b15-0000-0000-0000-00000000cc01','9b159b15-0000-0000-0000-00000000ee04','Reformer Open',10,null,
    t_at('Europe/Prague', current_setting('t.a_m1')::date + 9, '12:00'), t_at('Europe/Prague', current_setting('t.a_m1')::date + 9, '12:50'), 'scheduled'),
   -- Studio A, the month AFTER next: one class Mia is about to book into
   ('9b159b15-0000-0000-0000-00000000a201','9b159b15-0000-0000-0000-000000000001','9b159b15-0000-0000-0000-00000000000a',

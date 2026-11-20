@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Decision 106 — a manager sets a coach's "Core classes per day" budget (1..3).
+ * Decision 106 — a manager sets a coach's "Core classes per week" budget (1..21).
  * The RPC re-checks manager-up (PT403) and the range (PT422); a stale page can
  * only fail, never act around the gate.
  */
@@ -14,8 +14,8 @@ export async function saveBudget(_prev: BudgetState, fd: FormData): Promise<Budg
   const instructorId = String(fd.get("instructor_id") ?? "").trim();
   const n = Number.parseInt(String(fd.get("n") ?? ""), 10);
   if (!instructorId) return { ok: false, message: "No instructor." };
-  if (!Number.isFinite(n) || n < 1 || n > 3) {
-    return { ok: false, message: "Pick a number from 1 to 3." };
+  if (!Number.isFinite(n) || n < 1 || n > 21) {
+    return { ok: false, message: "Pick a number from 1 to 21." };
   }
   const supabase = createClient();
   const { data, error } = await supabase.rpc("set_instructor_core_budget", {
@@ -27,5 +27,5 @@ export async function saveBudget(_prev: BudgetState, fd: FormData): Promise<Budg
   }
   if (!(data as { ok?: boolean })?.ok) return { ok: false, message: "Nothing was saved." };
   revalidatePath(`/instructors/${instructorId}`);
-  return { ok: true, message: `Saved. ${n} core ${n === 1 ? "class" : "classes"} per day.` };
+  return { ok: true, message: `Saved. ${n} core ${n === 1 ? "class" : "classes"} per week.` };
 }

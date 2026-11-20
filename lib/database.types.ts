@@ -1789,6 +1789,7 @@ export type Database = {
           starts_on: string
           status: Database["public"]["Enums"]["series_status"]
           studio_id: string
+          tier_from: string | null
           time_of_day: string
           updated_at: string
         }
@@ -1818,6 +1819,7 @@ export type Database = {
           starts_on: string
           status?: Database["public"]["Enums"]["series_status"]
           studio_id: string
+          tier_from?: string | null
           time_of_day: string
           updated_at?: string
         }
@@ -1847,6 +1849,7 @@ export type Database = {
           starts_on?: string
           status?: Database["public"]["Enums"]["series_status"]
           studio_id?: string
+          tier_from?: string | null
           time_of_day?: string
           updated_at?: string
         }
@@ -2659,6 +2662,58 @@ export type Database = {
           },
           {
             foreignKeyName: "group_purchases_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      growth_dismissals: {
+        Row: {
+          created_at: string
+          dismissed_by: string | null
+          dow: number
+          expires_on: string
+          id: string
+          series_id: string
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed_by?: string | null
+          dow: number
+          expires_on: string
+          id?: string
+          series_id: string
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          dismissed_by?: string | null
+          dow?: number
+          expires_on?: string
+          id?: string
+          series_id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_dismissals_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "class_series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "growth_dismissals_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "growth_dismissals_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -3491,7 +3546,7 @@ export type Database = {
           bio: string | null
           certifications: Json
           color: string | null
-          core_classes_per_day: number | null
+          core_classes_per_week: number | null
           core_weekly_cap: number | null
           created_at: string
           display_name: string
@@ -3510,7 +3565,7 @@ export type Database = {
           bio?: string | null
           certifications?: Json
           color?: string | null
-          core_classes_per_day?: number | null
+          core_classes_per_week?: number | null
           core_weekly_cap?: number | null
           created_at?: string
           display_name: string
@@ -3529,7 +3584,7 @@ export type Database = {
           bio?: string | null
           certifications?: Json
           color?: string | null
-          core_classes_per_day?: number | null
+          core_classes_per_week?: number | null
           core_weekly_cap?: number | null
           created_at?: string
           display_name?: string
@@ -9261,11 +9316,21 @@ export type Database = {
         Returns: string
       }
       bulk_update_series: {
-        Args: { p_change: Json; p_preview?: boolean; p_series_ids: string[] }
+        Args: {
+          p_applies_from?: string
+          p_change: Json
+          p_preview?: boolean
+          p_series_ids: string[]
+        }
         Returns: Json
       }
       bulk_update_series_run: {
-        Args: { p_change: Json; p_preview: boolean; p_series_ids: string[] }
+        Args: {
+          p_applies_from?: string
+          p_change: Json
+          p_preview: boolean
+          p_series_ids: string[]
+        }
         Returns: Json
       }
       calendar_feed: { Args: { p_token: string }; Returns: string }
@@ -10010,13 +10075,20 @@ export type Database = {
         Returns: Json
       }
       growth_apply: {
-        Args: { p_occurrence_id: string; p_scope: string; p_tier: string }
+        Args: {
+          p_occurrence_id: string
+          p_raise_budget?: boolean
+          p_scope: string
+          p_tier: string
+        }
         Returns: Json
       }
+      growth_dismiss: { Args: { p_occurrence_id: string }; Returns: Json }
       growth_insights: {
         Args: { p_studio_id: string; p_week: string }
         Returns: Json
       }
+      growth_number_word: { Args: { p_n: number }; Returns: string }
       guarantee_report: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
@@ -11490,6 +11562,7 @@ export type Database = {
           p_first_name?: string
           p_html: string
           p_payload: Json
+          p_recipient_role?: string
           p_recipient_type: string
           p_studio_id: string
           p_subject: string
@@ -11734,6 +11807,8 @@ export type Database = {
         Returns: {
           end_minutes: number
           ends_at: string
+          growth_suggestion: Json
+          has_growth_suggestion: boolean
           local_date: string
           local_end: string
           local_start: string
@@ -12023,6 +12098,7 @@ export type Database = {
       }
       set_series_guarantee: {
         Args: {
+          p_applies_from?: string
           p_core_cutoff_hours?: number
           p_min_bookings?: number
           p_series_id: string
@@ -12131,6 +12207,10 @@ export type Database = {
       staff_delete_thread: { Args: { p_thread_id: string }; Returns: Json }
       staff_edit_availability_submission: {
         Args: { p_rows: Json; p_submission_id: string }
+        Returns: Json
+      }
+      staff_mark_attended: {
+        Args: { p_booking_id: string; p_reason?: string }
         Returns: Json
       }
       staff_mark_thread_read: { Args: { p_thread_id: string }; Returns: Json }

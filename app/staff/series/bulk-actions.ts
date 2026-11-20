@@ -63,6 +63,9 @@ async function run(fd: FormData, preview: boolean): Promise<BulkResult> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("bulk_update_series", {
     p_series_ids: ids, p_change: change as Json, p_preview: preview,
+    // Decision 21 (d): a tier change applies from a date (blank = today).
+    p_applies_from: /^\d{4}-\d{2}-\d{2}$/.test(String(fd.get("applies_from") ?? ""))
+      ? String(fd.get("applies_from")) : undefined,
   });
   if (error) {
     return {

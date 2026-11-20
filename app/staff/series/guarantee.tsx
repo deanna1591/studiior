@@ -82,6 +82,12 @@ export default function SeriesGuarantee({
                      className={`${inputClass} w-20`} />
             </label>
           )}
+          {/* Decision 21 (d): a tier change applies from a date. Blank = today;
+              classes before it keep the tier they have now. */}
+          <label className="flex items-center gap-1.5 text-[13px] leading-[20px] text-ink-2">
+            Applies from
+            <input name="applies_from" type="date" className={`${inputClass} w-40`} />
+          </label>
           <Save />
         </div>
         <p className="m-micro mt-2 max-w-[62ch] text-ink-3">

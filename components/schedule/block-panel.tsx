@@ -1,5 +1,6 @@
 "use client";
 
+import GrowthSuggestion, { type ScheduleGrowth } from "@/components/schedule/growth-suggestion";
 import { useEffect, useState, useTransition } from "react";
 import { republishShift, openShift, setAlwaysRuns, type AlwaysRunsState, setDayTier, type DayTierState } from "@/app/staff/roster/actions";
 import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
@@ -33,6 +34,8 @@ export type BlockFacts = {
   hidden?: boolean;
   /** Decision 116: a private session (always hidden; cancelled with the private tools). */
   isPrivate?: boolean;
+  /** Decision 106(a): the live growth suggestion for this class. */
+  growth?: ScheduleGrowth | null;
   /** Decision 91: whether this class is core, for the hide-confirm warning. */
   isCore?: boolean;
   /** Decision 21 amendment: the effective tier ('core'|'flex'|'always'), for the
@@ -237,6 +240,11 @@ export default function BlockPanel({
             {eff.waitlistCount > 0 && <> · <span className="num">+{eff.waitlistCount}</span> waiting</>}
             {facts.pendingApplications > 0 && <> · <span className="num">{facts.pendingApplications}</span> applied</>}
           </p>
+        )}
+
+        {canManage && !facts.cancelled && facts.growth && (
+          <GrowthSuggestion growth={facts.growth} coach={facts.instructorName?.split(" ")[0] ?? null}
+                            budget={facts.growth.budget ?? null} />
         )}
 
         {canManage && !facts.cancelled && !facts.isPrivate && (

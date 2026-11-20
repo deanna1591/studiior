@@ -12,6 +12,7 @@ import CheckinBanner from "@/components/instructor/checkin-banner";
 import { coverRequestAllowed } from "@/lib/cover-window";
 import { AddWalkIn, DeskPay, type DeskPlan } from "../../desk-ui";
 import { InstructorAddMember } from "@/components/instructor/add-member";
+import MarkAttended from "@/components/staff/mark-attended";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
     supabase.from("studio_settings").select("cover_auto_accept_enabled")
       .eq("studio_id", ctx.studio_id).maybeSingle(),
     // FIX B: the class start instant, so cover is offered only before it starts.
-    supabase.from("class_occurrences").select("starts_at").eq("id", params.id).maybeSingle(),
+    supabase.from("class_occurrences").select("starts_at, attendance_finalised_at").eq("id", params.id).maybeSingle(),
     supabase.from("studios").select("contact_email, contact_phone, currency").eq("id", ctx.studio_id).maybeSingle(),
     // Decision 81a: per-booking pay state (an instructor is denied `payments` by
     // RLS, so the marker/buttons read through this instructor-scoped reader),
@@ -69,6 +70,10 @@ export default async function RosterPage({ params }: { params: { id: string } })
       .map((p) => [p.booking_id, p]),
   );
   const r = data as Roster | null;
+  const classStarted = occRow?.starts_at ? new Date(occRow.starts_at).getTime() <= Date.now() : false;
+  // Once the class has started and the check-in window has shut, check-in would
+  // refuse; Mark attended (Decision 35 a) is the way in until finalisation.
+  const afterWindow = classStarted && !(data as Roster | null)?.live;
   // FIX B: a cover request is only open before the class starts (comparing
   // instants; request_cover refuses a started class too, even on a stale page).
   const coverOpen = occRow?.starts_at
@@ -161,9 +166,15 @@ export default async function RosterPage({ params }: { params: { id: string } })
                 {/* §8 gives an instructor check-in. It does NOT give them
                     "correct a no-show" or "add a walk-in", so those are absent
                     rather than drawn and refused. */}
-                {r.can_check_in && !m.checked_in && m.booking_status === "booked" && (
+                {r.can_check_in && !m.checked_in && m.booking_status === "booked" && !afterWindow && (
                   <CheckIn studioId={ctx.studio_id} occurrenceId={r.occurrence_id}
                            bookingId={m.booking_id} memberId={m.member_id} />
+                )}
+                {/* Decision 35 (a): after the class has started, until the day is
+                    finalised, the coach marks a booked member attended. */}
+                {!m.checked_in && m.booking_status === "booked"
+                  && afterWindow && !occRow?.attendance_finalised_at && (
+                  <MarkAttended bookingId={m.booking_id} occurrenceId={r.occurrence_id} />
                 )}
               </div>
 

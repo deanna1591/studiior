@@ -218,8 +218,9 @@ select expect_num('Dan took none: available, but down to teach nothing',
     where instructor_id='a55ea55e-0000-0000-0000-00000000d104')::bigint, 0);
 
 -- The working, in words.
+-- Decision 19: the other sentence is the adjacency rule, "continues their block".
 select expect_true('the run says why each person got theirs',
-  (select bool_and(x ->> 'why' like '% classes that week, fewest of the candidates')
+  (select bool_and(x ->> 'why' like '% classes that week, fewest of the candidates' or x ->> 'why' = 'continues their block')
      from jsonb_array_elements(current_setting('t.r3')::jsonb -> 'detail') x
     where x ->> 'outcome' = 'assigned'));
 -- One rule, so one sentence. A line claiming a target would be a true number
@@ -310,7 +311,7 @@ select set_config('request.jwt.claim.sub','a55ea55e-0000-0000-0000-0000000000a1'
 select set_config('t.r5', (select assign_instructors('a55ea55e-0000-0000-0000-000000000001')::text), false);
 
 select expect_true('the reason given is fewest classes, never a target',
-  (select bool_and(x ->> 'why' like '% classes that week, fewest of the candidates')
+  (select bool_and(x ->> 'why' like '% classes that week, fewest of the candidates' or x ->> 'why' = 'continues their block')
      from jsonb_array_elements(current_setting('t.r5')::jsonb -> 'detail') x
     where x ->> 'outcome' = 'assigned'));
 select expect_true('the run no longer reports a commitment fallback at all',

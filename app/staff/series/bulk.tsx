@@ -103,6 +103,10 @@ export default function BulkManage({
                   <input type="number" min={1} value={v("minimum")} onChange={(e) => setV("minimum", e.target.value)}
                          className="w-24 rounded border border-line bg-paper px-2 py-1.5 text-[13px] text-ink" /></label>
               )}
+              {/* Decision 21 (d): blank = today; earlier classes keep their tier. */}
+              <label className="flex flex-col gap-1 text-[12px] text-ink-2">Applies from
+                <input type="date" value={v("applies_from")} onChange={(e) => setV("applies_from", e.target.value)}
+                       className="rounded border border-line bg-paper px-2 py-1.5 text-[13px] text-ink" /></label>
             </>
           )}
           {ct === "room" && (

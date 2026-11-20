@@ -1,5 +1,6 @@
 "use client";
 
+import type { ScheduleGrowth } from "@/components/schedule/growth-suggestion";
 import { flexStateChip } from "@/lib/flex-state";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -130,6 +131,9 @@ export type CalEvent = {
   hidden?: boolean;
   /** Decision 116: a private session (hidden by definition) — labelled Private. */
   isPrivate?: boolean;
+  /** Decision 106(a): the weekly growth review's live suggestion for this class
+   *  (glow border + sparkle on the block, the line and buttons in the sheet). */
+  growth?: ScheduleGrowth | null;
 };
 
 /** A CalEvent with the two Dates the grid lays out, in studio wall time. */
@@ -456,8 +460,12 @@ export default function ScheduleCalendar({
                     : f === "quiet" ? "var(--ink-3)" : "var(--lime-text)"}`,
         // A full class is closed, and the ring says so without another colour:
         // the palette's loud slots are spent on staffing.
-        boxShadow: f === "full" || f === "nearly_full"
-          ? "inset 0 0 0 1.5px var(--lime-text)" : undefined,
+        // Decision 106(a): a growth suggestion glows (accent ring + soft halo);
+        // the full ring, when also full, sits inside it.
+        boxShadow: [
+          f === "full" || f === "nearly_full" ? "inset 0 0 0 1.5px var(--lime-text)" : null,
+          e.growth ? "0 0 0 2px var(--lime-text), 0 0 10px 1px color-mix(in srgb, var(--lime-text) 45%, transparent)" : null,
+        ].filter(Boolean).join(", ") || undefined,
         // A flex class awaiting its deadline reads as provisional: a dashed
         // edge, which is the same vocabulary the no-room block uses for "this
         // is not settled yet".
@@ -693,8 +701,13 @@ export default function ScheduleCalendar({
       }
 
       return (
-        <div className={root}>
-          <div className="flex items-baseline gap-1.5">
+        <div className={`${root} relative`}>
+          {event.growth && (
+            <span aria-label="Growth suggestion" title={event.growth.line ?? "Growth suggestion"}
+                  className="pointer-events-none absolute right-0.5 top-0 text-[11px] leading-none"
+                  style={{ color: "var(--lime-text)" }}>✦</span>
+          )}
+          <div className={`flex items-baseline gap-1.5 ${event.growth ? "pr-2.5" : ""}`}>
             <span className="num min-w-0 flex-1 truncate tabular-nums text-ink">{timeRange}</span>
             <span className="num shrink-0 text-[13px] font-semibold tabular-nums text-ink">{headcount}</span>
           </div>
@@ -860,6 +873,7 @@ export default function ScheduleCalendar({
             staffing: selected.staffing,
             pendingApplications: selected.pendingApplications,
             hidden: selected.hidden ?? false,
+            growth: selected.growth ?? null,
             isPrivate: selected.isPrivate ?? false,
             // The core warning fires for a class that runs regardless of bookings
             // (core; a one-off carries its tier on effectiveTier when there is no

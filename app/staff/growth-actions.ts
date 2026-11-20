@@ -20,12 +20,13 @@ export async function applyGrowthTier(_prev: GrowthState, fd: FormData): Promise
   const occId = String(fd.get("occurrence_id") ?? "").trim();
   const tier = String(fd.get("tier") ?? "").trim();
   const scope = String(fd.get("scope") ?? "week").trim();
+  const raise = String(fd.get("raise_budget") ?? "") === "1";
   if (!occId || (tier !== "core" && tier !== "flex") || (scope !== "week" && scope !== "series")) {
     return { error: "Something’s missing — try again." };
   }
   const supabase = createClient();
   const { error } = await supabase.rpc("growth_apply", {
-    p_occurrence_id: occId, p_tier: tier, p_scope: scope,
+    p_occurrence_id: occId, p_tier: tier, p_scope: scope, p_raise_budget: raise,
   });
   if (error) {
     const c = codeOf(error);
@@ -35,6 +36,7 @@ export async function applyGrowthTier(_prev: GrowthState, fd: FormData): Promise
   }
   revalidatePath("/");
   revalidatePath("/retention");
+  revalidatePath("/schedule");
   return { ok: true };
 }
 
@@ -49,11 +51,28 @@ export async function raiseInstructorBudget(_prev: GrowthState, fd: FormData): P
   if (error) {
     const c = codeOf(error);
     if (c === "PT403") return { error: "Only owners and managers set a budget." };
-    if (c === "PT422") return { error: "The budget is a number from 1 to 3." };
+    if (c === "PT422") return { error: "The budget is a number from 1 to 21." };
     return { error: error.message };
   }
   revalidatePath("/");
   revalidatePath("/retention");
   revalidatePath(`/instructors/${instructorId}`);
+  return { ok: true };
+}
+
+/** Decision 106(a): hide a growth suggestion for four weeks (series plus weekday). */
+export async function dismissGrowth(_prev: GrowthState, fd: FormData): Promise<GrowthState> {
+  const occId = String(fd.get("occurrence_id") ?? "").trim();
+  if (!occId) return { error: "Something’s missing — try again." };
+  const supabase = createClient();
+  const { error } = await supabase.rpc("growth_dismiss", { p_occurrence_id: occId });
+  if (error) {
+    const c = codeOf(error);
+    if (c === "PT403") return { error: "Only owners and managers change the timetable." };
+    return { error: error.message };
+  }
+  revalidatePath("/");
+  revalidatePath("/retention");
+  revalidatePath("/schedule");
   return { ok: true };
 }

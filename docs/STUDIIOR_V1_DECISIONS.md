@@ -4,7 +4,7 @@
 
 **Source of truth above this file:** `docs/STUDIIOR_PRODUCT_BIBLE.md`. Note its per-chapter **MVP Scope** sections — Ch. 4, Ch. 5, 6.23, Ch. 7, 8.18, Ch. 10, Ch. 12 — which is where scope actually lives. The earlier citation here ("Ch. 8 seven modules, Ch. 7 exclusions, Ch. 9 roles, Ch. 20 scope test") pointed at chapters that either say something else or do not exist; roles are in `STUDIIOR_V1_PERMISSIONS.md`.
 
-**On the numbering:** the entries are not contiguous. **13** is real — the community-feed exclusion — but it lives in *Excluded from V1* below rather than as its own `## 13`. **19** and **20** were never assigned; checked against git history (`git log -S "Decision 19" --all` and 20 return nothing, no doc references), they are skipped numbers, not lost entries. Recent decisions (25–30) sit just below Decision 18, newest first.
+**On the numbering:** the entries are not contiguous. **13** is real — the community-feed exclusion — but it lives in *Excluded from V1* below rather than as its own `## 13`. **19** and **20** were never assigned; checked against git history (`git log -S "Decision 19" --all` and 20 return nothing, no doc references), they were skipped numbers, not lost entries. On 21 Nov 2026 the unused **19** took the filler rule; **20** is still unassigned. Recent decisions (25–30) sit just below Decision 18, newest first.
 
 ---
 
@@ -530,6 +530,42 @@ Every Monday at 7:00 studio time a card on the staff dashboard and a page under 
 **Polish, no decision, checkout-body only.** The checkout credit line reads "gift credit applied" or "reservation credit applied" by source, or "credit applied" when both are used; at a total of zero the button reads "Complete" and the Pay at the desk option is hidden. This touches checkout-body and the credit-line helper only; the reserve, buy and plan surfaces are out of scope.
 
 **Where:** a per instructor budget column with the November seed (service only, audited); growth_insights(p_studio_id, p_week) service only (the ranked slots, the qualifying rule, the proposals, the raise signal, the wanted slots and the members to nudge); a weekly pg_cron job per studio at 07:00 Monday writing the week's insight rows and the optional summary through the insight path; apply functions calling set_occurrence_day_tier and set_series_guarantee with audit; the Settings and profile budget field; the dashboard card, the Retention growth section (Make core, Make flex, Add a class here, nudge), and the two checkout polish items in checkout-body plus the source split in the credit-line helper. **Status:** settled, build in the next gate. **Reuses:** Decision 21 and 22 (flex and core tiers, the flex minimum), Decision 79b (ai_drafts_enabled, the per studio voice, the platform key), Decision 92 (dashboard_facts and the number verifier), Decision 91 (the dashboard), Decision 79a (the Retention page), Decision 103 and 110 (the checkout credit line). Deanna, 18 Nov 2026.
+
+---
+
+## 106 (a) — The core budget is per week and informs, it does not block (amendment, recorded 21 Nov 2026)
+
+A coach's core budget is the number of core classes they hold per week, not per day. The weekly growth review proposes every flex slot that qualifies on the data as core, whatever the budget, and every core slot that runs empty as flex. When a proposal would take the coach past their weekly budget, the card says so on that line, 'Hubert would hold 4 core classes this week, budget 3', and the button reads 'Make core and raise budget', which does both in one tap. A series core on two days counts as two. The field on Instructors → coach reads 'Core classes per week'. On the staff Schedule, a class with an open growth suggestion carries a suggestion marker: a soft glowing border in the studio accent with a small sparkle at the top right corner, on week and day views; tapping the class opens its sheet with the suggestion line at the top ('Reached 2 of 2 three weeks running. Make it core?' or 'Empty four weeks running. Make it flex?') and the same buttons as the card. The marker clears when the suggestion is applied or dismissed; 'Dismiss' hides it for four weeks.
+
+**Build notes.** The budget range is 1 to 21. The Schedule marker matches on series plus weekday, not on a single class. Dismissals live in their own small table keyed on series, weekday and an expiry four weeks out. schedule_range is dropped and recreated with the flag, and its grants are re-applied exactly. Existing budget values carry over unchanged; Reform's per-coach values are set in the December apply, not in this build.
+
+**Status:** settled, to build. **Amends:** Decision 106. Deanna, 21 Nov 2026.
+
+---
+
+## 35 (a) — Staff can mark attended until the day is finalised (amendment, recorded 21 Nov 2026)
+
+On the roster, front desk and up and the class's own coach can mark a booked member attended at any time after the class starts and until the studio's attendance finalisation runs (midnight studio time at Reform), with the check-in timed at the class start and an audit row. After finalisation, a manager or owner can still flip a no-show to attended with a reason. That reversal voids the infraction, clears the desk-pay strike it caused (only when the member has no other no-show or late cancel on an unpaid drop-in), returns any kept reservation fee as credit through the existing trigger, and writes an audit row; the coach's pay does not change, because a no-show seat was already paid under 75(j). The existing mark_present is folded into this path. The member's app shows the visit as attended either way.
+
+**Status:** settled, to build. **Amends:** Decision 35, Decision 75 (f). **Reuses:** Decision 73 (c) desk-pay restore, Decision 103 reservation credit, Decision 75 (j). Deanna, 21 Nov 2026.
+
+---
+
+## 21 (d) — Tier changes from a date (amendment, recorded 21 Nov 2026)
+
+A series tier change, single or bulk, takes an 'Applies from' date (default today). Classes before that date keep the tier they have at that moment, pinned on the class, and classes from the date on follow the new series tier. Classes from the date on take the new tier, replacing any per-day pin. Committed classes are never changed. The series shows 'core from 1 Dec' until the date passes.
+
+**Status:** settled, to build. **Amends:** Decision 21, Decision 21 (b), Decision 22, Decision 42b. Deanna, 21 Nov 2026.
+
+---
+
+## 19 — The filler keeps a coach's hours together (recorded 21 Nov 2026)
+
+When Fill the timetable chooses between available coaches for a class, it first prefers the coach already assigned to the class immediately before or after in the same room that day, then the coach with the fewest classes that week. The preview shows the reason 'continues their block' where that applied.
+
+**Build notes.** The fill preview tracks its own picks in memory, so adjacency and weekly counts in the preview match the real run.
+
+**Status:** settled, to build. **Amends:** the fill engine (migrations 061 and 065). Number 19 was never assigned before; it now holds this rule. Deanna, 21 Nov 2026.
 
 ---
 
@@ -1756,6 +1792,8 @@ On the Recurring classes list a manager selects any number of series and applies
 **Migration 195** (`20260832000000`). Tests: `test/bulk_series_test.sql` (space `b012`, 31 assertions — preview writes nothing (md5 unchanged); minimum/tier/room/ends_on applied to several series, past and cancelled occurrences untouched; a room clash refused and listed while the rest apply; a start-date change over booked earlier occurrences refused; the template instructor changed with the occurrence set md5 unchanged; foreign-studio and unknown ids PT403; a non-manager PT403; the audit row). Browser-verified as the Reform owner: a three-series minimum change previewed 3 rows and applied ("Changed 3 recurring classes.") with the series page reflecting the new minimum; a mixed end-date batch previewed one change + one refusal and applied to *"Changed 1 recurring class. 1 refused: Reformer Flow Mon 07:00 — later classes have bookings."*; at 375px no page overflow and the preview table scrolls in its container.
 
 **Where:** Business Rules §5; Data Model §5; migration 195. **Status:** settled. **Extends:** Decision 42a (per-class/period assignment), Decision 37 (series editing). **Reuses:** `set_series_guarantee`, `update_series`, the `studiior.series_editing` flag, the single-series refusal reasons.
+
+**Note (21 Nov 2026): series end-date fix.** An End-date-only change sets the end date and cancels the series' classes after it, and nothing else; it never replays the template over earlier dates. Classes moved off their series time by staff are left where staff put them.
 
 ---
 

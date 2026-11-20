@@ -983,7 +983,7 @@ select expect_num('...and the peak slot STAYS SPENT, because they attended',
 select expect_num('...with an audit row for the correction',
   (select count(*) from audit_logs
     where studio_id = '9eac9eac-0000-0000-0000-000000000001'
-      and action = 'booking.marked_present'), 1);
+      and action = 'booking.marked_attended'), 1);
 
 -- Excusing a LATE CANCEL does give the slot back, which is what excusing means.
 select expect_num('(the second infraction''s booking spent nothing — it was off-peak)',

@@ -74,3 +74,37 @@ test("qualifies: reached the flex minimum in three of the last four weeks", () =
   // exactly three met in the last four
   assert.equal(qualifies([w(2), w(2), w(2), w(0)], 2), true);
 });
+
+// --- Decision 106 (a) -------------------------------------------------------
+import { metStreak, emptyStreak, suggestionLine, weekBudget } from "../lib/growth-score.mjs";
+
+test("streaks count from the most recent week", () => {
+  const wk = (b) => ({ booked: b });
+  assert.equal(metStreak([wk(3), wk(2), wk(1), wk(4)], 2), 2);
+  assert.equal(metStreak([wk(1), wk(5)], 2), 0);
+  assert.equal(emptyStreak([wk(0), wk(0), wk(3)]), 2);
+  assert.equal(emptyStreak([wk(1), wk(0)]), 0);
+});
+
+test("the suggestion lines read plainly", () => {
+  assert.equal(suggestionLine({ action: "make_core", metStreak: 3, emptyStreak: 0, met4: 3, lastBooked: 4, flexMin: 2 }),
+    "Reached 2 of 2 three weeks running. Make it core?");
+  assert.equal(suggestionLine({ action: "make_flex", metStreak: 0, emptyStreak: 4, met4: 0, lastBooked: 0, flexMin: 2 }),
+    "Empty four weeks running. Make it flex?");
+  assert.equal(suggestionLine({ action: "make_flex", metStreak: 0, emptyStreak: 1, met4: 2, lastBooked: 0, flexMin: 2 }),
+    "Reached the minimum in two of the last four weeks. Make it flex?");
+  assert.equal(suggestionLine({ action: null, metStreak: 0, emptyStreak: 0, met4: 0, lastBooked: 0, flexMin: 2 }), null);
+});
+
+test("the weekly budget flags, it never drops a proposal", () => {
+  const out = weekBudget(3, 3, [
+    { id: "a", score: 0.5, classes: 1 },
+    { id: "b", score: 0.9, classes: 1 },
+  ]);
+  assert.deepEqual(out, [
+    { id: "b", wouldHold: 4, overBudget: true },
+    { id: "a", wouldHold: 5, overBudget: true },
+  ]);
+  // three on one day under a weekly cap of 3: none over.
+  assert.ok(weekBudget(0, 3, [1, 2, 3].map((i) => ({ id: String(i), score: i, classes: 1 }))).every((x) => !x.overBudget));
+});

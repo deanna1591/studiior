@@ -26,6 +26,7 @@ import { canForceCommit, forceCommitMinimum } from "@/lib/force-commit";
 import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
 import ScrollToMember from "./scroll-to-member";
+import MarkAttended from "@/components/staff/mark-attended";
 import { fullName } from "@/lib/full-name";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
 
   const { data: occ } = await supabase
     .from("class_occurrences")
-    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, hidden_from_members, unrecorded_resolved_at, unrecorded_resolved_by, unrecorded_resolved_choice, instructors!instructor_id(display_name), rooms(name)")
+    .select("id, name, starts_at, ends_at, class_type_id, capacity, booked_count, waitlist_count, status, staffing, instructor_id, assignment_requested_at, assignment_confirmed_at, flex, minimum_bookings, committed_at, guarantee_tier, hidden_from_members, unrecorded_resolved_at, unrecorded_resolved_by, attendance_finalised_at, unrecorded_resolved_choice, instructors!instructor_id(display_name), rooms(name)")
     .eq("id", params.occurrenceId)
     .maybeSingle();
   if (!occ) notFound();
@@ -422,6 +423,19 @@ export default async function Roster({ params, searchParams }: { params: { occur
                 )}
                 {guestOf.has(b.member_id) && !b.members?.waiver_signed_at && (
                   <PaperWaiverButton memberId={b.member_id} occurrenceId={occ.id} />
+                )}
+                {/* Decision 35 (a): mark attended. A booked member once the class
+                    has started (until the day is finalised); a no-show, with a
+                    reason, by a manager (required once finalised). */}
+                {desk && b.status === "booked" && !checkedIn.has(b.id) && !occ.attendance_finalised_at
+                  && new Date(occ.starts_at).getTime() <= Date.now() && (
+                  <div className="mt-1 pl-9"><MarkAttended bookingId={b.id} occurrenceId={occ.id} /></div>
+                )}
+                {b.status === "no_show" && (manager || (desk && !occ.attendance_finalised_at)) && (
+                  <div className="mt-1 pl-9">
+                    <MarkAttended bookingId={b.id} occurrenceId={occ.id} withReason
+                                  reasonRequired={!!occ.attendance_finalised_at} />
+                  </div>
                 )}
                 {manager && b.status === "booked" && b.payment_source === "drop_in" && !paidBookings.has(b.id) && (
                   <MakeFreeButton bookingId={b.id} occurrenceId={occ.id} />

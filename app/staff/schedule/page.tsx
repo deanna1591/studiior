@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ScheduleGrowth } from "@/components/schedule/growth-suggestion";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
 import { shiftDateKey, studioDateKey, studioToday } from "@/lib/tz";
@@ -168,6 +169,7 @@ export default async function Schedule({
     occ_hidden: boolean | null;
     occ_is_private: boolean | null;
     occ_reached_minimum: boolean | null; occ_paid_count: number | null; occ_unpaid_count: number | null;
+    has_growth_suggestion: boolean | null; growth_suggestion: ScheduleGrowth | null;
   }[];
 
   const appCount = new Map<string, number>();
@@ -210,6 +212,8 @@ export default async function Schedule({
     minimum: o.occ_minimum ?? null,
     // Decision 91: off the member app, still on the staff calendar.
     hidden: o.occ_hidden ?? false,
+    // Decision 106(a): the weekly growth review's live proposal for this class.
+    growth: o.has_growth_suggestion ? o.growth_suggestion : null,
     isPrivate: o.occ_is_private ?? false,
     // A flex slot with nothing else of that instructor's beside it: the one
     // that costs a trip for a class that may not run, and the one a studio

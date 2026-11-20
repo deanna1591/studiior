@@ -7,7 +7,8 @@ import type { GrowthCoach, GrowthSlot, GrowthPayload } from "@/lib/dashboard";
 
 /**
  * Decision 106 — the growth card. Per instructor and weekday, each coach's class
- * slots ranked by a score, proposed as the top {budget} core and the rest flex,
+ * slots ranked by a score; every qualifying slot is proposed core (106(a): the
+ * weekly budget informs, a slot past it says so and offers to raise it),
  * with a "Make core" / "Make flex" button each. A slot with fewer than four
  * weeks of history shows "Collecting data" with no proposal. Nothing changes
  * without a tap; the RPCs re-check manager-up in the database.
@@ -23,13 +24,16 @@ function SubmitPill({ label }: { label: string }) {
   );
 }
 
-function ApplyForm({ occId, tier, scope, label }: { occId: string; tier: string; scope: "week" | "series"; label: string }) {
+export function ApplyForm({ occId, tier, scope, label, raise = false }: {
+  occId: string; tier: string; scope: "week" | "series"; label: string; raise?: boolean;
+}) {
   const [state, action] = useFormState<GrowthState, FormData>(applyGrowthTier, null);
   return (
     <form action={action} className="contents">
       <input type="hidden" name="occurrence_id" value={occId} />
       <input type="hidden" name="tier" value={tier} />
       <input type="hidden" name="scope" value={scope} />
+      {raise && <input type="hidden" name="raise_budget" value="1" />}
       <SubmitPill label={label} />
       {state && "error" in state && <span className="text-[11px] text-coral">{state.error}</span>}
     </form>
@@ -56,7 +60,14 @@ function tierChip(t: "core" | "flex") {
   );
 }
 
-function SlotRow({ slot }: { slot: GrowthSlot }) {
+/** Decision 106(a): "Hubert would hold 4 core classes this week, budget 3". */
+export function overBudgetLine(coach: string, slot: GrowthSlot, budget: number): string | null {
+  if (!slot.over_budget || slot.would_hold == null) return null;
+  return `${coach} would hold ${slot.would_hold} core classes this week, budget ${budget}`;
+}
+
+function SlotRow({ slot, coach, budget }: { slot: GrowthSlot; coach: string; budget: number }) {
+  const over = overBudgetLine(coach, slot, budget);
   const nums = slot.collecting
     ? slot.collecting_label
     : [
@@ -78,12 +89,17 @@ function SlotRow({ slot }: { slot: GrowthSlot }) {
           )}
         </div>
         <div className="mt-0.5 text-[12px] text-ink-3">{nums}</div>
+        {over && <div className="mt-0.5 text-[12px] text-ink-2">{over}</div>}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         {slot.action ? (
           <>
             <ApplyForm occId={slot.occurrence_id} tier={slot.proposed_tier!} scope="week"
                        label={slot.action === "make_core" ? "Make core" : "Make flex"} />
+            {over && (
+              <ApplyForm occId={slot.occurrence_id} tier="core" scope="series" raise
+                         label="Make core and raise budget" />
+            )}
             <ApplyForm occId={slot.occurrence_id} tier={slot.proposed_tier!} scope="series"
                        label="every week" />
           </>
@@ -105,18 +121,15 @@ export function CoachProposals({ coaches }: { coaches: GrowthCoach[] }) {
         <div key={c.instructor_id}>
           <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <h3 className="text-[13px] font-semibold text-ink">{c.name}</h3>
-            <span className="text-[12px] text-ink-3">{c.budget} core/day</span>
+            <span className="text-[12px] text-ink-3">{c.budget} core/week</span>
           </div>
           {c.raise_to && <RaiseForm instructorId={c.instructor_id} to={c.raise_to} coach={c.name} />}
           {c.days.map((d) => (
             <div key={d.dow} className="mt-2">
               <div className="flex items-center gap-2">
                 <span className="text-[12px] font-medium text-ink-2">{d.day_name}</span>
-                {d.unfilled > 0 && (
-                  <span className="text-[11px] text-ink-3">{d.unfilled} core place{d.unfilled > 1 ? "s" : ""} unfilled</span>
-                )}
               </div>
-              <ul>{d.slots.map((s) => <SlotRow key={s.series_id} slot={s} />)}</ul>
+              <ul>{d.slots.map((s) => <SlotRow key={s.series_id} slot={s} coach={c.name} budget={c.budget} />)}</ul>
             </div>
           ))}
         </div>

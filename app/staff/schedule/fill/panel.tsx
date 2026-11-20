@@ -76,10 +76,11 @@ export default function FillPanel() {
       <p className="mb-3 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
         Assigns an instructor to every open class in the range: somebody down to
         teach that class type, inside the dates they gave you, free at the time,
-        and not already teaching. Whoever has fewest classes that week goes
-        first — the agreed weekly minimum is how you review an instructor, not
-        how the studio staffs a Tuesday. Anything it cannot fill honestly is
-        left as an open shift.
+        and not already teaching. The coach teaching the class just before or
+        after it in the same room goes first, so their hours stay together;
+        otherwise whoever has fewest classes that week. The agreed weekly
+        minimum is how you review an instructor, not how the studio staffs a
+        Tuesday. Anything it cannot fill honestly is left as an open shift.
       </p>
 
       <form action={doPreview} className="flex flex-wrap items-end gap-3">
@@ -144,7 +145,7 @@ function RunReport({
       </p>
 
       {/* There is no fallback notice any more, and its absence is the point.
-          The engine has one rule — fewest classes that week — so there is no
+          The engine's rules are the adjacent coach, then fewest classes that week, so there is no
           second behaviour to fall back FROM. Commitments are a hiring
           expectation the studio reviews people against, not an input here, and
           a banner saying "set their commitment and the next run will aim at it"

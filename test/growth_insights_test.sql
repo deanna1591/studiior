@@ -178,8 +178,8 @@ begin
 end $$;
 
 -- The budgets: Ann 1 (ranking / raise / actions), Ben 2 (unfilled).
-update instructors set core_classes_per_day = 1 where id = '91060000-0000-0000-0000-0000000001a1';
-update instructors set core_classes_per_day = 2 where id = '91060000-0000-0000-0000-0000000002a1';
+update instructors set core_classes_per_week = 1 where id = '91060000-0000-0000-0000-0000000001a1';
+update instructors set core_classes_per_week = 2 where id = '91060000-0000-0000-0000-0000000002a1';
 
 -- --- GB: the seed test. Cara teaches 2 core + 1 flex per day (mode 2); Dan all
 --     flex (mode 0 -> floors to 1); Eve teaches nothing in the window (stays null).
@@ -221,17 +221,17 @@ end $$;
 -- SECTION 1 — the seed (service context).
 -- =============================================================================
 select seed_instructor_core_budgets('91060000-0000-0000-0000-0000000000b1');
-select expect_num('seed: Cara (2 core + 1 flex per day) -> mode 2',
-  (select core_classes_per_day from instructors where id='91060000-0000-0000-0000-0000000003b1'), 2);
+select expect_num('seed: Cara (2 core + 1 flex a week) -> mode 2',
+  (select core_classes_per_week from instructors where id='91060000-0000-0000-0000-0000000003b1'), 2);
 select expect_num('seed: Dan (all flex, mode 0) -> floors to 1',
-  (select core_classes_per_day from instructors where id='91060000-0000-0000-0000-0000000004b1'), 1);
+  (select core_classes_per_week from instructors where id='91060000-0000-0000-0000-0000000004b1'), 1);
 select expect_num('seed: Eve (no classes in window) stays null',
-  (select core_classes_per_day from instructors where id='91060000-0000-0000-0000-0000000005b1'), null);
+  (select core_classes_per_week from instructors where id='91060000-0000-0000-0000-0000000005b1'), null);
 -- idempotent + does not overwrite a manager's number
-update instructors set core_classes_per_day = 3 where id='91060000-0000-0000-0000-0000000003b1';
+update instructors set core_classes_per_week = 3 where id='91060000-0000-0000-0000-0000000003b1';
 select seed_instructor_core_budgets('91060000-0000-0000-0000-0000000000b1');
 select expect_num('seed: a re-run does not overwrite an existing budget',
-  (select core_classes_per_day from instructors where id='91060000-0000-0000-0000-0000000003b1'), 3);
+  (select core_classes_per_week from instructors where id='91060000-0000-0000-0000-0000000003b1'), 3);
 
 -- =============================================================================
 -- SECTION 2 — growth_insights: ranking, qualifying, collecting, proposals.
@@ -253,11 +253,16 @@ begin
   perform expect_true('ranking: Slot A (5 booked) outscores Slot B (4 booked)',
     (sa->>'score')::numeric > (sb->>'score')::numeric);
 
-  -- budget 1 on Ann's Monday: top qualifying -> core, the next -> flex
-  perform expect_text('Slot A proposed core (top of the day)', sa->>'proposed_tier', 'core');
+  -- Decision 106(a): the weekly budget informs, it does not block. Ann's budget
+  -- is 1 and she already holds 3 core classes this week (B, C, F), so Slot A
+  -- (qualifying) is still proposed core and flagged over budget with the count
+  -- it would reach (4).
+  perform expect_text('Slot A proposed core', sa->>'proposed_tier', 'core');
   perform expect_text('Slot A action make_core (it is flex today)', sa->>'action', 'make_core');
-  perform expect_text('Slot B proposed flex (over budget)', sb->>'proposed_tier', 'flex');
-  perform expect_text('Slot B action make_flex (it is core today)', sb->>'action', 'make_flex');
+  perform expect_true('Slot A over budget', (sa->>'over_budget')::boolean);
+  perform expect_num('Slot A would hold 4 core classes', (sa->>'would_hold')::int, 4);
+  perform expect_text('Slot B stays core (it qualifies; never dropped for budget)', sb->>'proposed_tier', 'core');
+  perform expect_true('Slot B has no action (already core)', (sb->'action') is null or jsonb_typeof(sb->'action')='null');
 
   -- a slot that never met the minimum: not core
   perform expect_false('Slot C does not qualify (1 booked < flex min 2)', (sc->>'qualifies')::boolean);
@@ -276,19 +281,18 @@ begin
   perform expect_false('Slot F does not qualify (met in 2 of last 4)', (sf->>'qualifies')::boolean);
   perform expect_text('Slot F proposed flex', sf->>'proposed_tier', 'flex');
 
-  -- unfilled: Ben's budget is 2 but only Slot G qualifies -> one place unfilled,
-  -- and the weak Slot H is NOT promoted into it
-  perform expect_num('Ben Monday: one budget place unfilled',
-    (g106_day(gi,'91060000-0000-0000-0000-0000000002a1',1)->>'unfilled')::int, 1);
+  -- Ben's budget is 2 and only Slot G qualifies; the weak Slot H is not
+  -- promoted to fill a place.
   perform expect_text('Slot G proposed core', sg->>'proposed_tier', 'core');
   perform expect_text('Slot H stays flex, not filled into the empty place', sh->>'proposed_tier', 'flex');
 
-  -- raise signal: Ann has 2 qualifying on Monday over a budget of 1
-  perform expect_num('Ann raise_to is budget+1',
-    (g106_coach(gi,'91060000-0000-0000-0000-0000000001a1')->>'raise_to')::int, 2);
-  perform expect_true('Ben has no raise signal (qualifying does not exceed budget)',
-    (g106_coach(gi,'91060000-0000-0000-0000-0000000002a1')->'raise_to') is null
-      or jsonb_typeof(g106_coach(gi,'91060000-0000-0000-0000-0000000002a1')->'raise_to')='null');
+  -- raise signal: with A then E made core Ann would hold 5 against a budget of 1
+  perform expect_num('Ann raise_to is the most she would hold',
+    (g106_coach(gi,'91060000-0000-0000-0000-0000000001a1')->>'raise_to')::int, 5);
+  -- Ben holds 1 core (H) and three qualifying flex slots (G and the two clamp
+  -- slots) all proposed core: counted per week he would hold 4 against 2.
+  perform expect_num('Ben raise_to counts the whole week (4 against a budget of 2)',
+    (g106_coach(gi,'91060000-0000-0000-0000-0000000002a1')->>'raise_to')::int, 4);
 
   -- clamp: over-capacity booked does not inflate the score beyond a full room
   perform expect_text('clamp: 10/8 scores the same as 8/8',
@@ -374,9 +378,9 @@ select expect_num('growth.applied audit rows written (week + series)',
 
 -- the budget setter (owner)
 select expect_num('set_instructor_core_budget sets the number',
-  ((set_instructor_core_budget('91060000-0000-0000-0000-0000000001a1', 3)) ->> 'core_classes_per_day')::int, 3);
-select expect_raise('set_instructor_core_budget rejects out of range (1..3)', 'PT422',
-  $$select set_instructor_core_budget('91060000-0000-0000-0000-0000000001a1', 5)$$);
+  ((set_instructor_core_budget('91060000-0000-0000-0000-0000000001a1', 3)) ->> 'core_classes_per_week')::int, 3);
+select expect_raise('set_instructor_core_budget rejects out of range (1..21)', 'PT422',
+  $$select set_instructor_core_budget('91060000-0000-0000-0000-0000000001a1', 22)$$);
 
 -- front desk is refused both the apply and the budget
 reset role; set role authenticated; select set_config('request.jwt.claim.sub','91060000-0000-0000-0000-00000000a0f1',false);

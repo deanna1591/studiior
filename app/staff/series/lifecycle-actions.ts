@@ -202,11 +202,13 @@ export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promis
     p_tier: tier,
     p_min_bookings: min === null ? undefined : Math.floor(min),
     p_core_cutoff_hours: undefined,
+    p_applies_from: /^\d{4}-\d{2}-\d{2}$/.test(String(fd.get("applies_from") ?? ""))
+      ? String(fd.get("applies_from")) : undefined,
   });
   if (error) return { ok: false, message: say(error.message) };
 
   refresh();
-  const r = data as unknown as { occurrences_updated?: number; standalone_count?: number };
+  const r = data as unknown as { occurrences_updated?: number; standalone_count?: number; applies_from?: string; pinned?: number };
   const n = r?.occurrences_updated ?? 0;
   // A standalone flex slot — nothing of the instructor's beside it — is a
   // standby-fee obligation under the instructor agreement, so the studio is
@@ -223,6 +225,7 @@ export async function setSeriesTier(_prev: LifecycleState, fd: FormData): Promis
         ? "Set to flex. It runs only if it reaches its minimum by the cutoff."
         : "Set to core. It runs if it reaches its minimum, and pays a holding rate if it does not.")
       + (n ? ` ${n} class${n === 1 ? "" : "es"} already on the calendar updated.` : "")
+      + (r?.pinned ? ` ${r.pinned} earlier class${r.pinned === 1 ? "" : "es"} keep their tier until ${r.applies_from}.` : "")
       + standaloneFlexSentence(st, standalone),
   };
 }

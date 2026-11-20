@@ -39,7 +39,7 @@ export default async function SeriesList({
 
   const [{ data: series }, { data: settings }, { data: classTypes }, { data: roomRows }, { data: instrRows }, { data: suggestRows }] = await Promise.all([
     supabase.from("class_series")
-      .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, flex, minimum_bookings, free_first_allowed, class_types(name, color), rooms(name)")
+      .select("id, name, rrule, time_of_day, duration_minutes, ends_on, status, capacity, instructor_id, class_type_id, guarantee_tier, tier_from, flex, minimum_bookings, free_first_allowed, class_types(name, color), rooms(name)")
       .order("status").order("time_of_day"),
     supabase.from("studio_settings")
       .select("week_starts_on, guarantees_enabled, flex_enabled, flex_min_bookings, core_min_bookings, free_first_class_enabled")
@@ -165,7 +165,11 @@ export default async function SeriesList({
     if (unsupported) return `Repeat rule Studiior cannot keep (${unsupported})`;
     const base = describeRule(rule, s.ends_on ?? until, s.time_of_day);
     const t = tierBits(s).label;
-    return t ? `${base} · ${t}` : base;
+    // Decision 21 (d): a tier change dated ahead reads "core from 1 Dec".
+    const from = showTier && s.tier_from && s.tier_from > today
+      ? ` from ${new Date(`${s.tier_from}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}`
+      : "";
+    return t ? `${base} · ${t}${from}` : base;
   };
 
   const filters = (showTier || (classTypes ?? []).length > 0)

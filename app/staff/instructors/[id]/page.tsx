@@ -26,7 +26,7 @@ export default async function EditInstructor({ params }: { params: { id: string 
     );
   }
   const { data: i } = await supabase.from("instructors")
-    .select("id, display_name, bio, avatar_url, color, certifications, staff_id, status, core_classes_per_day")
+    .select("id, display_name, bio, avatar_url, color, certifications, staff_id, status, core_classes_per_week")
     .eq("id", params.id).maybeSingle();
   if (!i) notFound();
   const certs = Array.isArray(i.certifications) ? (i.certifications as string[]) : [];
@@ -120,7 +120,7 @@ export default async function EditInstructor({ params }: { params: { id: string 
       {i.status === "active" && (
         <div className="mt-8">
           <SectionLabel>Growth budget</SectionLabel>
-          <BudgetPanel instructorId={i.id} current={i.core_classes_per_day ?? null} />
+          <BudgetPanel instructorId={i.id} current={i.core_classes_per_week ?? null} />
         </div>
       )}
 

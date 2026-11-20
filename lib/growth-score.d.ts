@@ -17,3 +17,12 @@ export function slotScore(weeks: SlotWeek[]): number;
 export function hasEnoughHistory(n: number): boolean;
 export function collectingLabel(n: number): string;
 export function qualifies(weeks: SlotWeek[], flexMin: number): boolean;
+export function metStreak(weeks: { booked?: number }[], flexMin: number): number;
+export function emptyStreak(weeks: { booked?: number }[]): number;
+export function numberWord(n: number): string;
+export function suggestionLine(a: {
+  action: "make_core" | "make_flex" | null; metStreak: number; emptyStreak: number;
+  met4: number; lastBooked: number; flexMin: number;
+}): string | null;
+export function weekBudget(coreNow: number, budget: number,
+  makeCore: { id: string; score: number; classes: number }[]): { id: string; wouldHold: number; overBudget: boolean }[];
