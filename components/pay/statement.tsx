@@ -8,7 +8,7 @@ import { classLineText, statusChip, settleWording, disputeMailto } from "@/lib/p
 
 type Line = {
   type: string; date: string; time: string | null; name: string;
-  status: string | null; booked: number | null; checked_in: number | null;
+  status: string | null; booked: number | null; checked_in: number | null; heads_paid?: number | null;
   finalised: boolean | null; headcount_note: string | null;
   from_previous_period: boolean; first_class_on: string | null;
   amount_cents: number; confirmed: boolean; payable: boolean; note: string | null;
@@ -56,7 +56,7 @@ export default function PayStatementView({ s, contactEmail }: { s: Statement; co
         {s.lines.map((l, i) => {
           const detail =
             l.type === "class" && l.status === "ran"
-              ? classLineText({ booked: l.booked ?? 0, checkedIn: l.checked_in, finalised: !!l.finalised })
+              ? classLineText({ booked: l.booked ?? 0, checkedIn: l.checked_in, headsPaid: l.heads_paid, finalised: !!l.finalised })
               : l.type === "class"
               ? (l.status ?? "")                                   // did not run / cancelled — N
               : l.type === "conversion"

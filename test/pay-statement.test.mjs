@@ -4,6 +4,8 @@ import { classLineText, statusChip, settleWording, disputeMailto } from "../lib/
 
 test("classLineText finalised shows checked in", () => {
   assert.equal(classLineText({ booked: 6, checkedIn: 4, finalised: true }), "6 booked · 4 checked in · paid on 4");
+  // Decision 75(j): 6 booked, 4 attend, 2 no-show is paid on 6.
+  assert.equal(classLineText({ booked: 6, checkedIn: 4, headsPaid: 6, finalised: true }), "6 booked · 4 checked in · paid on 6");
 });
 test("classLineText before finalisation awaits attendance", () => {
   assert.equal(classLineText({ booked: 6, checkedIn: null, finalised: false }), "6 booked · awaiting attendance");

@@ -1265,6 +1265,10 @@ Text on an accent-coloured surface always uses the studio's accent_on colour, ne
 
 **Where (settled from STEP 0).** Today about thirty accent-solid surfaces already pair with `var(--accent-on-solid)` but as a repeated inline literal, and accent-tint surfaces use `var(--ink)` on `var(--accent-chip)`; the one genuine hard-code is `#fff` on the brand accent in `components/staff/schedule-post.tsx`. A new `lib/accent-pair.mjs` supplies the pair(s); the repeated inline accent literals route through it, and the `#fff` in `schedule-post.tsx` is fixed to the brand on-accent. **Status:** pooled for the next build. **Extends:** Decision 80e (the highlight card's `{accent}`/`{accent_on}` pairing, now generalised to every accent surface). Deanna, 15 Nov 2026.
 
+### Note: the billing line is for the owner (20 Nov 2026)
+
+The billing footer line appears only on emails to the owner. The footer sentence on emails that always send reads "We always send this one. It is about your booking or your membership."
+
 ---
 
 ## 70 — Studio team access
@@ -1321,6 +1325,8 @@ Text on an accent-coloured surface always uses the studio's accent_on colour, ne
 
 **(g) 75d mechanics.** The pay line is written at commit on today's basis (unchanged) and trued up once more at finalisation on checked-in heads, reusing `snapshot_start_headcount`'s tail exactly (in place while the period is open; an adjustment in next_open_pay_period when closed; idempotent on `basis->>'finalise_of'`). When `finalise_attendance` is OFF for a studio the basis stays `greatest(booked_at_cutoff, booked_at_start)` — pay-on-checked-in is the behaviour of finalisation ON, never a silent cut. At finalisation the pay row's `instructor_id` is re-copied from the occurrence, so an accepted cover is paid for the class they taught; the displaced instructor's row is not duplicated. Holding fees, unmet-minimum pay, cause-based pay and bonuses unchanged. Private/duo/trio flat lines unchanged.
 
+**Superseded for the headcount (20 Nov 2026).** The 75d headcount at finalisation is replaced by 75(j) "pay follows the seat, not the body" below; checked-in heads no longer set the pay line.
+
 **(h) Period close is a human act with a button.** `close_pay_period` stays manual and keeps its refusal while held (unconfirmed) class records exist; 75e adds the button on the staff period page, with the refusal shown as a reason listing the held classes. `pay_settle_on` is what "paid on the 15th / month-end" means in the product; Studiior never moves money. Straggler class records gain `basis.original_period` so the statement can label them; true-up adjustments already carry it. The statement label for both is "from the previous period".
 
 **(i) 75e wires what exists.** `pay_statement` (currently uncalled) is the one statement source for both the instructor My pay page (period picker: Open / Closed / Paid, defaulting to the current period) and the staff per-instructor statement; `instructor_pay_summary` is retired from the page once `pay_statement` carries its fields. Per class line: "N booked · M checked in · paid on M" when finalised, "N booked · awaiting attendance" before; the Decision 32 cutoff/start note moves to the detail line. Conversion bonus lines show the member's first-class date in the detail so a bonus landing in a later period reads sensibly. Wording helpers in `lib/pay-statement.mjs` (new; `pay-copy.mjs` stays Decision 35's). "Something looks wrong" = a mailto to the studio contact email with the line prefilled, no new table.
@@ -1330,6 +1336,12 @@ Text on an accent-coloured surface always uses the studio's accent_on colour, ne
 **Builds.** 75a = (b) + (c) + (a) member statement + staff profile statement. 75b = (d) + (e) instructor statement + staff Payroll statement, built after 9 Nov and before Reform's first period closes 15 Nov. 75c = PDF period-close email + dispute link.
 
 **Non-goals.** No credit-expiry ledger rows (expiry stays silent for now); no change to suspension; no retroactive events before launch.
+
+### Amendment (j): pay follows the seat, not the body (20 Nov 2026)
+
+The pay true-up at finalisation counts the greater of the seats booked at the cut-off and the seats consumed: attended, no-show and late cancelled (after the cut-off) seats all count, because each used the member's credit, class or free class. Seats cancelled on time before the cut-off never count. For a class booked 6 of 6 where 4 attend and 2 no-show, the coach is paid on 6. Pay never drops below the count at the cut-off (Decision 32). No-show tagging itself is unchanged.
+
+Pay lines finalised before this amendment are not recalculated; the studio settled them by hand. The period-close clause (h) above stands unchanged.
 
 ---
 
@@ -1458,6 +1470,8 @@ Text on an accent-coloured surface always uses the studio's accent_on colour, ne
 **Why.** An intro offer priced below the packs exists to bring a new person in once; without the rule it is simply the cheapest pack. The owner stated the rule as one per person.
 
 **Where.** Migration: `activate_purchase` refuses a second trial for the member (before any membership/credit write — a comp grant on a non-trial plan is never touched, so Decision 61 is unaffected); `xendit_begin_purchase` admits `trial` as a one-time plan and refuses early with the same sentence so no checkout session is created; `member_bootstrap` exposes `trial_used boolean` for the member-app UI. `lib/plans` gains `isOneTimePlan` (class_pack / drop_in / trial — the single predicate `/account/plan`, `/buy/[plan]` and the staff plan page share) and `INTRO_USED_SENTENCE`. The staff manual-sale screen passes `trial_used` and shows the sentence when a used trial is picked. **Status:** settled. **Reuses:** Decision 12 amendment (trial = pack), Decision 40, Decision 57, Decision 61. **No setting; applies to every studio** (a studio without a trial plan is unaffected). Deanna, 5 Oct 2026.
+
+**Note (20 Nov 2026).** The refusal sentence loses its em dash: "The intro offer is for first-timers and you have had yours. Choose a pack or membership instead." The app and the database use the same words.
 
 ---
 

@@ -135,7 +135,7 @@ begin
 end $$;
 select expect_text('activate: the exact first-timers sentence',
   current_setting('t.msg'),
-  'The intro offer is for first-timers — you''ve had yours. Choose a pack or membership instead.');
+  'The intro offer is for first-timers and you have had yours. Choose a pack or membership instead.');
 
 -- A SECOND trial PLAN of the same studio is also blocked.
 select expect_raises('activate: a second trial PLAN of the studio refused PT409',
