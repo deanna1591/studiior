@@ -71,3 +71,46 @@ export const REASONS: Record<string, string> = {
   free_seats_full: "The free first-class spots for this class are full.",
   no_reservation_fee: "Free first classes don't carry a reservation fee here.",
 };
+
+/** The one generic fallback when a refusal has no sentence (no em dash). */
+export const GENERIC_FAILURE = "That didn't work. Please try again.";
+
+/**
+ * Every refusal the reservation path (startReservation: reserve_free_first and
+ * xendit_begin_reservation) can return, in the member's words. Decision 103(a)
+ * note, 19 Nov 2026: fee_waived and not_due are server guards; a waived member
+ * is routed to the ordinary free path and should never meet them.
+ */
+export const RESERVE_REASONS: Record<string, string> = {
+  no_reservation_fee: "This class does not need a reservation fee.",
+  not_authorised: "You are not signed in.",
+  not_found: "That class could not be found.",
+  class_not_bookable: "That class is not open for booking.",
+  class_in_past: "That class has already started.",
+  class_ended: "That class has already ended.",
+  class_full: "That class is full.",
+  not_first: "Your free first class has already been used.",
+  already_had_free: "Your free first class has already been used.",
+  already_member: "This looks like an existing account.",
+  missed: "Your free class was used when you missed it.",
+  late_cancel: "Your free class was used.",
+  duplicate: "Your free first class has already been used.",
+  not_staffed_yet: "This class isn’t open for booking yet.",
+  class_hidden: "That class isn’t available.",
+  past_booking_cutoff: "Booking has closed for that class.",
+  outside_booking_window: "That class isn’t open for booking yet.",
+  free_first_closed_here: "This class isn’t open to first-timers.",
+  flex_not_allowed: "Free classes are on core classes only here.",
+  not_trial_class: "This class isn’t open to first-timers.",
+  free_seats_full: "The free spots for this class are taken.",
+  peak_not_allowed: "Free classes aren’t available at peak times.",
+  month_not_published: "That class isn’t open for booking yet.",
+  fee_waived: "Your reservation fee is waived. Book the class without paying.",
+  not_enabled: "Reservations are not open right now.",
+  not_due: "This class is already booked. Nothing to pay.",
+};
+
+/** The sentence for a reservation refusal, or the generic fallback. */
+export function reserveReasonSentence(reason: string | null | undefined): string {
+  return RESERVE_REASONS[reason ?? ""] ?? GENERIC_FAILURE;
+}

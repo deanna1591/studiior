@@ -99,18 +99,18 @@ select expect_num('...one sale movement, delta -2',
 -- (3) Money readers see Merchandise (while the sale is still succeeded).
 -- =============================================================================
 select expect_num('dashboard_revenue: Merchandise = 30000',
-  (select (src ->> 'cents')::bigint from jsonb_array_elements(dashboard_revenue(:A, current_date, current_date) -> 'by_source') src
+  (select (src ->> 'cents')::bigint from jsonb_array_elements(dashboard_revenue(:A, (now() at time zone 'Europe/Prague')::date, (now() at time zone 'Europe/Prague')::date) -> 'by_source') src
     where src ->> 'source' = 'merch'), 30000);
 select expect_text('...labelled Merchandise',
-  (select (src ->> 'label') from jsonb_array_elements(dashboard_revenue(:A, current_date, current_date) -> 'by_source') src
+  (select (src ->> 'label') from jsonb_array_elements(dashboard_revenue(:A, (now() at time zone 'Europe/Prague')::date, (now() at time zone 'Europe/Prague')::date) -> 'by_source') src
     where src ->> 'source' = 'merch'), 'Merchandise');
 select expect_num('...memberships_sold unchanged (0)',
-  (dashboard_revenue(:A, current_date, current_date) -> 'counts' ->> 'memberships_sold')::bigint, 0);
+  (dashboard_revenue(:A, (now() at time zone 'Europe/Prague')::date, (now() at time zone 'Europe/Prague')::date) -> 'counts' ->> 'memberships_sold')::bigint, 0);
 select expect_text('sales_history carries the product name + plan_type merch',
-  (select plan_name || '|' || plan_type from sales_history(:A, current_date, current_date) where plan_type='merch' limit 1),
+  (select plan_name || '|' || plan_type from sales_history(:A, (now() at time zone 'Europe/Prague')::date, (now() at time zone 'Europe/Prague')::date) where plan_type='merch' limit 1),
   'Grip socks — S ×2|merch');
 select expect_num('sales_totals gross includes the merch sale (30000)',
-  (sales_totals(:A, current_date, current_date) ->> 'gross_cents')::bigint, 30000);
+  (sales_totals(:A, (now() at time zone 'Europe/Prague')::date, (now() at time zone 'Europe/Prague')::date) ->> 'gross_cents')::bigint, 30000);
 
 -- =============================================================================
 -- (4) Refusals.

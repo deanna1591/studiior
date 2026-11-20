@@ -569,10 +569,10 @@ export default async function Book({
           coreOnly={settings.freeFirstCoreOnly}
           fullTimetableHref={qs({ all: "1" })}
           initialDayKey={freeDeepLinkDay}
-          reservationFeeLabel={settings.reservationFeeCents > 0
-            ? formatMoney(settings.reservationFeeCents, settings.currency) : null}
-          creditCoversFee={settings.reservationFeeCents > 0
-            && settings.reservationCreditCents >= settings.reservationFeeCents}
+          reservationFeeLabel={settings.memberFeeCents > 0
+            ? formatMoney(settings.memberFeeCents, settings.currency) : null}
+          creditCoversFee={settings.memberFeeCents > 0
+            && settings.reservationCreditCents >= settings.memberFeeCents}
         />
       ) : (
       <>

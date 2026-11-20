@@ -848,9 +848,13 @@ select expect_true('the third suspends',
 select expect_false('...and a suspension is not also a warning',
   (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'warned')::boolean);
 select expect_true('...running from the third one''s own date, not from today',
-  (select ((member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'until')::timestamptz
-            - interval '14 days')::date
-        = (now() - interval '1 day')::date));
+  -- Pinned to the third infraction's own instant (not the UTC calendar day):
+  -- the fixture class starts at now()-1d+30min, which crosses UTC midnight for
+  -- the last half hour of each day, so a ::date comparison flaked at 23:30-00:00.
+  (select (member_suspension('9eac9eac-0000-0000-0000-00000000dd01') ->> 'until')::timestamptz
+            - interval '14 days'
+        = (select occurred_at from member_infractions
+            where booking_id = current_setting('t.i3')::uuid and kind = 'late_cancel')));
 reset role;
 
 -- --- what a suspension actually stops ----------------------------------------

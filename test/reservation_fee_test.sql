@@ -544,6 +544,68 @@ select sweep_free_reservation_dues();
 select expect_num('switch off wv2: the grandfathered booking is NOT re-asked', (select count(*) from notifications
    where dedupe_key = 'free_reservation_due:' || current_setting('t.wb2')), 0);
 
+-- =============================================================================
+-- 11c. Decision 103(a) note, 19 Nov 2026 — the two server guards on
+--      xendit_begin_reservation: a waived member (or a grandfathered booking)
+--      never starts a reservation payment (fee_waived), and an already booked
+--      seat starts one only with an open reservation due (not_due).
+-- =============================================================================
+create or replace function pg_temp.d103_begin_code(p_sub uuid, p_booking uuid) returns text
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  begin
+    perform xendit_begin_reservation('d1030000-0000-0000-0000-000000000001', p_booking);
+    return 'OK';
+  exception when others then
+    return sqlstate || ':' || sqlerrm;
+  end;
+end $$;
+grant execute on function pg_temp.d103_begin_code(uuid, uuid) to authenticated;
+
+-- (1) wv1 is waived and holds a booked comp free seat on a01 -> fee_waived.
+select set_config('t.wb1', (select id::text from bookings where member_id='d1030000-0000-0000-0000-0000000000f9'
+      and occurrence_id='d1030000-0000-0000-0000-00000d103a01' limit 1), false);
+set role authenticated;
+select set_config('t.g1', pg_temp.d103_begin_code('d1030000-0000-0000-0000-0000000000e9', current_setting('t.wb1')::uuid), false);
+reset role;
+select expect_text('guard: a waived member is refused PT409 fee_waived', current_setting('t.g1'), 'PT409:fee_waived');
+select expect_num('guard: no reservation purchase for the waived member', (select count(*) from xendit_purchases
+   where member_id='d1030000-0000-0000-0000-0000000000f9'), 0);
+
+-- (2) wv2 is no longer waived, but the booking carries the grandfather flag -> fee_waived.
+set role authenticated;
+select set_config('t.g2', pg_temp.d103_begin_code('d1030000-0000-0000-0000-0000000000ea', current_setting('t.wb2')::uuid), false);
+reset role;
+select expect_text('guard: a grandfathered booking is refused PT409 fee_waived', current_setting('t.g2'), 'PT409:fee_waived');
+select expect_num('guard: no reservation purchase for the grandfathered booking', (select count(*) from xendit_purchases
+   where booking_id = current_setting('t.wb2')::uuid), 0);
+
+-- (3) M8's seat is booked but its cut-off has passed (no open due) -> not_due.
+set role authenticated;
+select set_config('t.g3', pg_temp.d103_begin_code('d1030000-0000-0000-0000-0000000000e8', current_setting('t.bk8')::uuid), false);
+reset role;
+select expect_text('guard: a booked seat with no open due is refused PT409 not_due', current_setting('t.g3'), 'PT409:not_due');
+select expect_num('guard: no reservation purchase for the booked seat with no due', (select count(*) from xendit_purchases
+   where booking_id = current_setting('t.bk8')::uuid), 0);
+
+-- (4) A booked seat WITH an open due is still allowed (the pay-to-keep path, as 10b).
+insert into auth.users (id, email) values ('d1030000-0000-0000-0000-0000000000ee','rze@example.com');
+insert into profiles (id, email) values ('d1030000-0000-0000-0000-0000000000ee','rze@example.com');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status) values
+  ('d1030000-0000-0000-0000-0000000000fe','d1030000-0000-0000-0000-000000000001','d1030000-0000-0000-0000-0000000000ee','Dora','Due','rze@example.com','lead');
+set role authenticated; select set_config('request.jwt.claim.sub','d1030000-0000-0000-0000-0000000000ee',false);
+select set_config('t.bkd', (book_first_free('d1030000-0000-0000-0000-00000d103a02') ->> 'booking_id'), false);
+select set_config('t.dued', (select count(*)::text from member_reservation_dues('d1030000-0000-0000-0000-000000000001')
+   where booking_id = current_setting('t.bkd')::uuid), false);
+select set_config('request.jwt.claim.sub','',false);
+select set_config('t.g4', pg_temp.d103_begin_code('d1030000-0000-0000-0000-0000000000ee', current_setting('t.bkd')::uuid), false);
+reset role;
+select expect_text('guard: the booked seat has an open due', current_setting('t.dued'), '1');
+select expect_text('guard: a booked seat WITH an open due still begins the fee', current_setting('t.g4'), 'OK');
+select expect_num('guard: exactly one reservation purchase for the due seat', (select count(*) from xendit_purchases
+   where booking_id = current_setting('t.bkd')::uuid), 1);
+
 -- (f) The closure notice renders three classes as three cards.
 select expect_true('closure_card_html renders a bordered card',
   closure_card_html('Reformer Flow','Mon 5 Dec, 07:00') like '%border:1px solid #E7E5E4;border-radius:8px%');
@@ -574,5 +636,9 @@ select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','d103_complete')), 14);
+
+select expect_true('the inbox table is closed to anon reads, with RLS on',
+  not has_table_privilege('anon', 'resend_webhook_inbox', 'select')
+  and (select relrowsecurity from pg_class where relname = 'resend_webhook_inbox'));
 
 select 'reservation_fee_test: all assertions passed' as result;

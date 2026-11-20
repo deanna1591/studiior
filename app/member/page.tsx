@@ -250,7 +250,7 @@ export default async function MemberHome() {
 
   // Decision 103: free bookings that now need the reservation fee (only queried
   // when the studio charges one, so a fee-off studio pays no extra hop).
-  const reservationDues: ReservationDue[] = (settings.reservationFeeCents ?? 0) > 0
+  const reservationDues: ReservationDue[] = settings.memberFeeCents > 0
     ? ((await supabase.rpc("member_reservation_dues", { p_studio_id: ctx.studioId })).data ?? []) as ReservationDue[]
     : [];
 

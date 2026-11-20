@@ -90,8 +90,8 @@ export default async function ClassDetail({ params, searchParams }: { params: { 
                        seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff} duplicateHold={data.duplicateHold} holdTime={data.holdTime}
                        deskPayAvailable={ctx.bootstrap?.desk_pay_available ?? true}
                        reservationHold={data.reservationHold} due={data.due}
-                       reservationFeeLabel={settings.reservationFeeCents > 0 ? formatMoney(settings.reservationFeeCents, settings.currency) : null}
-                       creditCoversFee={settings.reservationFeeCents > 0 && settings.reservationCreditCents >= settings.reservationFeeCents} />
+                       reservationFeeLabel={settings.memberFeeCents > 0 ? formatMoney(settings.memberFeeCents, settings.currency) : null}
+                       creditCoversFee={settings.memberFeeCents > 0 && settings.reservationCreditCents >= settings.memberFeeCents} />
     </MemberShell>
   );
 }

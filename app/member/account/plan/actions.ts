@@ -6,6 +6,7 @@ import { currentMemberOrigin } from "@/lib/tenant";
 import { decryptSecret } from "@/lib/integrations-crypto";
 import { createSession, getCustomerByReferenceId } from "@/lib/xendit";
 import { safeNext } from "@/lib/auth-redirect";
+import { reserveReasonSentence } from "@/lib/booking-reasons";
 
 export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 
@@ -194,6 +195,10 @@ export async function startReservation(occId: string): Promise<BuyState> {
 
   const supabase = createClient();
 
+  // Decision 103(a) note, 19 Nov 2026: a waived member never starts a reservation
+  // payment. The pages route them to the ordinary free booking; this is the belt.
+  if (ctx.bootstrap?.fee_waived) return { ok: false, message: reserveReasonSentence("fee_waived") };
+
   // Decision 103 hotfix: an EXISTING free booking (the member already holds their
   // free class and got a "pay to keep your spot" due) goes straight to the fee
   // checkout. reserve_free_first is only for a brand-new first-timer — running it
@@ -201,7 +206,7 @@ export async function startReservation(occId: string): Promise<BuyState> {
   // "already_had_free". We reuse the existing seat; the fee makes it reserved.
   let bookingId: string | null = null;
   const { data: existing } = await supabase.from("bookings")
-    .select("id")
+    .select("id, status")
     .eq("occurrence_id", occId)
     .eq("member_id", ctx.memberId)
     .eq("payment_source", "comp")
@@ -209,13 +214,21 @@ export async function startReservation(occId: string): Promise<BuyState> {
     .limit(1);
   bookingId = existing?.[0]?.id ?? null;
 
+  // A seat that is already booked is paid for only when it has an open
+  // reservation due (the same reader the Home "Pay" card uses).
+  if (bookingId && existing?.[0]?.status === "booked") {
+    const { data: dues } = await supabase.rpc("member_reservation_dues", { p_studio_id: ctx.studioId });
+    const due = ((dues ?? []) as { booking_id: string }[]).some((d) => d.booking_id === bookingId);
+    if (!due) return { ok: false, message: reserveReasonSentence("not_due") };
+  }
+
   if (!bookingId) {
     // A brand-new first-timer: hold a comp seat through the eligibility gate.
     const { data: held, error: hErr } = await supabase.rpc("reserve_free_first", { p_occurrence_id: occId });
     if (hErr) return { ok: false, message: hErr.message };
     const h = held as { ok: boolean; reason?: string; booking_id?: string; credit_covered?: boolean } | null;
     if (!h?.ok || !h.booking_id) {
-      return { ok: false, message: FREE_RESERVE_REASONS[h?.reason ?? ""] ?? "That didn’t work — please try again." };
+      return { ok: false, message: reserveReasonSentence(h?.reason) };
     }
     // Decision 103(e): reservation credit of at least the fee covered it directly
     // — no Xendit. The seat is already booked; land on the class page's credit
@@ -230,7 +243,11 @@ export async function startReservation(occId: string): Promise<BuyState> {
     p_studio_id: ctx.studioId, p_booking_id: bookingId,
   });
   const purchase = Array.isArray(begun) ? begun[0] : begun;
-  if (bErr || !purchase) return { ok: false, message: bErr?.message || "Could not start the reservation." };
+  if (bErr || !purchase) {
+    // The server guards (fee_waived, not_due) raise with the reason code as the message.
+    const code = bErr?.message?.trim();
+    return { ok: false, message: code && /^[a-z_]+$/.test(code) ? reserveReasonSentence(code) : (bErr?.message || "Could not start the reservation.") };
+  }
 
   return openXenditSession(ctx, {
     purchaseId: purchase.purchase_id,
@@ -243,31 +260,6 @@ export async function startReservation(occId: string): Promise<BuyState> {
   });
 }
 
-const FREE_RESERVE_REASONS: Record<string, string> = {
-  no_reservation_fee: "This class does not need a reservation fee.",
-  not_authorised: "You are not signed in.",
-  not_found: "That class could not be found.",
-  class_not_bookable: "That class is not open for booking.",
-  class_in_past: "That class has already started.",
-  class_ended: "That class has already ended.",
-  class_full: "That class is full.",
-  not_first: "Your free first class has already been used.",
-  already_had_free: "Your free first class has already been used.",
-  already_member: "This looks like an existing account.",
-  missed: "Your free class was used when you missed it.",
-  late_cancel: "Your free class was used.",
-  duplicate: "Your free first class has already been used.",
-  not_staffed_yet: "This class isn’t open for booking yet.",
-  class_hidden: "That class isn’t available.",
-  past_booking_cutoff: "Booking has closed for that class.",
-  outside_booking_window: "That class isn’t open for booking yet.",
-  free_first_closed_here: "This class isn’t open to first-timers.",
-  flex_not_allowed: "Free classes are on core classes only here.",
-  not_trial_class: "This class isn’t open to first-timers.",
-  free_seats_full: "The free spots for this class are taken.",
-  peak_not_allowed: "Free classes aren’t available at peak times.",
-  month_not_published: "That class isn’t open for booking yet.",
-};
 
 /**
  * Decision 116: book a private. private_book holds the seats (pending) and

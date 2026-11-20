@@ -17,7 +17,7 @@ export default function ReserveBody({ occId, feeLabel }: { occId: string; feeLab
     setErr(null);
     const res = await startReservation(occId);
     if (res?.ok && res.url) { window.location.assign(res.url); return; }
-    setErr(res?.message ?? "That didn’t work — please try again.");
+    setErr(res?.message ?? "That didn't work. Please try again.");
   });
 
   return (

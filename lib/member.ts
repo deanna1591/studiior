@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { memberFeeCents } from "@/lib/reservation-route";
 import { createClient } from "@/lib/supabase/server";
 import { signAvatar } from "@/lib/avatars";
 import { getMemberContext, currentUserId } from "@/lib/auth";
@@ -88,6 +89,10 @@ export async function memberScreen() {
       // Decision 103a: a manager has waived the fee for this member (book free
       // directly), and their unused reservation credit (applied at checkout).
       feeWaived: b?.fee_waived ?? false,
+      // Decision 103(a) note, 19 Nov 2026: the fee THIS member is asked for (0 when
+      // waived). Every member surface that chooses "Book free" or the reserve page
+      // reads this, never reservationFeeCents alone.
+      memberFeeCents: memberFeeCents({ reservationFeeCents: b?.free_first_reservation_fee_cents ?? 0, feeWaived: b?.fee_waived ?? false }),
       reservationCreditCents: b?.reservation_credit_cents ?? 0,
       // Decision 110(a): the gift part of that credit, named apart on Account.
       giftCreditCents: b?.gift_credit_cents ?? 0,

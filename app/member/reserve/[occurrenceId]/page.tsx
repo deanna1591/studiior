@@ -21,8 +21,10 @@ export default async function Reserve({ params }: { params: { occurrenceId: stri
     await memberScreen();
   const occId = params.occurrenceId;
 
-  // No fee -> this screen does not apply; the ordinary free booking is on /book.
-  if ((settings.reservationFeeCents ?? 0) <= 0) redirect(`/class/${occId}`);
+  // No fee, or the fee is waived for this member (Decision 103(a) note, 19 Nov
+  // 2026) -> this screen does not apply; the class page offers the ordinary
+  // "Book free" path with no fee line.
+  if (settings.memberFeeCents <= 0) redirect(`/class/${occId}`);
 
   const { data: occ } = await supabase.from("class_occurrences")
     .select("id, name, starts_at, ends_at, status, instructors!instructor_id(display_name)")

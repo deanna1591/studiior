@@ -179,7 +179,7 @@ export async function bookFirstFree(_prev: BookResult, formData: FormData): Prom
   if (error) return { ok: false, message: error.message };
   const r = data as unknown as { ok: boolean; reason?: string } | null;
   if (!r) return { ok: false, message: "No response." };
-  if (!r.ok) return { ok: false, message: FREE_FIRST_REASONS[r.reason ?? ""] ?? "That didn't work — please try again." };
+  if (!r.ok) return { ok: false, message: FREE_FIRST_REASONS[r.reason ?? ""] ?? "That didn't work. Please try again." };
   revalidateMember();
   return { ok: true, message: "Booked — your first class is on us. See you there." };
 }

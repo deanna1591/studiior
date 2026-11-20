@@ -91,7 +91,7 @@ export default function FreeClassList({
     const f = new FormData();
     f.set("occurrence_id", id);
     const r = await bookFirstFree({ ok: false, message: "" }, f);
-    if (r && r.ok) { setBooked(id); setErr(null); } else setErr(r?.message ?? "That didn't work — please try again.");
+    if (r && r.ok) { setBooked(id); setErr(null); } else setErr(r?.message ?? "That didn't work. Please try again.");
   });
 
   return (
