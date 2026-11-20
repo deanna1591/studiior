@@ -61,7 +61,7 @@ export async function buyProduct(_prev: BuyState, fd: FormData): Promise<BuyStat
   try {
     secret = decryptSecret(c.secret_key_ciphertext);
   } catch {
-    return { ok: false, message: "The studio’s payment key couldn’t be read — ask the studio to reconnect Xendit." };
+    return { ok: false, message: "The studio’s payment key couldn’t be read. Ask the studio to reconnect Xendit." };
   }
 
   const [{ data: product }, { data: member }, { data: cust }] = await Promise.all([
@@ -77,7 +77,7 @@ export async function buyProduct(_prev: BuyState, fd: FormData): Promise<BuyStat
     amountCents: purchase.amount_cents,
     currency: purchase.currency,
     country: "PH",
-    description: `${ctx.studioName} — ${product?.name ?? "item"}`,
+    description: `${ctx.studioName} · ${product?.name ?? "item"}`,
     metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "product", product_id: productId },
     successUrl: `${origin}/purchase/${purchase.purchase_id}`,
     cancelUrl: `${origin}/shop`,

@@ -33,7 +33,7 @@ export default function GiftForm({
     start(async () => {
       const r: GiftState = await buyGift(null, fd);
       if (r?.ok && r.url) { window.location.assign(r.url); return; }
-      setErr(r?.message ?? "That didn't work — please try again.");
+      setErr(r?.message ?? "That didn't work. Please try again.");
     });
   }
 

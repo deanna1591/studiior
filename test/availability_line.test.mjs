@@ -99,11 +99,11 @@ test("open → the collected month is open, due dueDay of the month before", () 
 test("overdue → was due, submit now (and open upgrades to overdue past the due day)", () => {
   assert.equal(
     availabilityStatusLine({ today: "2026-10-25", shownMonth: "2026-11-01", dueDay: 20, state: "overdue" }),
-    "November availability was due 20 October — submit now; the studio may already be building the timetable.");
+    "November availability was due 20 October. Submit now; the studio may already be building the timetable.");
   // A stale 'open' page past the due day still warns, derived from today.
   assert.equal(
     availabilityStatusLine({ today: "2026-10-25", shownMonth: "2026-11-01", dueDay: 20, state: "open" }),
-    "November availability was due 20 October — submit now; the studio may already be building the timetable.");
+    "November availability was due 20 October. Submit now; the studio may already be building the timetable.");
 });
 
 test("locked → next month opens 1st of this one, due dueDay of this one", () => {

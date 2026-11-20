@@ -76,7 +76,7 @@ export function AddWalkIn({ occurrenceId, currency, tz, timeFormat }: {
 
       {res?.ok && (
         <p className="mt-2 text-[13px] leading-5 text-ink-2" role="status">
-          Added — {res.seat === "free_first" ? "free first class"
+          Added: {res.seat === "free_first" ? "free first class"
                    : res.seat === "plan" ? "on their plan" : "drop-in"}
           {res.seat === "drop_in" && res.due_cents != null && <> · <span className="num">{formatMoney(res.due_cents, currency)}</span> due at the desk</>}
           {!res.checked_in && res.checkin_reason && <> · not checked in yet ({res.checkin_reason})</>}
@@ -100,7 +100,7 @@ export function AddWalkIn({ occurrenceId, currency, tz, timeFormat }: {
             {(res.alternatives ?? []).map((a) => (
               <li key={a.occurrence_id}>
                 <Link href={`/instructor/roster/${a.occurrence_id}`} className="text-[13px] text-ink-2 underline underline-offset-4">
-                  {a.name} — {altWhen(a.start, tz, timeFormat)} · {a.seats_left} left
+                  {a.name} · {altWhen(a.start, tz, timeFormat)} · {a.seats_left} left
                 </Link>
               </li>
             ))}
@@ -159,7 +159,7 @@ export function DeskPay({
       <div className="flex flex-wrap items-center gap-1.5">
         {unpaidDropin && (
           <span className={chip} style={{ background: "var(--amber-tint)", color: "var(--ink)" }}>
-            Unpaid{dueCents != null && <> — <span className="num">{formatMoney(dueCents, currency)}</span></>}
+            Unpaid{dueCents != null && <> · <span className="num">{formatMoney(dueCents, currency)}</span></>}
           </span>
         )}
         {unpaidDropin && (
@@ -202,7 +202,7 @@ export function DeskPay({
       {open === "sell" && (
         <div className="mt-2 rounded-lg px-2.5 py-2.5" style={{ background: "var(--paper)" }}>
           <select className={field} value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={busy}>
-            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} — {formatMoney(p.price_cents, currency)}</option>)}
+            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price_cents, currency)}</option>)}
           </select>
           <div className="mt-2 flex gap-1.5">
             {METHODS.map((m) => (

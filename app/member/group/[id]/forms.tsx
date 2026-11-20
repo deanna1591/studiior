@@ -30,7 +30,7 @@ export function EmailsForm({ groupId, occId, hostEmail, groupSize, doneHref }: {
   const [emails, setEmails] = useState<string[]>(Array(groupSize - 1).fill(""));
   const check = validateGroupEmails(emails, hostEmail, groupSize);
   const clientError =
-    !check.ok && check.reason === "is_host" ? "That's your own email — you're already seat one."
+    !check.ok && check.reason === "is_host" ? "That's your own email. You're already seat one."
     : !check.ok && check.reason === "duplicate" ? "Two guests have the same email."
     : null;
 
@@ -41,7 +41,7 @@ export function EmailsForm({ groupId, occId, hostEmail, groupSize, doneHref }: {
       <input type="hidden" name="group_id" value={groupId} />
       <input type="hidden" name="occurrence_id" value={occId} />
       <div className="m-card p-3">
-        <p className="m-micro text-ink-3">Seat 1 — you</p>
+        <p className="m-micro text-ink-3">Seat 1: you</p>
         <p className="text-[14px] leading-5 text-ink">{hostEmail}</p>
       </div>
       {emails.map((v, i) => (
@@ -105,8 +105,8 @@ export function CancelGroupForm({ groupId, late }: { groupId: string; late: bool
       <input type="hidden" name="group_id" value={groupId} />
       <p className="text-[13px] leading-[18px] text-ink">
         {late
-          ? "It's inside the cancellation notice period, so this group is forfeited — no refund, and it can't be rebooked."
-          : "Everyone's seat is released and the package goes back to unbooked — you can book it into another class within its window."}
+          ? "It's inside the cancellation notice period, so this group is forfeited. No refund, and it can't be rebooked."
+          : "Everyone's seat is released and the package goes back to unbooked. You can book it into another class within its window."}
       </p>
       <div className="mt-3 flex items-center gap-3">
         <CancelSubmit />

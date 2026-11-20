@@ -37,7 +37,7 @@ export async function confirmMyWeek(
   return {
     ok: `${r.confirmed ?? 0} confirmed.` +
       (r.skipped_cover
-        ? ` ${r.skipped_cover} left alone — you have asked for cover on ${r.skipped_cover === 1 ? "it" : "those"}.`
+        ? ` ${r.skipped_cover} left alone. You have asked for cover on ${r.skipped_cover === 1 ? "it" : "those"}.`
         : ""),
   };
 }
@@ -59,7 +59,7 @@ export async function confirmMyMonth(
   revalidatePath("/instructor");
   revalidatePath("/instructor/month");
   return {
-    ok: `Confirmed — ${r.classes ?? 0} ${r.classes === 1 ? "class" : "classes"}.` +
+    ok: `Confirmed: ${r.classes ?? 0} ${r.classes === 1 ? "class" : "classes"}.` +
       (r.cover_requested
         ? ` ${r.cover_requested} of ${r.cover_requested === 1 ? "them is" : "them are"} waiting on cover; the studio decides those.`
         : ""),
@@ -83,7 +83,7 @@ export async function askForCover(
   if (error) {
     const m = error.message;
     // FIX B: request_cover refuses a started class (PT422) even on a stale page.
-    if (/already started/i.test(m)) return { error: "This class has started — call the studio." };
+    if (/already started/i.test(m)) return { error: "This class has started. Call the studio." };
     return { error: /PT400/.test(m) ? "That colleague cannot be asked to cover." : m };
   }
   revalidatePath("/instructor");
@@ -92,8 +92,8 @@ export async function askForCover(
   const r = (data ?? {}) as { directed?: boolean };
   return {
     ok: r.directed
-      ? "Asked. They confirm from their end, and the studio arranges it — you are still down to teach it until then."
-      : "Asked. The studio decides — you are still down to teach it until they do.",
+      ? "Asked. They confirm from their end, and the studio arranges it. You are still down to teach it until then."
+      : "Asked. The studio decides. You are still down to teach it until they do.",
   };
 }
 
@@ -116,7 +116,7 @@ export async function confirmCover(_prev: InstructorState, form: FormData): Prom
   const r = (data ?? {}) as { ok?: boolean; final?: boolean; reason?: string };
   if (!r.ok) return { error: r.reason === "instructor_busy" ? "You are already teaching then." : "That could not be arranged." };
   revalidatePath("/instructor"); revalidatePath("/instructor/shifts"); revalidatePath("/instructor/schedule");
-  return { ok: r.final ? "Done — you're teaching it." : "Confirmed — the studio will approve it." };
+  return { ok: r.final ? "Done. You're teaching it." : "Confirmed. The studio will approve it." };
 }
 
 /** Decision 58 — the named colleague's "Can't": it opens to everyone. */
@@ -131,7 +131,7 @@ export async function cantCover(_prev: InstructorState, form: FormData): Promise
       : /PT409/.test(m) ? "That cover has already been answered." : m };
   }
   revalidatePath("/instructor"); revalidatePath("/instructor/shifts");
-  return { ok: "No problem — it's open to the rest of the team now." };
+  return { ok: "No problem. It's open to the rest of the team now." };
 }
 
 /**
@@ -153,23 +153,42 @@ export async function submitMyAvailability(
 
   let days: Day[];
   try { days = JSON.parse(String(form.get("days") ?? "[]")) as Day[]; }
-  catch { return { error: "That did not come through — try again." }; }
+  catch { return { error: "That did not come through. Try again." }; }
 
   const bad = validateWeek(days);
   if (bad) return { error: bad };
+
+  // Decision 18(d): specific dates ride in the same payload, one entry each.
+  let dates: { date: string; off: boolean; from: string; to: string }[] = [];
+  try { dates = JSON.parse(String(form.get("dates") ?? "[]")); }
+  catch { return { error: "That did not come through. Try again." }; }
+  const periodEnd = String(form.get("period_end") ?? "");
+  const seen = new Set<string>();
+  for (const d of dates) {
+    if (!d.date) return { error: "Pick a date for each specific date." };
+    if (d.date < period || (periodEnd && d.date > periodEnd)) return { error: "Each specific date must fall inside this month." };
+    if (seen.has(d.date)) return { error: "Each date can be listed once." };
+    seen.add(d.date);
+    if (!d.off && !(d.to > d.from)) return { error: "A time must end after it starts." };
+  }
+  const payload = [
+    ...days,
+    ...dates.map((d) => (d.off ? { date: d.date, unavailable: true }
+      : { date: d.date, ranges: [{ from: d.from, to: d.to }] })),
+  ];
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("submit_availability", {
     p_instructor_id: instructorId,
     p_period_start: period,
-    p_days: days as never,
+    p_days: payload as never,
     p_submit: submit,
   });
   if (error) {
     const m = error.message;
     return {
       error: /PT403/.test(m) ? "That is not yours to change."
-        : /PT409/.test(m) ? "That month is already approved — ask the studio to reopen it."
+        : /PT409/.test(m) ? "That month is already approved. Ask the studio to reopen it."
         : /PT422/.test(m) ? m.replace(/^.*?:\s*/, "")
         : m,
     };
@@ -180,7 +199,7 @@ export async function submitMyAvailability(
   return {
     ok: submit
       ? "Sent to the studio. You can still change it until they look at it."
-      : `Saved as a draft — ${r.ranges ?? 0} time ${r.ranges === 1 ? "range" : "ranges"}. Nothing goes to the studio until you send it.`,
+      : `Saved as a draft: ${r.ranges ?? 0} time ${r.ranges === 1 ? "range" : "ranges"}. Nothing goes to the studio until you send it.`,
   };
 }
 
@@ -264,7 +283,7 @@ export async function acceptCover(_prev: InstructorState, form: FormData): Promi
   revalidatePath("/instructor");
   revalidatePath("/instructor/shifts");
   revalidatePath("/instructor/schedule");
-  return { ok: "Taken — it is yours. The studio has been told." };
+  return { ok: "Taken. It is yours. The studio has been told." };
 }
 
 export async function withdrawApplication(
@@ -281,7 +300,7 @@ export async function withdrawApplication(
   revalidatePath("/instructor/shifts");
   revalidatePath("/instructor/schedule");
   revalidatePath("/instructor");
-  return { ok: "Withdrawn — your name is off it." };
+  return { ok: "Withdrawn. Your name is off it." };
 }
 
 /**
@@ -356,7 +375,7 @@ export async function scanCheckIn(
   const r = res as { ok: boolean; already?: boolean } | null;
   revalidatePath(`/instructor/roster/${occurrenceId}`);
   if (r?.already) return { ok: `${m.first_name} is already in.` };
-  return { ok: `${m.first_name} ${m.last_name} — in.` };
+  return { ok: `${m.first_name} ${m.last_name} is in.` };
 }
 
 
@@ -385,7 +404,7 @@ export async function confirmClass(_prev: InstructorState, form: FormData): Prom
   if (!r.ok) return { error: "That could not be confirmed." };
   revalidatePath("/instructor");
   revalidatePath("/instructor/schedule");
-  return { ok: "Checked in — your pay for this class is released." };
+  return { ok: "Checked in. Your pay for this class is released." };
 }
 
 /**
@@ -424,7 +443,7 @@ export async function declineAssignment(_prev: InstructorState, form: FormData):
   });
   if (error) return { error: error.message };
   revalidatePath("/instructor"); revalidatePath("/instructor/schedule");
-  return { ok: "Cover requested — the studio will arrange it. The class stays yours until it's covered." };
+  return { ok: "Cover requested. The studio will arrange it. The class stays yours until it's covered." };
 }
 
 // ---------------------------------------------------------------------------
@@ -695,4 +714,38 @@ export async function instructorSearchMembers(
   return (data ?? []).map((m) => ({
     id: m.id, name: fullName(m.first_name, m.last_name), email: m.email,
   }));
+}
+
+/**
+ * Decision 18(d): after a month is approved, a coach changes a single date
+ * through the Time off sheet. "Different hours" writes a standalone dated row
+ * with those hours (set_availability_exception, own-subject guarded), which wins
+ * over everything for that date. Clearing it removes only that standalone row.
+ */
+export async function setDateHours(
+  instructorId: string, date: string, from: string, to: string, reason: string,
+): Promise<{ ok: string } | { error: string }> {
+  if (!date) return { error: "Pick a date." };
+  if (!(to > from)) return { error: "A time must end after it starts." };
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_availability_exception", {
+    p_instructor_id: instructorId, p_date: date,
+    p_ranges: [{ from, to }] as never, p_note: reason.trim() || undefined,
+  });
+  if (error) return { error: timeOffReason(error) };
+  revalidatePath("/instructor/me");
+  revalidatePath("/instructor/schedule");
+  return { ok: `Saved. Your hours on that date are ${from} to ${to}.` };
+}
+
+export async function clearDateHours(
+  instructorId: string, date: string,
+): Promise<{ ok: string } | { error: string }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("clear_availability_exception", {
+    p_instructor_id: instructorId, p_date: date,
+  });
+  if (error) return { error: timeOffReason(error) };
+  revalidatePath("/instructor/me");
+  return { ok: "Removed. That date follows your usual hours again." };
 }

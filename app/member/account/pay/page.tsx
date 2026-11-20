@@ -43,7 +43,7 @@ export default async function HowYouPay() {
         <section className="m-card mt-4 p-4">
           <p className="m-eyebrow mb-1 font-semibold text-ink">Your cards</p>
           <p className="m-sub text-ink-2">
-            Add a card when you book a class or buy a plan — it is saved for next
+            Add a card when you book a class or buy a plan. It is saved for next
             time, and you can remove it from the checkout screen.
           </p>
         </section>

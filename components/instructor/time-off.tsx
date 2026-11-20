@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
-import { blockTimeOff, unblockTimeOff, previewTimeOff } from "@/app/member/instructor/actions";
+import { blockTimeOff, unblockTimeOff, previewTimeOff, setDateHours, clearDateHours } from "@/app/member/instructor/actions";
 
 /**
  * Decision 99 — Time off. The instructor blocks a date or a range they cannot
@@ -27,7 +27,12 @@ function rangeLabel(r: TimeOffRange): string {
   return r.from_date === r.to_date ? fmt(r.from_date) : `${fmt(r.from_date)} to ${fmt(r.to_date)}`;
 }
 
-export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
+/** Decision 18(d): a single date with its own hours, set outside a submission. */
+export type DateHours = { date: string; from: string; to: string };
+
+export default function TimeOff({ ranges, hours = [], instructorId }: {
+  ranges: TimeOffRange[]; hours?: DateHours[]; instructorId: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState("");
@@ -36,6 +41,10 @@ export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
   const [warn, setWarn] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // "off": Not available over a range; "hours": Different hours on one date.
+  const [mode, setMode] = useState<"off" | "hours">("off");
+  const [hFrom, setHFrom] = useState("09:00");
+  const [hTo, setHTo] = useState("17:00");
   const [pending, start] = useTransition();
 
   async function recount(f: string, t: string) {
@@ -59,7 +68,26 @@ export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
 
       {msg && <p className="mt-2 text-[12.5px]" style={{ color: "var(--lime-text)" }}>{msg}</p>}
 
-      {ranges.length === 0 && !open && (
+      {hours.length > 0 && (
+        <ul className="mt-3 space-y-1" data-testid="date-hours">
+          {hours.map((h) => (
+            <li key={h.date} className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-2.5">
+              <span className="min-w-0 flex-1 text-[13px] leading-[18px] text-ink">
+                {fmt(h.date)} <span className="text-ink-2">· {h.from} to {h.to}</span>
+              </span>
+              <button disabled={pending}
+                onClick={() => start(async () => {
+                  const res = await clearDateHours(instructorId, h.date);
+                  if ("ok" in res) { setMsg(res.ok); router.refresh(); } else setErr(res.error);
+                })}
+                aria-label={`Remove different hours on ${fmt(h.date)}`}
+                className="shrink-0 rounded-md px-1.5 py-1 text-[15px] leading-none text-ink-3 disabled:opacity-60">×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {ranges.length === 0 && hours.length === 0 && !open && (
         <p className="mt-2 text-[13px] leading-[20px] text-ink-3">
           No time off. Add a date or a range you cannot teach, and the studio
           arranges cover for any classes in it.
@@ -98,6 +126,35 @@ export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
 
       {open && (
         <div className="mt-4 border-t border-line pt-4">
+          <div className="mb-3 flex gap-2" role="radiogroup" aria-label="Kind of change">
+            {(["off", "hours"] as const).map((k) => (
+              <button key={k} type="button" role="radio" aria-checked={mode === k}
+                onClick={() => { setMode(k); setErr(null); }}
+                className="rounded-full px-3.5 py-1.5 text-[13px] font-semibold"
+                style={mode === k ? accentSolid() : { background: "var(--accent-chip)", color: "var(--ink)" }}>
+                {k === "off" ? "Not available" : "Different hours"}
+              </button>
+            ))}
+          </div>
+          {mode === "hours" ? (
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-[13px] text-ink-2">
+                <span className="mb-1 block">Date</span>
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+                  className="rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+              </label>
+              <label className="text-[13px] text-ink-2">
+                <span className="mb-1 block">From</span>
+                <input type="time" step={900} value={hFrom} onChange={(e) => setHFrom(e.target.value)}
+                  className="rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+              </label>
+              <label className="text-[13px] text-ink-2">
+                <span className="mb-1 block">To</span>
+                <input type="time" step={900} value={hTo} onChange={(e) => setHTo(e.target.value)}
+                  className="rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+              </label>
+            </div>
+          ) : (
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-[13px] text-ink-2">
               <span className="mb-1 block">From</span>
@@ -112,9 +169,10 @@ export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
                 className="rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
             </label>
           </div>
+          )}
           <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)"
             className="mt-3 w-full rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
-          {warn !== null && (
+          {mode === "off" && warn !== null && (
             <p className="mt-2 text-[12.5px] leading-[18px] text-ink-2">
               You&apos;re down to teach {warn} class{warn === 1 ? "" : "es"} in these dates. The studio will need to cover them.
             </p>
@@ -124,6 +182,13 @@ export default function TimeOff({ ranges }: { ranges: TimeOffRange[] }) {
             <button disabled={pending || !from}
               onClick={() => start(async () => {
                 setErr(null);
+                if (mode === "hours") {
+                  const res = await setDateHours(instructorId, from, hFrom, hTo, reason);
+                  if ("ok" in res) {
+                    setMsg(res.ok); setOpen(false); setFrom(""); setReason(""); router.refresh();
+                  } else setErr(res.error);
+                  return;
+                }
                 const fd = new FormData();
                 fd.set("from", from); fd.set("to", to || from); fd.set("reason", reason);
                 const res = await blockTimeOff(fd);

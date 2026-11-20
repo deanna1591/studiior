@@ -69,7 +69,7 @@ export default async function InstallView({ which }: { which: "member" | "instru
   const pageUrl = `${origin}${path}`;
   const appUrl = `${origin}${appPath}`;
 
-  const appLabel = which === "instructor" ? `${studio.name} — Instructors` : studio.name;
+  const appLabel = which === "instructor" ? `${studio.name} · Instructors` : studio.name;
   const welcome = which === "instructor"
     ? `Add ${appLabel} to your home screen for one-tap access.`
     : installWelcome(studio.name, studio.install_welcome);

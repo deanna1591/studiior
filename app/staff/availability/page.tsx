@@ -2,7 +2,8 @@ import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, SectionLabel } from "@/components/ui";
-import ReviewControls from "./review";
+import EditLines from "./edit-lines";
+import { linesFromWeek, type AvailLine } from "@/lib/availability-edit";
 import ReopenControls from "./reopen";
 import { standingNote } from "@/lib/availability-line";
 import { standingCoverage } from "@/lib/availability-standing";
@@ -82,6 +83,19 @@ export default async function AvailabilityInbox({
   const waiting = cycle.instructors.filter((i) => i.status === "submitted");
   const done = cycle.instructors.filter((i) => i.status === "approved");
 
+  // Decision 18(c)/(d): each card shows the submitted hours inline, weekday
+  // lines then date lines, editable in place by a manager or owner.
+  const [py, pm] = cycle.period_start.split("-").map(Number);
+  const periodEnd = new Date(Date.UTC(py, pm, 0)).toISOString().slice(0, 10);
+  const weeks = new Map<string, AvailLine[]>(await Promise.all(
+    [...waiting, ...done].map(async (i) => {
+      const { data } = await supabase.rpc("availability_submission_week", {
+        p_instructor_id: i.instructor_id, p_period_start: cycle.period_start,
+      });
+      return [i.instructor_id, linesFromWeek(data as never)] as [string, AvailLine[]];
+    })));
+  const first = (n: string) => (n ?? "").split(" ")[0];
+
   return (
     <AppShell {...shell} title={`Availability — ${month}`}>
       {/* The confirmation line lives here too. One line, never one per class. */}
@@ -159,7 +173,11 @@ export default async function AvailabilityInbox({
                       { day: "numeric", month: "short" }) : ""}
                   </span>
                 </div>
-                {i.submission_id && <ReviewControls submissionId={i.submission_id} />}
+                {i.submission_id && (
+                  <EditLines submissionId={i.submission_id} initial={weeks.get(i.instructor_id) ?? []}
+                    periodStart={cycle.period_start} periodEnd={periodEnd}
+                    firstName={first(i.name)} approved={false} />
+                )}
               </li>
             ))}
           </ul>
@@ -173,6 +191,11 @@ export default async function AvailabilityInbox({
             {done.map((i) => (
               <li key={i.instructor_id} className="px-3.5 py-2.5">
                 <span className="text-[14px] leading-5 text-ink-2">{i.name}</span>
+                {i.submission_id && (
+                  <EditLines submissionId={i.submission_id} initial={weeks.get(i.instructor_id) ?? []}
+                    periodStart={cycle.period_start} periodEnd={periodEnd}
+                    firstName={first(i.name)} approved />
+                )}
                 {/* Decision 96: reopen an approved month so the instructor can
                     edit it — but only before the cut-off. After the due day the
                     button is gone (the function refuses too, as a belt). */}

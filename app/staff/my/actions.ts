@@ -168,3 +168,22 @@ export async function reopenSubmission(_prev: MyState, fd: FormData): Promise<My
       : `Reopened for ${r.instructor} to edit. They have no login, so nothing was emailed — tell them yourself.`,
   };
 }
+
+/**
+ * Decision 18(c)/(d): staff edit a submitted or approved month in place. The
+ * database (manager-up) replaces only that submission's rows, keeps its status,
+ * audits, emails the instructor the change lines, and returns how many of their
+ * assigned classes the new hours no longer cover.
+ */
+export async function editSubmission(submissionId: string, rows: unknown[]): Promise<{
+  ok: boolean; message?: string; changes?: string[]; outside?: number; first?: string; notified?: boolean;
+}> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("staff_edit_availability_submission", {
+    p_submission_id: submissionId, p_rows: rows as never,
+  });
+  if (error) return { ok: false, message: say(error.message) };
+  const r = data as unknown as { changes: string[]; outside_count: number; first_name: string; notified: boolean };
+  revalidatePath("/availability");
+  return { ok: true, changes: r.changes ?? [], outside: r.outside_count ?? 0, first: r.first_name, notified: r.notified };
+}

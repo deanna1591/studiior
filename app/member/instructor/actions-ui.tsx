@@ -125,7 +125,7 @@ function ColleaguePicker({ colleagues }: { colleagues: Colleague[] }) {
         {colleagues.map((c) =>
           c.hasLogin
             ? <option key={c.id} value={c.id}>{c.name}</option>
-            : <option key={c.id} value={c.id} disabled>{c.name} — no app login yet</option>)}
+            : <option key={c.id} value={c.id} disabled>{c.name} (no app login yet)</option>)}
       </select>
     </label>
   );
@@ -146,7 +146,7 @@ export function AskForCover({
         <form action={action} className="mt-2">
           <input type="hidden" name="occurrence_id" value={occurrenceId} />
           <input name="reason" required aria-label="Why"
-                 placeholder="Why — the studio decides from this"
+                 placeholder="Why? The studio decides from this"
                  className="m-tap w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink placeholder:text-ink-3" />
           <ColleaguePicker colleagues={colleagues} />
           <div className="mt-2"><CardActionOutline>Ask for cover</CardActionOutline></div>
@@ -162,7 +162,7 @@ export function AskForCover({
         Ask for cover
       </label>
       <input id="reason" name="reason" required
-             placeholder="Why — the studio decides from this"
+             placeholder="Why? The studio decides from this"
              className="m-tap mt-1 w-full rounded-xl border border-[color:var(--line-2)] bg-[color:var(--surface)] px-3 text-[15px] text-ink placeholder:text-ink-3" />
       <ColleaguePicker colleagues={colleagues} />
       <div className="mt-2"><CardActionOutline>Ask for cover</CardActionOutline></div>
@@ -250,7 +250,7 @@ export function ClaimClass({ occurrenceId }: { occurrenceId: string }) {
           <p className="text-[12px] leading-[17px] text-ink"
              style={{ borderLeft: "3px solid var(--accent)", paddingLeft: 8 }}>
             That is your <span className="num">{overCap.cap}</span>{overCap.cap === 1 ? "" : ""} core
-            {" "}{overCap.cap === 1 ? "class" : "classes"} for the week already. You can still put your name forward — the studio decides.
+            {" "}{overCap.cap === 1 ? "class" : "classes"} for the week already. You can still put your name forward. The studio decides.
           </p>
           <input type="hidden" name="over_cap_ack" value="1" />
           <div className="mt-2"><CardActionOutline>Ask anyway</CardActionOutline></div>

@@ -61,7 +61,7 @@ export default function AnnounceStrip({
           {a.linkUrl ? (
             <button type="button" onClick={() => open(a.linkUrl!)}
                     className="m-press flex min-w-0 flex-1 items-center gap-1.5 text-left"
-                    aria-label={`${a.title} — ${a.linkLabel ?? "Learn more"}`}>
+                    aria-label={`${a.title}: ${a.linkLabel ?? "Learn more"}`}>
               <span className="truncate text-[14px] font-semibold leading-5">{a.title}</span>
               <Icon name="arrow-out" size={15} className="shrink-0 opacity-90" />
             </button>

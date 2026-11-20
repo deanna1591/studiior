@@ -18,11 +18,16 @@ export default async function BookPrivate() {
   const { ctx, supabase, settings, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
-  const [{ data: types }, { data: coaches }] = await Promise.all([
+  // Decision 116(c): the coach profiles (name, photo, bio, certifications) come
+  // from the member-only reader; the private coach list decides who is shown.
+  const [{ data: types }, { data: coaches }, { data: profiles }] = await Promise.all([
     supabase.rpc("private_session_types_for", { p_studio_id: ctx.studioId }),
     supabase.from("instructors").select("id, display_name, avatar_url")
       .eq("studio_id", ctx.studioId).eq("status", "active").eq("teaches_privates", true).order("display_name"),
+    supabase.rpc("member_coaches", { p_studio_id: ctx.studioId }),
   ]);
+  const byId = new Map(((profiles ?? []) as { id: string; first_name: string; display_name: string; avatar_url: string | null;
+    bio: string | null; certifications: unknown }[]).map((p) => [p.id, p]));
   const list = (types ?? []) as { id: string; name: string; price_cents: number; people: number; duration_min: number }[];
 
   return (
@@ -42,7 +47,16 @@ export default async function BookPrivate() {
       ) : (
         <PrivateFlow
           types={list.map((t) => ({ ...t, priceLabel: formatMoney(t.price_cents, settings.currency) }))}
-          coaches={(coaches ?? []).map((c) => ({ id: c.id as string, name: (c.display_name as string).split(" ")[0] }))}
+          coaches={(coaches ?? []).map((c) => {
+            const p = byId.get(c.id as string);
+            return {
+              id: c.id as string, name: (c.display_name as string).split(" ")[0],
+              displayName: (p?.display_name ?? c.display_name) as string,
+              avatarUrl: (p?.avatar_url ?? c.avatar_url ?? null) as string | null,
+              bio: p?.bio ?? null,
+              certifications: Array.isArray(p?.certifications) ? (p!.certifications as string[]) : [],
+            };
+          })}
           timeZone={ctx.timeZone} timeFormat={ctx.timeFormat}
           packCredits={settings.privatePackCredits}
           creditCents={settings.reservationCreditCents}

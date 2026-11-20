@@ -388,9 +388,9 @@ export default function ClassDetailBody({
             <input type="hidden" name="occurrence_id" value={occ.id} />
             <p className="mb-2.5 rounded-xl px-3 py-2 text-[13px] leading-[18px] text-ink"
                style={{ background: "var(--accent-chip)" }}>
-              <span className="font-semibold">Your first class is on us.</span> No card, no plan — just book it.
+              <span className="font-semibold">Your first class is on us.</span> No card, no plan. Just book it.
             </p>
-            <PrimaryButton>Book — first class free</PrimaryButton>
+            <PrimaryButton>Book, first class free</PrimaryButton>
           </BookForm>
         ) : route === "waitlist" ? (
           <BookForm action={bookClass}>
@@ -458,7 +458,7 @@ export default function ClassDetailBody({
           <span className="flex-1">
             <span className="block text-[15px] font-medium leading-5 text-ink">This one&rsquo;s on us 🎉</span>
             <span className="m-sub mt-0.5 block text-ink-2">
-              Come along, and if you like it, see what a class costs after — the plans are here.
+              Come along, and if you like it, see what a class costs after. The plans are here.
             </span>
           </span>
           <span className="shrink-0 text-ink-3">›</span>

@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { accentSolid, accentChip } from "@/lib/accent-pair";
 import { fmtClock } from "@/lib/clock";
-import { coachStep, groupGaps, privateReasonSentence, REPLACES_LABEL, slotReplaces, slotsForCoach, type Slot } from "@/lib/private-sessions";
+import { certificationLines, coachAvatarRow, coachStep, groupGaps, privateReasonSentence, REPLACES_LABEL, slotReplaces, slotsForCoach, type Slot } from "@/lib/private-sessions";
+import Avatar from "@/components/member/avatar";
 import { privateSlots } from "./actions";
 import { startPrivate } from "../../account/plan/actions";
 
 type T = { id: string; name: string; price_cents: number; people: number; duration_min: number; priceLabel: string };
-type Coach = { id: string; name: string };
+type Coach = { id: string; name: string; displayName?: string; avatarUrl?: string | null; bio?: string | null; certifications?: string[] };
 
 const DAYS = 14;
 
@@ -44,6 +45,8 @@ export default function PrivateFlow({
   const [comps, setComps] = useState<{ name: string; email: string }[]>([]);
   const [pending, startPay] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  // Decision 116(c): the coach whose profile sheet is open.
+  const [profileId, setProfileId] = useState<string | null>(null);
 
   const t = types.find((x) => x.id === typeId) ?? types[0];
   const need = (t?.people ?? 1) - 1;
@@ -130,13 +133,35 @@ export default function PrivateFlow({
 
       <section>
         <p className="m-label mb-2 text-ink">Free times</p>
-        <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1" data-testid="coach-filter">
-          <button type="button" onClick={() => pickFilter(null)}
-            className="m-press shrink-0 rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(filter === null)}>All coaches</button>
-          {coaches.map((c) => (
-            <button key={c.id} type="button" onClick={() => pickFilter(c.id)}
-              className="m-press shrink-0 rounded-full px-4 py-2 text-[14px] font-semibold" style={chip(filter === c.id)}>{c.name}</button>
-          ))}
+        {/* Decision 116(c): "Coaches", a row of round photos (initials when there
+            is none) with the first name under each; "All" first. The photo
+            filters the times; the name opens the coach's profile. */}
+        <p className="m-micro mb-2 text-ink-2">Coaches</p>
+        <div className="-mx-1 mb-3 flex gap-3 overflow-x-auto px-1 pb-1" data-testid="coach-filter">
+          {coachAvatarRow(coaches.map((c) => ({ id: c.id, first_name: c.name, display_name: c.displayName ?? c.name, avatar_url: c.avatarUrl ?? null })), filter)
+            .map((it) => (
+              <div key={it.id ?? "all"} className="flex w-[64px] shrink-0 flex-col items-center gap-1">
+                <button type="button" onClick={() => pickFilter(it.id)} aria-pressed={it.selected}
+                  aria-label={it.id ? `Show ${it.label}'s times` : "Show every coach's times"}
+                  className="m-press rounded-full p-[3px]"
+                  style={{ boxShadow: it.selected ? "inset 0 0 0 2.5px var(--accent-solid)" : "none" }}>
+                  {it.id === null ? (
+                    <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-line text-[14px] font-semibold"
+                      style={it.selected ? accentSolid() : { background: "var(--accent-chip)", color: "var(--ink)" }}>All</span>
+                  ) : (
+                    <Avatar name={coaches.find((c) => c.id === it.id)?.displayName ?? it.label} url={it.photo} size={52} />
+                  )}
+                </button>
+                {it.id === null ? (
+                  <span className="text-[12.5px] font-semibold text-ink">All</span>
+                ) : (
+                  <button type="button" onClick={() => setProfileId(it.id)}
+                    className="max-w-full truncate text-[12.5px] font-semibold text-ink underline decoration-dotted underline-offset-4">
+                    {it.label}
+                  </button>
+                )}
+              </div>
+            ))}
         </div>
         {loading ? (
           <p className="m-sub text-ink-2">Looking for free times…</p>
@@ -152,18 +177,30 @@ export default function PrivateFlow({
                 <div className="flex flex-wrap gap-2">
                   {g.starts.map((s) => {
                     const sl = byStart.get(s);
+                    // The time picks the slot; each coach name under it is its
+                    // own tap target that opens that coach's profile (116(c)).
                     return (
-                      <button key={s} type="button" onClick={() => pick(s)}
-                        className="m-press rounded-2xl px-3.5 py-1.5 text-left text-[14px] font-semibold"
+                      <div key={s} className="rounded-2xl px-3.5 py-1.5 text-left"
                         style={chosen === s ? accentSolid() : accentChip()}>
-                        {fmtClock(s, timeZone, timeFormat)}
+                        <button type="button" onClick={() => pick(s)}
+                          className="m-press block text-left text-[14px] font-semibold" style={{ color: "inherit" }}>
+                          {fmtClock(s, timeZone, timeFormat)}
+                          {slotReplaces(sl) && (
+                            <span className="block text-[11.5px] font-medium">{REPLACES_LABEL}</span>
+                          )}
+                        </button>
                         <span className="block text-[12px] font-medium">
-                          {(sl?.coaches ?? []).map((c) => coachName(c.id)).join(", ")}
+                          {(sl?.coaches ?? []).map((c, i) => (
+                            <span key={c.id}>
+                              {i > 0 && ", "}
+                              <button type="button" onClick={() => setProfileId(c.id)}
+                                className="underline decoration-dotted underline-offset-2" style={{ color: "inherit" }}>
+                                {coachName(c.id)}
+                              </button>
+                            </span>
+                          ))}
                         </span>
-                        {slotReplaces(sl) && (
-                          <span className="block text-[11.5px] font-medium">{REPLACES_LABEL}</span>
-                        )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -224,6 +261,50 @@ export default function PrivateFlow({
           {creditCovers ? "Your account credit covers it, so there's nothing to pay." : "Card or GCash, on the next screen."}
         </p>
       </div>
+      {profileId && (
+        <CoachProfile coach={coaches.find((c) => c.id === profileId) ?? null} onClose={() => setProfileId(null)} />
+      )}
     </div>
+  );
+}
+
+/**
+ * Decision 116(c): the coach's profile, sliding up over the slot list. Photo,
+ * display name, the Bio and Certifications staff wrote. A coach with an empty
+ * Bio still opens with photo and name.
+ */
+function CoachProfile({ coach, onClose }: { coach: Coach | null; onClose: () => void }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  if (!coach) return null;
+  const name = coach.displayName ?? coach.name;
+  const certs = certificationLines(coach.certifications);
+  return (
+    <>
+      <div className="m-sheet-scrim" onClick={onClose} aria-hidden />
+      <div role="dialog" aria-modal="true" aria-label={name} className="m-sheet" data-testid="coach-profile">
+        <div className="m-sheet-grab" aria-hidden />
+        <div className="m-sheet-body px-5 pb-8 pt-2">
+          <div className="flex items-center gap-4">
+            <Avatar name={name} url={coach.avatarUrl ?? null} size={72} />
+            <p className="m-title text-ink">{name}</p>
+          </div>
+          {coach.bio && <p className="m-body mt-4 whitespace-pre-line text-ink">{coach.bio}</p>}
+          {certs.length > 0 && (
+            <div className="mt-4">
+              <p className="m-label mb-1 text-ink">Certifications</p>
+              <ul className="space-y-0.5">
+                {certs.map((c) => <li key={c} className="m-sub text-ink-2">{c}</li>)}
+              </ul>
+            </div>
+          )}
+          <button type="button" onClick={onClose}
+            className="m-press mt-6 w-full rounded-full py-3 text-[15px] font-semibold" style={accentChip()}>Done</button>
+        </div>
+      </div>
+    </>
   );
 }

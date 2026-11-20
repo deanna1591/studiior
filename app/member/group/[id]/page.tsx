@@ -133,8 +133,8 @@ export default async function GroupBooking({
         <h1 className="m-title mb-1 text-ink">Who&rsquo;s coming?</h1>
         {occ && <p className="m-sub mb-4 text-ink-2">{occ.name} · <span className="num">{when(occ.starts_at)}</span></p>}
         <p className="m-sub mb-3 text-ink-2">
-          You&rsquo;re seat one. Add the {gp.group_size - 1} {gp.group_size - 1 === 1 ? "person" : "people"} coming with you —
-          we&rsquo;ll email anyone who isn&rsquo;t a member yet to set up their account and sign the waiver.
+          You&rsquo;re seat one. Add the {gp.group_size - 1} {gp.group_size - 1 === 1 ? "person" : "people"} coming with you.
+          We&rsquo;ll email anyone who isn&rsquo;t a member yet to set up their account and sign the waiver.
         </p>
         <EmailsForm groupId={gp.id} occId={searchParams.occ} hostEmail={hostEmail}
                     groupSize={gp.group_size} doneHref={`/group/${gp.id}`} />

@@ -10,12 +10,12 @@ export type GroupActionState = { ok: boolean; error?: string } | null;
 // using the email the RPC names where it names one.
 function bookReason(r: string | undefined, email?: string | null): string {
   switch (r) {
-    case "already_booked": return `${email ?? "Someone"} is already booked on that class — pick a different person or class.`;
+    case "already_booked": return `${email ?? "Someone"} is already booked on that class. Pick a different person or class.`;
     case "class_full": return "That class doesn't have enough free seats for the whole group any more.";
     case "class_type_not_allowed": return "This package can't be used for that class.";
     case "host_already_booked": return "You already have a booking on that class.";
-    case "duplicate_email": return `${email ?? "An email"} is listed twice — each guest needs a different email.`;
-    case "email_is_host": return "One of the emails is your own — you are already seat one.";
+    case "duplicate_email": return `${email ?? "An email"} is listed twice. Each guest needs a different email.`;
+    case "email_is_host": return "One of the emails is your own. You are already seat one.";
     case "wrong_email_count": return "Please fill in every guest's email.";
     case "blank_email": return "One of the emails is blank.";
     case "window_closed": return "The window to book this group has closed.";

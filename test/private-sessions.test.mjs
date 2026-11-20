@@ -136,5 +136,7 @@ test("no 'any coach' wording is left in the member flow", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("../app/member/book/private/flow.tsx", import.meta.url), "utf8");
   assert.ok(!/Any coach/.test(src));
-  assert.ok(/All coaches/.test(src));
+  // Decision 116(c): the filter row is headed "Coaches" with "All" first.
+  assert.ok(/>Coaches</.test(src));
+  assert.ok(/coachAvatarRow/.test(src));
 });

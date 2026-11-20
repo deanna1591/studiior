@@ -50,7 +50,7 @@ export default async function MilestonesPage() {
             <p className="num mt-1 text-[40px] font-bold leading-[44px] text-ink">{next}
               <span className="m-sub font-medium text-ink-3"> classes</span></p>
             <p className="m-body mt-1 text-ink">
-              <span className="num font-semibold">{toGo}</span> to go — you are at{" "}
+              <span className="num font-semibold">{toGo}</span> to go. You are at{" "}
               <span className="num font-semibold">{total}</span>.
             </p>
             <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--accent-chip)" }}>

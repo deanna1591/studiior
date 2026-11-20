@@ -440,4 +440,25 @@ select expect_false('Alpha (guarantees off) carries guarantees_enabled = false',
 select expect_true('Alpha (guarantees off) -> every class tier is null',
   (select bool_and((c->>'tier') is null) from jsonb_array_elements(current_setting('t.a')::jsonb -> 'classes') c));
 
+-- =============================================================================
+-- Decision 116(c): private_enabled + private_url (on for Golf, off for Alpha)
+-- =============================================================================
+update studio_settings set private_sessions_enabled = true
+ where studio_id = (select id from studios where slug = 'ec40-golf');
+update studio_settings set private_sessions_enabled = false
+ where studio_id = (select id from studios where slug = 'ec40-alpha');
+delete from public_schedule_cache;
+set role anon;
+select set_config('t.gp', public_schedule('ec40-golf', 7)::text, false);
+select set_config('t.ap', public_schedule('ec40-alpha', 7)::text, false);
+reset role;
+select expect_true('private sessions on -> private_enabled true',
+  (current_setting('t.gp')::jsonb -> 'studio' ->> 'private_enabled')::boolean);
+select expect_text('...and private_url points at the member app private page',
+  current_setting('t.gp')::jsonb -> 'studio' ->> 'private_url', 'https://ec40-golf.studiior.app/book/private');
+select expect_false('private sessions off -> private_enabled false',
+  (current_setting('t.ap')::jsonb -> 'studio' ->> 'private_enabled')::boolean);
+select expect_true('...and no private_url',
+  (current_setting('t.ap')::jsonb -> 'studio' ->> 'private_url') is null);
+
 select 'public_schedule_test: all assertions passed' as done;

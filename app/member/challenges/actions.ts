@@ -26,5 +26,5 @@ export async function joinChallenge(_prev: ActionResult, fd: FormData): Promise<
   }
 
   for (const p of ["/", "/challenges", `/challenges/${id}`]) revalidatePath(p);
-  return { ok: true, message: "You're in — every class from the start counts." };
+  return { ok: true, message: "You're in. Every class from the start counts." };
 }

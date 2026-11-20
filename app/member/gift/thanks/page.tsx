@@ -29,7 +29,7 @@ export default async function GiftThanks() {
         <p className="m-body mt-3 text-ink-2">
           Your gift card for {studio?.name ?? "the studio"} is on its way. We've emailed you a
           receipt with the code, and we'll send the card to your recipient
-          {" "}— at once, or on the date you chose.
+          , at once or on the date you chose.
         </p>
       </main>
     </div>

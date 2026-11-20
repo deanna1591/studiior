@@ -9172,9 +9172,21 @@ export type Database = {
       }
       auth_staff_studios: { Args: never; Returns: string[] }
       auto_assign_enabled: { Args: { p_studio_id: string }; Returns: boolean }
+      availability_change_lines: {
+        Args: { p_after: Json; p_before: Json }
+        Returns: string[]
+      }
       availability_conflicts: { Args: { p_studio_id: string }; Returns: Json }
       availability_cycle: {
         Args: { p_period_start?: string; p_studio_id: string }
+        Returns: Json
+      }
+      availability_submission_dates: {
+        Args: { p_submission_id: string }
+        Returns: Json
+      }
+      availability_submission_rows: {
+        Args: { p_submission_id: string }
         Returns: Json
       }
       availability_submission_week: {
@@ -9818,22 +9830,6 @@ export type Database = {
         Args: { p_infraction_id: string; p_reason: string }
         Returns: Json
       }
-      expect_num: {
-        Args: { actual: number; label: string; want: number }
-        Returns: undefined
-      }
-      expect_raises: {
-        Args: { label: string; stmt: string; want_sqlstate: string }
-        Returns: undefined
-      }
-      expect_text: {
-        Args: { actual: string; label: string; want: string }
-        Returns: undefined
-      }
-      expect_true: {
-        Args: { actual: boolean; label: string }
-        Returns: undefined
-      }
       expire_group_purchases: { Args: never; Returns: number }
       extend_membership: {
         Args: {
@@ -10240,6 +10236,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      instructor_rate_at_run: {
+        Args: { p_instructor_id: string; p_on: string }
+        Returns: {
+          base_rate_cents: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          duo_rate_cents: number | null
+          effective_from: string
+          full_house_bonus_cents: number
+          id: string
+          instructor_id: string
+          is_demo: boolean
+          note: string | null
+          pay_model: Database["public"]["Enums"]["pay_model"]
+          pay_tier: string | null
+          per_head_rate_cents: number
+          per_head_threshold: number
+          private_rate_cents: number | null
+          studio_id: string
+          trio_rate_cents: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "instructor_rate_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       instructor_recognition: {
         Args: { p_instructor_id: string }
         Returns: Json
@@ -10493,6 +10518,17 @@ export type Database = {
         }[]
       }
       member_class_ics: { Args: { p_occurrence_id: string }; Returns: string }
+      member_coaches: {
+        Args: { p_studio_id: string }
+        Returns: {
+          avatar_url: string
+          bio: string
+          certifications: Json
+          display_name: string
+          first_name: string
+          id: string
+        }[]
+      }
       member_covers_occurrence: {
         Args: { p_occurrence_id: string }
         Returns: boolean
@@ -12093,6 +12129,10 @@ export type Database = {
       }
       staff_challenges: { Args: { p_studio_id: string }; Returns: Json }
       staff_delete_thread: { Args: { p_thread_id: string }; Returns: Json }
+      staff_edit_availability_submission: {
+        Args: { p_rows: Json; p_submission_id: string }
+        Returns: Json
+      }
       staff_mark_thread_read: { Args: { p_thread_id: string }; Returns: Json }
       staff_message_thread: { Args: { p_thread_id: string }; Returns: Json }
       staff_message_threads: { Args: { p_studio_id: string }; Returns: Json }

@@ -392,12 +392,27 @@
     });
 
     wrap.appendChild(strip); wrap.appendChild(daybar); wrap.appendChild(list);
-    // Decision 110(a): a link to the studio's gift page when gift cards are on.
+    // Decision 110(a) + 116(c): under the timetable, side by side, a link to the
+    // studio's gift page when gift cards are on and to its private sessions page
+    // when private sessions are on. Same style, same place.
+    var links = [];
     if (DATA.studio && DATA.studio.gift_enabled && DATA.studio.gift_url) {
-      var gift = el("a", "sd-note", "Give a gift card \u203a");
-      gift.href = DATA.studio.gift_url; gift.target = "_top";
-      gift.style.display = "block"; gift.style.marginTop = "14px"; gift.style.textDecoration = "underline";
-      wrap.appendChild(gift);
+      links.push(["Give a gift card \u203a", DATA.studio.gift_url]);
+    }
+    if (DATA.studio && DATA.studio.private_enabled && DATA.studio.private_url) {
+      links.push(["Book a private session \u203a", DATA.studio.private_url]);
+    }
+    if (links.length) {
+      var foot = el("div", "sd-links");
+      foot.style.display = "flex"; foot.style.flexWrap = "wrap";
+      foot.style.columnGap = "18px"; foot.style.rowGap = "6px"; foot.style.marginTop = "14px";
+      links.forEach(function (l) {
+        var a = el("a", "sd-note", l[0]);
+        a.href = l[1]; a.target = "_top";
+        a.style.display = "block"; a.style.textDecoration = "underline";
+        foot.appendChild(a);
+      });
+      wrap.appendChild(foot);
     }
     paintCells(); paintDay();
     mountNode(wrap);

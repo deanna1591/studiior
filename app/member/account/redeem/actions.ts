@@ -25,7 +25,7 @@ export async function redeemGift(_prev: RedeemState, fd: FormData): Promise<Rede
   const { data, error } = await supabase.rpc("gift_card_redeem", { p_code: code });
   if (error) {
     if (/PT403/.test(error.message)) return { ok: false, message: "That gift card is for a different studio." };
-    return { ok: false, message: "That didn't work — please try again." };
+    return { ok: false, message: "That didn't work. Please try again." };
   }
   const r = data as { ok: boolean; reason?: string; amount?: string } | null;
   if (!r?.ok) return { ok: false, message: REASONS[r?.reason ?? ""] ?? "That code could not be redeemed." };

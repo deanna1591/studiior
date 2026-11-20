@@ -17,7 +17,7 @@ export default function RedeemForm() {
       <div className="m-card p-4" style={{ background: "var(--accent-chip)" }}>
         <p className="m-name text-ink">Added to your account.</p>
         <p className="m-sub mt-1 text-ink-2">
-          {state.amount ? `${state.amount} of gift credit is yours` : "Your gift credit is yours"} — it
+          {state.amount ? `${state.amount} of gift credit is yours` : "Your gift credit is yours"}. It
           comes off your next checkout before any payment.
         </p>
       </div>

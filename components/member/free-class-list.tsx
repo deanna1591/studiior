@@ -155,7 +155,7 @@ export default function FreeClassList({
       {rows.length === 0 ? (
         <p className="rounded-2xl bg-surface px-3.5 py-6 text-center text-[13px] leading-[19px] text-ink-2"
            style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06)" }}>
-          No free-class slots this day — try another day.
+          No free-class slots this day. Try another day.
         </p>
       ) : (
         <ul className="space-y-2">

@@ -10,7 +10,7 @@ export type ClaimState = { error: string } | { ok: true } | null;
 const SAYS: Record<string, string> = {
   invalid: "That link is not one we recognise.",
   used: "That link has already been used. Try signing in.",
-  expired: "That link has expired — ask the studio for another.",
+  expired: "That link has expired. Ask the studio for another.",
   password_too_short: "Eight characters or more, please.",
   already_claimed: "You already have an account here. Try signing in.",
 };

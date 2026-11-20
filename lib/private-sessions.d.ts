@@ -21,3 +21,9 @@ export function mergeSlots(rows: { starts_at: string; coach_ids: string[] | null
 export function slotsForCoach(slots: Slot[], coachId: string | null): Slot[];
 export function coachStep(slot: Slot | null | undefined): { skip: boolean; coachId: string | null; choices: string[] };
 export function slotReplaces(slot: Slot | null | undefined, coachId?: string | null): boolean;
+export type CoachAvatarItem = { id: string | null; label: string; photo: string | null; initials: string | null; selected: boolean };
+export function coachAvatarRow(
+  coaches: { id: string; first_name?: string | null; display_name?: string | null; name?: string | null; avatar_url?: string | null }[],
+  selectedId: string | null,
+): CoachAvatarItem[];
+export function certificationLines(certs: unknown): string[];

@@ -102,7 +102,7 @@ export default async function MemberChallengeDetail({ params }: { params: { id: 
           <p className="m-sub text-ink-2">
             {c.status === "scheduled"
               ? <>Starts {fmtDayLong(`${c.starts_on}T00:00:00Z`, "UTC")}.</>
-              : <>Started {fmtDayLong(`${c.starts_on}T00:00:00Z`, "UTC")} — joining has closed.</>}
+              : <>Started {fmtDayLong(`${c.starts_on}T00:00:00Z`, "UTC")}. Joining has closed.</>}
           </p>
           {c.reward_description && <p className="m-sub mt-1 text-ink-2">Reward: {c.reward_description}</p>}
         </div>

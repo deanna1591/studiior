@@ -70,7 +70,7 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
         <div className="m-card mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)" }} role="alert">
           <p className="text-[13px] leading-[19px] text-ink">
-            Your month could not be read — this is not an empty month.
+            Your month could not be read. This is not an empty month.
           </p>
           <p className="num mt-1 text-[11px] leading-4 text-ink-2">{error.message}</p>
         </div>
@@ -84,7 +84,7 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
       )}
       {r?.confirmations_on && r?.state === "confirmed" && (
         <p className="m-card mb-4 px-4 py-3 text-[13px] leading-[19px] text-ink-2">
-          Confirmed. Ask for cover on any class below if something changes — the
+          Confirmed. Ask for cover on any class below if something changes. The
           studio decides, and you are down to teach it until they do.
         </p>
       )}
@@ -92,7 +92,7 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
         <p className="m-card mb-4 px-4 py-3 text-[13px] leading-[19px] text-ink">
           <span className="num font-semibold">{r.added_since}</span>{" "}
           {r.added_since === 1 ? "class was" : "classes were"} added after your roster
-          was sent — {r.added_since === 1 ? "it is" : "they are"} marked below.
+          was sent. {r.added_since === 1 ? "It is" : "They are"} marked below.
         </p>
       )}
 
@@ -134,12 +134,12 @@ export default async function MyMonth({ searchParams }: { searchParams: { m?: st
                     </Link>
                     {c.cover_status === "pending" && (
                       <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-                        Flagged — you have asked for cover. The studio decides.
+                        Flagged. You have asked for cover. The studio decides.
                       </p>
                     )}
                     {c.cover_status === "approved" && (
                       <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-                        Cover approved — this one is being reassigned.
+                        Cover approved. This one is being reassigned.
                       </p>
                     )}
                     {!c.cover_status && <AskForCover occurrenceId={c.occurrence_id} compact colleagues={colleagues} />}

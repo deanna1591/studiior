@@ -134,7 +134,7 @@ export default function ClassButton({
         router.refresh();
       } else {
         busy.current = false;
-        setMsg(r?.message ?? "You couldn't be checked in — show your code at the desk.");
+        setMsg(r?.message ?? "You couldn't be checked in. Show your code at the desk.");
         haptic("warning");
       }
     });

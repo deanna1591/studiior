@@ -53,7 +53,7 @@ function recurringIncludes(p: Plan): (string | null)[] {
   return [
     p.credits_per_period == null ? "Unlimited classes"
       : `${p.credits_per_period} class${p.credits_per_period === 1 ? "" : "es"} a ${per}`,
-    `one ${per} — renew by hand`,
+    `one ${per}, renew by hand`,
   ];
 }
 
@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: { params: { plan: string } })
   } catch {
     /* metadata is best-effort; fall back to the studio name */
   }
-  const title = planName ? `${planName} — ${studioName}` : studioName ? `Buy — ${studioName}` : "Buy";
+  const title = planName ? `${planName} · ${studioName}` : studioName ? `Buy · ${studioName}` : "Buy";
   return { title };
 }
 
@@ -149,7 +149,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
       <Frame>
         <section className="m-card p-5">
           <h1 className="m-head text-[24px] leading-8 text-ink">{plan.name}</h1>
-          <p className="m-body mt-3 text-ink">Online payment isn&rsquo;t set up yet — pay at the studio.</p>
+          <p className="m-body mt-3 text-ink">Online payment isn&rsquo;t set up yet. Pay at the studio.</p>
         </section>
       </Frame>
     );
@@ -209,8 +209,8 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
         {alreadyHas && !introUsed && (
           <p className="m-sub mt-3 text-ink-2">
             {plan.type === "recurring"
-              ? <>You already have {plan.name} — this renews it for another period.</>
-              : <>You already have {plan.name} — buying again adds to it.</>}
+              ? <>You already have {plan.name}. This renews it for another period.</>
+              : <>You already have {plan.name}. Buying again adds to it.</>}
           </p>
         )}
 
@@ -220,11 +220,11 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
           </p>
         ) : exclusiveLocked ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
-            This offer is just for your intro — take a free class first, and it opens up.
+            This offer is just for your intro. Take a free class first, and it opens up.
           </p>
         ) : full ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
-            This plan is full — ask the studio.
+            This plan is full. Ask the studio.
           </p>
         ) : (
           <div className="mt-5 flex justify-end">

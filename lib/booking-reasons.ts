@@ -27,7 +27,7 @@ export const REASONS: Record<string, string> = {
   past_booking_cutoff: "Booking has closed for that class.",
   waiver_not_signed: "Please sign the studio waiver before booking.",
   // Decision 34 Part B: require_waiver is on but the studio hasn't published one.
-  waiver_unavailable: "This studio hasn't published its waiver yet — please ask the studio.",
+  waiver_unavailable: "This studio hasn't published its waiver yet. Please ask the studio.",
   member_not_active: "Your membership is not active.",
   already_booked: "You are already on the list for that class.",
   daily_limit_reached: "You have reached your class limit for that day.",
@@ -37,11 +37,11 @@ export const REASONS: Record<string, string> = {
   waitlist_closed: "The waitlist has closed for that class.",
   // Decision 30 belt: an eligible member's first class is free — the UI routes
   // them to the free path, so this is only reached by a direct call.
-  use_free_first: "Your first class here is free — book it as your free class.",
+  use_free_first: "Your first class here is free. Book it as your free class.",
   // Decision 73: the studio caps how many unpaid bookings a member may hold.
   pay_first: "Pay for your booked class first, or pay at the desk when you come in.",
   // Decision 73: a provisional free first class blocks other bookings until it's confirmed.
-  free_first_pending: "Your free first class isn't confirmed yet — you can book more once it is.",
+  free_first_pending: "Your free first class isn't confirmed yet. You can book more once it is.",
   // Decision 73 (c): pay at the desk has been turned off for this member.
   desk_pay_blocked: "Pay online to book. Paying at the desk is not available on this account.",
   // Decision 98: a same-person twin has already had a free class.

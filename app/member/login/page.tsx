@@ -178,7 +178,7 @@ export default async function MemberLogin({
           {process.env.NODE_ENV === "development" && (
             <p className="m-micro mt-4 text-center"
                style={{ color: image ? "rgb(255 255 255 / 0.6)" : "var(--ink-3)" }}>
-              Seed: alena.fabricated@example.com · nikola.simulated@example.com —
+              Seed: alena.fabricated@example.com · nikola.simulated@example.com ·
               password reform-dev-password
             </p>
           )}

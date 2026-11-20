@@ -1,0 +1,10 @@
+export type AvailLine = { day?: number | null; date?: string | null; from?: string; to?: string; unavailable?: boolean };
+export function hhmm(t: string | null | undefined): string;
+export function lineLabel(line: AvailLine): string;
+export function lineHours(line: AvailLine): string;
+export function lineText(line: AvailLine): string;
+export function linesFromWeek(week: { days?: { day: number; ranges?: { from: string; to: string }[] }[];
+  dates?: { date: string; unavailable?: boolean; ranges?: { from: string; to: string }[] }[] } | null | undefined): AvailLine[];
+export function changeLines(before: AvailLine[], after: AvailLine[]): string[];
+export function outsideWarning(first: string | null | undefined, n: number | null | undefined): string | null;
+export function lineError(line: AvailLine, periodStart?: string | null, periodEnd?: string | null): string | null;

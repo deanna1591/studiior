@@ -216,7 +216,7 @@ export default async function InstructorHome() {
       {!confirmationsOn && next && (
         <p className="mt-2 px-1 text-[12.5px] leading-[18px] text-ink-3">
           Can&rsquo;t make a class? Ask for cover at least <span className="num">{coverHours}</span> hours
-          before it starts — you can ask a colleague directly and they confirm from their phone.
+          before it starts. You can ask a colleague directly and they confirm from their phone.
         </p>
       )}
 
@@ -226,7 +226,7 @@ export default async function InstructorHome() {
           <div className="m-card px-4 py-3.5" style={{ boxShadow: "0 0 0 1.5px var(--lime-text)" }}>
             <p className="text-[15px] font-semibold leading-[22px] text-ink">Cover needed now</p>
             <p className="m-sub mt-0.5 text-ink-3">
-              Whoever takes it first gets it — no waiting on the studio.
+              Whoever takes it first gets it. No waiting on the studio.
             </p>
             <ul className="mt-3 space-y-2">
               {coverClasses.map((c) => (

@@ -28,7 +28,7 @@ export default function InstructorForm({ draft, mode }: { draft: InstructorDraft
           What members see on the schedule.
         </p>
       </Field>
-      <Field label="Bio">
+      <Field label="Bio" hint="Members see this on the private sessions page.">
         <textarea name="bio" rows={3} defaultValue={draft.bio ?? ""} className={inputClass}
                   placeholder="A couple of lines for the member app." />
       </Field>

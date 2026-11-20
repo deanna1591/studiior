@@ -18,7 +18,7 @@ export default function WaiverBanner({ published, resign }: { published: boolean
         <p className="m-name text-ink">Waiver on the way</p>
         <p className="m-sub mt-1 text-ink-2">
           This studio hasn&rsquo;t published its waiver yet. You&rsquo;ll be able to
-          sign it here as soon as they do — have a word with the studio if you have a
+          sign it here as soon as they do. Have a word with the studio if you have a
           class coming up.
         </p>
       </div>
@@ -32,7 +32,7 @@ export default function WaiverBanner({ published, resign }: { published: boolean
       <p className="m-sub mt-1 text-ink-2">
         {resign
           ? "Please read and sign the current version to keep booking."
-          : "Please read and sign the studio waiver. Your place is confirmed once you have — the front desk can’t check you in without it."}
+          : "Please read and sign the studio waiver. Your place is confirmed once you have. The front desk can’t check you in without it."}
       </p>
       <Link href="/waiver"
             className="m-tap m-press mt-2 inline-flex rounded-full px-4 py-2.5 text-[13px] font-bold"

@@ -358,7 +358,7 @@ export default async function Book({
   if (settings.bookingWindowDays == null && process.env.NODE_ENV !== "production") {
     throw new Error(
       "member booking window is null: member_bootstrap returned no booking_window_days " +
-        "(studio_settings missing?). The screen must not invent 30 — fix the data.",
+        "(studio_settings missing?). The screen must not invent 30. Fix the data.",
     );
   }
   const windowMs =
@@ -419,7 +419,7 @@ export default async function Book({
     const insideFreeWindow = Date.now() < cutoffAt.getTime();
     const peakCancelNote = booked && isPeak && remaining !== null && remaining !== undefined
       ? insideFreeWindow
-        ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone, ctx.timeFormat)} — your peak class comes back`
+        ? `Free until ${fmtTime(cutoffAt.toISOString(), ctx.timeZone, ctx.timeFormat)}, then your peak class comes back`
         : "Cancelling now still uses your peak class"
       : null;
     const outOfWindow = !past && !booked && !waiting && !holding
@@ -448,7 +448,7 @@ export default async function Book({
       href: `/class/${o.id}?t=${o.class_type_id}`,
       startLabel: fmtTime(o.starts_at, ctx.timeZone, ctx.timeFormat),
       endLabel: o.ends_at ? fmtTime(o.ends_at, ctx.timeZone, ctx.timeFormat) : null,
-      durationLabel: mins ? `${mins} min` : "—",
+      durationLabel: mins ? `${mins} min` : "",
       instructor: o.instructors?.display_name ?? null,
       coachAvatar: o.instructors?.avatar_url ?? null,
       room: o.rooms?.name ?? null,
@@ -553,7 +553,7 @@ export default async function Book({
         <Link href="/book/private" className="m-card m-press mb-4 flex items-center justify-between px-4 py-3">
           <span>
             <span className="m-body block font-semibold text-ink">Private sessions</span>
-            <span className="m-sub text-ink-2">1:1, Duo or Trio, at a time the studio is free</span>
+            <span className="m-sub text-ink-2">1:1, Duo or Trio</span>
           </span>
           <span className="m-sub font-semibold text-ink" aria-hidden>›</span>
         </Link>

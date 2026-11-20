@@ -42,7 +42,7 @@ export async function signWaiver(
   } | null;
   if (!w?.exists) return { ok: false, message: "This studio has not provided a waiver yet." };
   if (w.version_id !== versionId) {
-    return { ok: false, message: "The waiver has changed — reload and sign the current version." };
+    return { ok: false, message: "The waiver has changed. Reload and sign the current version." };
   }
 
   const name = ctx.name?.trim() || "Member";
@@ -154,7 +154,7 @@ export async function signWaiver(
   });
   if (error) return { ok: false, message: error.message };
   const r = data as { ok?: boolean } | null;
-  if (!r?.ok) return { ok: false, message: "That didn't work — please try again." };
+  if (!r?.ok) return { ok: false, message: "That didn't work. Please try again." };
 
   for (const p of ["/", "/book", "/account", "/waiver"]) revalidatePath(p);
   return { ok: true };

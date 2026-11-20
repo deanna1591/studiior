@@ -144,7 +144,7 @@ export default async function ShiftsPage() {
                         style={{ background: "var(--accent-chip)", color: "var(--lime-text)" }}>Pending</span>
                 </div>
                 <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-                  You&apos;ve asked for this class — the studio will confirm. You can pull out until they do.
+                  You&apos;ve asked for this class. The studio will confirm. You can pull out until they do.
                 </p>
                 <WithdrawApplication occurrenceId={p.occurrence_id} />
               </li>

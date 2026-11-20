@@ -7,6 +7,13 @@ import { Note, accentFill } from "@/components/member/ui";
 import { submitMyAvailability, type InstructorState } from "@/app/member/instructor/actions";
 import { DAY_NAMES, emptyWeek, type Day, type Range } from "@/lib/availability";
 
+type DateEntry = { date: string; off: boolean; from: string; to: string };
+const fmtDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+    .format(new Date(Date.UTC(y, m - 1, d))).replace(",", "");
+};
+
 /**
  * The month ahead, entered on a phone (Decision 45).
  *
@@ -22,16 +29,26 @@ import { DAY_NAMES, emptyWeek, type Day, type Range } from "@/lib/availability";
  * <Sheet> — this is one long-lived client form, not a URL to step back out of.
  */
 export default function PhoneAvailabilityEditor({
-  instructorId, periodStart, initial, status, locked,
+  instructorId, periodStart, periodEnd, initial, initialDates = [], status, locked,
 }: {
   instructorId: string;
   periodStart: string;
+  periodEnd: string;
   initial: Day[];
+  initialDates?: { date: string; unavailable?: boolean; ranges?: { from: string; to: string }[] }[];
   status: string;
   locked: boolean;
 }) {
   const [days, setDays] = useState<Day[]>(() => emptyWeek(initial));
   const [open, setOpen] = useState<number | null>(null);
+  // Decision 18(d): specific dates with their own hours, or marked off. One
+  // entry per date; it wins over the weekday for that date once approved.
+  const [dates, setDates] = useState<DateEntry[]>(() => initialDates.map((d) => (
+    d.unavailable || !(d.ranges ?? []).length
+      ? { date: d.date, off: true, from: "09:00", to: "17:00" }
+      : { date: d.date, off: false, from: d.ranges![0].from, to: d.ranges![0].to })));
+  const setDate = (i: number, p: Partial<DateEntry>) =>
+    setDates((prev) => prev.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const [state, run] = useFormState<InstructorState, FormData>(submitMyAvailability, null);
 
   const ranges = (d: number) => days.find((x) => x.day === d)?.ranges ?? [];
@@ -46,6 +63,8 @@ export default function PhoneAvailabilityEditor({
       <input type="hidden" name="instructor_id" value={instructorId} />
       <input type="hidden" name="period_start" value={periodStart} />
       <input type="hidden" name="days" value={JSON.stringify(days)} />
+      <input type="hidden" name="dates" value={JSON.stringify(dates)} />
+      <input type="hidden" name="period_end" value={periodEnd} />
 
       {err && <Note ok={false}>{err}</Note>}
       {ok && <Note ok>{ok}</Note>}
@@ -85,6 +104,56 @@ export default function PhoneAvailabilityEditor({
           );
         })}
       </ul>
+
+      <section className="mt-6" data-testid="specific-dates">
+        <p className="m-label mb-1 text-ink">Specific dates</p>
+        <p className="m-micro mb-2 text-ink-2">
+          A date here wins over its weekday: add a day, give a day different hours, or mark it off.
+        </p>
+        {dates.length === 0 && locked && <p className="m-sub text-ink-3">None.</p>}
+        <ul className="space-y-2">
+          {dates.map((d, i) => (
+            <li key={i} className="m-card px-4 py-3">
+              {locked ? (
+                <p className="m-sub text-ink">
+                  <span className="num">{fmtDate(d.date)}</span>{" "}
+                  <span className="text-ink-2">{d.off ? "Not available" : `${d.from} to ${d.to}`}</span>
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input type="date" value={d.date} min={periodStart} max={periodEnd} aria-label="Date"
+                    onChange={(e) => setDate(i, { date: e.target.value })}
+                    className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[15px] text-ink" />
+                  {!d.off && (
+                    <>
+                      <input type="time" step={900} value={d.from} aria-label="From"
+                        onChange={(e) => setDate(i, { from: e.target.value })}
+                        className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[15px] text-ink" />
+                      <span className="m-sub text-ink-2">to</span>
+                      <input type="time" step={900} value={d.to} aria-label="To"
+                        onChange={(e) => setDate(i, { to: e.target.value })}
+                        className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[15px] text-ink" />
+                    </>
+                  )}
+                  <label className="m-sub flex items-center gap-1.5 text-ink-2">
+                    <input type="checkbox" checked={d.off} onChange={(e) => setDate(i, { off: e.target.checked })} />
+                    Not available
+                  </label>
+                  <button type="button" onClick={() => setDates((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label="Remove this date" className="ml-auto text-[18px] leading-none text-ink-3">×</button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+        {!locked && (
+          <button type="button" onClick={() => { haptic("tap"); setDates((prev) => [...prev, { date: periodStart, off: false, from: "09:00", to: "17:00" }]); }}
+            className="m-press mt-2 rounded-full px-4 py-2 text-[14px] font-semibold"
+            style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
+            Add a date
+          </button>
+        )}
+      </section>
 
       {/* The sticky bar: nothing is saved until one of these is pressed. Only
           when the month is still editable — an approved month is read-only. */}

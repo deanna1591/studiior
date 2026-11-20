@@ -6,7 +6,7 @@ import { CalendarFeedControl } from "@/components/member/calendar-feed";
 import { mintFeed, revokeFeed } from "@/lib/feed-actions";
 import PhotoUpload from "@/components/instructor/photo-upload";
 import ShowIntroAgain from "@/components/instructor/show-intro-again";
-import TimeOff, { type TimeOffRange } from "@/components/instructor/time-off";
+import TimeOff, { type TimeOffRange, type DateHours } from "@/components/instructor/time-off";
 import { uploadMyPhoto, removeMyPhoto } from "./actions";
 import { markGuide } from "../actions";
 
@@ -33,13 +33,20 @@ type Rec = {
  */
 export default async function MePage() {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data }, { data: relData }, { data: feed }, { data: timeOffData }] = await Promise.all([
+  const [{ data }, { data: relData }, { data: feed }, { data: timeOffData }, { data: weekData }] = await Promise.all([
     supabase.rpc("instructor_recognition", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("instructor_reliability", { p_instructor_id: ctx.instructor_id }),
     supabase.rpc("calendar_feed_state", { p_studio_id: ctx.studio_id, p_kind: "instructor" }),
     supabase.rpc("instructor_time_off"),
+    supabase.rpc("instructor_availability_week", { p_instructor_id: ctx.instructor_id }),
   ]);
   const timeOffRanges = (timeOffData ?? []) as unknown as TimeOffRange[];
+  // Decision 18(d): standalone dates with different hours, today onward.
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timezone }).format(new Date());
+  const dateHours: DateHours[] = (((weekData as { exceptions?: { date: string; available: boolean; ranges: { from: string; to: string }[] }[] } | null)
+    ?.exceptions) ?? [])
+    .filter((e) => e.available && e.ranges.length > 0 && e.date >= todayIso)
+    .map((e) => ({ date: e.date, from: e.ranges[0].from, to: e.ranges[0].to }));
   const feedState = (feed ?? {}) as { active?: boolean; last_used_at?: string | null };
   const r = data as Rec | null;
   const rel = relData as unknown as
@@ -86,7 +93,7 @@ export default async function MePage() {
           {rel.short_notice > 0 && (
             <p className="m-sub mt-1 text-ink-2">
               <span className="num">{rel.short_notice}</span> of those withdrawals came at short
-              notice — inside the studio&rsquo;s cover window, when it is hardest to fill.
+              notice, inside the studio&rsquo;s cover window, when it is hardest to fill.
             </p>
           )}
           <p className="m-sub mt-1.5 text-ink-3">
@@ -129,7 +136,7 @@ export default async function MePage() {
       </Link>
 
       {/* Decision 99: Time off lives under Me, below My availability. */}
-      <TimeOff ranges={timeOffRanges} />
+      <TimeOff ranges={timeOffRanges} hours={dateHours} instructorId={ctx.instructor_id} />
 
       {/* Decision 85: the Studio Guide, and a way to see the intro again. */}
       <div className="m-card mt-4 px-4 py-4">

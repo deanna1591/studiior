@@ -53,7 +53,7 @@ test("manifestObject — 52a follow-up: the five completeness keys, exact values
     { slug: "reform", name: "Reform Collective", themeColor: "#B85C38",
       backgroundColor: "#FAF6F2", iconV: "abc" }, "member");
   // description derived from the studio name, contains it
-  assert.equal(m.description, "Reform Collective — book classes, check in, and manage your membership.");
+  assert.equal(m.description, "Reform Collective: book classes, check in, and manage your membership.");
   assert.ok(m.description.includes("Reform Collective"));
   // the exact values asked for
   assert.equal(m.orientation, "portrait");
@@ -75,7 +75,7 @@ test("manifestObject — instructor app: separate name, id and scope", () => {
     { slug: "reform", name: "Reform Collective", themeColor: "#B85C38",
       backgroundColor: "#FAF6F2", iconV: "abc" }, "instructor");
   assert.equal(m.id, "reform-instructor");
-  assert.equal(m.name, "Reform Collective — Instructors");
+  assert.equal(m.name, "Reform Collective · Instructors");
   assert.equal(m.start_url, "/instructor");
   assert.equal(m.scope, "/instructor");
 });

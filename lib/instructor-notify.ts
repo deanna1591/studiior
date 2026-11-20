@@ -16,7 +16,7 @@ export type NotifItem = {
 
 const LABELS: Record<string, { title: string; action?: boolean }> = {
   instructor_assigned:            { title: "You were assigned a class" },
-  shift_approved:                 { title: "Your claim was approved — the class is yours" },
+  shift_approved:                 { title: "Your claim was approved. The class is yours" },
   shift_declined:                 { title: "A claim was not approved" },
   shift_taken_off:                { title: "You were taken off a class" },
   open_shifts_available:          { title: "There are open classes to claim", action: true },

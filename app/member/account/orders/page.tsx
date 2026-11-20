@@ -14,7 +14,7 @@ type Order = {
 };
 
 const STATUS: Record<string, string> = {
-  paid: "Paid — collect at the front desk",
+  paid: "Paid. Collect at the front desk.",
   collected: "Collected",
   refunded: "Refunded",
 };

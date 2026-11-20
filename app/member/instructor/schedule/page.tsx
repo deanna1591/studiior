@@ -164,7 +164,7 @@ export default async function MySchedule({
         <div className="m-card mb-4 border-l-[3px] px-3 py-2.5"
              style={{ borderLeftColor: "var(--coral)" }} role="alert">
           <p className="text-[13px] leading-[19px] text-ink">
-            Your schedule could not be read — this is not an empty week.
+            Your schedule could not be read. This is not an empty week.
           </p>
           <p className="num mt-1 text-[11px] leading-4 text-ink-2">{week.error.message}</p>
         </div>
@@ -299,8 +299,8 @@ function PendingRow({ p }: { p: Pending }) {
               style={{ background: "var(--accent-chip)", color: "var(--lime-text)" }}>Pending</span>
       </div>
       <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-        You have asked to take this. It is not yours until the studio approves —
-        they will tell you either way.
+        You have asked to take this. It is not yours until the studio approves.
+        They will tell you either way.
       </p>
     </li>
   );
@@ -351,7 +351,7 @@ function ClassRow({ c, confirmationsOn, guaranteesEnabled, flexEnabled }: {
         )}
         {c.cover_requested && (
           <p className="mt-1.5 text-[12px] leading-[17px] text-ink-2">
-            You have asked for cover. The studio decides — nothing is released
+            You have asked for cover. The studio decides. Nothing is released
             until they do.
           </p>
         )}

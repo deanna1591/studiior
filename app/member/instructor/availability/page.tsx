@@ -49,6 +49,7 @@ export default async function AvailabilityPage({
   const sub = data as unknown as {
     status: string; source?: string; note: string | null;
     period_start: string; pattern_ends_on?: string | null; days: Day[];
+    dates?: { date: string; unavailable?: boolean; ranges?: { from: string; to: string }[] }[];
   } | null;
 
   const status = sub?.status ?? "none";
@@ -86,7 +87,7 @@ export default async function AvailabilityPage({
   const statusLine = availabilityStatusLine({ today, shownMonth: period, dueDay, state: availState });
 
   return (
-    <InstructorShell ctx={ctx} title={`Availability — ${label}`} bare>
+    <InstructorShell ctx={ctx} title={`Availability: ${label}`} bare>
       <Link href="/instructor/me"
             className="m-sub mb-4 inline-flex items-center gap-1 text-ink-3">
         ‹ Me
@@ -119,7 +120,7 @@ export default async function AvailabilityPage({
 
       <p className="mb-5 text-[13px] leading-5 text-ink-2">
         {patternMode
-          ? <>The studio has your {label} availability on file — weekly pattern{patternThrough}. Ask the studio if something has changed. {statusLine}</>
+          ? <>The studio has your {label} availability on file: weekly pattern{patternThrough}. Ask the studio if something has changed. {statusLine}</>
           : <>{STATUS_LINE[status] ?? STATUS_LINE.none}{" "}{statusHelp(status, locked)}</>}
       </p>
 
@@ -127,13 +128,15 @@ export default async function AvailabilityPage({
         instructorId={ctx.instructor_id}
         periodStart={period}
         initial={sub?.days ?? []}
+        initialDates={sub?.dates ?? []}
+        periodEnd={new Date(Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0)).toISOString().slice(0, 10)}
         status={status}
         locked={locked}
       />
 
       {publishedLock ? (
         <p className="m-sub mt-5 text-ink-3">
-          This month&rsquo;s schedule is already published — ask the studio if
+          This month&rsquo;s schedule is already published. Ask the studio if
           something has changed. Your booking and class emails are unaffected.
         </p>
       ) : status === "approved" && (

@@ -132,7 +132,7 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
     : result.payment_source === "comp" ? "complimentary"
     : "drop-in, payable at the studio";
 
-  return { ok: true, message: `Booked — ${paid}.` };
+  return { ok: true, message: `Booked, ${paid}.` };
 }
 
 // Decision 30 — a new member's first class is free. Its own action (not
@@ -141,7 +141,7 @@ export async function bookClass(_prev: BookResult, formData: FormData): Promise<
 const FREE_FIRST_REASONS: Record<string, string> = {
   not_enabled: "This studio isn't offering a free first class right now.",
   already_had_free: "You've already had your free class here.",
-  not_first: "This isn't your first class — it's a drop-in or covered by your plan.",
+  not_first: "This isn't your first class. It's a drop-in or covered by your plan.",
   missed: "Your free class was used when you missed it. Here are the plans.",
   // Decision 98: one free class per person (a same-person twin already had free).
   duplicate: "It looks like you've had a free class with us before. You can still book this one by paying.",
@@ -170,7 +170,7 @@ export async function bookFirstFree(_prev: BookResult, formData: FormData): Prom
   // class page route to /reserve first; this is the belt for any other path.)
   if ((ctx.bootstrap?.free_first_reservation_fee_cents ?? 0) > 0
       && !(ctx.bootstrap?.fee_waived ?? false)) {
-    return { ok: false, message: "This class needs a reservation fee to hold your spot — open the class to reserve." };
+    return { ok: false, message: "This class needs a reservation fee to hold your spot. Open the class to reserve." };
   }
   const supabase = createClient();
   const { data, error } = await supabase.rpc("book_first_free", {
@@ -181,19 +181,19 @@ export async function bookFirstFree(_prev: BookResult, formData: FormData): Prom
   if (!r) return { ok: false, message: "No response." };
   if (!r.ok) return { ok: false, message: FREE_FIRST_REASONS[r.reason ?? ""] ?? "That didn't work. Please try again." };
   revalidateMember();
-  return { ok: true, message: "Booked — your first class is on us. See you there." };
+  return { ok: true, message: "Booked. Your first class is on us. See you there." };
 }
 
 // Decision 26 — the host brings a guest. Refusals are sentences.
 const GUEST_REASONS: Record<string, string> = {
   not_enabled: "This studio doesn't offer guest passes.",
-  bad_email: "That email doesn't look right — check it and try again.",
-  have_active_guest: "You already have a guest booked — you can invite another once they've come.",
+  bad_email: "That email doesn't look right. Check it and try again.",
+  have_active_guest: "You already have a guest booked. You can invite another once they've come.",
   already_had_free: "That email has already had a free class here.",
   already_member: "That email is already a member here.",
   // Decision 98: the invited name matches an existing member who has had free.
   duplicate: "It looks like they already have an account with us. Ask them to sign in instead.",
-  only_one_seat: "There's only one seat left — not enough for you and a guest.",
+  only_one_seat: "There's only one seat left, not enough for you and a guest.",
   class_full: "This class is full.",
   host_not_booked: "We couldn't book you into this class, so there's nothing to bring a guest to.",
   not_authorised: "Please sign in as a member to bring a guest.",
@@ -221,7 +221,7 @@ export async function bringGuest(_prev: BookResult, formData: FormData): Promise
     const reason = r.reason ?? "";
     // host_<code> means the host's own booking failed for that reason.
     const key = reason.startsWith("host_") && !GUEST_REASONS[reason] ? "host_not_booked" : reason;
-    return { ok: false, message: GUEST_REASONS[key] ?? "That didn't work — please try again." };
+    return { ok: false, message: GUEST_REASONS[key] ?? "That didn't work. Please try again." };
   }
   revalidateMember();
   return { ok: true, message: "Your guest is booked. We've emailed them to set up and sign the waiver." };
@@ -291,7 +291,7 @@ export async function selfCheckIn(
   const r = data as unknown as { ok: boolean; reason?: string; already?: boolean; distance_m?: number } | null;
   if (!r) return { ok: false, message: "No response." };
   if (!r.ok) {
-    return { ok: false, message: SELF_CHECKIN_REASONS[r.reason ?? ""] ?? "You couldn't be checked in — show your code at the desk." };
+    return { ok: false, message: SELF_CHECKIN_REASONS[r.reason ?? ""] ?? "You couldn't be checked in. Show your code at the desk." };
   }
   revalidateMember();
   return { ok: true, message: r.already ? "You're already checked in." : "You're checked in. See you in there." };
@@ -314,7 +314,7 @@ export async function signMyWaiver(_prev: BookResult, formData: FormData): Promi
   });
   if (error) return { ok: false, message: error.message };
   const r = data as unknown as { ok?: boolean } | null;
-  if (!r?.ok) return { ok: false, message: "That didn't work — please try again." };
+  if (!r?.ok) return { ok: false, message: "That didn't work. Please try again." };
   revalidateMember();
   return { ok: true, message: "Waiver signed." };
 }
@@ -426,7 +426,7 @@ export async function respondToOffer(_prev: ActionResult, formData: FormData): P
   }
   return r.accepted
     ? { ok: true, message: "You are in. See you there." }
-    : { ok: true, message: "No problem — the seat goes to the next person." };
+    : { ok: true, message: "No problem. The seat goes to the next person." };
 }
 
 export type ClaimState = { error: string } | { ok: true } | null;
@@ -505,7 +505,7 @@ export async function finishSignup(_prev: ClaimState, fd: FormData): Promise<Cla
   }
   if (r?.failure_reason) {
     const said: Record<string, string> = {
-      email_not_verified: "Confirm your email first — we've sent you a link. Then come back and press this again.",
+      email_not_verified: "Confirm your email first. We've sent you a link. Then come back and press this again.",
       already_claimed: "Someone has already set up an account for that email at this studio. Ask the studio if that wasn't you.",
       not_signed_in: "Sign in first.",
       no_such_studio: "That studio is not taking signups.",
@@ -688,7 +688,7 @@ export async function updateProfile(
   });
   if (pe) {
     return pe.code === "PT403"
-      ? { ok: false, message: "That is not something you can change here — ask the studio." }
+      ? { ok: false, message: "That is not something you can change here. Ask the studio." }
       : { ok: false, message: pe.message };
   }
   const pr = ps as unknown as { ok: boolean; reason?: string; masked_email?: string };
@@ -722,7 +722,7 @@ export async function updateProfile(
       .from("members").update(patch).eq("id", ctx.memberId).select("id");
     if (error) {
       return error.code === "PT403" || /may change their own contact details/.test(error.message)
-        ? { ok: false, message: "That is not something you can change here — ask the studio." }
+        ? { ok: false, message: "That is not something you can change here. Ask the studio." }
         : { ok: false, message: error.message };
     }
     if (!data || data.length === 0) return { ok: false, message: "That did not save. Please try again." };

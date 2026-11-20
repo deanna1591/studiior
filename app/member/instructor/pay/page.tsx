@@ -126,7 +126,7 @@ export default async function PayPage({ searchParams }: { searchParams: { period
         : <div className="m-card px-4 py-6"><p className="text-[15px] text-ink">This could not be read.</p></div>}
 
       <p className="m-sub mt-5 text-ink-3">
-        These are the studio&rsquo;s figures. If something looks wrong, tell them — nothing here can be edited from this screen.
+        These are the studio&rsquo;s figures. If something looks wrong, tell them. Nothing here can be edited from this screen.
       </p>
 
       <DeskPayments rows={desk} tz={tz} fmt={fmt} />

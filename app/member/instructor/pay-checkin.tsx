@@ -10,7 +10,7 @@ function Btn() {
     <button type="submit" disabled={pending}
             className="m-tap m-press mt-2 w-full rounded-xl py-2.5 text-[13px] font-bold"
             style={accentSolid()}>
-      {pending ? "Checking in…" : "Check in — your pay depends on it"}
+      {pending ? "Checking in…" : "Check in. Your pay depends on it"}
     </button>
   );
 }

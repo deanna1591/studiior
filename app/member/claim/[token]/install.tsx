@@ -42,7 +42,7 @@ export default function InstallHelp({ studioName }: { studioName: string }) {
   const steps =
     platform === "ios" ? [
       "Open this page in Safari, if you are not already",
-      "Tap the Share button — the square with an arrow out of it",
+      "Tap the Share button, the square with an arrow out of it",
       "Scroll down and tap Add to Home Screen",
     ] : platform === "android" ? [
       "Tap the ⋮ menu, top right",
@@ -62,7 +62,7 @@ export default function InstallHelp({ studioName }: { studioName: string }) {
         Put {studioName} on your home screen
       </h2>
       <p className="m-body mt-1.5 text-[13px] leading-[19px] text-ink-2">
-        There is nothing to download — it is this page. Adding it to your home
+        There is nothing to download. It is this page. Adding it to your home
         screen is what makes it open like an app, full screen and one tap away.
       </p>
       <ol className="m-body mt-2.5 list-decimal space-y-1 pl-5 text-[13px] leading-[19px] text-ink-2">

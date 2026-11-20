@@ -96,7 +96,7 @@ export default function CheckoutBody({
 
       {plans.length === 0 ? (
         <div className="m-card mt-3 p-4">
-          <p className="m-sub text-ink-2">There&rsquo;s nothing to buy online for this class yet — ask the studio.</p>
+          <p className="m-sub text-ink-2">There&rsquo;s nothing to buy online for this class yet. Ask the studio.</p>
         </div>
       ) : (
         <>

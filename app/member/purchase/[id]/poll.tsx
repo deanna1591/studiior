@@ -58,7 +58,7 @@ export default function PurchasePoll({ id, initialStatus, kind = "plan", groupHr
             : isGroup
             ? "Your payment went through. Now pick the class for your group."
             : returnTo
-            ? "Your payment went through — your booking is paid."
+            ? "Your payment went through. Your booking is paid."
             : "Your payment went through and your plan is ready."}
         </p>
         {/* Decision 73b: a "Pay now" that came from a class returns there.
@@ -90,8 +90,8 @@ export default function PurchasePoll({ id, initialStatus, kind = "plan", groupHr
       <div className="m-card p-5 text-center">
         <p className="text-[16px] font-semibold text-ink">Still confirming your payment</p>
         <p className="m-sub mt-1 text-ink-2">
-          This is taking longer than usual. If you completed the payment, we’ll email you once it’s confirmed —
-          you don’t need to pay again.
+          This is taking longer than usual. If you completed the payment, we’ll email you once it’s confirmed.
+          You don’t need to pay again.
         </p>
         <Link href={backHref} className="m-press mt-3 inline-block text-lime-text underline underline-offset-4">
           {backLabel}
@@ -104,7 +104,7 @@ export default function PurchasePoll({ id, initialStatus, kind = "plan", groupHr
     <div className="m-card p-5 text-center">
       <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-line border-t-ink" />
       <p className="text-[16px] font-semibold text-ink">Confirming your payment…</p>
-      <p className="m-sub mt-1 text-ink-2">One moment — this usually takes a few seconds.</p>
+      <p className="m-sub mt-1 text-ink-2">One moment. This usually takes a few seconds.</p>
     </div>
   );
 }

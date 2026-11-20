@@ -529,7 +529,7 @@ export default async function MemberHome() {
           and it was the only one the app knew and never showed. */}
       <div className="mt-4 grid grid-cols-3 gap-2.5">
         {([
-          ["ticket",   membership.live ? (unlimited ? "\u221e" : String(credits ?? 0)) : "\u2014",
+          ["ticket",   membership.live ? (unlimited ? "\u221e" : String(credits ?? 0)) : "0",
                        membership.live && unlimited ? "Unlimited" : "Classes left"],
           ["flame",    String(ctx.streak), "Week streak"],
           ["calendar", String(thisMonth ?? 0), "This month"],
@@ -565,7 +565,7 @@ export default async function MemberHome() {
         <Link href="/shop" className="m-card m-press mt-2.5 flex items-center gap-3 p-4">
           <span className="min-w-0 flex-1">
             <span className="m-body block font-semibold text-ink">Shop</span>
-            <span className="m-micro block text-ink-3">Socks, water, merch — pick up at the front desk</span>
+            <span className="m-micro block text-ink-3">Socks, water, merch. Pick up at the front desk.</span>
           </span>
           <Icon name="chevron-right" size={18} className="shrink-0 text-ink-3" />
         </Link>

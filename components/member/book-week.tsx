@@ -284,7 +284,7 @@ export default function BookWeek({
           <div className="m-card p-6 text-center">
             <p className="m-body text-ink">
               {bundle?.closed
-                ? bundle.closed.timeRange ? `${bundle.closed.timeRange} — ${bundle.closed.reason}` : bundle.closed.reason
+                ? bundle.closed.timeRange ? `${bundle.closed.timeRange}: ${bundle.closed.reason}` : bundle.closed.reason
                 : bundle?.draftMonthLabel
                 ? `${bundle.draftMonthLabel}'s timetable is not published yet.`
                 : filtered ? "Nothing matching on this day."

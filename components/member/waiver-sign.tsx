@@ -102,7 +102,7 @@ export default function WaiverSign({
   if (state?.ok) {
     return (
       <div className="m-card p-4" role="status">
-        <p className="m-name text-ink">Signed — thank you.</p>
+        <p className="m-name text-ink">Signed. Thank you.</p>
         <p className="m-sub mt-1 text-ink-2">
           {nextPath ? "Your signed waiver is on file. Taking you back to check in…"
                     : "Your place is confirmed and your signed waiver is on file."}
@@ -126,7 +126,7 @@ export default function WaiverSign({
         <div onScroll={onScroll}
              className="m-card mb-3 max-h-[46vh] overflow-y-auto whitespace-pre-line p-4 text-[14px] leading-6 text-ink-2">
           {body}
-          <p className="mt-4 text-[12px] text-ink-3">— end of waiver —</p>
+          <p className="mt-4 text-[12px] text-ink-3">End of waiver</p>
         </div>
       ) : (
         <div className="mb-3">

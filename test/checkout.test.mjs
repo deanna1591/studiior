@@ -55,8 +55,8 @@ test("planHelpLine: each plan type reads from stored fields", () => {
   assert.equal(planHelpLine(mk("p", "class_pack", { credits: 5 })), "5 classes");
   assert.equal(planHelpLine(mk("t", "trial", { credits: 3, validity_days: 14 })), "3 classes · use within 14 days");
   assert.equal(planHelpLine(mk("t", "trial", { credits: 1 })), "1 class");
-  assert.equal(planHelpLine(mk("r", "recurring", { credits_per_period: 8, billing_interval: "month" })), "8 classes each period · one month — renew by hand");
-  assert.equal(planHelpLine(mk("r", "recurring", { credits_per_period: null, billing_interval: "month" })), "Unlimited classes · one month — renew by hand");
+  assert.equal(planHelpLine(mk("r", "recurring", { credits_per_period: 8, billing_interval: "month" })), "8 classes each period · one month, renew by hand");
+  assert.equal(planHelpLine(mk("r", "recurring", { credits_per_period: null, billing_interval: "month" })), "Unlimited classes · one month, renew by hand");
   assert.equal(planHelpLine(null), "");
 });
 

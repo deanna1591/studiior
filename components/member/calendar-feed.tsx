@@ -66,7 +66,7 @@ export function CalendarFeedControl({
     <div className="m-card px-4 py-4">
       <p className="text-[15px] leading-5 text-ink">Subscribe your calendar</p>
       <p className="m-sub mt-1 text-ink-2">
-        Add {what} to your phone&rsquo;s calendar, and it stays up to date on its own —
+        Add {what} to your phone&rsquo;s calendar, and it stays up to date on its own:
         new classes, changes and cancellations all flow in.
       </p>
 

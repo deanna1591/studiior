@@ -533,6 +533,14 @@ Every Monday at 7:00 studio time a card on the staff dashboard and a page under 
 
 ---
 
+## 116 (c) — Coaches on the private slot list (amendment, recorded 20 Nov 2026)
+
+The Book entry reads 'Private sessions' with the line '1:1, Duo or Trio'. On the slot page the filter row is headed 'Coaches' and shows each private coach as a round photo (initials when there is no photo) with the first name under it, plus 'All' first; tapping a photo filters the times to that coach. Tapping a coach's name, under the photo or on a time card, slides up that coach's profile: photo, display name, the Bio and the Certifications staff wrote on Instructors → coach. A coach with an empty Bio still opens, showing photo and name. The profile is read through a member-only reader that returns name, photo, bio and certifications for the studio's active coaches and nothing else. When private sessions are on, the public schedule carries private_enabled and private_url, and the Webflow embed shows 'Book a private session ›' under the timetable, next to the gift link, pointing at the member app's private sessions page.
+
+**Status:** settled, to build. **Amends:** Decision 116, Decision 116 (b), Decision 110 (a). Deanna, 20 Nov 2026.
+
+---
+
 ## 116 (b) — A private keeps the class's coach (amendment, recorded 19 Nov 2026)
 
 An empty class is offered as a private slot only with the coach assigned to that class. A true free hour, with no class in the room, is offered with every private coach who is available then. The slot list shows the coach against each time; a coach filter shows one coach's open times; there is no 'any coach' choice. Because no coach is ever displaced, a replaced class pays nothing and sends no coach email; the coach's private confirmation says it replaces their empty class. A coach not ticked as teaching privates keeps their own empty hours out of private booking. A hidden empty class is offered like any other. Nothing else in 116(a) changes: the 48 hour core window, the pending hold, the race refusal and the audit rows stand.
@@ -562,6 +570,22 @@ On the staff Schedule and the Flex pending list a flex class shows its state usi
 Settings → Guarantees shows, under the flex minimum, the line 'Applies to new classes. {n} future flex classes still carry a different minimum.' with a button 'Apply to all future flex classes' (manager up). It sets the minimum on every active flex series and on every future flex class that is not committed and not yet past its cut-off, in one filtered pass with one audit row listing the counts. Classes inside their cut-off and committed classes are never touched. Saving the setting itself writes an audit row with before and after.
 
 **Status:** settled, to build. **Extends:** Decision 21. Deanna, 19 Nov 2026.
+
+---
+
+## 18 (d) — Dates with their own hours (amendment, recorded 20 Nov 2026)
+
+A month's availability can name specific dates as well as weekdays. A date row carries its own hours and wins over the weekday pattern for that date: it can add a day the pattern does not have, give a day different hours, or mark a day off. Instructors add date rows when they submit a month, in a 'Specific dates' section under the weekdays (pick a date, hours or 'Not available'), and can add or change them later the same way they block dates off. After a month is approved, a coach changes a single date through the Time off sheet, which offers 'Not available' or 'Different hours'. Staff see date rows in the review card under the weekday lines, as 'Mon 14 Dec 08:00 to 15:00', and edit, add or remove them in place like any other line. The availability function checks the date row first, then the weekday pattern. Every change writes an audit row, and staff edits send the same availability_edited_by_studio email. A standalone dated row, from time off or a date set outside a submission, wins over everything. Inside the approved month, the date row wins over the weekday rows. Date rows in a submission that is not yet approved do not count, like its weekday rows.
+
+**Status:** settled, to build. **Extends:** Decision 18, Decision 18 (b), Decision 99. Deanna, 20 Nov 2026.
+
+---
+
+## 18 (c) — Staff can edit a submission (amendment, recorded 20 Nov 2026)
+
+On the availability review page every card under Waiting for you and under Approved shows the submitted hours inline, one line per day such as 'Tue 09:00 to 20:00', under the coach's name and above the Approve and Ask for a change buttons. A manager or owner edits any line in place (day, from, to), adds a day or removes one, before or after approval; 'Save changes' appears next to Approve once something changed. An edit never touches the weekly pattern or any other month, and an approved submission stays approved. Every edit writes an audit row with the before and after rows and sends the instructor one email availability_edited_by_studio: subject '{studio_name} adjusted your {month} availability', body listing each change as a line such as 'Tue 09:00 to 20:00 is now 10:00 to 20:00', closing 'Reply to this email if this is not what we agreed.' If a removed or shortened day leaves the coach assigned to classes it no longer covers, the card warns '{First} is assigned to {n} classes in these hours. The assignments stay; reassign them from the Schedule.' and saves anyway. Staff edits are allowed after the cut-off; the cut-off binds instructors, not the studio.
+
+**Status:** settled, to build. **Extends:** Decision 18, Decision 96. Deanna, 20 Nov 2026.
 
 ---
 

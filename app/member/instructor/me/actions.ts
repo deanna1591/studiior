@@ -37,7 +37,7 @@ export async function uploadMyPhoto(fd: FormData): Promise<PhotoResult> {
 
   const file = fd.get("photo") as File | null;
   if (!file || file.size === 0) return { ok: false, message: "Choose a photo first." };
-  if (file.size > 2_000_000) return { ok: false, message: "That photo is too large after shrinking — try another." };
+  if (file.size > 2_000_000) return { ok: false, message: "That photo is too large after shrinking. Try another." };
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
     return { ok: false, message: "JPEG, PNG or WebP." };
   }

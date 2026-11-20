@@ -56,7 +56,7 @@ export default async function Signup({
       {studio?.free_first_class_enabled ? (
         <p className="m-body mt-2 rounded-lg px-3 py-2.5 text-ink"
            style={{ background: "var(--accent-chip)" }}>
-          <span className="font-semibold">Your first class is on us.</span> Make an account and book it — no card needed.
+          <span className="font-semibold">Your first class is on us.</span> Make an account and book it. No card needed.
         </p>
       ) : (
         <p className="m-body mt-2 text-ink-2">

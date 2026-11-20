@@ -11,6 +11,6 @@ test("provider connected -> online copy (GCash/Maya, confirmed straight away)", 
 });
 test("no provider -> desk copy (cash, bank transfer, card in person)", () => {
   const c = howYouPayCopy({ providerConnected: false, studioName: "Reform" });
-  assert.match(c.body, /takes payment at the desk — cash, bank transfer, or a card/);
+  assert.match(c.body, /takes payment at the desk: cash, bank transfer, or a card/);
   assert.doesNotMatch(c.body, /GCash/);
 });

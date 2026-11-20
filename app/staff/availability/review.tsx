@@ -18,7 +18,7 @@ function Btn({ label, busy, primary }: { label: string; busy: string; primary?: 
 }
 
 /** Approve, or send it back with a reason. A bare refusal is not a review. */
-export default function ReviewControls({ submissionId }: { submissionId: string }) {
+export default function ReviewControls({ submissionId, extra }: { submissionId: string; extra?: React.ReactNode }) {
   const [approveState, doApprove] = useFormState<MyState, FormData>(approveSubmission, null);
   const [changeState, doChange] = useFormState<MyState, FormData>(requestChanges, null);
   const [open, setOpen] = useState(false);
@@ -32,6 +32,7 @@ export default function ReviewControls({ submissionId }: { submissionId: string 
           <input type="hidden" name="submission_id" value={submissionId} />
           <Btn label="Approve" busy="Approving…" primary />
         </form>
+        {extra}
         <button type="button" onClick={() => setOpen((v) => !v)}
                 className="text-[12.5px] leading-4 text-ink-2 underline underline-offset-4 hover:text-ink">
           Ask for a change

@@ -34,7 +34,7 @@ export default async function WaiverPage({ searchParams }: { searchParams: { nex
         <div className="m-card p-5 text-center">
           <p className="m-body text-ink">{studioName} hasn&rsquo;t provided a waiver yet.</p>
           <p className="m-sub mt-1 text-ink-2">
-            Please have a word with the studio — they&rsquo;ll set one up, and then you can
+            Please have a word with the studio. They&rsquo;ll set one up, and then you can
             sign it here.
           </p>
           <Link href="/" className="m-sub mt-3 inline-block text-ink-2 underline">Back to home</Link>

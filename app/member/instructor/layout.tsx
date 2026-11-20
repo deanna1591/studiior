@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const studio = Array.isArray(data) ? data[0] : data;
   if (!studio?.name) return {};
 
-  const name = `${studio.name} — Instructors`;
+  const name = `${studio.name} · Instructors`;
   const v = iconVersion(studio.logo_url);
   return {
     title: name,

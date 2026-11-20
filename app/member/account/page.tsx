@@ -135,7 +135,7 @@ export default async function Account() {
       {aiDrafts === true && (
         <p className="m-micro mt-4 px-1 text-ink-3">
           To write you a personal note, {studioName} may use an AI assistant that sees your first
-          name, class history and plan — a person always reads and sends it.
+          name, class history and plan. A person always reads and sends it.
         </p>
       )}
 

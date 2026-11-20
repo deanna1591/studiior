@@ -66,7 +66,7 @@ export async function buyGift(_prev: GiftState, fd: FormData): Promise<GiftState
     const m = error?.message ?? "";
     if (/PT404/.test(m)) return { ok: false, message: "Gift cards aren't available for this studio." };
     if (/PT409/.test(m)) return { ok: false, message: "This studio isn't set up for online payments yet." };
-    if (/PT429/.test(m)) return { ok: false, message: "Too many right now — try again in a minute." };
+    if (/PT429/.test(m)) return { ok: false, message: "Too many right now. Try again in a minute." };
     if (/PT422/.test(m)) return { ok: false, message: "Check the amount, the emails, and the delivery date." };
     return { ok: false, message: m || "Could not start the purchase." };
   }
@@ -83,7 +83,7 @@ export async function buyGift(_prev: GiftState, fd: FormData): Promise<GiftState
     amountCents: g.amount_cents,
     currency: g.currency,
     country: "PH",
-    description: `${studio.name} — gift card`,
+    description: `${studio.name} · gift card`,
     customerReferenceId: g.purchase_id,
     customerGivenNames: buyerName || "Gift buyer",
     customerEmail: buyerEmail,

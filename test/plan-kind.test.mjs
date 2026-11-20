@@ -32,9 +32,9 @@ test("an unknown type is not a one-time plan", () => {
   assert.equal(isOneTimePlan("something_else"), false);
 });
 
-test("the intro-once sentence is the exact database sentence", () => {
+test("the intro-once sentence (app copy; the database raise keeps its own wording)", () => {
   assert.equal(
     INTRO_USED_SENTENCE,
-    "The intro offer is for first-timers — you've had yours. Choose a pack or membership instead.",
+    "The intro offer is for first-timers. You've had yours. Choose a pack or membership instead.",
   );
 });

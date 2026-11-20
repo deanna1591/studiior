@@ -27,8 +27,8 @@ export default async function NotificationsPage() {
         <div className="m-card px-4 py-6">
           <p className="text-[15px] leading-6 text-ink">Nothing yet.</p>
           <p className="m-sub mt-1 text-ink-2">
-            Anything the studio sends you — a class to teach, a cover request, an
-            approval — turns up here as well as in your email.
+            Anything the studio sends you (a class to teach, a cover request, an
+            approval) turns up here as well as in your email.
           </p>
         </div>
       ) : (

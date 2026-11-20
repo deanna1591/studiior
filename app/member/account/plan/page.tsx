@@ -119,7 +119,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
         <div className="m-card mb-3 p-4" style={{ background: "var(--accent-chip)" }}>
           <p className="text-[15px] font-medium leading-5 text-ink">Buying any plan pays for your held class</p>
           <p className="m-sub mt-1 text-ink-2">
-            Pick a plan below — the class you booked is settled as soon as the payment goes through.
+            Pick a plan below. The class you booked is settled as soon as the payment goes through.
           </p>
         </div>
       )}
@@ -142,7 +142,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
         <div className="m-card mb-3 p-4">
           <p className="text-[15px] font-semibold leading-5 text-ink">Your first class is on us</p>
           <p className="m-sub mt-1 text-ink-2">
-            Try a class free before you pick a plan — no card needed.{" "}
+            Try a class free before you pick a plan. No card needed.{" "}
             <Link href="/book" className="text-lime-text underline underline-offset-4">Book your free class</Link>.
           </p>
         </div>
@@ -176,9 +176,9 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
 
           <div className="mt-4 border-t border-line pt-3">
             {live.status === "past_due" ? (
-              <p className="m-sub text-ink">Your membership was due for renewal{live.renews_on && <> on {d(live.renews_on)}</>}. You can still book for now — have a word with the studio.</p>
+              <p className="m-sub text-ink">Your membership was due for renewal{live.renews_on && <> on {d(live.renews_on)}</>}. You can still book for now. Have a word with the studio.</p>
             ) : live.renews_on ? (
-              <p className="m-sub text-ink-2">Renews {d(live.renews_on)}{!live.auto_renew && " — and then stops, as you asked"}.</p>
+              <p className="m-sub text-ink-2">Renews {d(live.renews_on)}{!live.auto_renew && ", and then stops, as you asked"}.</p>
             ) : live.expires_on ? (
               <p className="m-sub text-ink-2">Runs until {d(live.expires_on)}.</p>
             ) : <p className="m-sub text-ink-2">No end date.</p>}
@@ -190,7 +190,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
             {renewable && (
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="m-sub text-ink">
-                  Your {live.membership_plans?.name} ends {live.renews_on && d(live.renews_on)} — renew for another {live.membership_plans?.billing_interval ?? "period"}.
+                  Your {live.membership_plans?.name} ends {live.renews_on && d(live.renews_on)}. Renew for another {live.membership_plans?.billing_interval ?? "period"}.
                 </p>
                 <BuyPlan planId={live.plan_id} returnTo={settleReturn} />
               </div>
@@ -214,7 +214,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
               <p className="m-sub text-ink-2">
                 {(activeGuests ?? 0) > 0
                   ? "Your guest is booked. You can bring another once they have come."
-                  : "You can bring a guest — their first class is free. Add them when you book a class."}
+                  : "You can bring a guest. Their first class is free. Add them when you book a class."}
               </p>
             </div>
           )}
@@ -261,7 +261,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                 // Decision 66: recurring is sold one period at a time online —
                 // say the per-period allowance and that there is no auto-charge.
                 : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
-                   `one ${p.billing_interval ?? "period"} — renew by hand`];
+                   `one ${p.billing_interval ?? "period"}, renew by hand`];
               return (
                 // Decision 74: a featured plan is highlighted with an accent
                 // border and its badge chip.
@@ -291,7 +291,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                       </p>
                     ) : full ? (
                       <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
-                        This plan is full — ask the studio.
+                        This plan is full. Ask the studio.
                       </p>
                     ) : (
                       <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} returnTo={settleReturn} /></div>

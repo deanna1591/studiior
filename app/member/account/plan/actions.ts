@@ -79,7 +79,7 @@ export async function beginXenditCheckout(
     purchaseId: purchase.purchase_id,
     amountCents: purchase.amount_cents,
     currency: purchase.currency,
-    description: `${ctx.studioName} — ${plan?.name ?? "plan"}`,
+    description: `${ctx.studioName} · ${plan?.name ?? "plan"}`,
     metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
     successUrl: `${origin}/purchase/${purchase.purchase_id}${returnTo && returnTo !== "/" ? `?return=${encodeURIComponent(returnTo)}` : ""}`,
     cancelUrl: `${origin}/account/plan`,
@@ -111,7 +111,7 @@ async function openXenditSession(
   try {
     secret = decryptSecret(c.secret_key_ciphertext);
   } catch {
-    return { ok: false, message: "The studio’s payment key couldn’t be read — ask the studio to reconnect Xendit." };
+    return { ok: false, message: "The studio’s payment key couldn’t be read. Ask the studio to reconnect Xendit." };
   }
 
   const [{ data: member }, { data: cust }] = await Promise.all([
@@ -253,7 +253,7 @@ export async function startReservation(occId: string): Promise<BuyState> {
     purchaseId: purchase.purchase_id,
     amountCents: purchase.amount_cents,
     currency: purchase.currency,
-    description: `${ctx.studioName} — reservation fee`,
+    description: `${ctx.studioName} · reservation fee`,
     metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "reservation", booking_id: bookingId },
     successUrl: `${origin}/class/${occId}?reserved=1`,
     cancelUrl: `${origin}/class/${occId}`,
@@ -287,7 +287,7 @@ export async function startPrivate(input: {
   if (r.confirmed) return { ok: true, url: `${origin}/private/${r.occurrence_id}?booked=1`, occurrenceId: r.occurrence_id };
   const opened = await openXenditSession(ctx, {
     purchaseId: r.purchase_id!, amountCents: r.amount_cents!, currency: r.currency!,
-    description: `${ctx.studioName} — private session`,
+    description: `${ctx.studioName} · private session`,
     metadata: { purchase_id: r.purchase_id!, studio_id: ctx.studioId, member_id: ctx.memberId,
                 kind: "private", occurrence_id: r.occurrence_id! },
     successUrl: `${origin}/private/${r.occurrence_id}?paid=1`,

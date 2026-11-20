@@ -29,7 +29,7 @@ const HOLD_NON_FATAL = new Set(["already_booked", "desk_pay_blocked"]);
 export async function checkoutPay(_prev: BuyState, fd: FormData): Promise<BuyState> {
   const occId = String(fd.get("occurrence_id") ?? "").trim();
   const planId = String(fd.get("plan_id") ?? "").trim();
-  if (!occId || !planId) return { ok: false, message: "Something’s missing — try again." };
+  if (!occId || !planId) return { ok: false, message: "Something’s missing. Try again." };
 
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
@@ -60,7 +60,7 @@ export type DeskState = { error: string } | { ok: true } | null;
  */
 export async function payAtDesk(_prev: DeskState, fd: FormData): Promise<DeskState> {
   const occId = String(fd.get("occurrence_id") ?? "").trim();
-  if (!occId) return { error: "Something’s missing — try again." };
+  if (!occId) return { error: "Something’s missing. Try again." };
 
   const ctx = await getMemberContext();
   if (!ctx) return { error: "You are not signed in." };
