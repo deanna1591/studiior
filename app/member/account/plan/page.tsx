@@ -194,9 +194,24 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                 checkout — a success extends this membership by one period. */}
             {renewable && (
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="m-sub text-ink">
-                  Your {live.membership_plans?.name} ends {live.renews_on && d(live.renews_on)}. Renew for another {live.membership_plans?.billing_interval ?? "period"}.
-                </p>
+                <div className="min-w-0">
+                  <p className="m-sub text-ink">
+                    Your {live.membership_plans?.name} ends {live.renews_on && d(live.renews_on)}. Renew for another {live.membership_plans?.billing_interval ?? "period"}.
+                  </p>
+                  {/* Decision 117(a): the price this renewal will charge (the sale
+                      price while a promotion runs, else the list price). */}
+                  {(() => {
+                    const rp = prices.get(live.plan_id);
+                    if (!rp) return null;
+                    return (
+                      <p className="m-sub mt-1 text-ink">
+                        You will pay <PriceAmount priceCents={rp.price_cents} listCents={rp.list_cents}
+                          currency={rp.currency} promo={rp} className="font-semibold" />
+                        {rp.promotion_id && <PromoTagChip promo={rp} className="ml-1.5 align-middle" />}
+                      </p>
+                    );
+                  })()}
+                </div>
                 <BuyPlan planId={live.plan_id} returnTo={settleReturn} />
               </div>
             )}

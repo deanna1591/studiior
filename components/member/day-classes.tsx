@@ -68,6 +68,8 @@ export type Row = {
   /** Decision 22 amendment: a core (or always-runs) class, tinted with an
    *  "Always runs" chip, only when the studio runs guarantees. */
   alwaysRuns: boolean;
+  /** Decision 22(f): the flex state chip input, or null (core, or no flex). */
+  flexState?: import("@/components/member/flex-chip").FlexChipInput | null;
   /** The resolved state the server computed for this row. */
   base: "none" | "booked" | "waiting" | "holding" | "reservationHold" | "full" | "past" | "peakBlocked" | "future";
   /** Decision 103(c): a reservation HOLD (pending_payment comp) expires at this
@@ -375,6 +377,7 @@ export default function DayClasses({
               booked={state === "booked"}
               dimmed={state === "past" || state === "peakBlocked"}
               alwaysRuns={r.alwaysRuns}
+              flexState={r.flexState ?? null}
             />
             {freeNote && (
               <li className="m-micro list-none px-3 pb-1 pt-0.5 text-ink-3" aria-hidden>

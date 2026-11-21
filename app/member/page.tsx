@@ -21,6 +21,7 @@ import PhoneSheet from "@/components/member/phone-sheet";
 import DuplicateHold from "@/components/member/duplicate-hold";
 import { HoldCountdown, PaymentPendingActions } from "@/components/member/payment-pending";
 import { cancelBooking } from "@/app/member/actions";
+import { FlexChip } from "@/components/member/flex-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function MemberHome() {
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { data: monthCheckins },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
          { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems },
-         { data: dupHolds }, { data: resHolds }] =
+         { data: dupHolds }, { data: resHolds }, { data: flexRows }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -127,7 +128,20 @@ export default async function MemberHome() {
       .eq("status", "pending_payment")
       .eq("payment_source", "comp")
       .is("hold_reason", null),
+    // Decision 22(f): the flex state of upcoming flex classes, for the chip on
+    // the next-class card. Only flex classes come back. Same batch.
+    supabase.rpc("member_flex_states", {
+      p_studio_id: ctx.studioId, p_from: new Date(now).toISOString(), p_to: "infinity" }),
   ]);
+  const flexMap = new Map(((flexRows ?? []) as {
+    occurrence_id: string; paid_count: number; min_bookings: number | null;
+    reached_minimum: boolean; committed: boolean;
+  }[]).map((f) => [f.occurrence_id, f]));
+  const flexChipFor = (id: string) => {
+    const f = flexMap.get(id);
+    return f ? <FlexChip state={{ tier: "flex", paid: f.paid_count, min: f.min_bookings,
+                                  reached: f.reached_minimum, committed: f.committed }} /> : null;
+  };
   const hasShop = Array.isArray(shopItems) && (shopItems as unknown[]).length > 0;
   // Decision 98: held free-class-duplicate bookings — the line + checkout button.
   const holdItems = ((dupHolds ?? []) as {
@@ -368,9 +382,12 @@ export default async function MemberHome() {
           <span aria-hidden className="m-hero-scrim" />
 
           <div className="relative flex h-full flex-col justify-between p-4">
-            <span className="m-hero-tag self-start rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
-              {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5 self-start">
+              <span className="m-hero-tag rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
+                {day(occ.starts_at)} · <span className="num">{fmtTime(occ.starts_at, ctx.timeZone, ctx.timeFormat)}</span>
+              </span>
+              {flexChipFor(occ.id)}
+            </div>
 
             <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
@@ -457,9 +474,12 @@ export default async function MemberHome() {
             )}
             <span aria-hidden className="m-hero-scrim" />
             <div className="relative flex h-full flex-col justify-between p-4">
-              <span className="m-hero-tag self-start rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
-                Next up · {day(o.starts_at)}
-              </span>
+              <div className="flex flex-wrap items-center gap-1.5 self-start">
+                <span className="m-hero-tag rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4">
+                  Next up · {day(o.starts_at)}
+                </span>
+                {flexChipFor(o.id)}
+              </div>
               <div className="flex items-end justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className="m-head break-words line-clamp-2 text-[19px] leading-6 text-white">{o.name}</h1>

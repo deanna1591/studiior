@@ -21,7 +21,7 @@ export default async function PromotionsSettings() {
 
   const [{ data: list }, { data: plans }, { data: studio }] = await Promise.all([
     supabase.rpc("promotions_list", { p_studio_id: ctx.studioId }),
-    supabase.from("membership_plans").select("id, name, type, price_cents, currency")
+    supabase.from("membership_plans").select("id, name, type, price_cents, currency, billing_interval")
       .eq("studio_id", ctx.studioId).neq("status", "archived").order("sort_order"),
     supabase.from("studios").select("currency, timezone").eq("id", ctx.studioId).maybeSingle(),
   ]);

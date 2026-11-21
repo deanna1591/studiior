@@ -46,3 +46,21 @@ test("the slot label and the refusal sentence", () => {
   assert.equal(slotLabel(null), null);
   assert.equal(privateReasonSentence("time_taken"), "That time was just taken. Pick another time.");
 });
+
+import { memberFlexChip } from "../lib/flex-state.mjs";
+
+test("22(f): the member chip table", () => {
+  const f = (o) => memberFlexChip({ tier: "flex", min: 2, ...o });
+  assert.deepEqual(memberFlexChip({ tier: "core", paid: 0, min: 0 }), { label: "Always runs", tone: "core" });
+  assert.deepEqual(memberFlexChip({ tier: "always", paid: 0, min: 0 }), { label: "Always runs", tone: "core" });
+  assert.deepEqual(f({ paid: 0 }), { label: "Be the first", tone: "first" });
+  assert.deepEqual(f({ paid: 1 }), { label: "Needs 1 more", tone: "needs" });
+  assert.deepEqual(memberFlexChip({ tier: "flex", paid: 1, min: 4 }), { label: "Needs 3 more", tone: "needs" });
+  assert.deepEqual(f({ paid: 2 }), { label: "Running", tone: "running" });
+  assert.deepEqual(f({ paid: 0, reached: true }), { label: "Running", tone: "running" });
+  assert.deepEqual(f({ paid: 1, committed: true }), { label: "Running", tone: "running" });
+  assert.equal(f({ paid: 1, isPrivate: true }), null);
+  assert.equal(f({ paid: 1, hidden: true }), null);
+  assert.equal(memberFlexChip({ tier: null, paid: 0, min: 0 }), null);
+  for (const p of [0, 1, 2]) assert.ok(!f({ paid: p }).label.includes("—"));
+});

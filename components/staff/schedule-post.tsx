@@ -6,7 +6,7 @@ import { BRAND_FONT_FACES } from "@/components/staff/brand-fonts";
 import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses,
-  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero, spotsLabel,
+  editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero, spotsLabel, flexLegend, needsNote,
   pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
@@ -337,7 +337,7 @@ export default function SchedulePosts({
               bgData={bgData} rangeLabel={rangeLabel} weekday={weekday} monthName={monthName}
               isToday={isToday} isCurrentMonth={isCurrentMonth} showSpots={showSpots}
               footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading}
-              weekTotal={totalClasses(days)} monthStart={from} />
+              weekTotal={totalClasses(days)} monthStart={from} flexMin={raw?.flex_min ?? flexMin} />
           </div>
         </div>
 
@@ -510,6 +510,7 @@ type StyleProps = {
   headline: { lead: string; accent: string }; rangeLabel: string;
   studioShort: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
   footer: string; scale: number; story: boolean; weekTotal: number; monthStart: string; showSpots: boolean;
+  flexMin: number;
   bgPhoto: string | null;   // a chosen coach's photo, full-bleed under a 0.55 ink tint (null for all-classes / edit photo)
 };
 
@@ -543,13 +544,13 @@ function SpotsPill({ n, t, fontSize }: { n: number | undefined; t: Tokens; fontS
 
 function EditorialPost({
   style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
-  rangeLabel, weekday, monthName, isToday, isCurrentMonth, showSpots, footer, empty, loading, weekTotal, monthStart,
+  rangeLabel, weekday, monthName, isToday, isCurrentMonth, showSpots, footer, empty, loading, weekTotal, monthStart, flexMin,
 }: {
   style: PostStyle; spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
   studioName: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
   bgData: string | null; rangeLabel: string; weekday: string; monthName: string;
   isToday: boolean; isCurrentMonth: boolean; showSpots: boolean;
-  footer: string; empty: boolean; loading: boolean; weekTotal: number; monthStart: string;
+  footer: string; empty: boolean; loading: boolean; weekTotal: number; monthStart: string; flexMin: number;
 }) {
   const t = tokens(spec);
   const story = format === "story";
@@ -584,7 +585,7 @@ function EditorialPost({
   // is null when one is set; all-classes posts have no coach, so it is null too.
   const editing = bgData && spec.background_image;
   const coachBg = !editing && coachFirst && coachData ? coachData : null;
-  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal, monthStart, showSpots, bgPhoto: coachBg };
+  const p: StyleProps = { t, page, mode, format, headline, rangeLabel, studioShort, logoData, coachFirst, coachData, footer, scale, story, weekTotal, monthStart, showSpots, flexMin, bgPhoto: coachBg };
   const styled = style === "guest_check" ? <GuestCheck {...p} />
     : style === "times" ? <Times {...p} />
     : <Invitation {...p} />;
@@ -705,7 +706,7 @@ function GuestCheck(p: StyleProps) {
           ? (day0?.classes ?? []).map((c, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "end", borderBottom: `2px solid ${line}`, padding: `${Math.round(13 * scale)}px 0 ${Math.round(4 * scale)}px` }}>
               <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.hand, fontSize: Math.round(31 * scale), color: t.ink }}>{c.name}</span>
-              <span style={{ flex: "0 0 auto", fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}{c.coach ? `, ${c.coach}` : ""}</span>
+              <span style={{ flex: "0 0 auto", fontFamily: t.hand, fontSize: Math.round(24 * scale), color: c.tier === "core" ? t.accent : t.secondary }}>{c.time}{c.coach ? `, ${c.coach}` : ""}{needsNote(c) ? `, ${needsNote(c)}` : ""}</span>
               {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(24 * scale)} />}
             </div>))
           : weekRows(page.days, { coachMode: !!coachFirst }).map((g) => (
@@ -715,7 +716,7 @@ function GuestCheck(p: StyleProps) {
                 <div key={i} style={{ display: "flex", gap: 8, alignItems: "baseline", borderBottom: `1px solid ${line}`, padding: `${Math.round(6 * scale)}px 0` }}>
                   <span style={{ flex: "0 0 26px", fontFamily: t.hand, fontSize: Math.round(22 * scale), color: t.accent }}>{c.icon}</span>
                   <span style={{ flex: "0 0 auto", minWidth: 72, fontFamily: t.mono, fontSize: Math.round(15 * scale), color: t.ink }}>{c.time}</span>
-                  <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}</span>
+                  <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.hand, fontSize: Math.round(24 * scale), color: t.ink }}>{c.name}{c.coach ? `, ${c.coach.replace(/^with /, "")}` : ""}{needsNote(c) ? `, ${needsNote(c)}` : ""}</span>
                   {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(18 * scale)} />}
                 </div>))}
             </div>))}
@@ -724,7 +725,7 @@ function GuestCheck(p: StyleProps) {
           <span style={{ fontFamily: t.hand }}>{weekTotal} {weekTotal === 1 ? "class" : "classes"}{mode === "week" ? " this week" : mode === "month" ? " this month" : ""}</span>
         </div>
         {(mode === "week" || mode === "month") && anyFlex(page.days) && (
-          <div style={{ fontFamily: t.hand, fontSize: 24, color: t.secondary, padding: "10px 0 0" }}>✦ = always runs</div>
+          <div style={{ fontFamily: t.hand, fontSize: 24, color: t.secondary, padding: "10px 0 0" }}>{flexLegend(p.flexMin)}</div>
         )}
         <div style={{ fontFamily: t.hand, fontSize: 26, color: t.secondary, padding: "14px 0 0" }}>thank you, come again ♡</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 24, borderTop: `2px solid ${t.ink}`, paddingTop: 14 }}>
@@ -777,7 +778,7 @@ function Times(p: StyleProps) {
             <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", padding: `${Math.round(9 * scale)}px 0`, borderBottom: `1px solid ${rule}` }}>
               <span style={{ flex: "0 0 140px", fontFamily: t.mono, fontSize: Math.round(16 * scale), fontWeight: 700 }}>{c.time}</span>
               <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: t.df, fontSize: Math.round(30 * scale) }}>{c.name}</span>
-              <span style={{ flex: "0 0 auto", fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : ""}</span>
+              <span style={{ flex: "0 0 auto", fontSize: Math.round(15 * scale), color: t.secondary, textAlign: "right" }}>with {c.coach ?? "the team"}{c.tier === "core" ? " · always runs" : needsNote(c) ? ` · ${needsNote(c)}` : ""}</span>
               {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(16 * scale)} />}
             </div>))
         )}
@@ -798,7 +799,7 @@ function Invitation(p: StyleProps) {
   type Row = { icon: string; time: string; text: string; sub: string; spots?: number };
   // Day is a flat list; week lists every class under a day heading; month is the
   // calendar grid.
-  const rows: Row[] = (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: c.coach ? `with ${c.coach}` : "", spots: c.spots_left }));
+  const rows: Row[] = (page.days[0]?.classes ?? []).map((c) => ({ icon: c.tier === "core" ? "✦" : "○", time: c.time, text: c.name, sub: [c.coach ? `with ${c.coach}` : "", needsNote(c) ?? ""].filter(Boolean).join(" · "), spots: c.spots_left }));
   const groups = mode === "week" ? weekRows(page.days, { coachMode: !!coachFirst }) : null;
   const showLegend = anyFlex(page.days);
   return (
@@ -831,7 +832,7 @@ function Invitation(p: StyleProps) {
                     <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", fontSize: Math.round(22 * scale), padding: `${Math.round(5 * scale)}px 0`, color: t.ink }}>
                       <span style={{ color: t.accent, fontSize: Math.round(20 * scale), width: 24, textAlign: "center" }}>{c.icon}</span>
                       <b style={{ flex: "0 0 auto", fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(18 * scale), color: t.ink, minWidth: 92 }}>{c.time}</b>
-                      <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}</i></span>
+                      <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name} <i style={{ fontStyle: "normal", color: t.secondary }}>{c.coach}{needsNote(c) ? ` · ${needsNote(c)}` : ""}</i></span>
                       {showSpots && <SpotsPill n={c.spots_left} t={t} fontSize={Math.round(18 * scale)} />}
                     </div>))}
                 </div>))
@@ -841,7 +842,7 @@ function Invitation(p: StyleProps) {
                   <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
                   {showSpots && <SpotsPill n={r.spots} t={t} fontSize={Math.round(20 * scale)} />}
                 </div>))}
-          {showLegend && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>✦ = always runs ♡</div>}
+          {showLegend && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>{flexLegend(p.flexMin)} ♡</div>}
           {!showLegend && <div style={{ height: 22 }} />}
           <div style={{ display: "flex", gap: 16 }}>
             <span style={{ borderRadius: 999, padding: "18px 40px", fontSize: 24, fontWeight: 800, background: t.accent, color: t.onAccent }}>{footer}</span>
@@ -902,6 +903,7 @@ function LockScreen({ t, page, format, coachFirst, footer, photo, logoData, show
           const parts: string[] = [];
           if (!coachMode && c.coach) parts.push(`with ${c.coach}`);
           if (core) parts.push("always runs");
+          else if (needsNote(c)) parts.push(needsNote(c)!);
           const body = parts.join(" · ");
           return (
             <div key={i} style={{ width: CARD_W, height: 108, borderRadius: 22, background: "rgba(255,255,255,0.8)", backdropFilter: "blur(11px)", WebkitBackdropFilter: "blur(11px)", display: "flex", alignItems: "center", gap: 20, padding: "0 26px", boxSizing: "border-box" }}>

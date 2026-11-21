@@ -1,4 +1,5 @@
 import { focalPoint } from "@/lib/focal";
+import { FlexChip, type FlexChipInput } from "@/components/member/flex-chip";
 import { accentSolid } from "@/lib/accent-pair";
 import Avatar from "@/components/member/avatar";
 import { Icon } from "@/components/member/icons";
@@ -53,7 +54,7 @@ export type DetailType = {
 export type DetailBooking = { id: string; status: string; waitlist_position: number | null } | null;
 
 export default function ClassDetailBody({
-  occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, alwaysRuns = false, freeFirst, pending,
+  occ, type, booking, timeZone, timeFormat, waitlistEnabled, guest, alwaysRuns = false, flexState = null, freeFirst, pending,
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
   seatKind = "unlimited", cutoffMinutes = 720, duplicateHold = false, holdTime = null,
@@ -68,6 +69,8 @@ export default function ClassDetailBody({
   guest?: { enabled: boolean; canInvite: boolean };
   /** Decision 22 amendment: a core (or always-runs) class, tinted in the header. */
   alwaysRuns?: boolean;
+  /** Decision 22(f): the flex state chip beside the time. */
+  flexState?: FlexChipInput | null;
   freeFirst?: FreeFirst;
   /** Decision 21 amendment: a flex class not yet decided — its confirmation
    *  deadline and how it is expressed. Null for core/always/decided classes. */
@@ -209,6 +212,7 @@ export default function ClassDetailBody({
           {fmtTime(occ.starts_at, timeZone, timeFormat)}
           {occ.ends_at && <> – {fmtTime(occ.ends_at, timeZone, timeFormat)}</>}
         </span>
+        {flexState && <FlexChip state={flexState} />}
         {mins && (
           <span className="rounded-full px-2 py-0.5 text-[11px] leading-4 text-ink-2" style={{ background: "var(--accent-chip)" }}>
             <span className="num">{mins}</span> mins

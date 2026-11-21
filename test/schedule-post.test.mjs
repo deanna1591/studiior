@@ -467,3 +467,15 @@ test("amendment: photo fallback returns ok with background_image when the reply 
   assert.equal(r2.spec.background_image, path);
   assert.equal(r2.spec.background_treatment, "full");
 });
+
+import { flexLegend, needsNote } from "../lib/schedule-post.mjs";
+
+test("22(f): the posts legend and the one-short note", () => {
+  assert.equal(flexLegend(2), "✦ always runs · ○ needs 2 to run, be one of them");
+  assert.equal(flexLegend(null), "✦ always runs · ○ needs 1 to run, be one of them");
+  assert.equal(needsNote({ needs: 1 }), "needs 1 more");
+  assert.equal(needsNote({ needs: 2 }), null);
+  assert.equal(needsNote({ needs: null }), null);
+  const rows = weekRows([{ label: "Mon", classes: [{ time: "7:00", name: "Flow", coach: "Ada", tier: "flex", spots_left: 3, needs: 1 }] }]);
+  assert.equal(rows[0].classes[0].needs, 1);
+});

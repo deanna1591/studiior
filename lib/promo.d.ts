@@ -9,9 +9,12 @@ export type PlanPrice = {
   pct: number | null;
   ends_on: string | null;
   ends_label: string | null;
+  plan_type?: string | null;
+  billing_interval?: string | null;
 };
 export function salePriceCents(listCents: number, pct: number): number;
 export function promoTag(p: PlanPrice | null | undefined): string | null;
+export function intervalAdjective(interval: string | null | undefined): string;
 export function saleAppliedLine(p: PlanPrice | null | undefined): string | null;
 export function pctOffLabel(pct: number | null | undefined): string | null;
 export function withPrice<T extends { id: string; price_cents: number }>(

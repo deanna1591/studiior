@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Avatar from "@/components/member/avatar";
+import { FlexChip, type FlexChipInput } from "@/components/member/flex-chip";
 
 /**
  * One class, as a card on the washed page.
@@ -25,7 +26,7 @@ import Avatar from "@/components/member/avatar";
 export default function ClassCard({
   href, startLabel, endLabel, durationLabel, name, instructor, room,
   statusLabel, statusTone = "quiet", action, dimmed = false, booked = false, tag = null,
-  alwaysRuns = false, stackAction = false, extraLine = null, coachAvatar = null,
+  alwaysRuns = false, stackAction = false, extraLine = null, coachAvatar = null, flexState = null,
 }: {
   href: string;
   /** "06:30" — the start alone, in the studio's zone. */
@@ -53,6 +54,9 @@ export default function ClassCard({
    *  the studio accent at 0.12 and adds an "Always runs" chip at the end of the
    *  first line. Only passed when the studio runs guarantees. */
   alwaysRuns?: boolean;
+  /** Decision 22(f): a flex class's state ("Be the first", "Needs 1 more",
+   *  "Running"), shown next to the time. Null for core and for no flex. */
+  flexState?: FlexChipInput | null;
   /** Decision 103(c): when the action label is more than one word, or the row
    *  is booked/held/owes a fee, the action sits on its own full-width line
    *  BELOW the text so the class name, coach and studio never truncate and the
@@ -89,6 +93,7 @@ export default function ClassCard({
           <p className="num m-time-lg text-ink">
             {startLabel}{endLabel ? <span className="text-ink-3"> – {endLabel}</span> : null}
             {tag ? <span className="ml-2 align-middle">{tag}</span> : null}
+            {flexState ? <FlexChip state={flexState} className="ml-2 align-middle" /> : null}
           </p>
 
           {/* The name wraps and is never truncated; the chip drops below it. */}

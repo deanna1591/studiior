@@ -2,7 +2,7 @@
 //   node --test test/promo.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { salePriceCents, promoTag, saleAppliedLine, pctOffLabel, withPrice } from "../lib/promo.mjs";
+import { salePriceCents, promoTag, saleAppliedLine, pctOffLabel, withPrice, intervalAdjective } from "../lib/promo.mjs";
 
 test("sale price rounds half up to the whole unit, like promo_sale_cents", () => {
   assert.equal(salePriceCents(140000, 15), 119000);
@@ -39,4 +39,15 @@ test("withPrice overlays the sale price and keeps the list price", () => {
 test("no em dash in any string", () => {
   const p = { promotion_id: "p", promotion_name: "Sale", pct: 10, ends_label: "Mon 28 Dec" };
   for (const s of [promoTag(p), saleAppliedLine(p), pctOffLabel(10)]) assert.ok(!s.includes("—"));
+});
+
+test("117(a): a recurring plan's tag reads this period, a pack keeps until", () => {
+  const rec = { promotion_id: "p", promotion_name: "Holiday Sale", pct: 20, ends_label: "Thu 31 Dec",
+                plan_type: "recurring", billing_interval: "month" };
+  assert.equal(promoTag(rec), "Holiday Sale, 20% off this month");
+  assert.equal(promoTag({ ...rec, billing_interval: "week" }), "Holiday Sale, 20% off this week");
+  assert.equal(promoTag({ ...rec, plan_type: "class_pack" }), "Holiday Sale, 20% off until Thu 31 Dec");
+  assert.equal(intervalAdjective("month"), "monthly");
+  assert.equal(intervalAdjective("year"), "yearly");
+  assert.equal(intervalAdjective(null), "recurring");
 });

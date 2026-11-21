@@ -106,7 +106,7 @@ export default async function Book({
   const [{ data: occurrences }, { data: week }, { data: types }, { data: instructors }, { data: mine },
          { data: closures }, { data: peak }, { data: horizonRaw }, { data: holds }, { data: freeElig },
          { data: announceRaw }, { data: freeListRaw }, { data: checkinRows }, { data: pendingRows },
-         { data: dueRows }] =
+         { data: dueRows }, { data: flexRows }] =
     await Promise.all([
       supabase
         .from("class_occurrences")
@@ -193,12 +193,26 @@ export default async function Book({
       supabase.rpc("member_pending_bookings", { p_studio_id: ctx.studioId }),
       // Decision 103(d) pay-to-keep: existing free bookings that owe the fee.
       supabase.rpc("member_reservation_dues", { p_studio_id: ctx.studioId }),
+      // Decision 22(f): each flex class's state (the count the running latch
+      // uses), so a row reads "Be the first", "Needs 1 more" or "Running".
+      // Only flex classes come back. Same batch, no extra hop.
+      supabase.rpc("member_flex_states", {
+        p_studio_id: ctx.studioId,
+        p_from: winFrom.toISOString(),
+        p_to: winTo.toISOString(),
+      }),
     ]);
+  const flexMap = new Map(((flexRows ?? []) as {
+    occurrence_id: string; paid_count: number; min_bookings: number | null;
+    reached_minimum: boolean; committed: boolean;
+  }[]).map((f) => [f.occurrence_id, f]));
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const freeList = ((freeListRaw ?? []) as unknown as {
     occurrence_id: string; name: string; starts_at: string; room_name: string | null;
     instructor_first: string | null; instructor_avatar: string | null;
     headcount: number; capacity: number; free_bookable: boolean;
+    occ_flex?: boolean; occ_paid_count?: number | null; occ_min?: number | null;
+    occ_reached_minimum?: boolean | null; occ_committed?: boolean | null;
   }[]);
   // Decision 55 follow-up: the Book tab is the free-class picker while the member
   // is eligible and has eligible classes (unless they asked for the full
@@ -461,6 +475,13 @@ export default async function Book({
         seriesTier: (o as { class_series?: { guarantee_tier?: string | null } | null }).class_series?.guarantee_tier ?? null,
         seriesFlex: (o as { class_series?: { flex?: boolean | null } | null }).class_series?.flex ?? null,
       }),
+      flexState: flexMap.has(o.id) ? {
+        tier: "flex",
+        paid: flexMap.get(o.id)!.paid_count,
+        min: flexMap.get(o.id)!.min_bookings,
+        reached: flexMap.get(o.id)!.reached_minimum,
+        committed: flexMap.get(o.id)!.committed,
+      } : null,
       base,
       spaces,
       waitlistPosition: booking?.waitlist_position ?? null,

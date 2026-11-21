@@ -107,6 +107,15 @@
         "font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:none;line-height:1.3;",
         "color:var(--sd-accent-ink);border:1px solid color-mix(in srgb,var(--sd-accent) 45%,#fff);",
         "border-radius:999px;padding:1px 8px;}",
+      // Decision 22(f): a flex class's state, the same words the member app uses.
+      // Running is green whatever the accent (#1D6630 on #E1F1DD is 5.95);
+      // "Needs 1 more" is ink on the accent at 16%; "Be the first" is quiet.
+      P+".sd-fx{display:inline-flex;align-items:center;margin-top:5px;font-family:",FONT,";",
+        "font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:none;line-height:1.3;",
+        "border-radius:999px;padding:1px 8px;}",
+      P+".sd-fx-running{background:#E1F1DD;color:#1D6630;}",
+      P+".sd-fx-needs{background:color-mix(in srgb,var(--sd-accent) 16%,#fff);color:#1C1917;}",
+      P+".sd-fx-first{background:#fff;color:#57534E;border:1px solid #E7E5E4;}",
       P+".sd-time{flex:0 0 auto;width:74px;}",
       P+".sd-time b{display:block;font-family:",FONT,";font-size:15px;font-weight:700;letter-spacing:-.01em;",
         "line-height:1.25;text-transform:none;}",
@@ -280,6 +289,15 @@
   }
 
   // ---- SCHEDULE -------------------------------------------------------------
+  // Decision 22(f): the flex chip (mirrors lib/flex-state.mjs memberFlexChip).
+  function flexChip(c) {
+    if (!c.flex) return null;
+    var p = Math.max(0, c.paid_count || 0), m = Math.max(0, c.min_bookings || 0);
+    if (c.committed || c.reached_minimum || p >= m) return { label: "Running", tone: "running" };
+    if (p === 0) return { label: "Be the first", tone: "first" };
+    return { label: "Needs " + (m - p) + " more", tone: "needs" };
+  }
+
   function renderSchedule() {
     var s = DATA.studio || {}, classes = DATA.classes || [];
     var wrap = baseWrap();
@@ -370,6 +388,8 @@
         if (c.room) sub.push(c.room);          // shown here at narrow widths (sd-loc hidden)
         info.appendChild(el("div", "sd-csub", sub.join(" · ")));
         if (isCore) info.appendChild(el("span", "sd-runs", "Always runs"));
+        var fx = flexChip(c);
+        if (fx) info.appendChild(el("span", "sd-fx sd-fx-" + fx.tone, fx.label));
         row.appendChild(info);
 
         var act = el("div", "sd-act");

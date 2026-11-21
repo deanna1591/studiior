@@ -9746,10 +9746,12 @@ export type Database = {
       }
       convert_keep_sweep_all: { Args: { p_now?: string }; Returns: Json }
       core_classes_for_rescue: {
-        Args: { p_occurrence_id: string }
+        Args: { p_booking_id?: string; p_occurrence_id: string }
         Returns: {
           coach_first: string
           day_label: string
+          kind: string
+          label: string
           n_booked: number
           name: string
           occurrence_id: string
@@ -10106,6 +10108,11 @@ export type Database = {
           instructor_avatar: string
           instructor_first: string
           name: string
+          occ_committed: boolean
+          occ_flex: boolean
+          occ_min: number
+          occ_paid_count: number
+          occ_reached_minimum: boolean
           occurrence_id: string
           room_name: string
           starts_at: string
@@ -10141,6 +10148,11 @@ export type Database = {
           instructor_avatar: string
           instructor_first: string
           name: string
+          occ_committed: boolean
+          occ_flex: boolean
+          occ_min: number
+          occ_paid_count: number
+          occ_reached_minimum: boolean
           occurrence_id: string
           room_name: string
           starts_at: string
@@ -10767,6 +10779,21 @@ export type Database = {
           occurrence_id: string
         }[]
       }
+      member_flex_states: {
+        Args: {
+          p_from: string
+          p_occurrence_id?: string
+          p_studio_id: string
+          p_to: string
+        }
+        Returns: {
+          committed: boolean
+          min_bookings: number
+          occurrence_id: string
+          paid_count: number
+          reached_minimum: boolean
+        }[]
+      }
       member_goal_progress: { Args: { p_goal_id: string }; Returns: Json }
       member_has_had_free: {
         Args: { p_member_id: string; p_studio_id: string }
@@ -11070,6 +11097,10 @@ export type Database = {
         Args: { p_occurrence_id: string }
         Returns: boolean
       }
+      occurrence_flex_state_run: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
+      }
       occurrence_free_seat_states: {
         Args: { p_occurrence_id: string }
         Returns: {
@@ -11125,6 +11156,10 @@ export type Database = {
       occurrence_outside_hours: {
         Args: { p_starts_at: string; p_studio_id: string }
         Returns: boolean
+      }
+      occurrence_paid_count_run: {
+        Args: { p_occurrence_id: string }
+        Returns: number
       }
       occurrence_published: {
         Args: { p_occurrence_id: string }

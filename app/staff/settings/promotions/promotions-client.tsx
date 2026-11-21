@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonClass, buttonQuietClass, inputClass } from "@/components/ui";
 import { formatMoney } from "@/lib/plans";
-import { salePriceCents } from "@/lib/promo";
+import { salePriceCents, intervalAdjective } from "@/lib/promo";
 import { savePromotion, endPromotion, archivePromotion, type PromoState } from "./actions";
 
 export type PromoRow = {
@@ -12,7 +12,7 @@ export type PromoRow = {
   ended_at: string | null; status: "scheduled" | "running" | "ended" | "archived";
   plan_ids: string[]; plan_names: string[]; sold: number; discount_cents: number;
 };
-export type PromoPlan = { id: string; name: string; type: string; price_cents: number; currency: string };
+export type PromoPlan = { id: string; name: string; type: string; price_cents: number; currency: string; billing_interval?: string | null };
 
 const STATUS: Record<string, string> = { scheduled: "Scheduled", running: "Running", ended: "Ended", archived: "Archived" };
 
@@ -33,7 +33,8 @@ function PromoForm({ plans, currency, today, edit, onDone }: {
   const [state, action] = useFormState<PromoState, FormData>(savePromotion, null);
   const [pct, setPct] = useState<number>(edit?.pct ?? 10);
   const [ticked, setTicked] = useState<Set<string>>(new Set(edit?.plan_ids ?? []));
-  const eligible = plans.filter((p) => p.type !== "recurring");
+  // Decision 117(a): every plan is eligible, recurring memberships included.
+  const eligible = plans;
   const toggle = (id: string) => setTicked((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   useEffect(() => { if (state?.ok && onDone) onDone(); }, [state, onDone]);
 
@@ -73,6 +74,9 @@ function PromoForm({ plans, currency, today, edit, onDone }: {
               <label className="flex items-center gap-2 text-[13px] text-ink">
                 <input type="checkbox" name="plan_ids" value={p.id} checked={on} onChange={() => toggle(p.id)} />
                 <span>{p.name}</span>
+                {p.type === "recurring" && (
+                  <span className="text-[12px] text-ink-2">{intervalAdjective(p.billing_interval)}</span>
+                )}
                 <span className="num text-[12px] text-ink-2">
                   {on
                     ? <><s>{formatMoney(p.price_cents, p.currency || currency)}</s> {formatMoney(sale, p.currency || currency)}</>
@@ -84,8 +88,9 @@ function PromoForm({ plans, currency, today, edit, onDone }: {
         })}
       </ul>
       <p className="mt-2 text-[12px] leading-[18px] text-ink-2">
-        The sale runs from 00:00 on the first day to the end of the last day, studio time. Recurring
-        memberships are not listed: they cannot carry a promotion.
+        The sale runs from 00:00 on the first day to the end of the last day, studio time. A
+        membership is on sale for each period paid for while the promotion runs; a period paid
+        for after the last day is at the list price.
       </p>
       <div className="mt-3 flex items-center gap-2">
         <Submit>{edit ? "Save changes" : "Create promotion"}</Submit>

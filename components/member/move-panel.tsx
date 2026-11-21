@@ -72,6 +72,7 @@ export default function MovePanel({
           <div className="mt-4 space-y-3">
             {cards.map((c) => (
               <div key={c.occurrence_id} className="m-card p-4">
+                {c.label && <p className="m-micro font-semibold text-ink-2">{c.label}</p>}
                 <p className="m-body font-semibold text-ink">{c.name}</p>
                 <p className="m-sub mt-0.5 text-ink-2">
                   {[c.day_label, c.time_label, c.coach_first ? `with ${c.coach_first}` : null]

@@ -85,10 +85,12 @@ select expect_err('2.3 a stranger cannot read the studio prices',
   $$select plan_prices_now('b1170000-0000-0000-0000-0000000000a0')$$, 'PT403');
 
 reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000a1',false);
-select expect_eq('2.4 a recurring plan is refused plan_recurring',
-  promotion_save('b1170000-0000-0000-0000-0000000000a0', null, 'Holiday Sale', 20,
-    current_setting('t.today')::date, current_setting('t.today')::date + 5,
-    array['b1170000-0000-0000-0000-0000000cc002'::uuid]) ->> 'reason', 'plan_recurring');
+-- Decision 117(a): a recurring plan can carry a promotion now (it was refused
+-- plan_recurring). Scheduled ahead, so 3.3 below still reads the list price.
+select expect_true('2.4 a recurring plan is accepted (117 a)',
+  (promotion_save('b1170000-0000-0000-0000-0000000000a0', null, 'Later Members Sale', 20,
+    current_setting('t.today')::date + 20, current_setting('t.today')::date + 22,
+    array['b1170000-0000-0000-0000-0000000cc002'::uuid]) ->> 'ok')::boolean);
 select expect_eq('2.5 percent out of range',
   promotion_save('b1170000-0000-0000-0000-0000000000a0', null, 'Big', 95,
     current_setting('t.today')::date, current_setting('t.today')::date + 5,
@@ -281,6 +283,80 @@ select expect_eq('7.6 nothing stripped', (select array_length(stripped, 1)::text
                      'offer_detail','5 classes','buy_url','https://x'), 'Mia')), null);
 select expect_true('7.7 template_sample_context carries offer_plan_id',
   template_sample_context('b1170000-0000-0000-0000-0000000000a0', 'b117-owner@example.com', 'Olive') ? 'offer_plan_id');
+
+-- =============================================================================
+-- 7b. Decision 117(a): a recurring membership on sale. The first purchase and a
+--     renewal paid inside the dates are at the sale price; the membership keeps
+--     the list price as its rate; a period paid after the end is list price.
+-- =============================================================================
+insert into auth.users (id) values ('b1170000-0000-0000-0000-0000000000c3');
+insert into profiles (id, email, full_name) values ('b1170000-0000-0000-0000-0000000000c3','b117-m3@example.com','Rae Three');
+insert into members (id, studio_id, user_id, first_name, last_name, email, status, waiver_signed_at) values
+  ('b1170000-0000-0000-0000-0000000d0003','b1170000-0000-0000-0000-0000000000a0','b1170000-0000-0000-0000-0000000000c3','Rae','Three','b117-m3@example.com','active', now());
+
+reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000a1',false);
+select set_config('t.pr', (promotion_save('b1170000-0000-0000-0000-0000000000a0', null, 'Members Sale', 20,
+    current_setting('t.today')::date, current_setting('t.today')::date + 3,
+    array['b1170000-0000-0000-0000-0000000cc002'::uuid]) ->> 'id'), false);
+select expect_true('7b.1 a promotion on the monthly membership saves', current_setting('t.pr') <> '');
+select expect_true('7b.2 promotions_list marks the recurring plan monthly',
+  (select (e -> 'plan_names') ? 'Unlimited (monthly)' from jsonb_array_elements(promotions_list('b1170000-0000-0000-0000-0000000000a0')) e
+    where e ->> 'id' = current_setting('t.pr')));
+reset role;
+select expect_eq('7b.3 the membership is 20% off now', plan_price_now_run('b1170000-0000-0000-0000-0000000cc002') ->> 'price_cents', '200000');
+select expect_eq('7b.4 the price carries the plan type and interval',
+  (plan_price_now_run('b1170000-0000-0000-0000-0000000cc002') ->> 'plan_type') || '/'
+  || (plan_price_now_run('b1170000-0000-0000-0000-0000000cc002') ->> 'billing_interval'), 'recurring/month');
+
+-- The first purchase, online.
+reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000c3',false);
+select set_config('t.r1', (select purchase_id::text from xendit_begin_purchase('b1170000-0000-0000-0000-0000000000a0','b1170000-0000-0000-0000-0000000cc002')), false);
+reset role;
+select expect_eq('7b.5 the first period is charged at the sale price',
+  (select amount_cents || '/' || (promotion_id = current_setting('t.pr')::uuid) || '/' || discount_cents
+     from xendit_purchases where id = current_setting('t.r1')::uuid), '200000/true/50000');
+select xendit_activate_success_internal(current_setting('t.r1')::uuid, 'b117-pay-r1');
+select set_config('t.ms', (select id::text from memberships where member_id = 'b1170000-0000-0000-0000-0000000d0003'
+                             and plan_id = 'b1170000-0000-0000-0000-0000000cc002'), false);
+select expect_eq('7b.6 the payment records the promotion',
+  (select amount_cents || '/' || list_price_cents || '/' || discount_cents from payments
+    where membership_id = current_setting('t.ms')::uuid and reference = 'b117-pay-r1'), '200000/250000/50000');
+select expect_eq('7b.7 the membership keeps the LIST price as its rate',
+  (select price_cents::text from memberships where id = current_setting('t.ms')::uuid), '250000');
+
+-- A renewal paid inside the dates.
+reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000c3',false);
+select set_config('t.r2', (select purchase_id::text from xendit_begin_purchase('b1170000-0000-0000-0000-0000000000a0','b1170000-0000-0000-0000-0000000cc002')), false);
+reset role;
+select expect_eq('7b.8 the renewal inside the dates is the sale price and renews the membership',
+  (select amount_cents || '/' || (renews_membership_id = current_setting('t.ms')::uuid) || '/' || (promotion_id is not null)
+     from xendit_purchases where id = current_setting('t.r2')::uuid), '200000/true/true');
+select xendit_activate_success_internal(current_setting('t.r2')::uuid, 'b117-pay-r2');
+select expect_eq('7b.9 still one membership, still at the list rate',
+  (select count(*) || '/' || max(price_cents) from memberships where member_id = 'b1170000-0000-0000-0000-0000000d0003'), '1/250000');
+
+-- After the end date: list price.
+select expect_eq('7b.10 a period paid after the end date is list price',
+  plan_price_now_run('b1170000-0000-0000-0000-0000000cc002', now() + interval '5 days') ->> 'price_cents', '250000');
+reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000a1',false);
+select expect_true('7b.11 End now', (promotion_end_now(current_setting('t.pr')::uuid) ->> 'ok')::boolean);
+reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000c3',false);
+select set_config('t.r3', (select purchase_id::text from xendit_begin_purchase('b1170000-0000-0000-0000-0000000000a0','b1170000-0000-0000-0000-0000000cc002')), false);
+reset role;
+select expect_eq('7b.12 the renewal after the sale is the list price, no promotion',
+  (select amount_cents || '/' || coalesce(promotion_id::text, 'none') from xendit_purchases where id = current_setting('t.r3')::uuid), '250000/none');
+
+-- The desk: a new recurring membership sold on sale keeps the list rate.
+reset role; set role authenticated; select set_config('request.jwt.claim.sub','b1170000-0000-0000-0000-0000000000a1',false);
+select set_config('t.pr2', (promotion_save('b1170000-0000-0000-0000-0000000000a0', null, 'Desk Sale', 10,
+    current_setting('t.today')::date, current_setting('t.today')::date + 1,
+    array['b1170000-0000-0000-0000-0000000cc002'::uuid]) ->> 'id'), false);
+reset role;
+select record_manual_payment_run('b1170000-0000-0000-0000-0000000000a0','b1170000-0000-0000-0000-0000000d0001','plan',
+  225000,'cash','b1170000-0000-0000-0000-0000000cc002');
+select expect_eq('7b.13 the desk sale records the promotion and the membership keeps the list rate',
+  (select p.discount_cents || '/' || ms.price_cents from payments p join memberships ms on ms.id = p.membership_id
+    where ms.member_id = 'b1170000-0000-0000-0000-0000000d0001' and ms.plan_id = 'b1170000-0000-0000-0000-0000000cc002'), '25000/250000');
 
 -- =============================================================================
 -- 8. Archive, and the surface.

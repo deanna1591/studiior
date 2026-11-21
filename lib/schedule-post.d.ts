@@ -1,4 +1,4 @@
-export type PostClass = { time: string; name: string; coach: string | null; tier: string; spots_left?: number };
+export type PostClass = { time: string; name: string; coach: string | null; tier: string; spots_left?: number; needs?: number | null };
 export type PostDay = { date: string; label: string; count: number; classes: PostClass[] };
 export type PostData = {
   studio_name: string;
@@ -59,7 +59,9 @@ export declare const STYLE_FIT: Record<PostStyle, {
 }>;
 export declare function stepFit(h: number, budget: number, steps: number[], floor: number): { scale: number; fits: boolean };
 export declare function editorialPlan(args: { days: PostDay[]; mode: PostMode; format: PostFormat; style: PostStyle }): FitPlan;
-export type WeekRow = { icon: string; time: string; name: string; coach: string; spots_left?: number };
+export type WeekRow = { icon: string; time: string; name: string; coach: string; spots_left?: number; needs?: number | null };
 export type WeekGroup = { label: string; classes: WeekRow[] };
 export declare function weekRows(days: PostDay[], opts?: { coachMode?: boolean }): WeekGroup[];
 export declare function anyFlex(days: PostDay[]): boolean;
+export function flexLegend(flexMin: number | null | undefined): string;
+export function needsNote(c: { needs?: number | null } | null | undefined): string | null;

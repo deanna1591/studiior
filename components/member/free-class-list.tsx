@@ -8,11 +8,15 @@ import { fmtTime, zonedDateKey } from "@/lib/time";
 import { FREE_PICKER_HEADING, freePickerSubline } from "@/lib/free-picker";
 import type { BookResult } from "@/app/member/actions";
 import type { TimeFormat } from "@/lib/time";
+import { FlexChip } from "@/components/member/flex-chip";
 
 type FreeClass = {
   occurrence_id: string; name: string; starts_at: string; room_name: string | null;
   instructor_first: string | null; instructor_avatar: string | null;
   headcount: number; capacity: number; free_bookable: boolean;
+  /** Decision 22(f): the flex state, for the chip beside the time. */
+  occ_flex?: boolean; occ_paid_count?: number | null; occ_min?: number | null;
+  occ_reached_minimum?: boolean | null; occ_committed?: boolean | null;
 };
 
 /**
@@ -181,7 +185,14 @@ export default function FreeClassList({
                     circle at the top right. Checked at 360px font scale 1.3. */}
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="num text-[15px] font-semibold text-ink">{fmtTime(c.starts_at, timeZone, timeFormat)}</p>
+                    <p className="num text-[15px] font-semibold text-ink">
+                      {fmtTime(c.starts_at, timeZone, timeFormat)}
+                      {c.occ_flex && (
+                        <FlexChip className="ml-2 align-middle" state={{
+                          tier: "flex", paid: c.occ_paid_count, min: c.occ_min,
+                          reached: c.occ_reached_minimum, committed: c.occ_committed }} />
+                      )}
+                    </p>
                     <p className="m-body mt-0.5 break-words text-ink">{c.name}</p>
                     <div className="m-micro mt-0.5 flex flex-wrap items-center gap-1.5 text-ink-3">
                       <span className="break-words">{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>

@@ -143,13 +143,21 @@ select expect_num('a second sweep queues no duplicate free final',
 -- =============================================================================
 -- 2. core_classes_for_rescue — ordered, filtered
 -- =============================================================================
-select expect_text('the first card is the core class with a booking (C1)',
-  (select name from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') limit 1), 'Core One');
-select expect_num('the hidden, full and past core classes are excluded (3 shown: C1,C2,CX)',
-  (select count(*) from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001')), 3);
-select expect_true('a flex class is never a rescue target',
+-- Decision 95(b): the flex class two short (Flex Plan, 1 of 3) now leads the
+-- list, then the core classes (a booked one first). The latched flex class is
+-- running and never offered as one needing people.
+select expect_text('the first card is the flex class two short (Flex Plan)',
+  (select name from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') limit 1), 'Flex Plan');
+select expect_text('...labelled Needs 2 more',
+  (select label from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') limit 1), 'Needs 2 more');
+select expect_text('the second card is the core class with a booking (C1), Always runs',
+  (select name || ' / ' || label from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') offset 1 limit 1),
+  'Core One / Always runs');
+select expect_num('hidden, full and past classes are excluded (4 shown: Flex Plan, C1, C2, CX)',
+  (select count(*) from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001')), 4);
+select expect_true('a latched (running) flex class is never offered as needing people',
   (select not exists (select 1 from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001')
-                       where occurrence_id = '95f10000-0000-0000-0000-0000000f0004')));
+                       where occurrence_id = '95f10000-0000-0000-0000-0000000f0003')));
 
 -- =============================================================================
 -- 3. refusals (service context passes the member guard; logic is what is tested)
@@ -207,6 +215,99 @@ select expect_num('one booking_rebooked email was queued by the move',
 select expect_num('the member statement carries a rescue_email row',
   (select count(*) from member_activity('95f10000-0000-0000-0000-0000000000b1', current_date - 1, current_date + 30)
     where kind = 'rescue_email'), 1);
+
+
+-- =============================================================================
+-- 7. Decision 95(b): the order. One short first (nearest), two short only while
+--    fewer than four rows, core last (booked first), the member's own classes
+--    left out, and a free first class rescue stays core-only when
+--    free_first_core_only is on. A studio of its own (suffix a9).
+-- =============================================================================
+insert into studios (id, name, slug, timezone, currency, status) values
+  ('95f10000-0000-0000-0000-0000000000a9','Rescue Order Studio','95f1-sb','UTC','PHP','active');
+insert into studio_settings (studio_id, require_waiver, flex_enabled, flex_min_bookings,
+       flex_deadline_mode, flex_deadline_hours, free_first_class_enabled) values
+  ('95f10000-0000-0000-0000-0000000000a9', false, true, 3, 'hours_before', 4, true);
+insert into locations (id, studio_id, name, is_primary) values
+  ('95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-0000000000a9','Main', true);
+insert into class_types (id, studio_id, name, duration_minutes, default_capacity, status) values
+  ('95f10000-0000-0000-0000-00000000a9c1','95f10000-0000-0000-0000-0000000000a9','Reformer',60,10,'active');
+insert into members (id, studio_id, first_name, last_name, email, status)
+select ('95f10000-0000-0000-0000-0000000a90' || lpad(g::text, 2, '0'))::uuid,
+       '95f10000-0000-0000-0000-0000000000a9', 'F' || g, 'Filler', 'f' || g || '@e.com', 'active'
+  from generate_series(1, 12) g;
+-- S source (flex, empty); O1a/O1b one short (2 of 3); T2a..T2c two short (1 of 3); K1 core booked, K2 core empty.
+insert into class_occurrences (id, studio_id, location_id, class_type_id, name, capacity, minimum_bookings, flex, starts_at, ends_at, status) values
+  ('95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','Source',10,3,true, date_trunc('day', now()) + interval '3 days', date_trunc('day', now()) + interval '3 days 1 hour','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a902','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','One Late',10,3,true, date_trunc('day', now()) + interval '3 days 3 hours', date_trunc('day', now()) + interval '3 days 4 hours','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a903','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','One Early',10,3,true, date_trunc('day', now()) + interval '3 days 1 hour', date_trunc('day', now()) + interval '3 days 2 hours','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a904','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','Two A',10,3,true, date_trunc('day', now()) + interval '3 days 30 minutes', date_trunc('day', now()) + interval '3 days 90 minutes','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a905','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','Two B',10,3,true, date_trunc('day', now()) + interval '3 days 2 hours', date_trunc('day', now()) + interval '3 days 3 hours','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a906','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','Two C',10,3,true, date_trunc('day', now()) + interval '3 days 4 hours', date_trunc('day', now()) + interval '3 days 5 hours','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a907','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','Core Booked',10,null,false, date_trunc('day', now()) + interval '3 days 6 hours', date_trunc('day', now()) + interval '3 days 7 hours','scheduled'),
+  ('95f10000-0000-0000-0000-00000000a908','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a90c','95f10000-0000-0000-0000-00000000a9c1','Core Empty',10,null,false, date_trunc('day', now()) + interval '3 days 5 hours', date_trunc('day', now()) + interval '3 days 6 hours','scheduled');
+insert into bookings (studio_id, occurrence_id, member_id, status, payment_source)
+select '95f10000-0000-0000-0000-0000000000a9', o::uuid, ('95f10000-0000-0000-0000-0000000a90' || m)::uuid, 'booked', 'comp'
+  from (values ('95f10000-0000-0000-0000-00000000a902','01'), ('95f10000-0000-0000-0000-00000000a902','02'),
+               ('95f10000-0000-0000-0000-00000000a903','03'), ('95f10000-0000-0000-0000-00000000a903','04'),
+               ('95f10000-0000-0000-0000-00000000a904','05'), ('95f10000-0000-0000-0000-00000000a905','06'),
+               ('95f10000-0000-0000-0000-00000000a906','07'), ('95f10000-0000-0000-0000-00000000a907','08')) v(o, m);
+-- booked_count is the cache book_class keeps; direct inserts do not touch it.
+update class_occurrences set booked_count = 1 where id = '95f10000-0000-0000-0000-00000000a907';
+-- The rescued member (F10) holds a free first class on Source.
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source) values
+  ('95f10000-0000-0000-0000-00000000a9b0','95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-0000000a9010','booked','comp');
+insert into guest_passes (id, studio_id, host_member_id, guest_member_id, guest_email, occurrence_id, guest_booking_id, status) values
+  ('95f10000-0000-0000-0000-00000000a9a1','95f10000-0000-0000-0000-0000000000a9', null,'95f10000-0000-0000-0000-0000000a9010','f10@e.com','95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-00000000a9b0','confirmed');
+
+select expect_text('the order: one short by start, two short while under four rows, then core booked first',
+  (select string_agg(name || ':' || label, ', ' order by ord)
+     from (select name, label, row_number() over () as ord
+             from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901')) z),
+  'One Early:Needs 1 more, One Late:Needs 1 more, Two A:Needs 2 more, Two B:Needs 2 more, Core Booked:Always runs, Core Empty:Always runs');
+select expect_true('the third two-short class (Two C) is left out: four rows were reached',
+  (select not exists (select 1 from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901') where name = 'Two C')));
+
+-- F10 is also booked on One Early: their own class is left out when the booking is passed.
+insert into bookings (studio_id, occurrence_id, member_id, status, payment_source) values
+  ('95f10000-0000-0000-0000-0000000000a9','95f10000-0000-0000-0000-00000000a903','95f10000-0000-0000-0000-0000000a9010','booked','class_pack');
+select expect_true('a class the member already holds is not offered',
+  (select not exists (select 1 from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901',
+                                                            '95f10000-0000-0000-0000-00000000a9b0')
+                        where name = 'One Early')));
+select expect_text('with the booking, Two C comes in (only one one-short row now)',
+  (select string_agg(name, ', ' order by ord) from (select name, row_number() over () as ord
+     from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-00000000a9b0')) z),
+  'One Late, Two A, Two B, Two C, Core Booked, Core Empty');
+
+update studio_settings set free_first_core_only = true where studio_id = '95f10000-0000-0000-0000-0000000000a9';
+select expect_text('free_first_core_only on: a free first class rescue lists core only',
+  (select string_agg(label, ', ' order by ord) from (select label, row_number() over () as ord
+     from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-00000000a9b0')) z),
+  'Always runs, Always runs');
+select expect_true('...but a paid rescue still leads with flex (no booking passed)',
+  (select label from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901') limit 1) = 'Needs 1 more');
+
+-- The email card carries the label; the platform default intro sentence changed.
+select expect_true('the rescue card prints its label',
+  (select html from flex_rescue_block('95f10000-0000-0000-0000-00000000a9b0')) like '%Always runs%');
+select expect_true('the 2-day default intro reads "Pick one that needs you"',
+  (select text_body from notification_templates where key='flex_rescue_2days')
+    like '%Pick one that needs you, or one that always runs:%');
+select expect_true('the free final default intro reads "Pick one that needs you"',
+  (select html_body from notification_templates where key='free_rescue_final')
+    like '%Pick one that needs you, or one that always runs:%');
+
+-- Only the booking's member (or the desk/service) may pass the booking.
+do $$ declare st text; begin
+  perform set_config('request.jwt.claim.sub', '95f10000-0000-0000-0000-0000000000f2', true);
+  set local role authenticated;
+  begin perform * from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-00000000a9b0');
+    st := 'none'; exception when others then st := sqlstate; end;
+  reset role;
+  if st <> 'PT403' then raise exception 'BAD another member passing a booking: got %', st; end if;
+  raise notice 'PASS another member passing a booking is refused PT403';
+end $$;
 
 -- anon stays FOURTEEN
 select expect_num('anon surface is exactly fourteen',

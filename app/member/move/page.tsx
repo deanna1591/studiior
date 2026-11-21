@@ -45,7 +45,8 @@ export default async function MovePage({
 
   let cards: RescueCard[] = [];
   if (sourceOcc) {
-    const { data } = await supabase.rpc("core_classes_for_rescue", { p_occurrence_id: sourceOcc });
+    const { data } = await supabase.rpc("core_classes_for_rescue", {
+      p_occurrence_id: sourceOcc, p_booking_id: bookingId || undefined });
     cards = orderRescueCards(
       (data ?? []).map((r: Record<string, unknown>) => ({
         occurrence_id: r.occurrence_id as string,
@@ -56,6 +57,7 @@ export default async function MovePage({
         coach_first: (r.coach_first as string) || "",
         n_booked: Number(r.n_booked ?? 0),
         spots_left: Number(r.spots_left ?? 0),
+        label: (r.label as string) ?? null,
       })),
     );
   }

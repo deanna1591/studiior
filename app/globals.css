@@ -39,6 +39,11 @@
 
   --amber:      #E8C93A;    /* fill only; ink on it is 11.09 */
   --amber-tint: #F7F2D9;
+  /* Decision 22(f): a flex class that is running, on member screens. Not themed:
+     green means running whatever the studio's accent. --run-ink is 5.95 on
+     --run-tint and 7.0 on white. */
+  --run-tint: #E1F1DD;
+  --run-ink:  #1D6630;
   /* Derived, and the only colour in the file that is. A health chip's dot has
      to clear 3:1 against its own fill to be a dot at all (WCAG 1.4.11), and
      amber manages 1.54 on its own tint — it is too near white to mark

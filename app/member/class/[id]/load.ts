@@ -28,6 +28,7 @@ export type FreeFirst = { eligible: boolean; isFreeBooking: boolean };
 export type Pending = { until: string | null; mode: string } | null;
 
 import { showsAlwaysRuns } from "@/lib/tier-tint";
+import type { FlexChipInput } from "@/components/member/flex-chip";
 
 export async function loadClassDetail(
   supabase: Supa,
@@ -42,6 +43,7 @@ export async function loadClassDetail(
   guest: { enabled: boolean; canInvite: boolean }; freeFirst: FreeFirst; pending: Pending;
   checkedIn: boolean; checkedInAt: string | null; selfCheckinAvailable: boolean;
   unpaid: boolean; covered: boolean; seatKind: SeatKind; alwaysRuns: boolean;
+  flexState: FlexChipInput | null;
   group: { isHost: boolean; host: string; plan: string; groupId: string } | null;
   duplicateHold: boolean; holdTime: string | null;
   reservationHold: { bookingId: string | null; holdUntil: string } | null;
@@ -110,6 +112,10 @@ export async function loadClassDetail(
   // expiry. Decision 103(d): existing free bookings that owe the fee -> pay-to-keep.
   const holdQuery = supabase.rpc("member_pending_bookings", { p_studio_id: studioId });
   const dueQuery = supabase.rpc("member_reservation_dues", { p_studio_id: studioId });
+  // Decision 22(f): this class's flex state for the header chip. Only a flex
+  // class comes back. In the parallel wave.
+  const flexQuery = supabase.rpc("member_flex_states", {
+    p_studio_id: studioId, p_from: "-infinity", p_to: "infinity", p_occurrence_id: id });
 
   const finish = (occ: Record<string, unknown> | null, type: unknown, booking: unknown,
                   activeGuests: number | null, elig: unknown, freeCount: number | null,
@@ -117,7 +123,9 @@ export async function loadClassDetail(
                   paidCount: number | null, groupRow: unknown, cover: unknown,
                   heldDup: { hold_until: string | null } | null,
                   pendRows: { occurrence_id: string; booking_id: string | null; status: string; hold_until: string | null }[] | null,
-                  dueRows: { occurrence_id: string; fee_cents: number }[] | null) => {
+                  dueRows: { occurrence_id: string; fee_cents: number }[] | null,
+                  flexRows: { paid_count: number; min_bookings: number | null;
+                              reached_minimum: boolean; committed: boolean }[] | null) => {
     if (!occ) return null;
     // Decision 116: a private session has its own page (its cancel and move are
     // the private ones, never a single-seat cancel_booking).
@@ -164,6 +172,9 @@ export async function loadClassDetail(
         seriesTier: (occ as { class_series?: { guarantee_tier?: string | null } | null }).class_series?.guarantee_tier ?? null,
         seriesFlex: (occ as { class_series?: { flex?: boolean | null } | null }).class_series?.flex ?? null,
       }),
+      flexState: flexRows && flexRows[0] ? {
+        tier: "flex", paid: flexRows[0].paid_count, min: flexRows[0].min_bookings,
+        reached: flexRows[0].reached_minimum, committed: flexRows[0].committed } : null,
       freeFirst: { eligible: e?.ok === true, isFreeBooking: (freeCount ?? 0) > 0 },
       // Decision 68: checked in by any door, and whether the geofenced self
       // check-in can run (else the button falls back to the desk code).
@@ -197,16 +208,16 @@ export async function loadClassDetail(
 
   if (classTypeId) {
     // One wave: nothing waits on the occurrence.
-    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }, { data: heldDup }, { data: pendRows }, { data: dueRows }] =
-      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery, heldDupQuery, holdQuery, dueQuery]);
-    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover, heldDup, pendRows, dueRows);
+    const [{ data: occ }, { data: type }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }, { data: heldDup }, { data: pendRows }, { data: dueRows }, { data: flexRows }] =
+      await Promise.all([occQuery, typeQuery(classTypeId), bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery, heldDupQuery, holdQuery, dueQuery, flexQuery]);
+    return finish(occ, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover, heldDup, pendRows, dueRows, flexRows);
   }
 
   // No hint (deep link / refresh): occurrence, booking and guest in parallel;
   // then type, the one read that needs the occurrence's class_type_id.
-  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }, { data: heldDup }, { data: pendRows }, { data: dueRows }] =
-    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery, heldDupQuery, holdQuery, dueQuery]);
+  const [{ data: occ }, { data: booking }, { count: activeGuests }, { data: elig }, { count: freeCount }, { data: pend }, { data: checkinRow }, { count: paidCount }, { data: groupRow }, { data: cover }, { data: heldDup }, { data: pendRows }, { data: dueRows }, { data: flexRows }] =
+    await Promise.all([occQuery, bookingQuery, guestQuery, freeEligQuery, freeBookingQuery, pendingQuery, checkinQuery, paidQuery, groupQuery, coverQuery, heldDupQuery, holdQuery, dueQuery, flexQuery]);
   if (!occ) return null;
   const { data: type } = occ.class_type_id ? await typeQuery(occ.class_type_id) : { data: null };
-  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover, heldDup, pendRows, dueRows);
+  return finish(occ as Record<string, unknown>, type, booking, activeGuests, elig, freeCount, pend, checkinRow, paidCount, groupRow, cover, heldDup, pendRows, dueRows, flexRows);
 }
