@@ -389,7 +389,14 @@ export async function convertToFreeFirst(_prev: ConvertFreeState, fd: FormData):
   const occurrenceId = String(fd.get("occurrence_id") ?? "");
 
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("convert_booking_to_free_first", { p_booking_id: bookingId });
+  // Decision 103 (k): the fee choice (sent only when the sheet showed the fee).
+  const feeChoice = String(fd.get("fee_choice") ?? "");
+  const feeNote = String(fd.get("fee_note") ?? "").trim();
+  const { data, error } = await supabase.rpc("convert_booking_to_free_first", {
+    p_booking_id: bookingId,
+    ...(feeChoice === "due" || feeChoice === "waive" ? { p_fee_choice: feeChoice } : {}),
+    ...(feeNote ? { p_fee_note: feeNote } : {}),
+  });
   if (error) {
     if (error.code === "PT403") return { ok: false, message: "Only owners and managers can do this." };
     return { ok: false, message: error.message };
@@ -406,6 +413,7 @@ export async function convertToFreeFirst(_prev: ConvertFreeState, fd: FormData):
       : reason === "not_first" ? "This member is not a first-timer here."
       : reason === "missed" ? "This member missed their free class."
       : reason === "not_enabled" ? "Free first classes are not turned on."
+      : reason === "fee_choice_required" ? "Choose whether the reservation fee is due or waived."
       : "That could not be done.";
     return { ok: false, message: msg };
   }

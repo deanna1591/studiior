@@ -533,6 +533,64 @@ Every Monday at 7:00 studio time a card on the staff dashboard and a page under 
 
 ---
 
+## 103 (i) — The reservation state is always visible (amendment, recorded 21 Nov 2026)
+
+Every free first class seat on the staff roster and the coach's roster shows one chip for its reservation state: 'Paid ₱{fee}', 'Credit covers', 'Fee waived', 'Due by {time}' or 'Not asked'. The Flex pending list shows classes, not seats, so it carries one line per class instead: '{n} free seats: {paid} paid, {due} due, {waived} waived'. The member's profile Reservation fees card and the class page agree with the chip.
+
+**Status:** settled, to build. **Amends:** Decision 103, Decision 103 (h), Decision 22 (e). Deanna, 21 Nov 2026.
+
+---
+
+## 103 (j) — A seat is released only after it was asked for (amendment, recorded 21 Nov 2026)
+
+An unpaid free first class seat is released at its deadline only when a 'pay to keep your spot' email was actually sent to the member. The sweep accepts any due row for the booking whose status is sent, including a resend row keyed with a suffix (free_reservation_due:{booking}:requeue:{date}), and releases on none other. A due whose email failed is retried through the normal retry path, and if it still has not been sent by the deadline the seat is kept and the daily check lists it. Two more emails go to an unpaid seat: a nudge 24 hours before the class and a last call 3 hours before the deadline, each with the Pay button and the line 'This is a reservation fee, not a charge for the class. Show up and the ₱{fee} comes back to you as studio credit to use on class packages or merchandise. If you don't show up or cancel late, the fee is kept.' Neither goes to a waived or credit-covered seat.
+
+**Status:** settled, to build. **Amends:** Decision 103, Decision 103 (d), Decision 113. Found on 21 Nov 2026: three seats on Sun 22 Nov had a failed original due email and a delivered resend, and the sweep read only the original key. Deanna, 21 Nov 2026.
+
+---
+
+## 103 (k) — Staff paths ask for the fee at booking (amendment, recorded 21 Nov 2026)
+
+When staff book a member's free first class, convert a booking to a free first class, or allow a free class on a flex class, the sheet shows 'Reservation fee ₱{fee} due by {deadline}' with a 'Waive the reservation fee' switch, off by default. With the switch off the due email goes out at once; with it on the booking is flagged waived with the note. The choice is required only when the studio's reservation fee is above zero; with the fee at zero the staff paths book exactly as today. The database function book_first_free refuses a studio call that has not chosen one of the two while a fee is set; a member's own call is unchanged.
+
+**Build notes.** book_first_free gains the fee choice by being dropped and recreated with the new parameter and its grants re-applied exactly, so no second overload exists. The free class on a flex class is an option on the staff booking, not its own action, so it is covered by the same change.
+
+**Status:** settled, to build. **Amends:** Decision 100, Decision 100 (b), Decision 30 (c), Decision 30 (e), Decision 103. Deanna, 21 Nov 2026.
+
+---
+
+## 21 (e) — A day tier switch clears stale latches (amendment, recorded 21 Nov 2026)
+
+When a class is switched to flex for the day and is not committed, its reached-minimum marks are cleared, and set again only if its paid seats already meet the new minimum. A core class switched to flex therefore shows '{paid} of {min}' until it earns 'Running'.
+
+**Status:** settled, to build. **Amends:** Decision 21 (b), Decision 22 (e). Deanna, 21 Nov 2026.
+
+---
+
+## 89 (b) — Message paragraphs (amendment, recorded 21 Nov 2026)
+
+A studio message already keeps its line breaks in the email and in the app bubble. In the email ('New message from the studio') a blank line now starts a new paragraph and a single break stays a line break, and Windows line endings are normalised so pasted text does not double its spacing.
+
+**Status:** settled, to build. **Amends:** Decision 89. Deanna, 21 Nov 2026.
+
+---
+
+## 108 (a) — Two pay watchdogs (amendment, recorded 21 Nov 2026)
+
+The daily money check also lists any flex class before its cut-off that carries a reached-minimum mark with fewer paid seats than its minimum, and any pay line whose amount does not match its own recorded basis.
+
+**Status:** settled, to build. **Amends:** Decision 108. Deanna, 21 Nov 2026.
+
+---
+
+## 80 — Note: three email tokens (recorded 21 Nov 2026)
+
+Three tokens are available in every email: {flex_min} (the studio's flex minimum), {flex_cutoff} (the flex cut-off in words, '8:00 PM the evening before' or '{n} hours before class', per the studio's rule), and, in the month roster emails, {roster_table} (an HTML table Day · Time · Class with an aligned text fallback like the digest).
+
+**Status:** settled, to build. **Amends:** Decision 80, Decision 59. Deanna, 21 Nov 2026.
+
+---
+
 ## 106 (a) — The core budget is per week and informs, it does not block (amendment, recorded 21 Nov 2026)
 
 A coach's core budget is the number of core classes they hold per week, not per day. The weekly growth review proposes every flex slot that qualifies on the data as core, whatever the budget, and every core slot that runs empty as flex. When a proposal would take the coach past their weekly budget, the card says so on that line, 'Hubert would hold 4 core classes this week, budget 3', and the button reads 'Make core and raise budget', which does both in one tap. A series core on two days counts as two. The field on Instructors → coach reads 'Core classes per week'. On the staff Schedule, a class with an open growth suggestion carries a suggestion marker: a soft glowing border in the studio accent with a small sparkle at the top right corner, on week and day views; tapping the class opens its sheet with the suggestion line at the top ('Reached 2 of 2 three weeks running. Make it core?' or 'Empty four weeks running. Make it flex?') and the same buttons as the card. The marker clears when the suggestion is applied or dismissed; 'Dismiss' hides it for four weeks.

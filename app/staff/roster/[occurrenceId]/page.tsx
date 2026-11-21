@@ -28,6 +28,7 @@ import { signAvatars } from "@/lib/avatars";
 import ScrollToMember from "./scroll-to-member";
 import MarkAttended from "@/components/staff/mark-attended";
 import { fullName } from "@/lib/full-name";
+import ReservationChip, { type SeatState } from "@/components/staff/reservation-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -159,7 +160,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
   // avatars, and the force_committed audit row (one query for the whole roster,
   // never one per row). The audit's ACTOR, when there is one, is the single
   // genuine dependency left serial below.
-  const [{ data: paidRows }, { data: pinned }, avatars, { data: fcAudit }, { data: resvRows }] = await Promise.all([
+  const [{ data: paidRows }, { data: pinned }, avatars, { data: fcAudit }, { data: seatRows }] = await Promise.all([
     dropinIds.length
       ? supabase.from("payments").select("booking_id")
           .in("booking_id", dropinIds).in("status", ["succeeded", "partially_refunded"])
@@ -176,18 +177,17 @@ export default async function Roster({ params, searchParams }: { params: { occur
           .eq("entity_id", occ.id).eq("action", "occurrence.force_committed")
           .order("created_at", { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Decision 103 (i): one reservation state per free first class seat.
     compIds.length
-      ? supabase.from("payments").select("booking_id, amount_cents, currency")
-          .in("booking_id", compIds).eq("kind", "reservation_fee")
-          .in("status", ["succeeded", "partially_refunded"])
-      : Promise.resolve({ data: [] as { booking_id: string | null; amount_cents: number; currency: string }[] }),
+      ? supabase.rpc("occurrence_free_seat_states", { p_occurrence_id: occ.id })
+      : Promise.resolve({ data: [] as SeatState[] }),
   ]);
 
   const paidBookings = new Set<string>();
   for (const p of paidRows ?? []) if (p.booking_id) paidBookings.add(p.booking_id as string);
-  // Decision 103: a free seat that paid its reservation fee -> "Reserved ₱X".
-  const reservedFee = new Map<string, { amount: number; currency: string }>();
-  for (const p of resvRows ?? []) if (p.booking_id) reservedFee.set(p.booking_id as string, { amount: p.amount_cents, currency: p.currency });
+  // Decision 103 (i): the reservation chip per free first class seat.
+  const seatState = new Map<string, SeatState>();
+  for (const r of (seatRows ?? []) as SeatState[]) seatState.set(r.booking_id, r);
 
   // The committed-to-run after-state: who forced it and why. The actor is
   // identified by their studio_staff email (the app keys staff by email), or the
@@ -377,6 +377,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
                       {guestOf.get(b.member_id) ? "Guest · first time" : "First class (free)"}
                     </span>
                   )}
+                  <ReservationChip s={seatState.get(b.id)} />
                   {groupOf.has(b.member_id) && (
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
                           style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
@@ -388,7 +389,6 @@ export default async function Roster({ params, searchParams }: { params: { occur
                   )}
                   <span className="hidden truncate text-[12px] leading-4 text-ink-3 sm:block">
                     {b.payment_source?.replace("_", " ") ?? "—"}
-                    {reservedFee.has(b.id) ? ` · Reserved ${formatMoney(reservedFee.get(b.id)!.amount, reservedFee.get(b.id)!.currency)}` : ""}
                     {b.override_reason ? ` · override: ${b.override_reason}` : ""}
                     {checkedIn.has(b.id) && methodLabel(checkinMeta.get(b.id)) ? ` · ${methodLabel(checkinMeta.get(b.id))}` : ""}
                   </span>
@@ -438,7 +438,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
                   </div>
                 )}
                 {manager && b.status === "booked" && b.payment_source === "drop_in" && !paidBookings.has(b.id) && (
-                  <MakeFreeButton bookingId={b.id} occurrenceId={occ.id} />
+                  <MakeFreeButton bookingId={b.id} occurrenceId={occ.id} memberId={b.member_id} />
                 )}
                 {/* Decision 92: rebook this member into another class (all staff). */}
                 {occ.status === "scheduled" && (b.status === "booked" || b.status === "attended") && (

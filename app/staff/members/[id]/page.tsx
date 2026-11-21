@@ -270,6 +270,10 @@ export default async function MemberDetail({
     switch (f.state) {
       case "held": return "held for this class";
       case "covering": return "covered by credit";
+      // Decision 103 (i): the unpaid seat states, in the roster chip's words.
+      case "waived": return "fee waived";
+      case "due": return f.state_at ? `due by ${dStr(f.state_at)}` : "due";
+      case "not_asked": return "not asked yet";
       case "credited": return f.state_at ? `credited back on ${dStr(f.state_at)}` : "credited back";
       case "returned": return f.state_at ? `credit returned on ${dStr(f.state_at)}` : "credit returned";
       case "kept": return "kept (no-show or late cancel)";

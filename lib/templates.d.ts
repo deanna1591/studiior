@@ -20,3 +20,5 @@ export function featureSet(flags: {
 }): Set<string>;
 export function templateKeysForMaster(master: "convert" | "keep" | string): TemplateKey[];
 export function placeholdersFrom(...texts: (string | null | undefined)[]): string[];
+
+export function globalTokens(key: string): string[];

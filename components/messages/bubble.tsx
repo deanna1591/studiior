@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { normaliseMessage } from "@/lib/message-format";
 import { accentRamp } from "@/lib/theme";
 import { fmtTime, fmtDayLong, relativeDayName } from "@/lib/time";
 
@@ -88,7 +89,7 @@ export default function MessageThread({
                     <span className="min-w-0 truncate underline underline-offset-2">{m.attachment_name ?? "Attachment"}</span>
                   </a>
                 )}
-                {m.body && <span className="block whitespace-pre-wrap break-words text-[14px] leading-[19px]">{m.body}</span>}
+                {m.body && <span className="block whitespace-pre-wrap break-words text-[14px] leading-[19px]">{normaliseMessage(m.body)}</span>}
                 <span className="mt-0.5 block text-right text-[10px] leading-[14px]"
                       style={studio ? { color: "var(--msg-fg)" } : { color: "var(--ink-3)" }}>
                   {fmtTime(m.created_at, tz, timeFormat)}

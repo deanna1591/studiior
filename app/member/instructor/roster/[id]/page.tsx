@@ -13,6 +13,7 @@ import { coverRequestAllowed } from "@/lib/cover-window";
 import { AddWalkIn, DeskPay, type DeskPlan } from "../../desk-ui";
 import { InstructorAddMember } from "@/components/instructor/add-member";
 import MarkAttended from "@/components/staff/mark-attended";
+import ReservationChip, { type SeatState } from "@/components/staff/reservation-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }, { data: payData }, { data: planData }] = await Promise.all([
+  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }, { data: payData }, { data: planData }, { data: seatData }] = await Promise.all([
     supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
     // Decision 78c: a drifting member's heads-up + their usual class (null when
     // retention tasks are off; the reader is guarded to this class's instructor).
@@ -62,7 +63,11 @@ export default async function RosterPage({ params }: { params: { id: string } })
     supabase.from("membership_plans").select("id, name, price_cents")
       .eq("studio_id", ctx.studio_id).eq("visibility", "public").eq("status", "active")
       .order("price_cents"),
+    // Decision 103 (i): the reservation chip per free first class seat.
+    supabase.rpc("occurrence_free_seat_states", { p_occurrence_id: params.id }),
   ]);
+  const seatState = new Map<string, SeatState>(
+    ((seatData ?? []) as SeatState[]).map((x) => [x.booking_id, x]));
   const currency = studio?.currency ?? "USD";
   const plans = (planData ?? []) as DeskPlan[];
   const pay = new Map<string, { member_id: string; payment_source: string; paid: boolean; due_cents: number | null }>(
@@ -178,8 +183,9 @@ export default async function RosterPage({ params }: { params: { id: string } })
                 )}
               </div>
 
-              {(m.first_timer || m.birthday || notes.get(m.member_id)?.drifting) && (
+              {(m.first_timer || m.birthday || notes.get(m.member_id)?.drifting || seatState.has(m.booking_id)) && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  <ReservationChip s={seatState.get(m.booking_id)} />
                   {/* A MEMBER'S FIRST EVER CLASS is the one thing an instructor
                       most needs to know, and the fact that decides how the next
                       hour goes. */}

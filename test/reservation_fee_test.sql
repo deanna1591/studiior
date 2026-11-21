@@ -330,6 +330,11 @@ select expect_num('dues: a second pass does not re-ask', (select count(*) from n
 select expect_num('dues: M8 past the cut-off is left as it is (still booked)', (select count(*) from bookings
    where id = current_setting('t.bk8')::uuid and status = 'booked'), 1);
 
+-- Decision 103 (j): only a due email that actually went (status sent) lets the
+-- sweep release a seat. Mark M7's as delivered, as the worker would.
+update notifications set status = 'sent', sent_at = now() - interval '13 hours',
+       created_at = now() - interval '14 hours'
+ where member_id = 'd1030000-0000-0000-0000-0000000000f7' and template_key = 'free_reservation_due';
 -- Now move M7's class so its cut-off has passed and it was not paid -> release.
 update class_occurrences set starts_at = now() + interval '20 minutes',
        ends_at = now() + interval '70 minutes' where id = 'd1030000-0000-0000-0000-00000000c008';

@@ -9141,6 +9141,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_free_fee_choice: {
+        Args: { p_booking_id: string; p_choice: string; p_note: string }
+        Returns: undefined
+      }
       apply_payment_refund: {
         Args: { p_refund_id: string }
         Returns: undefined
@@ -9281,7 +9285,12 @@ export type Database = {
         Returns: boolean
       }
       book_first_free: {
-        Args: { p_member_id?: string; p_occurrence_id: string }
+        Args: {
+          p_fee_choice?: string
+          p_fee_note?: string
+          p_member_id?: string
+          p_occurrence_id: string
+        }
         Returns: Json
       }
       book_first_free_run: { Args: { p_booking_id: string }; Returns: Json }
@@ -9625,7 +9634,11 @@ export type Database = {
         Returns: number
       }
       convert_booking_to_free_first: {
-        Args: { p_booking_id: string }
+        Args: {
+          p_booking_id: string
+          p_fee_choice?: string
+          p_fee_note?: string
+        }
         Returns: Json
       }
       convert_keep_sweep: {
@@ -9910,6 +9923,7 @@ export type Database = {
       }
       finalise_attendance_sweep: { Args: never; Returns: Json }
       finalise_pay_true_up: { Args: { p_occurrence_id: string }; Returns: Json }
+      flex_cutoff_words: { Args: { p_studio_id: string }; Returns: string }
       flex_deadline_for: {
         Args: { p_occurrence_id: string }
         Returns: {
@@ -9945,6 +9959,16 @@ export type Database = {
           unpaid_count: number
         }[]
       }
+      flex_pending_free_seats: {
+        Args: { p_studio_id: string }
+        Returns: {
+          due: number
+          n: number
+          occurrence_id: string
+          paid: number
+          waived: number
+        }[]
+      }
       flex_report: {
         Args: { p_from: string; p_studio_id: string; p_to: string }
         Returns: Json
@@ -9968,6 +9992,10 @@ export type Database = {
       force_commit_occurrence: {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
+      }
+      free_due_sent: {
+        Args: { p_before?: string; p_booking_id: string }
+        Returns: boolean
       }
       free_first_class_list: {
         Args: { p_studio_id: string }
@@ -10020,6 +10048,14 @@ export type Database = {
         }[]
       }
       free_first_report: { Args: { p_studio_id: string }; Returns: Json }
+      free_seat_reservation_state: {
+        Args: { p_booking_id: string }
+        Returns: Json
+      }
+      free_seat_reservation_state_run: {
+        Args: { p_booking_id: string }
+        Returns: Json
+      }
       freeze_membership: {
         Args: { p_membership_id: string; p_until: string }
         Returns: Json
@@ -10801,6 +10837,7 @@ export type Database = {
       }
       message_draft_for: { Args: { p_member_id: string }; Returns: Json }
       message_gap_phrase: { Args: { p_days: number }; Returns: string }
+      message_paragraphs_html: { Args: { p_text: string }; Returns: string }
       milestone_visit_targets: { Args: never; Returns: number[] }
       mint_calendar_feed: {
         Args: { p_kind: string; p_studio_id: string }
@@ -10923,6 +10960,17 @@ export type Database = {
       occurrence_empty_run: {
         Args: { p_occurrence_id: string }
         Returns: boolean
+      }
+      occurrence_free_seat_states: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          booking_id: string
+          currency: string
+          deadline_at: string
+          deadline_label: string
+          fee_cents: number
+          state: string
+        }[]
       }
       occurrence_guarantee: {
         Args: { p_occurrence_id: string }
@@ -11632,6 +11680,10 @@ export type Database = {
         Args: { p_member_id: string; p_studio_id: string }
         Returns: number
       }
+      reservation_fee_terms: {
+        Args: { p_member_id: string; p_occurrence_id: string }
+        Returns: Json
+      }
       reserve_free_first: { Args: { p_occurrence_id: string }; Returns: Json }
       resolve_checkin_code: {
         Args: { p_code: string }
@@ -11718,6 +11770,13 @@ export type Database = {
       roster_carry_preview: {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json
+      }
+      roster_table_render: {
+        Args: { p_rows: Json }
+        Returns: {
+          html: string
+          txt: string
+        }[]
       }
       rrule_last_date: {
         Args: { p_rrule: string; p_starts_on: string }

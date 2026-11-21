@@ -1,4 +1,5 @@
 import { flexStateChip } from "@/lib/flex-state";
+import { freeSeatsLine } from "@/lib/reservation-chip";
 import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
@@ -56,7 +57,7 @@ export default async function FlexDecisions() {
   const from = new Date(`${today}T00:00:00Z`);
   from.setUTCDate(from.getUTCDate() - 30);
 
-  const [{ data: settings }, { data: pendingData, error }, { data: reportData }] =
+  const [{ data: settings }, { data: pendingData, error }, { data: reportData }, { data: freeData }] =
     await Promise.all([
       supabase.from("studio_settings")
         .select("flex_enabled, flex_deadline_mode, flex_deadline_time, flex_deadline_hours")
@@ -66,7 +67,12 @@ export default async function FlexDecisions() {
         p_studio_id: ctx.studioId,
         p_from: from.toISOString().slice(0, 10), p_to: today,
       }),
+      // Decision 103 (i): free seats per class (Flex pending shows classes).
+      supabase.rpc("flex_pending_free_seats", { p_studio_id: ctx.studioId }),
     ]);
+  const freeSeats = new Map<string, { n: number; paid: number; due: number; waived: number }>(
+    ((freeData ?? []) as { occurrence_id: string; n: number; paid: number; due: number; waived: number }[])
+      .map((f) => [f.occurrence_id, f]));
 
   if (!settings?.flex_enabled) {
     return (
@@ -142,6 +148,7 @@ export default async function FlexDecisions() {
                   <div className="text-[12px] leading-4 text-ink-3">
                     {p.local_when} · <StateChip p={p} />
                     {p.past_due && <> · decision is due now</>}
+                    {freeSeats.has(p.occ_id) && <> · {freeSeatsLine(freeSeats.get(p.occ_id)!)}</>}
                   </div>
                 </div>
                 <Guarantee occurrenceId={p.occ_id} />
@@ -160,6 +167,7 @@ export default async function FlexDecisions() {
                 <span className="text-[14px] leading-5 text-ink-2">{p.occ_name}</span>
                 <span className="text-[12px] leading-4 text-ink-3">
                   {" "}· {p.local_when} · <StateChip p={p} />
+                  {freeSeats.has(p.occ_id) && <> · {freeSeatsLine(freeSeats.get(p.occ_id)!)}</>}
                 </span>
               </li>
             ))}

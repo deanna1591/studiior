@@ -4,8 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import {
-  bookingOptions, bookMemberAction, searchBookMembers, classPickerDays,
-  type BookOptions, type BookOption, type MemberHit, type PickClass,
+  bookingOptions, bookMemberAction, searchBookMembers, classPickerDays, feeTerms,
+  type BookOptions, type BookOption, type MemberHit, type PickClass, type FeeTerms,
 } from "@/app/staff/members/book-actions";
 
 const fmtWhen = (iso: string) =>
@@ -36,7 +36,10 @@ export function Sheet({
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState("");
-  const [waive, setWaive] = useState(true);  // Decision 100 (b): on by default for a late add
+  // Decision 103 (k): off by default; Decision 100 (b) keeps a late add on.
+  const [waive, setWaive] = useState(false);
+  const [feeNote, setFeeNote] = useState("");
+  const [terms, setTerms] = useState<FeeTerms>(null);
   const [freeOnFlex, setFreeOnFlex] = useState(false);  // Decision 30(e)
   const [result, setResult] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -47,20 +50,22 @@ export function Sheet({
       .then((o) => { if (!live) return;
         if (!o || o.options.length === 0) { setLoadErr("Nothing can be booked for this class."); return; }
         setOpts(o); setIdx(o.preselect ?? 0);
+        setWaive(!!o.late_add && o.method !== "instructor");
         const dp = o.options[o.preselect ?? 0];
         if (dp?.kind === "drop_in_paid" && dp.price_cents) setAmount(String(dp.price_cents / 100));
       })
       .catch(() => { if (live) setLoadErr("Could not load the options."); });
+    feeTerms(occurrenceId, memberId).then((t) => { if (live) setTerms(t); }).catch(() => {});
     return () => { live = false; };
   }, [memberId, occurrenceId]);
 
   const chosen: BookOption | undefined = opts?.options[idx];
   const isFree = !!chosen && (chosen.kind === "free_first" || chosen.kind === "free_first_override");
-  // Decision 100 (b): a free-first late add that owes the reservation fee shows a
-  // waiver switch to staff (on by default); an instructor sees no switch and the
-  // fee is due by the end of the studio day.
-  const feeLateAdd = !!opts?.late_add && isFree
-    && (opts?.reservation_fee_cents ?? 0) > 0 && !opts?.member_fee_waived;
+  // Decision 103 (k): a free first class that owes the reservation fee shows the
+  // fee and its deadline with a waive switch (staff only). An instructor late add
+  // shows the line alone: the fee is due by the end of the studio day.
+  const feeChoice = isFree && !!terms?.required;
+  const isInstructor = opts?.method === "instructor";
 
   function submit() {
     if (!chosen) return;
@@ -69,8 +74,9 @@ export function Sheet({
       (source as Record<string, unknown>).method = method;
       (source as Record<string, unknown>).amount_cents = Math.round(Number(amount || "0") * 100);
     }
-    if (opts?.late_add && isFree) {
-      (source as Record<string, unknown>).waive_fee = opts.method === "instructor" ? false : waive;
+    if (feeChoice) {
+      (source as Record<string, unknown>).fee_choice = !isInstructor && waive ? "waive" : "due";
+      if (!isInstructor && waive && feeNote.trim()) (source as Record<string, unknown>).fee_note = feeNote.trim();
     }
     if (chosen.kind === "free_first" && freeOnFlex) {
       (source as Record<string, unknown>).allow_free_on_flex = true;
@@ -139,22 +145,33 @@ export function Sheet({
               </label>
             )}
 
-            {feeLateAdd && opts.method === "staff" && (
-              <label className="mt-3 flex items-start gap-2 text-[13px] text-ink-2">
-                <input type="checkbox" className="mt-0.5" checked={waive}
-                       onChange={(e) => setWaive(e.target.checked)} />
-                <span>
-                  <span className="font-medium text-ink">Waive the reservation fee</span>
-                  <span className="mt-0.5 block text-[12px] text-ink-3">
-                    They are already in the room. Off means the fee is due by the end of today.
-                  </span>
-                </span>
-              </label>
-            )}
-            {feeLateAdd && opts.method === "instructor" && (
-              <p className="mt-3 text-[12px] text-ink-3">
-                The reservation fee is due by the end of today. The studio can waive it.
-              </p>
+            {feeChoice && terms && (
+              <div className="mt-3 rounded-lg bg-paper px-3 py-2.5" data-testid="fee-line">
+                <p className="text-[13px] text-ink">
+                  Reservation fee <span className="num font-semibold">{terms.fee_text}</span> due by {terms.deadline_label}
+                </p>
+                {!isInstructor ? (
+                  <>
+                    <label className="mt-2 flex items-start gap-2 text-[13px] text-ink-2">
+                      <input type="checkbox" className="mt-0.5" checked={waive}
+                             onChange={(e) => setWaive(e.target.checked)} />
+                      <span>
+                        <span className="font-medium text-ink">Waive the reservation fee</span>
+                        <span className="mt-0.5 block text-[12px] text-ink-3">
+                          {waive ? "No fee is asked for this booking." : "Off: the pay-to-keep email goes out now."}
+                        </span>
+                      </span>
+                    </label>
+                    {waive && (
+                      <input className="mt-2 w-full rounded-lg border border-line-2 bg-surface px-3 py-2 text-[13px] text-ink"
+                             placeholder="Why it is waived (optional)"
+                             value={feeNote} onChange={(e) => setFeeNote(e.target.value)} />
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-1 text-[12px] text-ink-3">The studio can waive it.</p>
+                )}
+              </div>
             )}
 
             {chosen?.kind === "drop_in_paid" && (

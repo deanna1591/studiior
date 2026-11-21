@@ -49,6 +49,7 @@ export const REASONS: Record<string, string> = {
   // Decision 100: staff pinned a plan in the "Pay with" dropdown that does not
   // cover this class type.
   plan_not_covering: "That plan does not cover this class.",
+  fee_choice_required: "Choose whether the reservation fee is due or waived.",
   // Decision 48: a class with no instructor assigned yet.
   not_staffed_yet: "No coach is assigned to this class yet.",
   // Decision 91: a class hidden from members.

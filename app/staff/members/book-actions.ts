@@ -19,6 +19,9 @@ export type BookOption = {
   price_cents?: number | null;
   // Decision 100 amendment (b): a free-first late add carries the waiver choice.
   waive_fee?: boolean;
+  // Decision 103 (k): the fee choice for a free first class.
+  fee_choice?: "due" | "waive";
+  fee_note?: string;
 };
 export type BookOptions = {
   member_first: string;
@@ -43,6 +46,22 @@ export async function bookingOptions(
     p_member_id: memberId, p_occurrence_id: occurrenceId,
   });
   return (data as unknown as BookOptions) ?? null;
+}
+
+// Decision 103 (k): what the sheet shows before a free first class is booked:
+// the fee, its deadline, and whether a due/waive choice is required.
+export type FeeTerms = {
+  required: boolean; fee_cents: number; fee_text: string;
+  member_waived: boolean; deadline_label: string;
+} | null;
+
+export async function feeTerms(occurrenceId: string, memberId: string): Promise<FeeTerms> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("reservation_fee_terms", {
+    p_occurrence_id: occurrenceId, p_member_id: memberId,
+  });
+  if (error) return null;
+  return (data as unknown as FeeTerms) ?? null;
 }
 
 export type BookResult = { ok: true; source: string } | { error: string };

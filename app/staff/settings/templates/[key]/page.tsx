@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
-import { isEditableTemplate, templateLabel, templateEntry, placeholdersFrom, templateFeature } from "@/lib/templates";
+import { isEditableTemplate, templateLabel, templateEntry, placeholdersFrom, templateFeature, globalTokens } from "@/lib/templates";
 import TemplateEditor from "@/components/staff/template-editor";
 
 const FEATURE_LABEL: Record<string, string> = {
@@ -42,7 +42,8 @@ export default async function TemplateEditScreen({ params }: { params: { key: st
   ]);
 
   if (!def) notFound();
-  const placeholders = placeholdersFrom(def.subject, def.text_body);
+  const own = placeholdersFrom(def.subject, def.text_body);
+  const placeholders = [...own, ...globalTokens(key).filter((t) => !own.includes(t))];
   const enabled = !((settings?.disabled_templates as string[] | null) ?? []).includes(key);
 
   // A template whose feature is off is hidden from the lists; reached directly it
