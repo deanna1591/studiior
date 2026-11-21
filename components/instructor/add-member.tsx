@@ -11,7 +11,9 @@ import type { MemberHit } from "@/app/staff/members/book-actions";
  *  class they are teaching. The shared Sheet shows the late-add banner and, for a
  *  free class that owes the reservation fee, the end-of-day due line (no switch;
  *  the instructor cannot waive). */
-export function InstructorAddMember({ occurrenceId }: { occurrenceId: string }) {
+export function InstructorAddMember({ occurrenceId, timeZone, timeFormat }: {
+  occurrenceId: string; timeZone: string; timeFormat: "24h" | "12h";
+}) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [hits, setHits] = useState<MemberHit[]>([]);
@@ -56,7 +58,7 @@ export function InstructorAddMember({ occurrenceId }: { occurrenceId: string }) 
         </div>
       )}
       {open && picked && (
-        <Sheet memberId={picked.id} occurrenceId={occurrenceId}
+        <Sheet timeZone={timeZone} timeFormat={timeFormat} memberId={picked.id} occurrenceId={occurrenceId}
                optionsFn={instructorBookingOptions} bookFn={instructorBookMember}
                onClose={() => { setOpen(false); setPicked(null); setTerm(""); }} />
       )}

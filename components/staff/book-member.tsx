@@ -2,15 +2,15 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { accentSolid } from "@/lib/accent-pair";
+import { staffWhen } from "@/lib/staff-when";
 import { useRouter } from "next/navigation";
 import {
   bookingOptions, bookMemberAction, searchBookMembers, classPickerDays, feeTerms,
   type BookOptions, type BookOption, type MemberHit, type PickClass, type FeeTerms,
 } from "@/app/staff/members/book-actions";
 
-const fmtWhen = (iso: string) =>
-  new Date(iso).toLocaleString(undefined,
-    { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+// Decision 100(a): the studio's zone and clock, never the viewer's.
+type Clock = { timeZone: string; timeFormat: "24h" | "12h" };
 
 const money = (c: number | null | undefined) =>
   c == null ? "" : (c / 100).toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -23,12 +23,12 @@ function toast(msg: string) {
  *  optionsFn/bookFn are injected so the instructor portal can reuse it with its
  *  own actions (Decision 100 amendment b). */
 export function Sheet({
-  memberId, occurrenceId, onClose,
+  memberId, occurrenceId, onClose, timeZone, timeFormat,
   optionsFn = bookingOptions, bookFn = bookMemberAction,
 }: {
   memberId: string; occurrenceId: string; onClose: () => void;
   optionsFn?: typeof bookingOptions; bookFn?: typeof bookMemberAction;
-}) {
+} & Clock) {
   const router = useRouter();
   const [opts, setOpts] = useState<BookOptions>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -104,7 +104,7 @@ export function Sheet({
         ) : (
           <>
             <p className="mt-1 text-[13px] text-ink-2">
-              {opts.member_first} · {opts.class_name} · {fmtWhen(opts.starts_at)}
+              {opts.member_first} · {opts.class_name} · {staffWhen(opts.starts_at, timeZone, timeFormat)}
             </p>
 
             {opts.late_add && (
@@ -222,7 +222,7 @@ export function Sheet({
 }
 
 /** Roster entry: search for a member, then book them into this class. */
-export function BookMemberFromRoster({ occurrenceId }: { occurrenceId: string }) {
+export function BookMemberFromRoster({ occurrenceId, timeZone, timeFormat }: { occurrenceId: string } & Clock) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [hits, setHits] = useState<MemberHit[]>([]);
@@ -267,7 +267,7 @@ export function BookMemberFromRoster({ occurrenceId }: { occurrenceId: string })
         </div>
       )}
       {open && picked && (
-        <Sheet memberId={picked.id} occurrenceId={occurrenceId}
+        <Sheet timeZone={timeZone} timeFormat={timeFormat} memberId={picked.id} occurrenceId={occurrenceId}
                onClose={() => { setOpen(false); setPicked(null); setTerm(""); }} />
       )}
     </>
@@ -275,7 +275,7 @@ export function BookMemberFromRoster({ occurrenceId }: { occurrenceId: string })
 }
 
 /** Profile entry: pick a class in the next 14 days, then book this member. */
-export function BookClassFromProfile({ memberId }: { memberId: string }) {
+export function BookClassFromProfile({ memberId, timeZone, timeFormat }: { memberId: string } & Clock) {
   const [open, setOpen] = useState(false);
   const [days, setDays] = useState<PickClass[] | null>(null);
   const [picked, setPicked] = useState<PickClass | null>(null);
@@ -302,7 +302,7 @@ export function BookClassFromProfile({ memberId }: { memberId: string }) {
                 <li key={c.id}>
                   <button onClick={() => setPicked(c)}
                           className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[14px] text-ink hover:bg-paper">
-                    <span>{c.name} <span className="text-ink-3">· {fmtWhen(c.starts_at)}</span></span>
+                    <span>{c.name} <span className="text-ink-3">· {staffWhen(c.starts_at, timeZone, timeFormat)}</span></span>
                     <span className={c.full ? "text-ink-3" : "text-ink-2"}>
                       {c.full ? "Full" : `${c.spots_left} left`}
                     </span>
@@ -320,7 +320,7 @@ export function BookClassFromProfile({ memberId }: { memberId: string }) {
         </div>
       )}
       {open && picked && (
-        <Sheet memberId={memberId} occurrenceId={picked.id}
+        <Sheet timeZone={timeZone} timeFormat={timeFormat} memberId={memberId} occurrenceId={picked.id}
                onClose={() => { setOpen(false); setPicked(null); }} />
       )}
     </>

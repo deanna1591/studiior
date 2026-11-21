@@ -442,4 +442,52 @@ select expect_true('only one book_first_free exists (no second overload)',
 select expect_true('the Resend inbox table stays closed to anon reads',
   not has_table_privilege('anon', 'resend_webhook_inbox', 'select'));
 
+
+-- ---- Step 11a: the {button} marker is our syntax, not a token -------------
+-- Reform's nudge override (same shape, copied onto this studio) ends the pay
+-- line with `[Pay {fee} to keep my spot]({pay_url}){button}`. Rendering it must
+-- log NO warning, and the text and HTML must be exactly what they were (the
+-- marker dropped) -- proven against the same render with `button` supplied as
+-- empty, which is what the strip did before.
+insert into notification_templates_overrides (studio_id, key, subject, body, body_html)
+select s.id, 'free_reservation_nudge', 'See you tomorrow, {first_name}! Keep your spot 🎀',
+ E'Hi {first_name}!\n\nSo excited to see you tomorrow for {class_name}, {day} at {time}! 🎀\n\nTo keep your spot, please settle the {fee} reservation fee by {deadline}.\n\nThis is a reservation fee, not a charge for the class. Show up and the {fee} comes back to you as studio credit to use on class packages or merchandise. If you don''t show up or cancel late, the fee is kept.\n\n[Pay {fee} to keep my spot]({pay_url}){button}\n\nCan''t make it anymore? You can cancel here: {cancel_url}\n\nSee you at the reformer!\nRPC Studio',
+ '<p>Hi {first_name}!</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td style="border:1px solid #E7E5E4;border-radius:8px;padding:16px"><div style="font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;color:#14170E">{class_name}</div><div style="font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;color:#57534E;margin-top:4px">{day} · {time}</div></td></tr></table><p>So excited to see you tomorrow! 🎀 To keep your spot, please settle the {fee} reservation fee by {deadline}.</p><p>This is a reservation fee, not a charge for the class. Show up and the {fee} comes back to you as studio credit to use on class packages or merchandise. If you don&#39;t show up or cancel late, the fee is kept.</p><table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td align="center" style="border-radius:6px;background:{accent}"><a href="{pay_url}" style="display:inline-block;padding:11px 24px;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:1;color:{accent_on};text-decoration:none;border-radius:6px">Pay {fee} to keep my spot</a></td></tr></table><p>Can&#39;t make it anymore? <a href="{cancel_url}" style="color:#57534E">You can cancel here</a>.</p><p>See you at the reformer!<br>RPC Studio</p>'
+  from studios s where s.id = 'b11a0000-0000-0000-0000-0000000000a0'
+on conflict (studio_id, key) do nothing;
+insert into notification_templates_overrides (studio_id, key, subject, body, body_html)
+select s.id, 'free_reservation_last_call', 'Last call to keep your spot, {first_name}',
+ E'Hi {first_name}!\n\nJust a gentle last reminder for your free class, {class_name}, {day} at {time}. 💗\n\nThe {fee} reservation fee is due by {deadline}. After that we''ll have to release your spot to someone on the list.\n\nThis is a reservation fee, not a charge for the class. Show up and the {fee} comes back to you as studio credit to use on class packages or merchandise. If you don''t show up or cancel late, the fee is kept.\n\n[Pay {fee} to keep my spot]({pay_url}){button}\n\nCan''t make it anymore? You can cancel here: {cancel_url}\n\nRPC Studio',
+ '<p>Hi {first_name}!</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td style="border:1px solid #E7E5E4;border-radius:8px;padding:16px"><div style="font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;color:#14170E">{class_name}</div><div style="font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Helvetica,Arial,sans-serif;font-size:14px;line-height:20px;color:#57534E;margin-top:4px">{day} · {time}</div></td></tr></table><p>Just a gentle last reminder for your free class. 💗 The {fee} reservation fee is due by {deadline}. After that we&#39;ll have to release your spot to someone on the list.</p><p>This is a reservation fee, not a charge for the class. Show up and the {fee} comes back to you as studio credit to use on class packages or merchandise. If you don&#39;t show up or cancel late, the fee is kept.</p><table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0"><tr><td align="center" style="border-radius:6px;background:{accent}"><a href="{pay_url}" style="display:inline-block;padding:11px 24px;font-family:-apple-system,BlinkMacSystemFont,''Segoe UI'',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:1;color:{accent_on};text-decoration:none;border-radius:6px">Pay {fee} to keep my spot</a></td></tr></table><p>Can&#39;t make it anymore? <a href="{cancel_url}" style="color:#57534E">You can cancel here</a>.</p><p>RPC Studio</p>'
+  from studios s where s.id = 'b11a0000-0000-0000-0000-0000000000a0'
+on conflict (studio_id, key) do nothing;
+
+create temp table _btn as
+select o.key, plain.stripped, plain.text_body, plain.html_body,
+       blank.text_body as text_blank, blank.html_body as html_blank
+  from notification_templates_overrides o,
+  lateral render_email(o.studio_id, o.key, 'member', o.subject, o.body, o.body_html,
+    jsonb_build_object('first_name','Ana','class_name','REFORMER FLOW','day','Sunday 22 November',
+      'time','9:00 AM','fee','₱500','deadline','9:00 PM on Saturday 21 November',
+      'pay_url','https://b11a-s.studiior.app/class/x','cancel_url','https://b11a-s.studiior.app/class/x'),
+    'Ana', null) plain,
+  lateral render_email(o.studio_id, o.key, 'member', o.subject, o.body, o.body_html,
+    jsonb_build_object('first_name','Ana','class_name','REFORMER FLOW','day','Sunday 22 November',
+      'time','9:00 AM','fee','₱500','deadline','9:00 PM on Saturday 21 November',
+      'pay_url','https://b11a-s.studiior.app/class/x','cancel_url','https://b11a-s.studiior.app/class/x',
+      'button',''),
+    'Ana', null) blank
+ where o.studio_id = 'b11a0000-0000-0000-0000-0000000000a0'
+   and o.key in ('free_reservation_nudge','free_reservation_last_call');
+select expect_eq('11a: both override shapes rendered', (select count(*)::text from _btn), '2');
+select expect_eq('11a: nudge logs zero render warnings',
+  (select coalesce(array_length(stripped,1),0)::text from _btn where key='free_reservation_nudge'), '0');
+select expect_eq('11a: last call logs zero render warnings',
+  (select coalesce(array_length(stripped,1),0)::text from _btn where key='free_reservation_last_call'), '0');
+select expect_true('11a: the nudge text body is unchanged (marker dropped, link line kept)',
+  (select text_body = text_blank and text_body like '%[Pay ₱500 to keep my spot](https://b11a-s.studiior.app/class/x)' || E'\n\n' || 'Can''t make it%'
+          and position('{' in text_body) = 0 from _btn where key='free_reservation_nudge'));
+select expect_true('11a: the HTML is unchanged for both',
+  (select bool_and(html_body = html_blank) from _btn));
+
 \echo 'step11_test: all assertions passed'

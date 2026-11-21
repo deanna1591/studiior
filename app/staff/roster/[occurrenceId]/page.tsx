@@ -331,7 +331,7 @@ export default async function Roster({ params, searchParams }: { params: { occur
       <div className="mb-2 flex items-center justify-between">
         <SectionLabel>Roster</SectionLabel>
         {/* Decision 100: book a member into this class. */}
-        {desk && occ.status === "scheduled" && <BookMemberFromRoster occurrenceId={occ.id} />}
+        {desk && occ.status === "scheduled" && <BookMemberFromRoster occurrenceId={occ.id} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />}
       </div>
       {booked.length === 0 ? (
         <Empty>Nobody has booked yet. They will appear here as they do.</Empty>

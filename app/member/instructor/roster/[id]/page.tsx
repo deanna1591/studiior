@@ -255,7 +255,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
       {r.status === "scheduled" && (
         <div className="mt-5 flex flex-wrap gap-2">
           <AddWalkIn occurrenceId={r.occurrence_id} currency={currency} tz={ctx.timezone} timeFormat={ctx.time_format} />
-          <InstructorAddMember occurrenceId={r.occurrence_id} />
+          <InstructorAddMember occurrenceId={r.occurrence_id} timeZone={ctx.timezone} timeFormat={ctx.time_format} />
         </div>
       )}
 

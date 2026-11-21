@@ -448,7 +448,7 @@ export default async function MemberDetail({
       {isDeskUp(ctx.role) && !mm.deleted_at && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <EditPhone memberId={m.id} current={m.phone} />
-          <BookClassFromProfile memberId={m.id} />
+          <BookClassFromProfile memberId={m.id} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} />
           <BookPrivateFromProfile memberId={m.id} />
         </div>
       )}

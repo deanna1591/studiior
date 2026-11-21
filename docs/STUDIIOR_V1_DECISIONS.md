@@ -1012,6 +1012,10 @@ Staff can book a class on a member's behalf, and can edit a member's phone and e
 
 **Test pins (no decision).** Three pre-existing date-fragile fixtures anchored to a fixed studio-local day: `series_test` BYDAY Mon/Thu materialise fixture, `flex_rescue` 2-day gate, and `platform_billing` sweep-warning window. The `platform_billing` anchor is chosen to keep the complimentary studio unambiguously past grace and never at day 14 noon, so it does not trip the premature lock that would break the "front desk can resolve during grace" positive control.
 
+## 100(a) — Staff see studio time
+
+Every time shown to staff in the booking sheet (the Book a class picker, the confirmation sheet, and any refusal sentence that quotes a time) is the studio's local time in the studio's clock format (12h at Reform), never the viewer's browser zone or locale. It uses the same formatter as the roster and the Schedule. Found 21 Nov 2026: a 10:00 class read "Sun, Nov 22, 02:00 AM" to a viewer in another zone. **Status:** settled, to build. Deanna, 21 Nov 2026.
+
 ---
 
 ## 99 — Instructors block off dates (recorded 12 Nov 2026)

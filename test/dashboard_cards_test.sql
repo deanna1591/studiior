@@ -131,7 +131,12 @@ begin
   values
     ('86d586d5-0000-0000-0000-0000000cc001','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Ended',10,3, e_start, e_end,'scheduled'),
     ('86d586d5-0000-0000-0000-0000000cc002','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Upcoming',10,5, u_base, u_base + interval '20 min','scheduled'),
-    ('86d586d5-0000-0000-0000-0000000cc003','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Old',10,1, now() - interval '10 days', now() - interval '10 days' + interval '50 min','scheduled');
+    ('86d586d5-0000-0000-0000-0000000cc003','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Old',10,1, now() - interval '10 days', now() - interval '10 days' + interval '50 min','scheduled'),
+    -- Step 11a: a class that has not run, pinned to 10:00 Prague two studio days
+    -- ahead. No run can cross it, unlike UPCOMING, which must stay TODAY for the
+    -- seats-in-today's-classes card and the today list, so it cannot leave the
+    -- last half hour of the Prague day.
+    ('86d586d5-0000-0000-0000-0000000cc004','86d586d5-0000-0000-0000-0000000000a1','86d586d5-0000-0000-0000-0000000000aa','86d586d5-0000-0000-0000-0000000c7a01','86d586d5-0000-0000-0000-00000000aa01','86d586d5-0000-0000-0000-0000000149a1','Later',10,0, d0 + interval '2 days 10 hours', d0 + interval '2 days 10 hours 50 minutes','scheduled');
 end $$;
 
 -- Ended-class bookings: attended / no_show / booked. booked_at in the PAST, so
@@ -305,8 +310,8 @@ select expect_txt('the emptiest ran-class is first (Old, 10%)',
   (select name from dashboard_occupancy_30d('86d586d5-0000-0000-0000-0000000000a1') limit 1), 'Old');
 select expect_num('its occupancy is 10%',
   (select pct from dashboard_occupancy_30d('86d586d5-0000-0000-0000-0000000000a1') limit 1)::bigint, 10);
-select expect_num('the upcoming class has not run, so it is excluded',
-  (select count(*) from dashboard_occupancy_30d('86d586d5-0000-0000-0000-0000000000a1') where name = 'Upcoming'), 0);
+select expect_num('a class that has not run is excluded',
+  (select count(*) from dashboard_occupancy_30d('86d586d5-0000-0000-0000-0000000000a1') where name = 'Later'), 0);
 reset role;
 
 \echo ''
