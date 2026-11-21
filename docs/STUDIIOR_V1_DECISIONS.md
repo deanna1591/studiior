@@ -707,6 +707,8 @@ A private slot is offered when the hour is empty, or when the only class in that
 
 **Touches.** schedule_range (member arm) and member_next_class_day carry occ_paid_count, occ_min and occ_reached_minimum; public_schedule re-issued byte-faithfully with the two counts (still anon, surface unchanged at FOURTEEN); lib/flex-state.mjs gives the chip wording and colour from (paid, min, reached, committed, tier); components: class-card, free-class-list, class-detail header, Home card, embed script, schedule post rows and legend (Decision 93 styles). Tests: node for the wording table; schedule_range/public_schedule suites extended. **Status:** settled, to build in Step 12b. Deanna, 21 Nov 2026.
 
+Wording settled 22 Nov 2026: a flex class with nothing counting reads "Needs {min} to run"; short of the minimum "Needs {n} more to run"; minimum reached or committed "Confirmed" in green on rows and "Confirmed to run" on the class page header; core keeps "Always runs"; the staff chip from 22 (e) reads "Confirmed" instead of "Running" so staff and members say the same; posts legend "✦ always runs · ○ needs {min} to run", a row one short "needs 1 more". {min} is the class's flex minimum, never a typed number.
+
 ---
 
 ## 22 (e) — Flex state at a glance (amendment, recorded 19 Nov 2026)
