@@ -533,6 +533,18 @@ Every Monday at 7:00 studio time a card on the staff dashboard and a page under 
 
 ---
 
+## 36 (a) — Staff cancel a booking and return the credit (amendment, recorded 21 Nov 2026)
+
+**Context.** On 21 Nov a member booked a class by mistake and cancelled it 30 seconds later, inside the 12-hour window, so the cancel was late and used one Intro Offer credit. There was no staff action to give the credit back on an already-cancelled booking, so it took an authorised one-off write. Deanna's call: staff handle this with the ordinary cancel action, with a note; members get no undo window and keep the rule exactly as Decision 36 shows it before the tap.
+
+**Decision.** The Decision 92(b) "Remove from class" control is renamed "Cancel booking" everywhere it appears (roster row, member profile). Its sheet is unchanged on a live booking: tick "Return their credit or free class" (on by default), a note, and the Cancel button; the booking is cancelled with no penalty and the credit or free class goes back. The same sheet now also opens on a booking that is already `late_cancelled` (from the member's Journey row and the roster's cancelled list): the booking is already cancelled, so the sheet shows only "Return their credit or free class" with the note and the button reads "Return credit". It returns what the late cancel took: the credit to the same membership or pack with its original expiry (the `cancellation_refund` ledger row `cancel_booking` writes on an on-time cancel), or the free first class eligibility when the seat was the free class, or nothing when the seat was a paid drop-in (the money stays; a refund is Decision 111). It voids the late-cancel infraction and any desk-pay strike that cancel alone caused. The booking stays `late_cancelled`, the seat stays free. One audit row `booking.credit_returned_by_studio` with the note and before and after balances; one Journey row "Credit returned by {staff first name}: {note}"; one email `credit_returned_by_studio` on the per-email switch, subject "Your credit for {class_name} is back", body states what came back and signs off in the studio voice. Refusals: the booking is not `late_cancelled`, the credit was already returned, or the membership has since been refunded or ended (say so, nothing changes). Desk-up (owner, manager, front desk); instructors do not get it. No time limit.
+
+The reservation fee is never touched by this action: a fee kept on a late cancel stays kept, a fee already credited stays credit, and a fee due stays due; the fee follows Decision 103 only, and giving it back is a refund under Decision 111 or a waiver under 103(a), each its own action with its own audit row.
+
+**Touches.** Migration: `return_booking_credit(p_booking_id, p_note)` desk-up, template `credit_returned_by_studio`, `member_activity` arm. App: rename the control, second state of the sheet on late-cancelled rows. Tests: credit case, free-class case, drop-in case, strike voiding, the three refusals. The 21 Nov one-off for Malyssa Alemania (audit `f5f972dc`) is the precedent and needs no replay. **Status:** settled, to build in Step 12 alongside Decision 117. Deanna, 21 Nov 2026.
+
+---
+
 ## 103 (i) — The reservation state is always visible (amendment, recorded 21 Nov 2026)
 
 Every free first class seat on the staff roster and the coach's roster shows one chip for its reservation state: 'Paid ₱{fee}', 'Credit covers', 'Fee waived', 'Due by {time}' or 'Not asked'. The Flex pending list shows classes, not seats, so it carries one line per class instead: '{n} free seats: {paid} paid, {due} due, {waived} waived'. The member's profile Reservation fees card and the class page agree with the chip.
@@ -624,6 +636,32 @@ When Fill the timetable chooses between available coaches for a class, it first 
 **Build notes.** The fill preview tracks its own picks in memory, so adjacency and weekly counts in the preview match the real run.
 
 **Status:** settled, to build. **Amends:** the fill engine (migrations 061 and 065). Number 19 was never assigned before; it now holds this rule. Deanna, 21 Nov 2026.
+
+---
+
+## 117 — Promotions: a price cut on chosen plans for a date range (recorded 21 Nov 2026)
+
+**Context.** Reform wants holiday sales: a percentage off class packs for a few weeks. Decisions 88 and 103 left discounts out of scope; this is the first discount mechanic and it is deliberately small: a price cut, nothing else.
+
+**Decision.** A promotion is a row per studio: name ("Holiday Sale"), percent off (1 to 90, whole numbers), start date and end date in studio time (runs from 00:00 on the start day to 23:59:59 on the end day), and the plans it applies to, chosen from the studio's one-time plans only: class packs, private packs, drop-ins, one-time memberships, and the Intro Offer (unticked by default when creating). Recurring memberships and merchandise cannot carry a promotion. One promotion per plan at a time: saving a promotion whose dates overlap another live or scheduled promotion on the same plan is refused with "{plan} already has {other name} from {from} to {to}." The plan does not change: credits, validity days, class types and visibility are the plan's own; a 5-class pack bought on sale still gives 5 credits valid 30 days.
+
+**Sale price.** List price less the percent, rounded to the nearest whole unit of currency (half up). The ₱20 Xendit floor from Decision 103(f) still applies to the amount actually charged.
+
+**Member surfaces.** While a promotion is running, every place that shows the plan's price shows the sale price with the list price struck through and a tag "{promotion name}, {pct}% off until {end day}": Account → Plans, the class checkout plan picker, the free class convert path, the private booking pay step, the staff sell-a-plan sheet (with the line "Sale price applied: {name}, {pct}% off"). Outside the dates the surfaces show the list price with no tag. Public pages and the embed are unchanged (they carry no prices).
+
+**Charging.** The price is fixed when the checkout starts: `xendit_begin_purchase` and `sell_plan_at_desk` read the promotion in force at that moment and write on the payment row `list_price_cents`, `promotion_id` and `discount_cents`. Reservation credit and gift credit are applied after the discount. The receipt and the BIR invoice show a discount line "{promotion name}: -{amount}"; Sales history rows show the sale price with "{pct}% off" and Sales totals gain "Discounts given". Dashboard revenue is net of discounts, as it is the amount received.
+
+**Timing table.** Checkout started before the end and paid after it: sale price kept (the session carries its price). Checkout started after the end: list price. Promotion ended early ("End now") while a checkout is pending: that checkout keeps its price; new checkouts pay list. Checkout abandoned and restarted after the end: list price. Refund of a discounted purchase: the amount paid, never the list price. Plan list price edited while a promotion runs: the percent applies to the new list price from the next checkout; pending checkouts keep theirs. Promotion edited (percent or plans) after it has started: not allowed; end it and create a new one.
+
+**Emails.** `{offer_price}` resolves to the sale price while the promotion covers the offer plan. New token `{promo_line}` on the plan and convert templates: "{promotion name}: {pct}% off until {end day}" while running, empty otherwise, and the renderer drops the line when the token is empty so no blank paragraph is left. No automatic announcement email: the studio announces with the Campaign frame or a post.
+
+**Staff surface.** Settings → Selling → Promotions (manager-up): list with Scheduled / Running / Ended, create, edit only before the start, "End now" while running (sets the end to now, audited), archive after the end. Every change is audited with before and after.
+
+**Permissions.** Manager-up to create, edit, end and archive; desk-up sees the sale price and the tag on the sell sheet; members see prices only.
+
+**Not in V1.** Promo codes, fixed-amount discounts, per-member or first-purchase-only offers, stacking, recurring membership discounts, merchandise discounts, scheduled announcement emails. Each would be its own amendment.
+
+**Touches.** Migration: table `plan_promotions` (RLS, studio-scoped), payments columns `list_price_cents`, `promotion_id`, `discount_cents`, reader `plan_price_now(plan_id, at)` used by every price surface, `xendit_begin_purchase` and `sell_plan_at_desk` re-issued byte-faithfully from the TRUE newest definitions with the price read, `sales_totals` and `sales_history` discount arms, invoice and receipt discount line, `render_email` `{promo_line}` and `{offer_price}` resolution, RPCs `promotion_save` / `promotion_end_now` / `promotion_archive` manager-up, `promotions_list`. App: Settings → Selling → Promotions page, price display component shared by Plans, checkout picker, private pay step and the sell sheet. Tests: a promotions suite covering the timing table, node tests for the rounding and the display string. **Status:** settled, to build as Step 12. Deanna, 21 Nov 2026.
 
 ---
 
