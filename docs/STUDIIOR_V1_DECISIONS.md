@@ -639,6 +639,16 @@ When Fill the timetable chooses between available coaches for a class, it first 
 
 ---
 
+## 117 (a) — Recurring memberships can carry a promotion (amendment, recorded 21 Nov 2026)
+
+**Context.** Decision 117 excluded recurring plans. Reform wants the monthly memberships in the Holiday Sale. Memberships are sold one period at a time (Decision 66), so a period's charge is an ordinary payment and the only question is what the next period costs.
+
+**Decision.** Recurring plans are eligible for a promotion. The sale price applies to each period paid for while the promotion is running: the first purchase and any renewal paid inside the dates. A period paid for after the end date is at list price. The member tag on a recurring plan reads "{name}, {pct}% off this month" instead of "until {end day}", and the renewal screen shows the price it will charge. No change to the plan, its period or its credits. The `plan_recurring` refusal is removed.
+
+**Touches.** promotion_save eligibility (all active plans of the studio except merchandise), plan_price_now unchanged, the renewal payment path reads plan_price_now like the first purchase, PriceTag wording for recurring, Promotions page plan list shows recurring plans with a "monthly" note. Tests: promotions suite renewal inside and after the dates. **Status:** settled, to build in Step 12b. Deanna, 21 Nov 2026.
+
+---
+
 ## 117 — Promotions: a price cut on chosen plans for a date range (recorded 21 Nov 2026)
 
 **Context.** Reform wants holiday sales: a percentage off class packs for a few weeks. Decisions 88 and 103 left discounts out of scope; this is the first discount mechanic and it is deliberately small: a price cut, nothing else.
@@ -686,6 +696,16 @@ An empty class is offered as a private slot only with the coach assigned to that
 A private slot is offered when the hour is empty, or when the only class in that hour is empty: no seats counted in booked_count, no live payment hold, no held waitlist offer, not committed, not private, still scheduled. An empty flex class can be replaced at any time. An empty core or always-runs class can be replaced only when the private starts within the studio's replace window (setting private_replace_core_hours, Reform 48 hours), so core classes keep their chance to fill. A pending private records the class it replaces (replaces_occurrence_id) and takes no room until it is confirmed; while pending it holds that class's slot so nobody else can target it, and the group class stays bookable by members. At confirm, under a row lock, the class is checked again: if it is still empty it is cancelled with the cause replaced_by_private and the private takes the room; if a member booked it or it committed in the meantime, the private is refused, the payment comes back as credit (or the pack session is returned), and the member is told 'That time was just taken. Pick another time.' on their return screen and by email (template private_time_taken). A replaced class sends no member emails; its coach is told (template private_replaced_class) unless that coach is the one teaching the private. The replaced class's coach, when they teach privates and are free, is offered first in the coach picker, and their own empty class never counts as them being busy. Pay for a replaced class: the core holding fee (core_unmet_pay_cents) when the class was core or always-runs, the flex standby amount (flex_unmet_pay_cents) when it was flex, and nothing when the displaced coach teaches the private. The cause never follows the not-confirmed path and reads 'Replaced by a private session' on staff screens and in the digest. Every replacement and every refusal writes an audit row.
 
 **Status:** settled, to build. **Extends:** Decision 116, Decision 22. Deanna, 19 Nov 2026.
+
+---
+
+## 22 (f) — Members see a flex class's state too (amendment, recorded 21 Nov 2026)
+
+**Context.** Since 22(e) staff see "1 of 2" and a green "Running" on flex classes; members see only the core chip "Always runs". Reform's bookings now cluster on core classes: members read a bare flex class as uncertain and the core chip as the safe choice, so off-peak slots stay empty even when they are one booking from running. Members are avoiding uncertainty, not the time slots.
+
+**Decision.** Every member-facing class row and class page shows a flex state chip next to the time, using the same count the latch uses (seats that count toward the minimum, so the chip never says more than the truth): "Be the first" when nothing counts yet; "Needs {n} more" while short of the minimum ("Needs 1 more" is the invitation); "Running" in green once the minimum is reached or the class is committed, and from then on it reads exactly like a core class apart from the chip wording. Core keeps "Always runs". Private slots and hidden classes show nothing new. A flex class past its cut-off and not confirmed is cancelled by the existing path and never shows a chip. Surfaces: member Book (week and day), Home next-class card, the class page header, the free class picker, the Webflow embed (public_schedule carries the count and minimum), and the schedule posts, where the legend becomes "✦ always runs · ○ needs {flex_min} to run, be one of them" and a row one short reads "needs 1 more". No change to booking rules, cut-offs, pay or the latch itself; this is display only, read from fields the readers already carry or gain in the same build.
+
+**Touches.** schedule_range (member arm) and member_next_class_day carry occ_paid_count, occ_min and occ_reached_minimum; public_schedule re-issued byte-faithfully with the two counts (still anon, surface unchanged at FOURTEEN); lib/flex-state.mjs gives the chip wording and colour from (paid, min, reached, committed, tier); components: class-card, free-class-list, class-detail header, Home card, embed script, schedule post rows and legend (Decision 93 styles). Tests: node for the wording table; schedule_range/public_schedule suites extended. **Status:** settled, to build in Step 12b. Deanna, 21 Nov 2026.
 
 ---
 
@@ -1124,6 +1144,16 @@ Decision 18 governs how an instructor submits a month of availability and how a 
 An owner or manager can reopen a submitted or approved availability submission so the instructor can edit it, with a button "Reopen for editing" on the review page and an optional note. Reopening puts the submission and its rows back to `changes_requested` and sends the existing `availability_changes_requested` email with the note, or with "Reopened by {studio_name} so you can make changes." when no note is given. Reopening is allowed only while the studio-local date is on or before the availability due day for that period (`availability_due_day` of the month before). The cut-off date is read from `availability_cycle(studio_id, period_start)->>'due_on'`, the single existing source, and is not computed again. After the cut-off the button is gone and the function refuses with reason `cutoff_passed`: "The cut-off for {Month} was {date}. Ask the instructor to send a change request instead." Rows already used by auto-assign are not touched by reopening; assignments stand until changed, exactly as `request_availability_changes` already behaves (it flips the submission and its `instructor_availability` rows to `changes_requested` and touches no `class_occurrences`). The reopen reuses the `request_availability_changes` body through a shared service-only `_run` twin, so there is one implementation of "send a month back to the instructor"; the cut-off check and the note default sit in the reopen wrapper, and the existing public `request_availability_changes` (which still requires a note) is unchanged. Status before this: Approve and Ask-for-a-change showed only on a `submitted` submission, and an `approved` month had no action at all, so a studio could not let an instructor amend an approved month even before the cut-off.
 
 **Where:** Business Rules §3.3; migration 066 (availability submissions and review). **Status:** settled. **References:** Decision 18 for the submission and review flow. **Reuses:** `request_availability_changes` (through a shared `_run` twin), `availability_cycle` for the cut-off, the `availability_changes_requested` email. Deanna, 11 Nov 2026.
+
+---
+
+## 95 (b) — Rescue emails point at the nearest flex class first (amendment, recorded 21 Nov 2026)
+
+**Context.** The flex and free rescue emails ("your class still needs {n_more} more") offer a list of core classes to move to. That rescues the member but drains the flex slots: the booking leaves a class that was one short and lands on one that was already running. The list should first try to make the member's own kind of class run.
+
+**Decision.** The list token the four rescue templates use (`{class_list_core}`, name kept so Reform's overrides need no change) is filled in a new order: first flex classes in the next 7 days that are one booking from running (same minimum rule, not hidden, not full, not past, not the member's own class), nearest in time first, each labelled "Needs 1 more"; then flex classes two short, labelled "Needs 2 more", only if fewer than four rows so far; then core classes as today, labelled "Always runs", up to the existing cap of 8 rows plus "See the full schedule". "Move me to this class" works unchanged on every row. The intro sentence above the list becomes "Pick one that needs you, or one that always runs:". Free first class rescues apply the same order, respecting free_first_core_only when it is on (then the list stays core-only, as the setting says).
+
+**Touches.** core_classes_for_rescue re-issued (function name kept) with the new ordering and labels; flex_rescue_block label line per row; four platform defaults' intro sentence; Reform's four overrides left as they are (their token still works). Tests: flex_rescue_test ordering section. **Status:** settled, to build in Step 12b. Deanna, 21 Nov 2026.
 
 ---
 
