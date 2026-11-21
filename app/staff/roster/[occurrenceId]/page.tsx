@@ -16,6 +16,7 @@ import PaperWaiverButton from "./paper-waiver-button";
 import MakeFreeButton from "./make-free-button";
 import RebookButton from "./rebook-button";
 import RemoveBooking from "@/components/staff/remove-booking";
+import ReturnCredit from "@/components/staff/return-credit";
 import { BookMemberFromRoster } from "@/components/staff/book-member";
 import { HoldRows } from "@/components/staff/hold-rows";
 import ToastHost from "@/components/staff/toast-host";
@@ -226,6 +227,13 @@ export default async function Roster({ params, searchParams }: { params: { occur
   };
   const booked = (bookings ?? []).filter((b) => ["booked", "attended", "no_show"].includes(b.status));
   const waitlisted = (bookings ?? []).filter((b) => b.status === "waitlisted");
+  // Decision 36(a): late cancellations, each with the Return credit sheet
+  // (desk-up). One read for the seat kinds and who already returned what.
+  const lateCancelled = (bookings ?? []).filter((b) => b.status === "late_cancelled");
+  const { data: lateRows } = desk && lateCancelled.length
+    ? await supabase.rpc("late_cancel_returns", { p_studio_id: ctx.studioId, p_booking_ids: lateCancelled.map((b) => b.id) })
+    : { data: [] as { booking_id: string; seat_kind: string; returned_at: string | null; returned_by: string | null }[] };
+  const lateOf = new Map((lateRows ?? []).map((r) => [r.booking_id, r]));
   // Decision 26(e): a payment hold (a pending_payment comp seat with a hold_until)
   // shows as its own row with a live countdown and, for desk-up, a Release button.
   // It is counted in the seat total (occurrence_seats_taken counts pending_payment)
@@ -466,6 +474,28 @@ export default async function Roster({ params, searchParams }: { params: { occur
       )}
 
       <HoldRows holds={holds} canRelease={desk} />
+
+      {desk && lateCancelled.length > 0 && (
+        <div className="mt-8">
+          <SectionLabel>Cancelled late</SectionLabel>
+          <Rows>
+            {lateCancelled.map((b) => {
+              const st = lateOf.get(b.id);
+              return (
+                <div key={b.id} className="px-3 py-2.5">
+                  <span className="text-[14px] leading-5 text-ink">
+                    {b.members?.first_name} {b.members?.last_name}
+                  </span>
+                  <ReturnCredit bookingId={b.id} indent={false}
+                    firstName={b.members?.preferred_name || b.members?.first_name || "This member"}
+                    seatKind={st?.seat_kind ?? null} returnedAt={st?.returned_at ?? null}
+                    returnedBy={st?.returned_by ?? null} timeZone={ctx.timeZone} />
+                </div>
+              );
+            })}
+          </Rows>
+        </div>
+      )}
 
       {waitlisted.length > 0 && (
         <div className="mt-8">

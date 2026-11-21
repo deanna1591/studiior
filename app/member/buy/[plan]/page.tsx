@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
+import type { PlanPrice } from "@/lib/promo";
+import { PriceAmount, PromoTagChip } from "@/components/price-tag";
 import CreditApplied from "@/components/member/credit-applied";
 import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { buyPath } from "@/lib/member-urls";
@@ -176,7 +178,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
   // never a new place and is never gated — begin treats a recurring plan the
   // member already holds (active/past_due) as a renewal and skips the cap, so
   // this screen must too, or it would hide the Buy a renewal needs.
-  const [{ data: held }, { data: seats }, { data: introCfg }, { data: introWin }] = await Promise.all([
+  const [{ data: held }, { data: seats }, { data: introCfg }, { data: introWin }, { data: priceNow }] = await Promise.all([
     supabase.from("memberships")
       .select("status").eq("member_id", ctx.memberId).eq("plan_id", plan.id)
       .not("status", "in", "(cancelled,expired)"),
@@ -185,7 +187,11 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
     supabase.from("studio_settings").select("intro_offer_plan_id, intro_offer_exclusive")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
+    // Decision 117: the price now (a sale while a promotion runs).
+    supabase.rpc("plan_price_now", { p_plan_id: plan.id }),
   ]);
+  const price = (priceNow as PlanPrice | null) ?? null;
+  const priceCents = price?.price_cents ?? plan.price_cents;
   const introActive = ((introWin as { active?: boolean } | null)?.active) === true;
   const exclusiveLocked = !!introCfg?.intro_offer_exclusive
     && introCfg?.intro_offer_plan_id === plan.id && !introActive;
@@ -200,9 +206,10 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
       <section className="m-card p-5">
         <h1 className="m-head text-[24px] leading-8 text-ink">{plan.name}</h1>
         <p className="m-sub mt-1 text-ink-2">
-          <span className="num">{formatMoney(plan.price_cents, plan.currency)}</span>
+          <PriceAmount priceCents={priceCents} listCents={price?.list_cents} currency={plan.currency} promo={price} />
         </p>
-        <CreditApplied creditCents={settings.reservationCreditCents} priceCents={plan.price_cents} currency={plan.currency} showNet />
+        {price?.promotion_id && <PromoTagChip promo={price} className="mt-1.5" />}
+        <CreditApplied creditCents={settings.reservationCreditCents} priceCents={priceCents} currency={plan.currency} showNet />
         {plan.description && <p className="m-body mt-3 text-ink">{plan.description}</p>}
         <p className="m-sub mt-2 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
 

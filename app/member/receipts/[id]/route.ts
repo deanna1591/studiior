@@ -69,6 +69,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     .select(`
       id, studio_id, member_id, amount_cents, currency, provider, method, status,
       refunded_cents, refunded_at, invoice_no, received_by, reference, paid_at, created_at, description,
+      list_price_cents, discount_cents, plan_promotions(name),
       memberships(membership_plans(name)),
       product_orders(products(name)),
       bookings(class_occurrences(name, class_types(name))),
@@ -114,6 +115,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     appliedCredit = ((xp as any)?.credit_applied_cents as number | null) ?? 0;
   }
 
+  // Decision 117: a promotion's discount, shown as its own line under the list
+  // price ("{promotion name}: -{amount}"). The amount paid already reflects it.
+  const discount = ((anyP.discount_cents as number | null) ?? 0);
+  const promoName: string = anyP.plan_promotions?.name ?? "Promotion";
+
   let bytes: Uint8Array;
   let name: string;
 
@@ -130,7 +136,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       const refunded = p.refunded_cents ?? 0;
       // Show the gross price, then the reservation credit as a deduction, so the
       // total still equals what was paid (amount_cents, already net of credit).
-      const items: InvoiceData["items"] = [{ desc: item, qty: 1, price: p.amount_cents + appliedCredit }];
+      const items: InvoiceData["items"] = [{ desc: item, qty: 1, price: p.amount_cents + appliedCredit + discount }];
+      if (discount > 0) items.push({ desc: promoName, qty: 1, price: -discount });
       if (appliedCredit > 0) items.push({ desc: "Reservation credit applied", qty: 1, price: -appliedCredit });
       if (refunded > 0) items.push({ desc: "Refund", qty: 1, price: -refunded });
       const data: InvoiceData = {
@@ -206,6 +213,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     ["Member", win(memberName)],
     ["Date", win(when)],
     ["Item", win(item)],
+    ...(discount > 0
+      ? [["List price", win(formatMoney(p.amount_cents + appliedCredit + discount, p.currency).replace(/[^\u0000-ÿ]\s*/, `${p.currency} `))] as [string, string],
+         [win(promoName), "-" + win(formatMoney(discount, p.currency).replace(/[^\u0000-ÿ]\s*/, `${p.currency} `))] as [string, string]]
+      : []),
     ["Amount", win(formatMoney(p.amount_cents, p.currency).replace(/[^\u0000-ÿ]\s*/, `${p.currency} `))],
     ...(appliedCredit > 0
       ? [["Reservation credit applied", win(formatMoney(appliedCredit, p.currency).replace(/[^\u0000-ÿ]\s*/, `${p.currency} `))] as [string, string]]

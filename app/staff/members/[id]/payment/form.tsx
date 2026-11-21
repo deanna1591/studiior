@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
 import { INTRO_USED_SENTENCE } from "@/lib/plans";
+import { saleAppliedLine, type PlanPrice } from "@/lib/promo";
 import { recordPayment, type PayState } from "./actions";
 
 type Plan = {
   id: string; name: string; type: string; price_cents: number; currency: string;
+  /** Decision 117: the list price and the promotion in force (price_cents is the sale price). */
+  list_cents?: number; promo?: PlanPrice | null;
   /**
    * Decision 24. Null for a plan with no limit and for every plan at a studio
    * with the switch off — so a studio that does not use places sees no line
@@ -81,9 +84,15 @@ export default function PaymentForm({
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} — {p.currency} {(p.price_cents / 100).toFixed(2)}
+                {p.promo ? ` (was ${(p.list_cents! / 100).toFixed(2)})` : ""}
               </option>
             ))}
           </select>
+          {/* Decision 117: the amount is pre-filled with the sale price; recording
+              exactly that amount records the promotion. */}
+          {saleAppliedLine(chosen?.promo) && (
+            <p className="mt-1.5 text-[12px] leading-[18px] text-ink-2">{saleAppliedLine(chosen?.promo)}</p>
+          )}
           {/* Decision 62: an intro offer is bought once per person. The sale is
               refused by activate_purchase (PT409); say so before it is attempted.
               A sentence, so ink on the coral tint with a coral rule. */}

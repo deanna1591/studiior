@@ -9,6 +9,8 @@ import { payeeNoticeLine } from "@/lib/payee-notice";
 import { haptic } from "@/lib/haptics";
 import GuestInvite from "@/components/member/guest-invite";
 import CreditApplied from "@/components/member/credit-applied";
+import { PriceAmount, PromoTagChip } from "@/components/price-tag";
+import type { PlanPrice } from "@/lib/promo";
 import { netTotalCents } from "@/lib/reservation-credit";
 import { checkoutPay, payAtDesk, type DeskState } from "./actions";
 import type { BuyState } from "@/app/member/account/plan/actions";
@@ -16,6 +18,8 @@ import type { BuyState } from "@/app/member/account/plan/actions";
 export type CheckoutPlanRow = {
   id: string; type: string; name: string;
   price_cents: number; currency: string; help: string;
+  // Decision 117: the list price and the promotion in force (null outside a sale).
+  list_cents?: number; promo?: PlanPrice | null;
 };
 
 /**
@@ -123,10 +127,10 @@ export default function CheckoutBody({
                       <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-semibold leading-5 text-ink">{p.name}</span>
                         {p.help && <span className="m-sub mt-0.5 block text-ink-3">{p.help}</span>}
+                        {p.promo && <PromoTagChip promo={p.promo} className="mt-1" />}
                       </span>
-                      <span className="num shrink-0 text-[15px] font-semibold text-ink">
-                        {formatMoney(p.price_cents, p.currency)}
-                      </span>
+                      <PriceAmount priceCents={p.price_cents} listCents={p.list_cents} currency={p.currency}
+                                   promo={p.promo} className="shrink-0 text-[15px] font-semibold text-ink" />
                     </label>
                   </li>
                 );

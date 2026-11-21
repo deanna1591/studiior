@@ -553,7 +553,29 @@ export async function removeBooking(_prev: RemoveResult, fd: FormData): Promise<
   }
   const r = data as unknown as { ok: boolean; class_name?: string; when?: string } | null;
   revalidatePath("/roster");
-  return { ok: true, message: `Removed from ${r?.class_name ?? "the class"}, ${r?.when ?? ""}.` };
+  return { ok: true, message: `Booking cancelled: ${r?.class_name ?? "the class"}, ${r?.when ?? ""}.` };
+}
+
+// ===========================================================================
+// Decision 36(a) — return what a late cancel took. Desk-up. The booking stays
+// late_cancelled; the credit or free class goes back, the infraction and any
+// desk-pay strike it caused are voided. The reservation fee is never touched.
+// ===========================================================================
+export async function returnCredit(_prev: RemoveResult, fd: FormData): Promise<RemoveResult> {
+  const ctx = await getStaffContext();
+  if (!ctx) return { ok: false, message: "You are not signed in." };
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("return_booking_credit", {
+    p_booking_id: String(fd.get("booking_id") ?? ""),
+    p_note: (String(fd.get("note") ?? "").trim() || null) as unknown as string,
+  });
+  if (error) {
+    return { ok: false, message: /PT403/.test(error.code ?? "") ? "Only studio staff can return a credit." : error.message };
+  }
+  const r = data as unknown as { ok: boolean; message?: string } | null;
+  revalidatePath("/roster");
+  revalidatePath("/members");
+  return r?.ok ? { ok: true, message: r.message ?? "Returned." } : { ok: false, message: r?.message ?? "That could not be done." };
 }
 
 export type AlwaysRunsState = { ok: boolean; message: string } | null;

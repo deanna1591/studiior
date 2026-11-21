@@ -1,3 +1,5 @@
+import { planPrices } from "@/lib/plan-prices";
+import { withPrice } from "@/lib/promo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { memberScreen } from "@/lib/member";
@@ -24,7 +26,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
     await memberScreen();
   const occId = params.occurrenceId;
 
-  const [{ data: occ }, { data: covers }, { data: catalogue }, { count: activeGuests }, { data: introCfg }, { data: introWin }, { data: credits }] =
+  const [{ data: occ }, { data: covers }, { data: catalogue }, { count: activeGuests }, { data: introCfg }, { data: introWin }, { data: credits }, prices] =
     await Promise.all([
       // RLS occ_member_read: a scheduled, visible class only — notFound otherwise,
       // the same answer the class page gives.
@@ -50,6 +52,8 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
       // member_credits_self_read scopes this to the signed-in member.
       supabase.from("member_credits").select("reason, amount_cents, used_cents")
         .eq("member_id", ctx.memberId).is("voided_at", null),
+      // Decision 117: every plan priced now, one call.
+      planPrices(supabase, ctx.studioId),
     ]);
 
   if (!occ || occ.status !== "scheduled") notFound();
@@ -78,11 +82,14 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
     introPlanId: introCfg?.intro_offer_plan_id ?? null,
     hideExclusiveIntro,
   });
-  const plans: CheckoutPlanRow[] = ordered.map((p) => ({
-    id: p.id, type: p.type, name: p.name,
-    price_cents: p.price_cents, currency: p.currency,
-    help: planHelpLine(p),
-  }));
+  const plans: CheckoutPlanRow[] = ordered.map((p) => {
+    const pp = withPrice(p, prices);
+    return {
+      id: p.id, type: p.type, name: p.name,
+      price_cents: pp.price_cents, list_cents: pp.list_cents, promo: pp.promo, currency: p.currency,
+      help: planHelpLine(p),
+    };
+  });
 
   const instructor = (occ as { instructors: { display_name: string } | null }).instructors;
   const instructorFirst = instructor?.display_name?.split(" ")[0] ?? null;

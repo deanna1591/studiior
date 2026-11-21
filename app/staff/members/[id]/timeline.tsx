@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ReturnCredit from "@/components/staff/return-credit";
 import { formatMoney } from "@/lib/plans";
 import { rowLine, statementTitle } from "@/lib/statement";
 import { dayMonthParts, type TimeFormat } from "@/lib/time";
@@ -75,8 +76,12 @@ const DOT: Record<string, string> = {
 
 const PAYMENT_KINDS = new Set(["purchase", "refund", "payment_failed"]);
 
-export function TimelineList({ events, timeZone, timeFormat = "24h", memberId, manager, currency }:
-  { events: Ev[]; timeZone: string; timeFormat?: TimeFormat; memberId: string; manager: boolean; currency: string }) {
+type LateState = { booking_id: string; seat_kind: string; returned_at: string | null; returned_by: string | null };
+
+export function TimelineList({ events, timeZone, timeFormat = "24h", memberId, manager, currency, lateStates, firstName = "This member" }:
+  { events: Ev[]; timeZone: string; timeFormat?: TimeFormat; memberId: string; manager: boolean; currency: string;
+    /** Decision 36(a): desk-up only — the Return credit sheet on a late cancel. */
+    lateStates?: Record<string, LateState>; firstName?: string }) {
   const money = (c: number) => formatMoney(c, currency);
 
   function href(e: Ev): string | null {
@@ -149,6 +154,14 @@ export function TimelineList({ events, timeZone, timeFormat = "24h", memberId, m
                     <Link href={to} className="-mx-2 flex gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-paper">{body}</Link>
                   ) : (
                     <div className="flex gap-3 py-1.5">{body}</div>
+                  )}
+                  {lateStates && e.kind === "late_cancelled" && e.booking_id && lateStates[e.booking_id] && (
+                    <div className="pb-2 pl-[64px]">
+                      <ReturnCredit bookingId={e.booking_id} indent={false} firstName={firstName}
+                        seatKind={lateStates[e.booking_id].seat_kind}
+                        returnedAt={lateStates[e.booking_id].returned_at}
+                        returnedBy={lateStates[e.booking_id].returned_by} timeZone={timeZone} />
+                    </div>
                   )}
                 </li>
               );

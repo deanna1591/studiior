@@ -5972,6 +5972,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string | null
+          discount_cents: number | null
           failure_code: string | null
           failure_message: string | null
           gift_card_id: string | null
@@ -5980,6 +5981,7 @@ export type Database = {
           invoice_no: string | null
           is_demo: boolean
           kind: string | null
+          list_price_cents: number | null
           member_id: string | null
           membership_id: string | null
           method: string | null
@@ -5988,6 +5990,7 @@ export type Database = {
           paid_at: string | null
           product_order_id: string | null
           promo_code_id: string | null
+          promotion_id: string | null
           provider: Database["public"]["Enums"]["payment_provider"]
           received_by: string | null
           recorded_by: string | null
@@ -6012,6 +6015,7 @@ export type Database = {
           created_at?: string
           currency: string
           description?: string | null
+          discount_cents?: number | null
           failure_code?: string | null
           failure_message?: string | null
           gift_card_id?: string | null
@@ -6020,6 +6024,7 @@ export type Database = {
           invoice_no?: string | null
           is_demo?: boolean
           kind?: string | null
+          list_price_cents?: number | null
           member_id?: string | null
           membership_id?: string | null
           method?: string | null
@@ -6028,6 +6033,7 @@ export type Database = {
           paid_at?: string | null
           product_order_id?: string | null
           promo_code_id?: string | null
+          promotion_id?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
           received_by?: string | null
           recorded_by?: string | null
@@ -6052,6 +6058,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          discount_cents?: number | null
           failure_code?: string | null
           failure_message?: string | null
           gift_card_id?: string | null
@@ -6060,6 +6067,7 @@ export type Database = {
           invoice_no?: string | null
           is_demo?: boolean
           kind?: string | null
+          list_price_cents?: number | null
           member_id?: string | null
           membership_id?: string | null
           method?: string | null
@@ -6068,6 +6076,7 @@ export type Database = {
           paid_at?: string | null
           product_order_id?: string | null
           promo_code_id?: string | null
+          promotion_id?: string | null
           provider?: Database["public"]["Enums"]["payment_provider"]
           received_by?: string | null
           recorded_by?: string | null
@@ -6138,6 +6147,13 @@ export type Database = {
             columns: ["promo_code_id"]
             isOneToOne: false
             referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "plan_promotions"
             referencedColumns: ["id"]
           },
           {
@@ -6292,6 +6308,73 @@ export type Database = {
           },
           {
             foreignKeyName: "peak_windows_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_promotions: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          ends_on: string
+          id: string
+          name: string
+          pct: number
+          plan_ids: string[]
+          starts_on: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          ends_on: string
+          id?: string
+          name: string
+          pct: number
+          plan_ids?: string[]
+          starts_on: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          ends_on?: string
+          id?: string
+          name?: string
+          pct?: number
+          plan_ids?: string[]
+          starts_on?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_promotions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_promotions_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_promotions_studio_id_fkey"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
@@ -8834,17 +8917,20 @@ export type Database = {
           created_at: string
           credit_applied_cents: number
           currency: string
+          discount_cents: number | null
           failure_reason: string | null
           gift_card_id: string | null
           id: string
           last_return_check_at: string | null
           last_return_check_result: string | null
+          list_price_cents: number | null
           member_id: string | null
           payment_link_url: string | null
           payment_session_id: string | null
           plan_id: string | null
           private_occurrence_id: string | null
           product_order_id: string | null
+          promotion_id: string | null
           renews_membership_id: string | null
           status: string
           studio_id: string
@@ -8858,17 +8944,20 @@ export type Database = {
           created_at?: string
           credit_applied_cents?: number
           currency: string
+          discount_cents?: number | null
           failure_reason?: string | null
           gift_card_id?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
+          list_price_cents?: number | null
           member_id?: string | null
           payment_link_url?: string | null
           payment_session_id?: string | null
           plan_id?: string | null
           private_occurrence_id?: string | null
           product_order_id?: string | null
+          promotion_id?: string | null
           renews_membership_id?: string | null
           status?: string
           studio_id: string
@@ -8882,17 +8971,20 @@ export type Database = {
           created_at?: string
           credit_applied_cents?: number
           currency?: string
+          discount_cents?: number | null
           failure_reason?: string | null
           gift_card_id?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
+          list_price_cents?: number | null
           member_id?: string | null
           payment_link_url?: string | null
           payment_session_id?: string | null
           plan_id?: string | null
           private_occurrence_id?: string | null
           product_order_id?: string | null
+          promotion_id?: string | null
           renews_membership_id?: string | null
           status?: string
           studio_id?: string
@@ -8947,6 +9039,13 @@ export type Database = {
             columns: ["product_order_id"]
             isOneToOne: false
             referencedRelation: "product_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "plan_promotions"
             referencedColumns: ["id"]
           },
           {
@@ -10502,6 +10601,16 @@ export type Database = {
         Args: { p_challenge_id: string; p_member_id?: string }
         Returns: Json
       }
+      late_cancel_returns: {
+        Args: { p_booking_ids: string[]; p_studio_id: string }
+        Returns: {
+          booking_id: string
+          returned_at: string
+          returned_by: string
+          seat_kind: string
+        }[]
+      }
+      late_cancel_seat_kind: { Args: { p_booking_id: string }; Returns: string }
       mark_assignment_confirmed: {
         Args: { p_occurrence_id: string }
         Returns: Json
@@ -11059,6 +11168,15 @@ export type Database = {
         Args: { p_from: string; p_plan_id: string }
         Returns: string
       }
+      plan_price_now: {
+        Args: { p_at?: string; p_plan_id: string }
+        Returns: Json
+      }
+      plan_price_now_run: {
+        Args: { p_at?: string; p_plan_id: string }
+        Returns: Json
+      }
+      plan_prices_now: { Args: { p_studio_id: string }; Returns: Json }
       plan_seats: {
         Args: { p_studio_id: string }
         Returns: {
@@ -11266,6 +11384,36 @@ export type Database = {
           stock: number
           threshold: number
         }[]
+      }
+      promo_price_reader: { Args: { p_studio_id: string }; Returns: boolean }
+      promo_sale_cents: {
+        Args: { p_list_cents: number; p_pct: number }
+        Returns: number
+      }
+      promotion_archive: { Args: { p_promotion_id: string }; Returns: Json }
+      promotion_bounds: {
+        Args: { p_promotion_id: string }
+        Returns: {
+          end_at: string
+          start_at: string
+        }[]
+      }
+      promotion_end_now: { Args: { p_promotion_id: string }; Returns: Json }
+      promotion_save: {
+        Args: {
+          p_ends_on: string
+          p_name: string
+          p_pct: number
+          p_plan_ids: string[]
+          p_promotion_id: string
+          p_starts_on: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      promotions_list: {
+        Args: { p_include_archived?: boolean; p_studio_id: string }
+        Returns: Json
       }
       provision_studio: {
         Args: {
@@ -11751,6 +11899,10 @@ export type Database = {
         Args: { p_studio_id: string }
         Returns: number
       }
+      return_booking_credit: {
+        Args: { p_booking_id: string; p_note?: string }
+        Returns: Json
+      }
       return_reservation_credit: {
         Args: { p_booking_id: string }
         Returns: undefined
@@ -11798,6 +11950,8 @@ export type Database = {
           amount_cents: number
           bought_on: string
           currency: string
+          discount_cents: number
+          discount_pct: number
           expires_on: string
           is_renewal: boolean
           member_id: string

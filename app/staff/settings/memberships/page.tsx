@@ -151,6 +151,12 @@ export default async function MembershipSettings() {
           state="Create and edit the plans members buy — price, credits, limits and who can see them."
           href="/plans" cta="Open plans" />
       </SettingsSection>
+
+      <SettingsSection id="promotions" title="Promotions">
+        <SettingsSummaryRow title="Promotions"
+          state="A percent off chosen packs, drop-ins and the intro offer, for a date range."
+          href="/settings/promotions" cta="Open promotions" />
+      </SettingsSection>
     </AppShell>
   );
 }

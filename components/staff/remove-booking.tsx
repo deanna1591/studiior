@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { removeBooking } from "@/app/staff/roster/actions";
 
 /**
- * Decision 92(b) — remove a member from a class. Desk-up. Opens a small sheet:
- * a "Return their credit or free class" tick (on by default), an optional note,
- * and a "Remove" button. On success a page-level toast shows and the row leaves
+ * Decision 92(b), renamed by 36(a) — "Cancel booking". Desk-up. Opens a small
+ * sheet: a "Return their credit or free class" tick (on by default), an optional
+ * note, and a "Cancel booking" button. On success a page-level toast shows and the row leaves
  * the roster (router.refresh). Tick off is a late cancel inside the cutoff.
  */
 export default function RemoveBooking({
@@ -24,14 +24,14 @@ export default function RemoveBooking({
     return (
       <button onClick={() => setOpen(true)}
         className="mt-1 ml-9 rounded-lg border border-line-2 px-2.5 py-1 text-[12px] text-ink-2 hover:text-ink">
-        Remove from class
+        Cancel booking
       </button>
     );
   }
 
   return (
     <div className="mt-1 ml-9 max-w-[42ch] rounded-lg border border-line bg-surface p-3">
-      <p className="text-[12.5px] leading-[18px] text-ink">Remove {firstName} from this class?</p>
+      <p className="text-[12.5px] leading-[18px] text-ink">Cancel {firstName}&rsquo;s booking?</p>
       <label className="mt-2 flex items-center gap-2 text-[12.5px] text-ink-2">
         <input type="checkbox" checked={ret} onChange={(e) => setRet(e.target.checked)} />
         Return their credit or free class
@@ -60,7 +60,7 @@ export default function RemoveBooking({
           })}
           className="rounded-lg px-3 py-1.5 text-[12.5px] font-medium text-paper disabled:opacity-50"
           style={{ background: "var(--coral-deep)" }}>
-          {pending ? "Removing…" : "Remove"}
+          {pending ? "Cancelling…" : "Cancel booking"}
         </button>
         <button onClick={() => { setOpen(false); setErr(null); }}
           className="text-[12px] text-ink-2 underline underline-offset-4">Keep booked</button>

@@ -5,6 +5,7 @@ import { accentSolid } from "@/lib/accent-pair";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatMoney } from "@/lib/plans";
+import { saleAppliedLine, type PlanPrice } from "@/lib/promo";
 import { fmtClock } from "@/lib/time";
 import { addWalkIn, moveBookingHere, recordDeskDropinPaid, sellPlanAtDesk,
          type WalkInResult, type DeskResult } from "./actions";
@@ -18,7 +19,7 @@ function altWhen(start: string, tz: string, timeFormat: "24h" | "12h"): string {
 }
 
 /** Decision 81a — the desk, from the roster. All amounts via formatMoney. */
-export type DeskPlan = { id: string; name: string; price_cents: number };
+export type DeskPlan = { id: string; name: string; price_cents: number; list_cents?: number; promo?: PlanPrice | null };
 
 const METHODS: { v: string; label: string }[] = [
   { v: "gcash", label: "GCash" }, { v: "cash", label: "Cash" }, { v: "card_terminal", label: "Card" },
@@ -202,8 +203,11 @@ export function DeskPay({
       {open === "sell" && (
         <div className="mt-2 rounded-lg px-2.5 py-2.5" style={{ background: "var(--paper)" }}>
           <select className={field} value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={busy}>
-            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price_cents, currency)}</option>)}
+            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price_cents, currency)}{p.promo ? ` (was ${formatMoney(p.list_cents ?? p.price_cents, currency)})` : ""}</option>)}
           </select>
+          {/* Decision 117: the sale price is what the desk charges. */}
+          {(() => { const line = saleAppliedLine(plans.find((p) => p.id === planId)?.promo); return line
+            ? <p className="mt-1.5 text-[12.5px] leading-[18px] text-ink-2">{line}</p> : null; })()}
           <div className="mt-2 flex gap-1.5">
             {METHODS.map((m) => (
               <button key={m.v} onClick={() => setSMethod(m.v)} disabled={busy}

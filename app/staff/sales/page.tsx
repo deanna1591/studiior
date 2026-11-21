@@ -1,3 +1,4 @@
+import { pctOffLabel } from "@/lib/promo";
 import Link from "next/link";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
@@ -35,6 +36,8 @@ type Sale = {
   amount_cents: number; currency: string; payment_source: string;
   bought_on: string; starts_on: string | null; expires_on: string | null;
   sale_status: string;
+  // Decision 117: the discount on a sale bought under a promotion.
+  discount_cents?: number | null; discount_pct?: number | null;
 };
 
 type Totals = {
@@ -44,6 +47,7 @@ type Totals = {
   refunds?: { count: number; total_cents: number };
   gift_sold?: { count: number; total_cents: number };
   gift_redeemed?: { count: number; total_cents: number };
+  discounts?: { count: number; total_cents: number };
   private?: { count: number; total_cents: number; after_vat_cents: number; vat_cents: number;
               coach_pay_cents: number; studio_keeps_cents: number };
 };
@@ -203,6 +207,10 @@ export default async function Sales({
             <> · <span className="num text-ink">{formatMoney(totals.gift_sold.total_cents, totals.currency)}</span>
               {" "}gift cards sold ({totals.gift_sold.count})</>
           )}
+          {totals.discounts && totals.discounts.count > 0 && (
+            <> · <span className="num text-ink">{formatMoney(totals.discounts.total_cents, totals.currency)}</span>
+              {" "}discounts given ({totals.discounts.count})</>
+          )}
           {totals.gift_redeemed && totals.gift_redeemed.count > 0 && (
             <> · <span className="num text-ink">{formatMoney(totals.gift_redeemed.total_cents, totals.currency)}</span>
               {" "}gift credit redeemed ({totals.gift_redeemed.count})</>
@@ -273,7 +281,12 @@ export default async function Sales({
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-ink-2">{s.payment_source}</td>
-                  <td className="num px-3 py-2.5 text-right">{formatMoney(s.amount_cents, s.currency)}</td>
+                  <td className="num px-3 py-2.5 text-right">
+                    {formatMoney(s.amount_cents, s.currency)}
+                    {pctOffLabel(s.discount_pct) && (
+                      <span className="block text-[11px] leading-4 text-ink-3">{pctOffLabel(s.discount_pct)}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-ink-2">{d(s.bought_on)}</td>
                   <td className="px-3 py-2.5 text-ink-2">{d(s.starts_on)}</td>
                   <td className="px-3 py-2.5 text-ink-2">{d(s.expires_on)}</td>

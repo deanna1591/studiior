@@ -1087,8 +1087,15 @@ reset role;
 update studio_settings
    set cancellation_cutoff_minutes = 720, peak_cutoff_reminder_minutes = 120
  where studio_id = '9eac9eac-0000-0000-0000-000000000001';
+-- Step 12: the class starts ON a studio-local hour, 12 to 13 hours out (inside
+-- the reminder's lead-up, 12 to 14 hours before the start). A raw now()+13h start
+-- landed at 23:59 Manila at some times of day, outside the half-open 00:00-23:59
+-- peak window below, and the booking spent no slot.
+select set_config('t.peak_start',
+  ((date_trunc('hour', (now() + interval '13 hours') at time zone 'Asia/Manila')) at time zone 'Asia/Manila')::text, false);
 update class_occurrences
-   set starts_at = now() + interval '13 hours', ends_at = now() + interval '13 hours 50 minutes'
+   set starts_at = current_setting('t.peak_start')::timestamptz,
+       ends_at = current_setting('t.peak_start')::timestamptz + interval '50 minutes'
  where id = '9eac9eac-0000-0000-0000-00000000e021';
 
 insert into class_occurrences (id, studio_id, location_id, class_type_id, room_id, name,
@@ -1096,7 +1103,8 @@ insert into class_occurrences (id, studio_id, location_id, class_type_id, room_i
 values ('9eac9eac-0000-0000-0000-0000000009d1','9eac9eac-0000-0000-0000-000000000001',
         '9eac9eac-0000-0000-0000-00000000000c','9eac9eac-0000-0000-0000-00000000cc01',
         null, 'Peak tomorrow', 10,
-        now() + interval '13 hours', now() + interval '13 hours 50 minutes', 'scheduled');
+        current_setting('t.peak_start')::timestamptz,
+        current_setting('t.peak_start')::timestamptz + interval '50 minutes', 'scheduled');
 -- Peak by the clock it actually starts at, rather than by hope. Replaced rather
 -- than widened, because two windows widened to the same hours collide on the
 -- unique index that exists to stop a double-clicked form.

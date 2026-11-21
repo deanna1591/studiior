@@ -186,7 +186,8 @@ declare
     'class_list_html','<li><a href="https://app.studiior.com/roster/x">Reformer Flow · Mon 15 Dec 07:00</a></li>',
     'reservation_line','','reservation_html','','fee','₱150','from_date','13 Nov',
     'deadline','7:00 PM on Sun 08 Nov','pay_url','https://ef-sa.studiior.app/class/x',
-    'cancel_url','https://ef-sa.studiior.app/class/x');
+    'cancel_url','https://ef-sa.studiior.app/class/x')
+    || jsonb_build_object('returned_line','The class credit is back on your Intro Pack.');
   k text; v_nid uuid; r record; v_n int := 0;
   v_keys text[] := array[
     'booking_confirmed','free_booking_confirmed','flex_booking_pending','flex_booking_confirmed',
@@ -195,7 +196,7 @@ declare
     'keep_renew_7','keep_renew_1','keep_renew_0','keep_lapsed_3','keep_credits_7','keep_credits_2',
     'keep_winback_30','keep_winback_60','keep_drifting','membership_expiring','credit_expiry',
     'product_order_paid','free_class_duplicate','booking_removed_by_studio','instructor_time_off',
-    'free_reservation_due','free_reservation_released'];
+    'free_reservation_due','free_reservation_released','credit_returned_by_studio'];
   -- retention_* are composer SEEDS (sent via the `retention` passthrough with the
   -- composer's rendered html, never rendered directly), so their text_body carries
   -- composer markup — not a directly-rendered template.

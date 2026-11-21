@@ -4,6 +4,9 @@ import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
 import { Icon } from "@/components/member/icons";
 import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
+import { planPrices } from "@/lib/plan-prices";
+import { withPrice } from "@/lib/promo";
+import { PriceAmount, PromoTagChip } from "@/components/price-tag";
 import { payeeNoticeLine } from "@/lib/payee-notice";
 import CreditApplied from "@/components/member/credit-applied";
 import { sortPlans } from "@/lib/plan-order";
@@ -31,7 +34,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   // the batch — it depended on nothing in it and was a needless extra wave,
   // exactly as /account already folds it in.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ live, all }, { data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }] =
+  const [{ live, all }, { data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }, prices] =
     await Promise.all([
       membershipState(supabase, ctx.memberId),
       supabase.from("credit_ledger")
@@ -63,6 +66,8 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       supabase.from("studio_settings").select("intro_offer_plan_id, intro_offer_exclusive")
         .eq("studio_id", ctx.studioId).maybeSingle(),
       supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
+      // Decision 117: every plan priced now, one call.
+      planPrices(supabase, ctx.studioId),
     ]);
   // Decision 66: a recurring membership can be renewed by hand online in its
   // last week, or while past-due inside Decision 4's grace (past_due IS the
@@ -248,6 +253,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
               const seat = seatOf.get(p.id);
               const full = !!seat?.is_full;
               if (full && seat?.on_limit_reached === "hide") return null;
+              const pp = withPrice(p, prices);
               const includes = p.type === "group"
                 ? [`${p.group_size ?? 2} people`, "one class together"]
                 : p.type === "class_pack"
@@ -273,13 +279,13 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                   )}
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="text-[16px] font-semibold leading-5 text-ink">{p.name}</h3>
-                    <span className="num shrink-0 text-[16px] font-semibold text-ink">
-                      {formatMoney(p.price_cents, p.currency)}
-                    </span>
+                    <PriceAmount priceCents={pp.price_cents} listCents={pp.list_cents} currency={p.currency}
+                                 promo={pp.promo} className="shrink-0 text-[16px] font-semibold text-ink" />
                   </div>
+                  {pp.promo && <PromoTagChip promo={pp.promo} className="mt-1.5" />}
                   {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
                   <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
-                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={p.price_cents} currency={p.currency} showNet />
+                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={pp.price_cents} currency={p.currency} showNet />
                   {/* Decision 40/66: buy online when the studio has Xendit — a
                       pack, drop-in, trial, or a recurring plan one period at a
                       time (renew by hand). Decision 62: show the intro-once

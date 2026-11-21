@@ -134,6 +134,8 @@ export function railGroups(
         ...(manager
           ? [
               { href: "/plans", label: "Plans" },
+              // Decision 117. A percent off chosen plans for a date range.
+              { href: "/settings/promotions", label: "Promotions" },
               // Decision 49. Every plan purchase, with the membership actions.
               { href: "/sales", label: "Sales" },
               // Decision 110. The studio's gift cards — resend, void.

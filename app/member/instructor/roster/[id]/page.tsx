@@ -1,3 +1,5 @@
+import { planPrices } from "@/lib/plan-prices";
+import { withPrice } from "@/lib/promo";
 import Link from "next/link";
 import { accentSolid } from "@/lib/accent-pair";
 import { instructorScreen } from "@/lib/instructor";
@@ -43,7 +45,7 @@ type Roster = {
  */
 export default async function RosterPage({ params }: { params: { id: string } }) {
   const { ctx, supabase } = await instructorScreen();
-  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }, { data: payData }, { data: planData }, { data: seatData }] = await Promise.all([
+  const [{ data, error }, { data: notesData }, { data: colleaguesData }, { data: settings }, { data: occRow }, { data: studio }, { data: payData }, { data: planData }, { data: seatData }, prices] = await Promise.all([
     supabase.rpc("instructor_roster", { p_occurrence_id: params.id }),
     // Decision 78c: a drifting member's heads-up + their usual class (null when
     // retention tasks are off; the reader is guarded to this class's instructor).
@@ -65,11 +67,13 @@ export default async function RosterPage({ params }: { params: { id: string } })
       .order("price_cents"),
     // Decision 103 (i): the reservation chip per free first class seat.
     supabase.rpc("occurrence_free_seat_states", { p_occurrence_id: params.id }),
+    // Decision 117: the plans priced now, so the desk charges the sale price.
+    planPrices(supabase, ctx.studio_id),
   ]);
   const seatState = new Map<string, SeatState>(
     ((seatData ?? []) as SeatState[]).map((x) => [x.booking_id, x]));
   const currency = studio?.currency ?? "USD";
-  const plans = (planData ?? []) as DeskPlan[];
+  const plans = ((planData ?? []) as DeskPlan[]).map((p) => withPrice(p, prices));
   const pay = new Map<string, { member_id: string; payment_source: string; paid: boolean; due_cents: number | null }>(
     ((payData ?? []) as { booking_id: string; member_id: string; payment_source: string; paid: boolean; due_cents: number | null }[])
       .map((p) => [p.booking_id, p]),

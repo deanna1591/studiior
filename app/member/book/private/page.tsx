@@ -1,3 +1,5 @@
+import { planPrices } from "@/lib/plan-prices";
+import { withPrice } from "@/lib/promo";
 import Link from "next/link";
 import { memberScreen } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
@@ -20,12 +22,19 @@ export default async function BookPrivate() {
 
   // Decision 116(c): the coach profiles (name, photo, bio, certifications) come
   // from the member-only reader; the private coach list decides who is shown.
-  const [{ data: types }, { data: coaches }, { data: profiles }] = await Promise.all([
+  const [{ data: types }, { data: coaches }, { data: profiles }, { data: packRows }, prices] = await Promise.all([
     supabase.rpc("private_session_types_for", { p_studio_id: ctx.studioId }),
     supabase.from("instructors").select("id, display_name, avatar_url")
       .eq("studio_id", ctx.studioId).eq("status", "active").eq("teaches_privates", true).order("display_name"),
     supabase.rpc("member_coaches", { p_studio_id: ctx.studioId }),
+    // Decision 117: the private packs, priced now, shown beside the pay step so a
+    // pack on sale carries its tag there.
+    supabase.from("membership_plans").select("id, name, price_cents, currency")
+      .eq("private_pack", true).eq("visibility", "public").eq("status", "active").order("sort_order"),
+    planPrices(supabase, ctx.studioId),
   ]);
+  const packs = ((packRows ?? []) as { id: string; name: string; price_cents: number; currency: string }[])
+    .map((p) => withPrice(p, prices));
   const byId = new Map(((profiles ?? []) as { id: string; first_name: string; display_name: string; avatar_url: string | null;
     bio: string | null; certifications: unknown }[]).map((p) => [p.id, p]));
   const list = (types ?? []) as { id: string; name: string; price_cents: number; people: number; duration_min: number }[];
@@ -60,6 +69,7 @@ export default async function BookPrivate() {
           timeZone={ctx.timeZone} timeFormat={ctx.timeFormat}
           packCredits={settings.privatePackCredits}
           creditCents={settings.reservationCreditCents}
+          packs={packs}
         />
       )}
     </MemberShell>

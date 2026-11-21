@@ -1,3 +1,5 @@
+import { planPrices } from "@/lib/plan-prices";
+import { withPrice } from "@/lib/promo";
 import { notFound } from "next/navigation";
 import { AppShell, Empty, NavLink } from "@/components/ui";
 import { staffScreen } from "@/lib/screen";
@@ -22,7 +24,7 @@ export default async function RecordPayment({ params }: { params: { id: string }
   const { ctx, supabase, shell } = screen;
 
   const [{ data: member }, { data: plans }, { data: unpaid }, { data: studio },
-         { data: seats }, { data: held }, { data: trialHeld }] =
+         { data: seats }, { data: held }, { data: trialHeld }, prices] =
     await Promise.all([
       supabase.from("members").select("id, first_name, last_name").eq("id", params.id).maybeSingle(),
       supabase.from("membership_plans")
@@ -49,6 +51,8 @@ export default async function RecordPayment({ params }: { params: { id: string }
       // refuses it, and the form says so before the sale is attempted.
       supabase.from("memberships").select("plan_id, membership_plans!inner(type)")
         .eq("member_id", params.id).eq("membership_plans.type", "trial").limit(1),
+      // Decision 117: the plans priced now, so the form pre-fills the sale price.
+      planPrices(supabase, ctx.studioId),
     ]);
 
   const seatOf = new Map((seats ?? []).map((r) => [r.plan_id, r]));
@@ -71,9 +75,10 @@ export default async function RecordPayment({ params }: { params: { id: string }
           memberId={params.id}
           currency={studio?.currency ?? "USD"}
           trialUsed={trialUsed}
-          plans={(plans ?? []).map((p) => ({
+          plans={(plans ?? []).map((p) => withPrice(p, prices)).map((p) => ({
             id: p.id, name: p.name, type: p.type,
             price_cents: p.price_cents, currency: p.currency,
+            list_cents: p.list_cents, promo: p.promo,
             seats: seatOf.has(p.id)
               ? {
                   cap: seatOf.get(p.id)!.cap,

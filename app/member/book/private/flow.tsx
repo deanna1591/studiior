@@ -1,5 +1,8 @@
 "use client";
 
+import { PriceAmount, PromoTagChip } from "@/components/price-tag";
+import type { PlanPrice } from "@/lib/promo";
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { accentSolid, accentChip } from "@/lib/accent-pair";
 import { fmtClock } from "@/lib/clock";
@@ -28,10 +31,12 @@ function localMidnight(timeZone: string, d: number): Date {
 }
 
 export default function PrivateFlow({
-  types, coaches, timeZone, timeFormat, packCredits, creditCents,
+  types, coaches, timeZone, timeFormat, packCredits, creditCents, packs = [],
 }: {
   types: T[]; coaches: Coach[]; timeZone: string; timeFormat: "24h" | "12h";
   packCredits: number; creditCents: number;
+  /** Decision 117: the private packs priced now (a sale shows its tag). */
+  packs?: { id: string; name: string; price_cents: number; list_cents: number; currency: string; promo: PlanPrice | null }[];
 }) {
   const [typeId, setTypeId] = useState<string>(types[0]?.id ?? "");
   // Decision 116(b): the coach filter (null = all coaches) and the coach the
@@ -261,6 +266,27 @@ export default function PrivateFlow({
           {creditCovers ? "Your account credit covers it, so there's nothing to pay." : "Card or GCash, on the next screen."}
         </p>
       </div>
+      {/* Decision 117: private packs, for a 1:1 session. A pack on sale shows the
+          struck list price and its tag; the single session price never does. */}
+      {t?.people === 1 && packs.length > 0 && (
+        <section>
+          <h2 className="section-label mb-2 text-ink-2">Or buy a private pack</h2>
+          <ul className="space-y-2">
+            {packs.map((p) => (
+              <li key={p.id}>
+                <Link href={`/buy/${p.id}`} className="m-card m-press flex items-center justify-between gap-3 p-4">
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-semibold leading-5 text-ink">{p.name}</span>
+                    {p.promo && <PromoTagChip promo={p.promo} className="mt-1" />}
+                  </span>
+                  <PriceAmount priceCents={p.price_cents} listCents={p.list_cents} currency={p.currency}
+                               promo={p.promo} className="shrink-0 text-[15px] font-semibold text-ink" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {profileId && (
         <CoachProfile coach={coaches.find((c) => c.id === profileId) ?? null} onClose={() => setProfileId(null)} />
       )}

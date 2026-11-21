@@ -181,6 +181,14 @@ export default async function MemberDetail({
       ...e,
     }));
 
+  // Decision 36(a): the late cancellations on the journey carry the Return
+  // credit sheet (desk-up). One read for their seat kinds and returns.
+  const lateIds = journey.filter((e) => e.kind === "late_cancelled" && e.booking_id).map((e) => e.booking_id as string);
+  const { data: lateRows } = desk && lateIds.length
+    ? await supabase.rpc("late_cancel_returns", { p_studio_id: ctx.studioId, p_booking_ids: lateIds })
+    : { data: [] as { booking_id: string; seat_kind: string; returned_at: string | null; returned_by: string | null }[] };
+  const lateStates = Object.fromEntries((lateRows ?? []).map((r) => [r.booking_id, r]));
+
   // Goal progress is computed, never read off member_goals.current_value —
   // that column has never been written and every goal read "0 of 12".
   //
@@ -513,7 +521,8 @@ export default async function MemberDetail({
               <Empty>Nothing recorded yet. Their first visit will start this off.</Empty>
             ) : (
               <>
-                <TimelineList events={journey.slice(0, JOURNEY_SHOWN)} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} memberId={params.id} manager={manager} currency={ctx.currency} />
+                <TimelineList events={journey.slice(0, JOURNEY_SHOWN)} timeZone={ctx.timeZone} timeFormat={ctx.timeFormat} memberId={params.id} manager={manager} currency={ctx.currency}
+                              lateStates={desk ? lateStates : undefined} firstName={mm.first_name || "This member"} />
                 {journey.length > JOURNEY_SHOWN && (
                   <p className="mt-3 text-[12px] leading-4 text-ink-3">
                     <span className="num">{journey.length - JOURNEY_SHOWN}</span> earlier
