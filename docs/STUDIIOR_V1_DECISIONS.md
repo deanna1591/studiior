@@ -823,6 +823,10 @@ On the class sheet, for one occurrence only and before its cut-off, a manager or
 
 ---
 
+## 30 (f) — The free class picker uses the member class card (amendment, recorded 22 Nov 2026)
+
+While a member still has their free first class, the Book tab lists classes with the same card every other member sees: time range, the tier chip (Always runs, Needs {min} to run, Needs {n} more to run, Confirmed), class name, coach and room, duration and places left, coach photo, and one round button reading "Book for free" on every row (no asterisk). The long "Book free, your {fee} credit covers the reservation" strip leaves the list; the header line keeps explaining the reservation fee. The class page is unchanged: it keeps the credit box and the long button for a member with credit, and the reserve step for a member without. Found 22 Nov: the picker drew its own small rows and showed no chip at all on some classes. Status: settled, to build. Deanna, 22 Nov 2026.
+
 ## 30 (e) — Free class on a flex class (amendment, recorded 17 Nov 2026)
 
 A manager or owner can allow one free first class booking on a flex class from the staff booking sheet with the switch 'Allow this free class on a flex class'. The class stays flex, the seat counts toward the minimum like any other, the member is told the class only runs if it reaches its minimum and gets the normal flex notices, and an audit row `booking.free_on_flex` is written. The reservation fee rules apply as on a core class.
