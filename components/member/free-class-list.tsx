@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import Avatar from "@/components/member/avatar";
+import ClassCard from "@/components/member/class-card";
 import { accentSolid } from "@/lib/accent-pair";
 import { useMemo, useState, useTransition } from "react";
 import { fmtTime, zonedDateKey } from "@/lib/time";
-import { FREE_PICKER_HEADING, freePickerSubline } from "@/lib/free-picker";
+import { FREE_PICKER_HEADING, FREE_PICKER_BUTTON, freePickerSubline, freePickerTier } from "@/lib/free-picker";
 import type { BookResult } from "@/app/member/actions";
 import type { TimeFormat } from "@/lib/time";
-import { FlexChip } from "@/components/member/flex-chip";
 
 type FreeClass = {
-  occurrence_id: string; name: string; starts_at: string; room_name: string | null;
+  occurrence_id: string; name: string; starts_at: string; duration_min?: number | null; room_name: string | null;
   instructor_first: string | null; instructor_avatar: string | null;
   headcount: number; capacity: number; free_bookable: boolean;
   /** Decision 22(f): the flex state, for the chip beside the time. */
@@ -23,15 +22,15 @@ type FreeClass = {
  * Decision 55 — the free booker's day strip (replacing the Decision 30 amendment
  * flat list). Only eligible classes come in; they are grouped by studio-local
  * day. The strip marks (a dot) every day with one and opens on the first such
- * day; a day with none shows the "try another day" line. Each row: time (per the
- * studio's format), class, instructor, room, a "{n} going" chip, and Book free;
+ * day; a day with none shows the "try another day" line. Each row is the member
+ * class card (Decision 30 f) with its tier chip and one "Book for free" button;
  * a cap-full class is muted and unbookable. The member picks their one free
  * class; once booked they are no longer eligible and the picker disappears.
  */
 export default function FreeClassList({
   classes, timeZone, timeFormat = "24h", bookFirstFree,
-  heading, fullTimetableHref, initialDayKey, reservationFeeLabel = null, creditCoversFee = false,
-  coreOnly = false,
+  heading, fullTimetableHref, initialDayKey, reservationFeeLabel = null,
+  coreOnly = false, guaranteesEnabled = false,
 }: {
   classes: FreeClass[]; timeZone: string; timeFormat?: TimeFormat;
   bookFirstFree: (p: BookResult, f: FormData) => Promise<BookResult>;
@@ -43,10 +42,12 @@ export default function FreeClassList({
   // "Book free, {fee} to reserve" and routes to the reservation checkout instead
   // of booking directly.
   reservationFeeLabel?: string | null;
-  creditCoversFee?: boolean;
   // Decision 30 amendment: the studio limits the free first class to core
   // classes, so the line reads "These classes always run."
   coreOnly?: boolean;
+  // Decision 30 (f): a core row reads "Always runs" only when the studio runs
+  // guarantees, the same rule as the Book timetable.
+  guaranteesEnabled?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [booked, setBooked] = useState<string | null>(null);
@@ -162,76 +163,54 @@ export default function FreeClassList({
           No free-class slots this day. Try another day.
         </p>
       ) : (
-        <ul className="space-y-2">
+        // Decision 30 (f): every row is the member class card Book uses, with
+        // its tier chip, and one round "Book for free" button. A fee routes the
+        // tap to the reservation step; the class page keeps the credit box.
+        <ul className="space-y-3">
           {rows.map((c) => {
             const isBooked = booked === c.occurrence_id;
-            const muted = !c.free_bookable;
+            const tier = freePickerTier(c, { guaranteesEnabled });
+            const mins = Number(c.duration_min) || 0;
+            const end = mins ? new Date(new Date(c.starts_at).getTime() + mins * 60_000).toISOString() : null;
+            const left = Math.max(0, (c.capacity ?? 0) - (c.headcount ?? 0));
+            const btnStyle = tier.alwaysRuns
+              ? { background: "transparent", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" }
+              : { background: "var(--accent-chip)", color: "var(--ink)" };
+            const btnClass = "m-tap m-press flex w-full items-center justify-center rounded-full px-4 text-center text-[13px] font-bold disabled:opacity-60";
+            const action = isBooked || !c.free_bookable ? null
+              : reservationFeeLabel ? (
+                <Link href={`/reserve/${c.occurrence_id}`} className={btnClass} style={btnStyle}>
+                  {FREE_PICKER_BUTTON}
+                </Link>
+              ) : (
+                <button type="button" onClick={() => book(c.occurrence_id)} disabled={pending}
+                        className={btnClass} style={btnStyle}>
+                  {pending ? "…" : FREE_PICKER_BUTTON}
+                </button>
+              );
             return (
-              // The whole row opens the class page (same detail as a regular
-              // booking row); the inline Book-free button sits above the overlay
-              // link and books directly. A form/button cannot nest in an anchor,
-              // so the link is an absolute overlay.
-              // Decision 103(c): a column, not a row — the action sits on its own
-              // full-width line BELOW the text so the class name, coach and studio
-              // never truncate and the time stays on one line.
-              <li key={c.occurrence_id}
-                  className="relative flex flex-col gap-2.5 rounded-2xl bg-surface px-3.5 py-3"
-                  style={{ boxShadow: "0 1px 3px rgb(26 21 18 / 0.06), 0 6px 20px rgb(26 21 18 / 0.05)",
-                           opacity: muted && !isBooked ? 0.72 : 1 }}>
-                <Link href={`/class/${c.occurrence_id}`} className="absolute inset-0 rounded-2xl"
-                      aria-label={`Open ${c.name}`} />
-                {/* Decision 22(d): the time on its own line, the class name
-                    wrapping (never truncated), the coach photo a fixed 40px
-                    circle at the top right. Checked at 360px font scale 1.3. */}
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="num text-[15px] font-semibold text-ink">
-                      {fmtTime(c.starts_at, timeZone, timeFormat)}
-                      {c.occ_flex && (
-                        <FlexChip className="ml-2 align-middle" state={{
-                          tier: "flex", paid: c.occ_paid_count, min: c.occ_min,
-                          reached: c.occ_reached_minimum, committed: c.occ_committed }} />
-                      )}
-                    </p>
-                    <p className="m-body mt-0.5 break-words text-ink">{c.name}</p>
-                    <div className="m-micro mt-0.5 flex flex-wrap items-center gap-1.5 text-ink-3">
-                      <span className="break-words">{[c.instructor_first, c.room_name].filter(Boolean).join(" · ")}</span>
-                      {c.headcount > 0 && (
-                        <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                              style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-                          {c.headcount} going
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {c.instructor_first && (
-                    <span className="shrink-0"><Avatar name={c.instructor_first} url={c.instructor_avatar} size={40} /></span>
-                  )}
-                </div>
-                {isBooked ? (
-                  // Decision 21 amendment (20 Oct 2026): plain words. A free seat
-                  // is provisional with no fixed deadline — it confirms once the
-                  // class is on.
-                  <span className="relative z-10 text-[12.5px] font-medium text-ink-2">Booked · we&rsquo;ll confirm once the class is on</span>
-                ) : c.free_bookable && reservationFeeLabel ? (
-                  // Decision 103: the fee is on — go to the reservation checkout.
-                  <Link href={`/reserve/${c.occurrence_id}`}
-                        className="m-press relative z-10 w-full rounded-full px-3.5 py-2 text-center text-[13px] font-semibold"
-                        style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-                    {creditCoversFee
-                      ? <>Book free, your {reservationFeeLabel} credit covers the reservation</>
-                      : <>Book free, {reservationFeeLabel} to reserve</>}
-                  </Link>
-                ) : c.free_bookable ? (
-                  <button onClick={() => book(c.occurrence_id)} disabled={pending}
-                          className="m-press relative z-10 w-full rounded-full px-3.5 py-2 text-center text-[13px] font-semibold disabled:opacity-60"
-                          style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>
-                    {pending ? "…" : "Book free"}
-                  </button>
-                ) : (
-                  <span className="relative z-10 text-[12px] text-ink-3">Full for free classes</span>
-                )}
-              </li>
+              <ClassCard
+                key={c.occurrence_id}
+                href={`/class/${c.occurrence_id}`}
+                startLabel={fmtTime(c.starts_at, timeZone, timeFormat)}
+                endLabel={end ? fmtTime(end, timeZone, timeFormat) : null}
+                durationLabel={mins ? `${mins} min` : ""}
+                name={c.name}
+                instructor={c.instructor_first}
+                coachAvatar={c.instructor_avatar}
+                room={c.room_name}
+                statusLabel={isBooked
+                  // Decision 21 amendment: a free seat confirms once the class is on.
+                  ? <>Booked · we&rsquo;ll confirm once the class is on</>
+                  : !c.free_bookable ? "Full for free classes"
+                  : <><span className="num">{left}</span> left</>}
+                statusTone={isBooked ? "booked" : !c.free_bookable ? "full" : "quiet"}
+                action={action}
+                stackAction
+                booked={isBooked}
+                alwaysRuns={tier.alwaysRuns}
+                flexState={tier.flexState}
+              />
             );
           })}
         </ul>

@@ -592,8 +592,7 @@ export default async function Book({
           initialDayKey={freeDeepLinkDay}
           reservationFeeLabel={settings.memberFeeCents > 0
             ? formatMoney(settings.memberFeeCents, settings.currency) : null}
-          creditCoversFee={settings.memberFeeCents > 0
-            && settings.reservationCreditCents >= settings.memberFeeCents}
+          guaranteesEnabled={settings.guaranteesEnabled}
         />
       ) : (
       <>

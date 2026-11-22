@@ -36,3 +36,31 @@ test("no em dashes on the picker copy", () => {
     assert.ok(!s.includes("—"), `em dash in: ${s}`);
   }
 });
+
+// Decision 30 (f): the picker row uses the class card, one "Book for free"
+// button, and the same chip table every member sees.
+import { FREE_PICKER_BUTTON, freePickerTier } from "../lib/free-picker.mjs";
+import { memberFlexChip } from "../lib/flex-state.mjs";
+
+test("30(f): the picker button reads Book for free, no asterisk", () => {
+  assert.equal(FREE_PICKER_BUTTON, "Book for free");
+  assert.ok(!FREE_PICKER_BUTTON.includes("*"));
+});
+
+test("30(f): a core row reads Always runs; flex rows read the chip table", () => {
+  const chip = (row) => {
+    const t = freePickerTier(row, { guaranteesEnabled: true });
+    if (t.alwaysRuns) return "Always runs";
+    return memberFlexChip(t.flexState)?.label ?? null;
+  };
+  assert.equal(chip({ occ_flex: false }), "Always runs");
+  assert.equal(chip({ occ_flex: true, occ_paid_count: 0, occ_min: 2 }), "Needs 2 to run");
+  assert.equal(chip({ occ_flex: true, occ_paid_count: 1, occ_min: 2 }), "Needs 1 more to run");
+  assert.equal(chip({ occ_flex: true, occ_paid_count: 1, occ_min: 2, occ_reached_minimum: true }), "Confirmed");
+});
+
+test("30(f): a core row shows nothing when the studio does not run guarantees", () => {
+  const t = freePickerTier({ occ_flex: false }, { guaranteesEnabled: false });
+  assert.equal(t.alwaysRuns, false);
+  assert.equal(t.flexState, null);
+});
