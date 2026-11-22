@@ -842,7 +842,7 @@ function Invitation(p: StyleProps) {
                   <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><b style={{ fontFamily: t.mono, fontWeight: 700, fontSize: Math.round(20 * scale), color: t.ink, marginRight: 8 }}>{r.time}</b>{r.text} <i style={{ fontStyle: "normal", color: t.secondary }}>{r.sub}</i></span>
                   {showSpots && <SpotsPill n={r.spots} t={t} fontSize={Math.round(20 * scale)} />}
                 </div>))}
-          {showLegend && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>{flexLegend(p.flexMin)} ♡</div>}
+          {showLegend && flexLegend(p.flexMin) && <div style={{ fontFamily: t.hand, fontSize: 30, color: t.secondary, margin: "22px 0 26px" }}>{flexLegend(p.flexMin)} ♡</div>}
           {!showLegend && <div style={{ height: 22 }} />}
           <div style={{ display: "flex", gap: 16 }}>
             <span style={{ borderRadius: 999, padding: "18px 40px", fontSize: 24, fontWeight: 800, background: t.accent, color: t.onAccent }}>{footer}</span>

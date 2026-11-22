@@ -63,5 +63,5 @@ export type WeekRow = { icon: string; time: string; name: string; coach: string;
 export type WeekGroup = { label: string; classes: WeekRow[] };
 export declare function weekRows(days: PostDay[], opts?: { coachMode?: boolean }): WeekGroup[];
 export declare function anyFlex(days: PostDay[]): boolean;
-export function flexLegend(flexMin: number | null | undefined): string;
+export function flexLegend(flexMin: number | null | undefined): string | null;
 export function needsNote(c: { needs?: number | null } | null | undefined): string | null;

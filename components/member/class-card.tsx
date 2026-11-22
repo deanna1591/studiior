@@ -54,8 +54,8 @@ export default function ClassCard({
    *  the studio accent at 0.12 and adds an "Always runs" chip at the end of the
    *  first line. Only passed when the studio runs guarantees. */
   alwaysRuns?: boolean;
-  /** Decision 22(f): a flex class's state ("Be the first", "Needs 1 more",
-   *  "Running"), shown next to the time. Null for core and for no flex. */
+  /** Decision 22(f): a flex class's state ("Needs {min} to run",
+   *  "Needs 1 more to run", "Confirmed"), shown next to the time. Null for core and for no flex. */
   flexState?: FlexChipInput | null;
   /** Decision 103(c): when the action label is more than one word, or the row
    *  is booked/held/owes a fee, the action sits on its own full-width line

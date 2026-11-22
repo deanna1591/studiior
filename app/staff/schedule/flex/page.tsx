@@ -26,7 +26,7 @@ function StateChip({ p }: { p: Pending }) {
   if (chip.kind === "running") {
     return (
       <span className="rounded-full px-1.5 text-[12px] font-semibold"
-            style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>Running</span>
+            style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}>Confirmed</span>
     );
   }
   return <span className="num text-ink-2">{chip.text}</span>;

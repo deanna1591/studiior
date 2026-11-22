@@ -108,8 +108,8 @@
         "color:var(--sd-accent-ink);border:1px solid color-mix(in srgb,var(--sd-accent) 45%,#fff);",
         "border-radius:999px;padding:1px 8px;}",
       // Decision 22(f): a flex class's state, the same words the member app uses.
-      // Running is green whatever the accent (#1D6630 on #E1F1DD is 5.95);
-      // "Needs 1 more" is ink on the accent at 16%; "Be the first" is quiet.
+      // Confirmed is green whatever the accent (#1D6630 on #E1F1DD is 5.95);
+      // "Needs 1 more to run" is ink on the accent at 16%; "Needs {min} to run" is quiet.
       P+".sd-fx{display:inline-flex;align-items:center;margin-top:5px;font-family:",FONT,";",
         "font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:none;line-height:1.3;",
         "border-radius:999px;padding:1px 8px;}",
@@ -293,9 +293,9 @@
   function flexChip(c) {
     if (!c.flex) return null;
     var p = Math.max(0, c.paid_count || 0), m = Math.max(0, c.min_bookings || 0);
-    if (c.committed || c.reached_minimum || p >= m) return { label: "Running", tone: "running" };
-    if (p === 0) return { label: "Be the first", tone: "first" };
-    return { label: "Needs " + (m - p) + " more", tone: "needs" };
+    if (c.committed || c.reached_minimum || p >= m) return { label: "Confirmed", tone: "running" };
+    if (p === 0) return { label: "Needs " + m + " to run", tone: "first" };
+    return { label: "Needs " + (m - p) + " more to run", tone: "needs" };
   }
 
   function renderSchedule() {

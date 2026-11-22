@@ -2,8 +2,9 @@ import { memberFlexChip } from "@/lib/flex-state";
 
 /**
  * Decision 22(f): the one chip for a class's state on member screens. "Always
- * runs" (core), "Running" (green), "Needs {n} more" (the invitation, ink on the
- * accent chip) or "Be the first" (quiet). The wording comes from
+ * runs" (core), "Confirmed" (green; "Confirmed to run" with long, the class page
+ * header), "Needs {n} more to run" (the invitation, ink on the accent chip) or
+ * "Needs {min} to run" (quiet), {min} being the class's own flex minimum. The wording comes from
  * memberFlexChip, so every surface says the same thing.
  */
 export type FlexChipInput = {
@@ -18,11 +19,11 @@ const STYLE: Record<string, React.CSSProperties> = {
   first:   { background: "var(--surface)", color: "var(--ink-2)", boxShadow: "inset 0 0 0 1px var(--line)" },
 };
 
-export function FlexChip({ state, className = "" }: { state: FlexChipInput; className?: string }) {
+export function FlexChip({ state, className = "", long = false }: { state: FlexChipInput; className?: string; long?: boolean }) {
   const chip = memberFlexChip({
     tier: state.tier, paid: state.paid ?? 0, min: state.min ?? 0,
     reached: state.reached, committed: state.committed,
-    isPrivate: state.isPrivate, hidden: state.hidden,
+    isPrivate: state.isPrivate, hidden: state.hidden, long,
   });
   if (!chip) return null;
   return (

@@ -194,7 +194,7 @@ export default async function Book({
       // Decision 103(d) pay-to-keep: existing free bookings that owe the fee.
       supabase.rpc("member_reservation_dues", { p_studio_id: ctx.studioId }),
       // Decision 22(f): each flex class's state (the count the running latch
-      // uses), so a row reads "Be the first", "Needs 1 more" or "Running".
+      // uses), so a row reads "Needs {min} to run", "Needs 1 more to run" or "Confirmed".
       // Only flex classes come back. Same batch, no extra hop.
       supabase.rpc("member_flex_states", {
         p_studio_id: ctx.studioId,

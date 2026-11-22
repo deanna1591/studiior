@@ -662,7 +662,7 @@ export default function ScheduleCalendar({
         if (event.standalone)
           bits.push(<span key="alone" title="Nothing else of this instructor's within 90 minutes">On its own</span>);
         // Decision 22(e): the flex state chip. "{paid} of {min}" (", n unpaid") in
-        // grey until the minimum is reached, then a green "Running". The block
+        // grey until the minimum is reached, then a green "Confirmed". The block
         // colour stays staffing.
         if (event.effectiveFlex && !event.isPrivate) {
           const chip = flexStateChip({
@@ -673,7 +673,7 @@ export default function ScheduleCalendar({
           if (chip.kind === "running")
             bits.push(<span key="flexstate" className="rounded-full px-1.5 font-semibold"
               style={{ background: "var(--lime-tint)", color: "var(--lime-text)" }}
-              title="Reached its minimum, so it runs">Running</span>);
+              title="Reached its minimum, so it runs">Confirmed</span>);
           else if (chip.kind === "count")
             bits.push(<span key="flexstate" className="num text-ink-2"
               title="Paid seats towards the flex minimum">{chip.text}</span>);

@@ -5,5 +5,5 @@ export function flexStateChip(a: {
 export function cancellationCauseLabel(cause: string | null | undefined): string | null;
 export function memberFlexChip(a: {
   tier: string | null | undefined; paid: number | null | undefined; min: number | null | undefined;
-  reached?: boolean | null; committed?: boolean | null; isPrivate?: boolean; hidden?: boolean;
+  reached?: boolean | null; committed?: boolean | null; isPrivate?: boolean; hidden?: boolean; long?: boolean;
 }): { label: string; tone: "core" | "running" | "needs" | "first" } | null;

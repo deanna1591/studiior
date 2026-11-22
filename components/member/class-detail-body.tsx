@@ -212,7 +212,7 @@ export default function ClassDetailBody({
           {fmtTime(occ.starts_at, timeZone, timeFormat)}
           {occ.ends_at && <> – {fmtTime(occ.ends_at, timeZone, timeFormat)}</>}
         </span>
-        {flexState && <FlexChip state={flexState} />}
+        {flexState && <FlexChip state={flexState} long />}
         {mins && (
           <span className="rounded-full px-2 py-0.5 text-[11px] leading-4 text-ink-2" style={{ background: "var(--accent-chip)" }}>
             <span className="num">{mins}</span> mins

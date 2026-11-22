@@ -471,8 +471,10 @@ test("amendment: photo fallback returns ok with background_image when the reply 
 import { flexLegend, needsNote } from "../lib/schedule-post.mjs";
 
 test("22(f): the posts legend and the one-short note", () => {
-  assert.equal(flexLegend(2), "✦ always runs · ○ needs 2 to run, be one of them");
-  assert.equal(flexLegend(null), "✦ always runs · ○ needs 1 to run, be one of them");
+  assert.equal(flexLegend(2), "✦ always runs · ○ needs 2 to run");
+  assert.equal(flexLegend(3), "✦ always runs · ○ needs 3 to run");
+  assert.equal(flexLegend(null), null);
+  assert.equal(flexLegend(0), null);
   assert.equal(needsNote({ needs: 1 }), "needs 1 more");
   assert.equal(needsNote({ needs: 2 }), null);
   assert.equal(needsNote({ needs: null }), null);
