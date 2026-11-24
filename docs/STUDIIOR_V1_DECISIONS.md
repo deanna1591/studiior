@@ -551,6 +551,14 @@ Each roster row that is booked and not checked in shows "Mark no-show" once the 
 
 ---
 
+## 108 (c) — The daily check respects settled lines (recorded 25 Nov 2026)
+
+Both pay items in daily_money_check, the older "line differs from its basis" and the newer "line differs from 75 (l)", skip any pay line that carries a pay.line_corrected, pay.line_voided or pay.line_restored audit: a line someone deliberately settled is not a mistake. Both judge a class by its tier at decision time, the tier recorded on the pay line (or the occurrence's tier pin when the line records none), never by today's tier, so a class that was core when it was decided and whose series is flex today is checked as core. When the tier at decision time differs from today's, the 75 (l) comparison against a fresh calculation is not made and the line is checked against its own recorded basis instead. The two items share one helper, so they cannot disagree about which lines are settled or which tier applies.
+
+**Status:** settled, to build in Step 13b. **Amends:** Decision 108 (b). Deanna, 25 Nov 2026.
+
+---
+
 ## 108 (b) — The daily check catches pay mistakes (amendment, recorded 25 Nov 2026)
 
 daily_money_check no longer lets one null item line wipe the list (member-less payments such as gift cards are excluded from "payment attached to nothing" and every item line is coalesced). New items: a class that ran with no pay line; a pay line whose amount differs from 75(l); an always-runs class past its start never committed; a cancelled or not-run class carrying pay that 75(l) says is ₱0; a held pay line older than 3 days.
