@@ -27,8 +27,23 @@ The seven modules — Scheduling & Booking · Member CRM · Memberships & Paymen
 
 ## Current state
 
-Two hundred and forty-two migrations, applying clean from `supabase db reset`:
+Two hundred and forty-three migrations, applying clean from `supabase db reset`:
 
+- **370 (`20260833700000`), 25 Nov 2026: Step 13b, Decision 108 (c), the daily check respects settled lines.**
+  - **The helper:** new `pay_line_review_run(line)` (service-only) returns {settled, decision_tier, today_tier, basis_expected}:
+    - settled: the line has a `pay.line_corrected`, `pay.line_voided` or `pay.line_restored` audit;
+    - the tier at decision time is the one recorded on the line (`basis.tier`), else the occurrence pin, else today's.
+  - **`daily_money_check`** is re-issued from 369 with only items 12 and 12b changed:
+    - both read the helper and skip settled lines;
+    - item 12 checks the recorded basis at the decision-time tier;
+    - item 12b (the 75 (l) comparison) is made only when the decision tier equals today's tier, so a class that was core when decided and is flex today is judged by its basis, never by today's tier.
+  - **Tests:** `pay_timing_test` +8, covering:
+    - a corrected, a voided and a restored line are not flagged;
+    - a class that was core at decision and is flex today, paid ₱400, is not flagged;
+    - a genuinely wrong line is still flagged by both items.
+
+    Teeth: with 369's check, "a corrected line is not flagged" fails.
+  - Anon stays EXACTLY FOURTEEN.
 - **369 (`20260833690000`), 24 Nov 2026: Step 13a, pay follows the term sheet (Decisions 75 (l), 31 (a), 21 (f), 75 (k), 108 (b)), plus Mark no-show.** The source is `docs/RPC_INSTRUCTOR_TERM_SHEET_2026.md` (sections 3, 4 and 7). Two differences from the term sheet are Deanna's decisions of 24 Nov and are recorded under 75 (l) and 31 (a): a studio-cancelled flex class pays ₱0, and pay settles on the 15th and month-end, with the conversion bonus paid at month-end only.
   - **75 (l), the pay rules:**
     - `compute_class_pay_run` pays heads = greatest(cutoff count, start count, `class_seats_used_run`). Seats used are distinct members who attended or cancelled late, plus booked or no-show seats that are not provisional and not unpaid drop-ins (Decision 81b).

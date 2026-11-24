@@ -417,6 +417,53 @@ select expect_eq('a finalised line that differs from 75 (l) is listed (2 at the 
   (select count(*)::text from jsonb_array_elements_text(daily_money_check('13a00000-0000-0000-0000-0000000000a0') -> 'items') i
     where i like '%T10%but the rules give%'), '1');
 
+-- --- 108 (c): settled lines and the tier at decision time ----------------------
+-- Five not-run classes, each with a crafted pay line in the open period. Every
+-- one would be flagged on its own amount; the audit or the decision tier is the
+-- only thing that should keep T71 to T74 off the list.
+do $$
+declare k int; o uuid; v_period uuid; v_line uuid;
+begin
+  select period_id into v_period from instructor_pay_records
+   where occurrence_id = '13a00000-0000-0000-0000-00000000c003' and type = 'class';
+  for k in 71..75 loop
+    -- T74 is flex today (its series changed); the rest are core today.
+    o := t_occ(k, t_past(k), case when k = 74 then 'flex' else 'core' end, 'cancelled', false, 0, 'unmet_minimum');
+    delete from instructor_pay_records where occurrence_id = o and type = 'class';
+    insert into instructor_pay_records (studio_id, instructor_id, period_id, type, occurrence_id, amount_cents, currency, basis, confirmed_at, confirm_method)
+    values ('13a00000-0000-0000-0000-0000000000a0', '13a00000-0000-0000-0000-0000000a00c1', v_period, 'class', o,
+            case k when 74 then 40000 when 75 then 90000 else 0 end, 'PHP',
+            jsonb_build_object('kind','group','outcome','not_running','tier','core','base_cents',90000,
+                               'holding_model','flat','holding_flat_cents',40000,'holding_pct',0),
+            now(), 'auto')
+    returning id into v_line;
+    if k in (71,72,73) then
+      insert into audit_logs (studio_id, action, entity_table, entity_id, before, after)
+      values ('13a00000-0000-0000-0000-0000000000a0',
+              case k when 71 then 'pay.line_corrected' when 72 then 'pay.line_voided' else 'pay.line_restored' end,
+              'instructor_pay_records', v_line, '{}'::jsonb, '{}'::jsonb);
+    end if;
+  end loop;
+end $$;
+create temp table t_dmc as
+  select i from jsonb_array_elements_text(daily_money_check('13a00000-0000-0000-0000-0000000000a0') -> 'items') i;
+select expect_eq('108 (c): a corrected line is not flagged',  (select count(*)::text from t_dmc where i like '%T71 %'), '0');
+select expect_eq('108 (c): a voided line is not flagged',     (select count(*)::text from t_dmc where i like '%T72 %'), '0');
+select expect_eq('108 (c): a restored line is not flagged',   (select count(*)::text from t_dmc where i like '%T73 %'), '0');
+select expect_eq('108 (c): core at decision, flex today, paid ₱400 is not flagged',
+  (select count(*)::text from t_dmc where i like '%T74 %'), '0');
+select expect_eq('108 (c): the helper reads T74 at its decision tier (core) while today it is flex',
+  (select (r ->> 'decision_tier') || '/' || (r ->> 'today_tier') || '/' || (r ->> 'basis_expected')
+     from instructor_pay_records ipr cross join lateral pay_line_review_run(ipr.id) r
+    where ipr.occurrence_id = '13a00000-0000-0000-0000-00000000c074'), 'core/flex/40000');
+select expect_eq('108 (c): a genuinely wrong line (₱900 on a core class nobody booked) is still flagged by its basis',
+  (select count(*)::text from t_dmc where i like '%T75 %but its basis gives%'), '1');
+select expect_eq('108 (c): and by the 75 (l) rules',
+  (select count(*)::text from t_dmc where i like '%T75 %but the rules give%'), '1');
+select expect_eq('108 (c): without the audit, T71''s twin would have been flagged (T75 is flagged, so the audit is what clears T71)',
+  (select count(*)::text from t_dmc where i like '%T75 %'), '2');
+drop table t_dmc;
+
 -- --- the anon surface ------------------------------------------------------------
 select expect_eq('anon surface stays EXACTLY FOURTEEN',
   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace

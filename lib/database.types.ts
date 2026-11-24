@@ -11195,6 +11195,7 @@ export type Database = {
         Args: { p_occurrence_id: string; p_reason: string }
         Returns: Json
       }
+      pay_line_review_run: { Args: { p_line_id: string }; Returns: Json }
       pay_period_export: { Args: { p_period_id: string }; Returns: Json }
       pay_settle_on: {
         Args: { p_dow: number; p_ends_on: string; p_offset_days: number }
