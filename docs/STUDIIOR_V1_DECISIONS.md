@@ -515,6 +515,50 @@ On approval staff choose one of two things, and both are Decision 17's machinery
 
 ---
 
+## 75 (l) — Instructor pay follows the term sheet (amendment, recorded 25 Nov 2026)
+
+Pay basis: heads = the greater of (booked at the cut-off) and (seats used: checked in, no-show, late cancel inside the cut-off, and anyone added after the cut-off who takes the class, including walk-ins). Not heads: on-time cancels, moved bookings, unpaid holds or provisional free seats released by the system. Rates (Reform's rate card): 1 or 2 heads ₱900, 3 ₱975, 4 ₱1,050, 5 ₱1,125, full house (heads reach capacity) ₱1,400 TOTAL (a fixed total, not a bonus on top). Did not run: core class with nobody booked at the cut-off ₱400 holding fee; flex class under its minimum at the flex cut-off ₱0; flex class that confirmed and then lost every booking and did not run ₱0. A core class that confirmed keeps its pay at the cut-off count even if everyone cancels late. Studio cancellation (brownout, broken machine, studio booking error): core ₱900 base, flex ₱0. Typhoon or government suspension (force majeure, closure) ₱0. Instructor no-show: held and never released, ₱0. Privates ₱1,000 / ₱1,400 / ₱1,600. Conversion bonus ₱500 (first-ever class taught by the coach, pack or membership within 30 days). Supersedes 75(j) where they differ. Pay lines from 9 to 15 Nov are not recalculated.
+
+**Source:** docs/RPC_INSTRUCTOR_TERM_SHEET_2026.md (the pay sections of the RPC Studio Instructor Term Sheet 2026) plus Deanna's decisions of 24 Nov. **Where the term sheet reads differently:** it pays "your full base rate" when the studio cancels, without splitting core from flex; this amendment pays flex ₱0. **Status:** settled, to build in Step 13a. **Amends:** Decision 75 (j), Decision 22. Deanna, 24 Nov 2026.
+
+Differs from the term sheet by Deanna's decision of 24 Nov; the term sheet is to be updated.
+
+---
+
+## 31 (a) — Conversion bonus paid at month-end only (amendment, recorded 25 Nov 2026)
+
+Class pay settles on the 15th and the last day of the month as now. A conversion bonus line is always placed in the period that ends on the last day of the month in which it is earned (a bonus earned 1 to 15 goes to that month's 16-to-month-end period).
+
+**Where the term sheet reads differently:** it says pay is made "every two weeks, on the Friday after the period closes"; the studio's settle dates (the 15th and the last day of the month, Decision 31) stand. **Status:** settled, to build in Step 13a. **Amends:** Decision 31, Decision 22 (conversion bonus). Deanna, 24 Nov 2026.
+
+Differs from the term sheet by Deanna's decision of 24 Nov; the term sheet is to be updated.
+
+---
+
+## 21 (f) — A flex class's state follows its live bookings (amendment, recorded 25 Nov 2026)
+
+(1) Before the flex cut-off, the reached-minimum latch clears the moment paid seats drop below the minimum; the chip returns to "Needs n more to run". (2) At the flex cut-off the decision uses the live paid count, never a stale latch. (3) After the cut-off, a confirmed flex class whose live bookings all drop to zero is cancelled at once with cause unmet minimum (no bookings left): chip gone on member, staff, instructor and public surfaces, coach told through the day's digest or one notice, pay ₱0 under 75(l); late cancellers keep their late-cancel consequence. A flex class with at least one live booking still runs. (4) An always-runs class is committed at its start: the pending-decision selector includes always-runs classes whose decision time is their start, so its pay line is written.
+
+**Context.** On 24 Nov a flex class at Reform read "Confirmed" with nobody booked after both members cancelled after the cut-off, and every always-runs class since opening had no pay line because the selector only looked at classes that had not started. Both were fixed by authorised one-off writes. **Status:** settled, to build in Step 13a. **Amends:** Decision 21, Decision 21 (e), Decision 22. Deanna, 24 Nov 2026.
+
+---
+
+## 35 (b) — Mark no-show from the roster (amendment, recorded 25 Nov 2026)
+
+Each roster row that is booked and not checked in shows "Mark no-show" once the class has started. The class's coach and desk-up staff may use it until attendance is finalised; after finalisation, manager-up with a reason. It does exactly what the finalisation sweep does for that booking: status no_show, class or credit used, free first class used, reservation fee kept, desk-pay strike under 73(c) where it applies; the seat stays a head under 75(l). Mark attended reverses a mistaken no-show. Audit booking.marked_no_show, Journey row "Marked no-show by {first name}". No email to the member.
+
+**Status:** settled, to build in Step 13a. **Amends:** Decision 35, Decision 35 (a). **Reuses:** Decision 73 (c), Decision 103, Decision 75 (l). Deanna, 24 Nov 2026.
+
+---
+
+## 108 (b) — The daily check catches pay mistakes (amendment, recorded 25 Nov 2026)
+
+daily_money_check no longer lets one null item line wipe the list (member-less payments such as gift cards are excluded from "payment attached to nothing" and every item line is coalesced). New items: a class that ran with no pay line; a pay line whose amount differs from 75(l); an always-runs class past its start never committed; a cancelled or not-run class carrying pay that 75(l) says is ₱0; a held pay line older than 3 days.
+
+**Status:** settled, to build in Step 13a. **Amends:** Decision 108, Decision 108 (a). Deanna, 24 Nov 2026.
+
+---
+
 ## 106 — Growth insights within the core budget (recorded 18 Nov 2026)
 
 Each instructor carries a budget, "Core classes per day", a single number from 1 to 3 that is the same every weekday for that coach, seeded once from the studio's actual November pattern (the per coach mode of core classes per day) and editable by a manager on the instructor's profile at any time. For Reform the seed is Hubert 1, Joseph 1, Migs 2, Alla 1, Illiana 3, Nikko 1, Rhon 1, Kai 1 (the minimum is 1, so Kai's zero floors to one); an occurrence with no instructor is ignored.

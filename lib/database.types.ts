@@ -3464,6 +3464,7 @@ export type Database = {
           duo_rate_cents: number | null
           effective_from: string
           full_house_bonus_cents: number
+          full_house_total_cents: number | null
           id: string
           instructor_id: string
           is_demo: boolean
@@ -3484,6 +3485,7 @@ export type Database = {
           duo_rate_cents?: number | null
           effective_from: string
           full_house_bonus_cents?: number
+          full_house_total_cents?: number | null
           id?: string
           instructor_id: string
           is_demo?: boolean
@@ -3504,6 +3506,7 @@ export type Database = {
           duo_rate_cents?: number | null
           effective_from?: string
           full_house_bonus_cents?: number
+          full_house_total_cents?: number | null
           id?: string
           instructor_id?: string
           is_demo?: boolean
@@ -9555,6 +9558,10 @@ export type Database = {
       }
       claim_ranking: { Args: { p_occurrence_id: string }; Returns: Json }
       claiming_enabled: { Args: { p_studio_id: string }; Returns: boolean }
+      class_seats_used_run: {
+        Args: { p_occurrence_id: string }
+        Returns: number
+      }
       claw_back_conversion_bonus: {
         Args: { p_member_id: string; p_reason: string }
         Returns: Json
@@ -10039,6 +10046,7 @@ export type Database = {
           mode: string
         }[]
       }
+      flex_emptied_run: { Args: { p_occurrence_id: string }; Returns: Json }
       flex_minimum_mismatch_count: {
         Args: { p_studio_id: string }
         Returns: number
@@ -10436,6 +10444,7 @@ export type Database = {
           duo_rate_cents: number | null
           effective_from: string
           full_house_bonus_cents: number
+          full_house_total_cents: number | null
           id: string
           instructor_id: string
           is_demo: boolean
@@ -10465,6 +10474,7 @@ export type Database = {
           duo_rate_cents: number | null
           effective_from: string
           full_house_bonus_cents: number
+          full_house_total_cents: number | null
           id: string
           instructor_id: string
           is_demo: boolean
@@ -10638,6 +10648,10 @@ export type Database = {
           p_method?: string
         }
         Returns: Json
+      }
+      mark_no_show_run: {
+        Args: { p_booking_id: string; p_by: string }
+        Returns: undefined
       }
       mark_order_collected: { Args: { p_order_id: string }; Returns: Json }
       mark_present: { Args: { p_booking_id: string }; Returns: Json }
@@ -12458,6 +12472,10 @@ export type Database = {
         Returns: Json
       }
       staff_mark_attended: {
+        Args: { p_booking_id: string; p_reason?: string }
+        Returns: Json
+      }
+      staff_mark_no_show: {
         Args: { p_booking_id: string; p_reason?: string }
         Returns: Json
       }

@@ -28,6 +28,7 @@ import StaffAvatar from "@/components/staff-avatar";
 import { signAvatars } from "@/lib/avatars";
 import ScrollToMember from "./scroll-to-member";
 import MarkAttended from "@/components/staff/mark-attended";
+import MarkNoShow from "@/components/staff/mark-no-show";
 import { fullName } from "@/lib/full-name";
 import ReservationChip, { type SeatState } from "@/components/staff/reservation-chip";
 
@@ -438,6 +439,18 @@ export default async function Roster({ params, searchParams }: { params: { occur
                 {desk && b.status === "booked" && !checkedIn.has(b.id) && !occ.attendance_finalised_at
                   && new Date(occ.starts_at).getTime() <= Date.now() && (
                   <div className="mt-1 pl-9"><MarkAttended bookingId={b.id} occurrenceId={occ.id} /></div>
+                )}
+                {/* Decision 35 (b): mark a booked member a no-show once the class has
+                    started; desk-up until the day is finalised, a manager with a
+                    reason after. */}
+                {b.status === "booked" && !checkedIn.has(b.id)
+                  && new Date(occ.starts_at).getTime() <= Date.now()
+                  && (occ.attendance_finalised_at ? manager : desk) && (
+                  <div className="mt-1 pl-9">
+                    <MarkNoShow bookingId={b.id} occurrenceId={occ.id}
+                                firstName={b.members?.preferred_name || b.members?.first_name || ""}
+                                withReason={!!occ.attendance_finalised_at} />
+                  </div>
                 )}
                 {b.status === "no_show" && (manager || (desk && !occ.attendance_finalised_at)) && (
                   <div className="mt-1 pl-9">

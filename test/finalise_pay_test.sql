@@ -132,7 +132,9 @@ select expect_eq('OG2 recorded at 3 booked = 97500',  rec_amt('75d075d0-0000-000
 select finalise_pay_true_up('75d075d0-0000-0000-0000-00000000a001');
 select expect_eq('OG1 4 attended + 2 no-show is paid on 6 = 120000', rec_amt('75d075d0-0000-0000-0000-00000000a001')::text, '120000');
 select expect_eq('OG1 basis checked_in = 4',      rec_checked('75d075d0-0000-0000-0000-00000000a001'), '4');
-select expect_eq('OG1 basis heads_consumed = 6',  rec_basis('75d075d0-0000-0000-0000-00000000a001','heads_consumed'), '6');
+-- Decision 75 (l) with 81b: this suite's seats are unpaid drop-ins, and an unpaid
+-- drop-in no-show adds no seat used, so 4 are used; the cut-off count of 6 still pays.
+select expect_eq('OG1 basis heads_consumed = 4 (unpaid drop-in no-shows add none)',  rec_basis('75d075d0-0000-0000-0000-00000000a001','heads_consumed'), '4');
 select expect_eq('OG1 basis heads_basis = cutoff (a tie stays cutoff)', rec_basis('75d075d0-0000-0000-0000-00000000a001','heads_basis'), 'cutoff');
 select expect_eq('OG1 basis heads_paid = 6',      rec_basis('75d075d0-0000-0000-0000-00000000a001','heads_paid'), '6');
 select expect_eq('OG1 basis keeps finalise_of',   rec_basis('75d075d0-0000-0000-0000-00000000a001','finalise_of'), '75d075d0-0000-0000-0000-00000000a001');

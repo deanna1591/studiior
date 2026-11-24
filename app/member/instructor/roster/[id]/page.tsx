@@ -15,6 +15,7 @@ import { coverRequestAllowed } from "@/lib/cover-window";
 import { AddWalkIn, DeskPay, type DeskPlan } from "../../desk-ui";
 import { InstructorAddMember } from "@/components/instructor/add-member";
 import MarkAttended from "@/components/staff/mark-attended";
+import MarkNoShow from "@/components/staff/mark-no-show";
 import ReservationChip, { type SeatState } from "@/components/staff/reservation-chip";
 
 export const dynamic = "force-dynamic";
@@ -184,6 +185,13 @@ export default async function RosterPage({ params }: { params: { id: string } })
                 {!m.checked_in && m.booking_status === "booked"
                   && afterWindow && !occRow?.attendance_finalised_at && (
                   <MarkAttended bookingId={m.booking_id} occurrenceId={r.occurrence_id} />
+                )}
+                {/* Decision 35 (b): once the class has started, until the day is
+                    finalised, the coach marks a booked member a no-show. */}
+                {!m.checked_in && m.booking_status === "booked"
+                  && classStarted && !occRow?.attendance_finalised_at && (
+                  <MarkNoShow bookingId={m.booking_id} occurrenceId={r.occurrence_id}
+                              firstName={m.name.split(" ")[0] ?? ""} />
                 )}
               </div>
 

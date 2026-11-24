@@ -158,8 +158,12 @@ select expect_num('six bookings is still no flex_going_ahead',
       and dedupe_key like 'flex_going_ahead:f0f4f0f4-0000-0000-0000-00000000c101:%'), 0);
 
 -- =============================================================================
--- 2. THE LATCH HOLDS: members cancel below the minimum, it still runs
+-- 2. Decision 21 (f): members cancel below the minimum before the cut-off,
+--    the latch clears, and at the cut-off the live count decides
 -- =============================================================================
+-- Before the cut-off: move studio A's cut-off to 1 hour so C1 (two days out)
+-- has not reached it yet while members cancel.
+update studio_settings set flex_deadline_hours = 1 where studio_id = 'f0f4f0f4-0000-0000-0000-000000000001';
 set role authenticated;
 select set_config('request.jwt.claim.sub','f0f4f0f4-0000-0000-0000-0000000000e3',false);
 select cancel_booking((select id from bookings where occurrence_id='f0f4f0f4-0000-0000-0000-00000000c101'
@@ -170,16 +174,20 @@ select cancel_booking((select id from bookings where occurrence_id='f0f4f0f4-000
 reset role;
 select expect_num('C1 is back down to one booking, below its minimum of two',
   (select booked_count from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101')::bigint, 1);
+select expect_true('Decision 21 (f)(1): the latch cleared when paid seats dropped below the minimum',
+  (select flex_reached_minimum_at is null from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101'));
 
--- Now the sweep runs. C1 reached its minimum once, so it COMMITS despite being
--- below now; C2 and CB never reached theirs, so they cancel.
+-- The cut-off passes (back to 168 hours, so every class here is past it).
+update studio_settings set flex_deadline_hours = 168 where studio_id = 'f0f4f0f4-0000-0000-0000-000000000001';
+-- Now the sweep runs. Decision 21 (f)(2): the live count decides, so C1 (one
+-- booking, minimum two) does not run; C2 and CB never reached theirs either.
 select set_config('t.sweep', (select sweep_commitments()::text), false);
 -- The sweep is global; asserting the count would be a shared-reset count of
 -- every flex studio. Both OF MINE being decided is proved by C2 and CB below.
 select expect_true('the sweep covers at least this suite''s two studios',
   (current_setting('t.sweep')::jsonb ->> 'studios')::bigint >= 2);
-select expect_true('C1 committed (latched) and is NOT cancelled',
-  (select committed_at is not null and status = 'scheduled'
+select expect_true('C1 is not running: cancelled for unmet_minimum on its live count',
+  (select committed_at is null and status = 'cancelled' and cancellation_cause = 'unmet_minimum'
      from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101'));
 select expect_num('...with booked_at_cutoff the REAL count at the cutoff, not the minimum',
   (select booked_at_cutoff from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101')::bigint, 1);
@@ -198,8 +206,8 @@ set role authenticated;
 select set_config('request.jwt.claim.sub','f0f4f0f4-0000-0000-0000-0000000000e3',false);  -- M3, never booked C2
 select expect_num('a member cannot see the not-running class at all',
   (select count(*) from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c102'), 0);
-select expect_num('...and the committed C1 IS visible to a member (scheduled)',
-  (select count(*) from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101'), 1);
+select expect_num('...and C1, not running either, reads as cancelled to a member who left it (own-read keeps their history)',
+  (select count(*) from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101' and status = 'scheduled'), 0);
 reset role;
 select expect_num('no member notification for the empty not-running class',
   (select count(*) from notifications n join members m on m.id = n.member_id
@@ -242,10 +250,10 @@ select expect_false('...while a run-of-the-mill cancelled class would NOT be on 
 reset role;
 
 -- =============================================================================
--- 4. A CLASS THAT REACHES ITS MINIMUM IS UNAFFECTED
+-- 4. Decision 21 (f): a class that reached its minimum and then lost it does not run
 -- =============================================================================
-select expect_true('C1 runs — committed, scheduled, on the member and staff views',
-  (select status='scheduled' and committed_at is not null and cancellation_cause is null
+select expect_true('C1 does not run: not committed, cancelled for unmet_minimum',
+  (select status='cancelled' and committed_at is null and cancellation_cause = 'unmet_minimum'
      from class_occurrences where id='f0f4f0f4-0000-0000-0000-00000000c101'));
 
 -- =============================================================================

@@ -29,3 +29,20 @@ test("disputeMailto builds a prefilled mailto, null without an email", () => {
   assert.ok(m.includes(encodeURIComponent("Reformer")));
   assert.equal(disputeMailto({ email: null }), null);
 });
+
+test("75 (l): full house and holding fee read on the line", async () => {
+  const { classLineText } = await import("../lib/pay-statement.mjs");
+  assert.equal(classLineText({ booked: 6, checkedIn: 6, headsPaid: 6, finalised: true, fullHouse: true }),
+    "6 booked · 6 checked in · paid on 6 · full house");
+  assert.equal(classLineText({ booked: 0, checkedIn: 0, headsPaid: 0, finalised: true, holdingFee: true }),
+    "0 booked · 0 checked in · paid on 0 · nobody came, holding fee");
+});
+
+test("75 (l): did-not-run and cancel causes read in plain words", async () => {
+  const { lineStatusWords } = await import("../lib/pay-statement.mjs");
+  assert.equal(lineStatusWords("did not run"), "Did not run");
+  assert.equal(lineStatusWords("cancelled — studio_fault"), "Cancelled by the studio");
+  assert.equal(lineStatusWords("cancelled — force_majeure"), "Cancelled for a typhoon or suspension");
+  assert.equal(lineStatusWords("cancelled — closure"), "Studio closed");
+  assert.equal(lineStatusWords(null), "");
+});

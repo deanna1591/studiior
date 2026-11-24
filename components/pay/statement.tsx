@@ -1,5 +1,5 @@
 import { money } from "@/lib/dashboard";
-import { classLineText, statusChip, settleWording, disputeMailto } from "@/lib/pay-statement";
+import { classLineText, lineStatusWords, statusChip, settleWording, disputeMailto } from "@/lib/pay-statement";
 
 // Decision 75b-2 (i) — the ONE statement view, rendered from a pay_statement
 // jsonb. Used by the instructor My Pay page and the staff per-instructor
@@ -12,6 +12,7 @@ type Line = {
   finalised: boolean | null; headcount_note: string | null;
   from_previous_period: boolean; first_class_on: string | null;
   amount_cents: number; confirmed: boolean; payable: boolean; note: string | null;
+  basis?: { full_house?: boolean; holding_fee?: boolean } | null;
 };
 export type Statement = {
   ok: boolean; instructor_name: string | null; period_id: string;
@@ -56,9 +57,10 @@ export default function PayStatementView({ s, contactEmail }: { s: Statement; co
         {s.lines.map((l, i) => {
           const detail =
             l.type === "class" && l.status === "ran"
-              ? classLineText({ booked: l.booked ?? 0, checkedIn: l.checked_in, headsPaid: l.heads_paid, finalised: !!l.finalised })
+              ? classLineText({ booked: l.booked ?? 0, checkedIn: l.checked_in, headsPaid: l.heads_paid, finalised: !!l.finalised,
+                                fullHouse: !!l.basis?.full_house, holdingFee: !!l.basis?.holding_fee })
               : l.type === "class"
-              ? (l.status ?? "")                                   // did not run / cancelled — N
+              ? lineStatusWords(l.status)
               : l.type === "conversion"
               ? `Conversion bonus${l.first_class_on ? ` · first class ${dmy(l.first_class_on)}` : ""}`
               : (l.note ?? "Adjustment");
