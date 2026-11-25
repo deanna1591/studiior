@@ -95,10 +95,10 @@ select expect_raises('anon cannot execute it',
   $q$select * from member_coaches('c9c0c9c0-0000-0000-0000-0000000000a1')$q$, '42501');
 reset role;
 
-select expect_num('anon surface is EXACTLY FIFTEEN',
+select expect_num('anon surface is EXACTLY FOURTEEN',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%')::bigint, 15);
+      and p.proname not like 'expect_%')::bigint, 14);
 select expect_true('the inbox table is closed to anon reads with RLS on',
   not has_table_privilege('anon','public.resend_webhook_inbox','select')
   and (select relrowsecurity from pg_class where oid = 'public.resend_webhook_inbox'::regclass));

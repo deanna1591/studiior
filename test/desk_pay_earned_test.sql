@@ -197,16 +197,16 @@ select expect_text('add_walk_in books the blocked member (unaffected)',
     $$ select jsonb_build_object('ok', ((add_walk_in('d73c0000-0000-0000-0000-0000000000cd','M Five','m5@a.co',null))->>'booking_id') is not null) $$)->>'ok'),
   'true');
 
-\echo '--- 9. the Members chip + the class-page flag + anon FIFTEEN ---'
+\echo '--- 9. the Members chip + the class-page flag + anon FOURTEEN ---'
 reset role;
 select expect_true('overview desk_pay_blocked true for a blocked member',
   (select desk_pay_blocked from member_plan_overview('d73c0000-0000-0000-0000-0000000000a0') where id='d73c0000-0000-0000-0000-00000000dd05'));
 select expect_true('overview desk_pay_blocked false for a clean member',
   (select not desk_pay_blocked from member_plan_overview('d73c0000-0000-0000-0000-0000000000a0') where id='d73c0000-0000-0000-0000-00000000dd03'));
-select expect_num('anon surface is fifteen',
+select expect_num('anon surface is fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('login','as_json','expect_text','expect_true','expect_null','expect_num','mk_desk_booking')), 15);
+      and p.proname not in ('login','as_json','expect_text','expect_true','expect_null','expect_num','mk_desk_booking')), 14);
 
 reset role;
 drop function login(text); drop function as_json(text,text); drop function mk_desk_booking(text,text,text);

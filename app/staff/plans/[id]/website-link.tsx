@@ -8,9 +8,7 @@ import { useRef, useState } from "react";
  * where available, falling back to selecting the (read-only) field so the
  * owner can copy by hand.
  */
-export default function WebsiteLink({ url, title = "Website link", hint = "Paste this behind the \u201cBuy\u201d button on your website. No account needed to buy." }: {
-  url: string; title?: string; hint?: string;
-}) {
+export default function WebsiteLink({ url }: { url: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -27,8 +25,10 @@ export default function WebsiteLink({ url, title = "Website link", hint = "Paste
 
   return (
     <div className="mb-5 rounded border border-line bg-paper px-3 py-3">
-      <p className="text-[13px] font-medium text-ink">{title}</p>
-      <p className="mt-0.5 text-xs text-ink-3">{hint}</p>
+      <p className="text-[13px] font-medium text-ink">Website link</p>
+      <p className="mt-0.5 text-xs text-ink-3">
+        Paste this behind the &ldquo;Buy&rdquo; button on your website.
+      </p>
       <div className="mt-2 flex items-center gap-2">
         <input
           ref={ref}

@@ -270,10 +270,10 @@ reset role;
 -- anon-executable function is a real surface and must be one of the eleven. (The
 -- hosted advisor is the true gate — local and hosted ACLs differ — but this
 -- catches a stray grant before it ships.)
-select expect_num('exactly fifteen real functions are executable by anon',
+select expect_num('exactly fourteen real functions are executable by anon',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%')::bigint, 15);
+      and p.proname not like 'expect\_%')::bigint, 14);
 select expect_true('public_schedule is one of them',
   has_function_privilege('anon', 'public_schedule(text,int)'::regprocedure, 'execute'));
 select expect_true('calendar_feed is one of them',

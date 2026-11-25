@@ -24,7 +24,7 @@
 -- audit; a December submission plus a staff pattern save leaving both intact; the
 -- availability function reading the pattern and the submission each for its own
 -- dates, and "nothing stated" with only a next-month submission; front desk
--- PT403; anon EXACTLY FIFTEEN and the inbox table closed to anon reads.
+-- PT403; anon EXACTLY FOURTEEN and the inbox table closed to anon reads.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -444,10 +444,10 @@ select expect_true('only a next-month submission: a Monday outside it is availab
     (current_setting('t.mon_out')::date + time '12:50') at time zone 'Asia/Manila'));
 
 \echo '==== 8. surfaces ===='
-select expect_num('anon surface is fifteen',
+select expect_num('anon surface is fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%' and p.proname not like 'd16a\_%'), 15);
+      and p.proname not like 'expect\_%' and p.proname not like 'd16a\_%'), 14);
 select expect_true('the new functions are not anon',
   not has_function_privilege('anon', 'apply_flex_minimum_to_future(uuid, integer)', 'execute')
   and not has_function_privilege('anon', 'flex_minimum_mismatch_count(uuid)', 'execute')

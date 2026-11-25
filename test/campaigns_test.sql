@@ -5,7 +5,7 @@
 --
 -- SA (Prague) carries members across consent states and plan/health bands; SB
 -- proves no cross-studio leak. Campaigns are manager-up; the audience is
--- consent-gated; the unsubscribe is anon (the fifteenth anon surface).
+-- consent-gated; the unsubscribe is anon (the fourteenth anon surface).
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -320,12 +320,12 @@ select expect_txt('booking envelope domain = from_domain',
   notification_envelope_domain('booking_confirmed'), 'studiior.app');
 
 -- =============================================================================
--- I. The anon surface is EXACTLY FIFTEEN, naming unsubscribe_marketing.
+-- I. The anon surface is EXACTLY FOURTEEN, naming unsubscribe_marketing.
 -- =============================================================================
-select expect_num('anon surface is exactly fifteen (suite helpers excluded)',
+select expect_num('anon surface is exactly fourteen (suite helpers excluded)',
   (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%')::bigint, 15);
+      and p.proname not like 'expect\_%')::bigint, 14);
 select expect_true('unsubscribe_marketing is anon-executable',
   has_function_privilege('anon', 'unsubscribe_marketing(uuid)'::regprocedure, 'execute'));
 

@@ -7,7 +7,7 @@
 -- already-booked email is refused BY NAME and nothing is written (all-or-none);
 -- class_full when seats run out writes nothing; class-type restriction; swap;
 -- early vs late cancel (late never stamps the guests); expiry; host-or-staff
--- only; anon stays FIFTEEN; member_activity group lines.
+-- only; anon stays FOURTEEN; member_activity group lines.
 -- =============================================================================
 \set A   '''6a0a0000-0000-0000-0000-000000000001'''
 \set CT  '''6a0a0000-0000-0000-0000-0000000000c1'''
@@ -388,7 +388,7 @@ do $$ begin
 end $$;
 
 -- =============================================================================
--- 9. HOST-OR-STAFF only, and anon FIFTEEN.
+-- 9. HOST-OR-STAFF only, and anon FOURTEEN.
 -- =============================================================================
 -- A booked group owned by MB on O4 (M3's seat was on O4; O4 has room). Book it
 -- cleanly on O6? O6 already has the restricted group (2 seats). Use a fresh
@@ -426,17 +426,17 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 
 do $$ begin
   perform expect_true('9.4 staff can cancel a group', (current_setting('t.r9cancel')::jsonb ->> 'ok')::boolean);
-  -- The enum values landed, and the anon surface is EXACTLY FIFTEEN.
+  -- The enum values landed, and the anon surface is EXACTLY FOURTEEN.
   perform expect_true('9.5 plan_type has group',
     exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
              where t.typname = 'plan_type' and e.enumlabel = 'group'));
   perform expect_true('9.6 payment_source has group',
     exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
              where t.typname = 'payment_source' and e.enumlabel = 'group'));
-  perform expect_num('9.7 anon surface is exactly FIFTEEN',
+  perform expect_num('9.7 anon surface is exactly FOURTEEN',
     (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
       where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-        and p.proname not like 'expect_%'), 15);
+        and p.proname not like 'expect_%'), 14);
 end $$;
 
 select 'group_packages_test: all assertions passed' as result;

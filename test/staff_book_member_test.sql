@@ -260,7 +260,7 @@ select expect_true('a member.phone_changed audit row exists',
   exists(select 1 from audit_logs where action='member.phone_changed' and entity_id='100b0000-0000-0000-0000-0000000000f8'));
 
 \echo ''
-\echo '=== 5. the new functions are not anon + anon FIFTEEN ==='
+\echo '=== 5. the new functions are not anon + anon FOURTEEN ==='
 reset role;
 select expect_false('staff_book_member not anon',
   has_function_privilege('anon','public.staff_book_member(uuid,uuid,jsonb,text)','execute'));
@@ -268,10 +268,10 @@ select expect_false('staff_booking_options not anon',
   has_function_privilege('anon','public.staff_booking_options(uuid,uuid)','execute'));
 select expect_false('staff_set_member_phone not anon',
   has_function_privilege('anon','public.staff_set_member_phone(uuid,text)','execute'));
-select expect_num('anon surface EXACTLY FIFTEEN',
+select expect_num('anon surface EXACTLY FOURTEEN',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon',p.oid,'execute')
-      and p.proname not like 'expect_%' and p.proname not in ('has_opt','act')), 15);
+      and p.proname not like 'expect_%' and p.proname not in ('has_opt','act')), 14);
 
 \echo ''
 \echo 'ALL DECISION 100 (staff book for a member) ASSERTIONS PASSED'

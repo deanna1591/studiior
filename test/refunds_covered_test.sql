@@ -2,7 +2,7 @@
 -- Covers: the timing table (paid + covered, on-time/late/no-show), the covered
 -- marker and the readers that must treat it as paid, the stale-hold clear, the
 -- studio and Xendit refund paths, the spent-credit refusal, role guards, the
--- roster hold + release, the daily-check belt, anon FIFTEEN + the inbox table.
+-- roster hold + release, the daily-check belt, anon FOURTEEN + the inbox table.
 
 create or replace function expect_num(label text, actual bigint, want bigint)
 returns void language plpgsql as $$
@@ -289,11 +289,11 @@ begin
   perform expect_true('daily check flags covered-due belt',
     exists (select 1 from jsonb_array_elements_text(chk->'items') x where x like '%covered booking%reported as owing%'));
 
-  -- anon surface EXACTLY FIFTEEN, resend_webhook_inbox table anon-insert-yes/select-no
+  -- anon surface EXACTLY FOURTEEN, resend_webhook_inbox table anon-insert-yes/select-no
   select count(*) into v_anon from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname not like 'expect_%' and p.proname not like 'd111\_%';
-  perform expect_num('anon surface is fifteen', v_anon, 15);
+  perform expect_num('anon surface is 13', v_anon, 14);
   perform expect_true('inbox anon insert', has_table_privilege('anon','public.resend_webhook_inbox','insert'));
   perform expect_false('inbox anon select', has_table_privilege('anon','public.resend_webhook_inbox','select'));
   perform expect_false('payment_refunds anon select', has_table_privilege('anon','public.payment_refunds','select'));

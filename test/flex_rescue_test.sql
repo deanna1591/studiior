@@ -309,10 +309,10 @@ do $$ declare st text; begin
   raise notice 'PASS another member passing a booking is refused PT403';
 end $$;
 
--- anon stays FIFTEEN
-select expect_num('anon surface is exactly fifteen',
+-- anon stays FOURTEEN
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('login','expect_text','expect_true','expect_num','move_reason')), 15);
+      and p.proname not in ('login','expect_text','expect_true','expect_num','move_reason')), 14);
 
 select 'ALL FLEX RESCUE TESTS PASSED' as result;

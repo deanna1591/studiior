@@ -3,7 +3,7 @@
 -- the four exclusions, the weekly sweep + per-step dedupe + cadence, the three tokens,
 -- the day tier switch both ways + the lock + the booked-member notice, the free-on-flex
 -- override + its audit, notification_wanted gating by marketing consent, the Journey
--- staff-release distinction, the default audiences, role guards, anon FIFTEEN + RLS.
+-- staff-release distinction, the default audiences, role guards, anon FOURTEEN + RLS.
 
 create or replace function expect_num(label text, actual bigint, want bigint)
 returns void language plpgsql as $$
@@ -391,7 +391,7 @@ begin
     (select count(*) from member_activity(m, current_date - 10, current_date + 1) where kind='hold_released'), 1);
 end $t$;
 
--- ===================== Part 9: defaults + RLS + role guard + anon FIFTEEN =====================
+-- ===================== Part 9: defaults + RLS + role guard + anon FOURTEEN =====================
 do $t$
 declare s2 uuid := 'c1120000-0000-0000-0000-000000000002'; mgru uuid := 'c1120000-0000-0000-0000-0000000000e2';
         n int;
@@ -422,7 +422,7 @@ begin
     (select count(*) from campaign_audiences where studio_id=s2) >= 3);
 end $t$;
 
--- anon surface EXACTLY FIFTEEN + payment_refunds revoked from anon + inbox table
+-- anon surface EXACTLY FOURTEEN + payment_refunds revoked from anon + inbox table
 do $t$
 declare n int;
 begin
@@ -430,7 +430,7 @@ begin
    where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not like 'expect_%' and p.proname not like 'c112_%'
      and p.proname not like 'd111_%';
-  perform expect_num('9 anon surface FIFTEEN', n, 15);
+  perform expect_num('9 anon surface FOURTEEN', n, 14);
   perform expect_false('9 payment_refunds not anon-selectable',
     has_table_privilege('anon','payment_refunds','select'));
 end $t$;

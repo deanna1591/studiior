@@ -6,7 +6,7 @@
 -- one-time correction, same_person_match's empty-last rule, phone_taken for the
 -- member and staff writers, a deleted member's old phone reusable, the picker's
 -- core-only reader honours free_first_core_only, member_bootstrap carries it,
--- and anon stays FIFTEEN.
+-- and anon stays FOURTEEN.
 
 begin;
 set local client_min_messages = warning;
@@ -222,10 +222,10 @@ select expect_true('member_bootstrap.free_first_core_only true when the limit is
   (select free_first_core_only from member_bootstrap('sa-d102')));
 select set_config('request.jwt.claim.sub','', false); reset role;
 
--- ================================================= anon stays FIFTEEN
-select expect_num('anon surface is FIFTEEN (suite helpers excluded)',
+-- ================================================= anon stays FOURTEEN
+select expect_num('anon surface is FOURTEEN (suite helpers excluded)',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%'), 15);
+      and p.proname not like 'expect\_%'), 14);
 
 rollback;

@@ -70,9 +70,9 @@ select expect_eq('render_email is closed to every client role',
   (has_function_privilege('authenticated','render_email(uuid,text,text,text,text,text,jsonb,text,text)','execute')
    or has_function_privilege('anon','render_email(uuid,text,text,text,text,text,jsonb,text,text)','execute'))::text, 'false');
 
-select expect_eq('anon surface is EXACTLY FIFTEEN',
+select expect_eq('anon surface is EXACTLY FOURTEEN',
   (select count(*)::text from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'expect_eq'), '15');
+    where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute') and p.proname <> 'expect_eq'), '14');
 select expect_eq('the webhook inbox table is closed to anon reads with RLS on',
   (select (not has_table_privilege('anon','resend_webhook_inbox','select') and relrowsecurity)::text
      from pg_class where relname='resend_webhook_inbox'), 'true');

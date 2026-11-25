@@ -307,7 +307,7 @@ select expect_true('instructor brand kit: carries a spec',
 select expect_raise('instructor brand kit: front desk refused', :'FD'::uuid,
   'select instructor_brand_kit()', 'PT403');
 
--- 6. anon refused, and the surface is EXACTLY FIFTEEN
+-- 6. anon refused, and the surface is EXACTLY FOURTEEN
 do $$
 declare got text;
 begin
@@ -323,7 +323,7 @@ begin
   select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not like 'expect%' and p.proname <> 'call_jsonb';
-  perform expect_num('anon surface is exactly fifteen', n::bigint, 15);
+  perform expect_num('anon surface is exactly fourteen', n::bigint, 14);
 end $$;
 
 select 'schedule_post_test OK' as result;

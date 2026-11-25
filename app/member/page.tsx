@@ -17,7 +17,6 @@ import Announcements, { type Announcement } from "@/components/member/announceme
 import AnnounceStrip, { type StripItem } from "@/components/member/announce-strip";
 import ClassButton from "@/components/member/class-button";
 import InstallCard from "@/components/member/install-card";
-import GuestPlansWaiting from "@/components/member/guest-plans-waiting";
 import PhoneSheet from "@/components/member/phone-sheet";
 import DuplicateHold from "@/components/member/duplicate-hold";
 import { HoldCountdown, PaymentPendingActions } from "@/components/member/payment-pending";
@@ -55,7 +54,7 @@ export default async function MemberHome() {
   const [{ data: bookings }, { data: offers }, membership, { data: upcoming }, { data: monthCheckins },
          { data: challenges }, { data: meRow }, { count: guestPassCount }, { data: milestones }, { data: announcements },
          { data: waiver }, { data: pendingRows }, { data: installRow }, { data: shopItems },
-         { data: dupHolds }, { data: resHolds }, { data: flexRows }, { data: guestPlans }] =
+         { data: dupHolds }, { data: resHolds }, { data: flexRows }] =
     await Promise.all([
     supabase
       .from("bookings")
@@ -133,14 +132,7 @@ export default async function MemberHome() {
     // the next-class card. Only flex classes come back. Same batch.
     supabase.rpc("member_flex_states", {
       p_studio_id: ctx.studioId, p_from: new Date(now).toISOString(), p_to: "infinity" }),
-    // Decision 118: plans bought before having an account. waiting = paid under
-    // this verified email, not yet in the account; ready = claimed in the last day.
-    supabase.rpc("my_guest_plans", { p_studio_id: ctx.studioId }),
   ]);
-  const guest = (guestPlans ?? { waiting: [], ready: [] }) as {
-    waiting: { purchase_id: string; plan_name: string }[];
-    ready: { purchase_id: string; plan_name: string }[];
-  };
   const flexMap = new Map(((flexRows ?? []) as {
     occurrence_id: string; paid_count: number; min_bookings: number | null;
     reached_minimum: boolean; committed: boolean;
@@ -290,14 +282,6 @@ export default async function MemberHome() {
       {needsWaiver && <WaiverBanner published={waiverPublished} resign={staleResign} />}
       {/* Decision 103: a free booking that now needs the reservation fee. */}
       <ReservationDueNotice dues={reservationDues} currency={settings.currency} timeZone={ctx.timeZone} />
-      {/* Decision 118: a plan bought before the account existed. */}
-      {guest.ready.map((g) => (
-        <Link key={g.purchase_id} href="/account/plan" className="m-card m-press mb-4 flex items-center justify-between px-4 py-3">
-          <span className="m-body text-ink">Your {g.plan_name} is ready</span>
-          <span className="m-sub font-semibold text-ink">See it ›</span>
-        </Link>
-      ))}
-      {guest.waiting.length > 0 && <GuestPlansWaiting names={guest.waiting.map((g) => g.plan_name)} />}
       {/* Decision 110(a): a member holding gift credit is told, with a way to spend it. */}
       {settings.giftCreditCents > 0 && (
         <Link href="/account/plan" className="m-card m-press mb-4 flex items-center justify-between px-4 py-3">

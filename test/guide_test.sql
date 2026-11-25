@@ -5,7 +5,7 @@
 -- instructor_guide_mark('intro') sets guide_seen_at; 'reset' clears it; any
 -- other value records a dismissed hint (merged, not replaced). my_instructor
 -- carries both. A caller who is not an instructor is refused PT403. Anon
--- surface stays EXACTLY FIFTEEN. RED first (functions/columns absent), GREEN.
+-- surface stays EXACTLY FOURTEEN. RED first (functions/columns absent), GREEN.
 -- =============================================================================
 \set S '''85020000-0000-0000-0000-000000000001'''
 
@@ -90,10 +90,10 @@ select expect_true('hints_seen holds roster and pay on the instructor row',
   (select coalesce(hints_seen ->> 'roster','') = 'true' and coalesce(hints_seen ->> 'pay','') = 'true'
      from instructors where id = '85020000-0000-0000-0000-00000000d001'));
 
--- --- anon surface EXACTLY FIFTEEN ------------------------------------------
-select expect_num('anon surface is exactly fifteen',
+-- --- anon surface EXACTLY FOURTEEN ------------------------------------------
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 15);
+      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig')), 14);
 
 select 'guide_test: all assertions passed' as done;

@@ -88,7 +88,7 @@ select expect((select count(*) from notifications
 select expect((select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
                 where ns.nspname = 'public'
                   and has_function_privilege('anon', p.oid, 'execute')
-                  and p.proname not like 'expect%') = 15,
-  '8 anon surface is exactly FIFTEEN');
+                  and p.proname not like 'expect%') = 14,
+  '8 anon surface is exactly FOURTEEN');
 
 rollback;

@@ -260,12 +260,12 @@ select expect_text('a cross-tenant event is ignored', current_setting('t.r_xt'),
 select expect_text('the cross-tenant order is NOT paid', (select status from product_orders where id=(select product_order_id from xendit_purchases where id=current_setting('t.pid_xt')::uuid)), 'reserved');
 
 -- =============================================================================
--- Anon surface is EXACTLY FIFTEEN (a merch purchase rides xendit_webhook).
+-- Anon surface is EXACTLY FOURTEEN (a merch purchase rides xendit_webhook).
 -- =============================================================================
-select expect_num('anon surface is exactly fifteen',
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%')::bigint, 15);
+      and p.proname not like 'expect_%')::bigint, 14);
 
 -- --- cleanup -----------------------------------------------------------------
 drop function expect_true(text,boolean);

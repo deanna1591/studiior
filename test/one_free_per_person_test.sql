@@ -352,14 +352,14 @@ select expect_true('member_duplicates finds the name twin (had_free flag present
   (select jsonb_array_length(member_duplicates('98010000-0000-0000-0000-00000000ad02')) >= 1));
 
 -- =============================================================================
--- 11. the new functions are not anon; anon stays FIFTEEN
+-- 11. the new functions are not anon; anon stays FOURTEEN
 -- =============================================================================
 select expect_false('staff_remove_booking not anon', has_function_privilege('anon','staff_remove_booking(uuid,boolean,text)','execute'));
 select expect_false('member_duplicates not anon', has_function_privilege('anon','member_duplicates(uuid)','execute'));
 select expect_false('recheck_free_first_duplicate not anon', has_function_privilege('anon','recheck_free_first_duplicate(uuid)','execute'));
-select expect_num('anon surface EXACTLY FIFTEEN',
+select expect_num('anon surface EXACTLY FOURTEEN',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon',p.oid,'execute')
-      and p.proname not like 'expect\_%' and p.proname not like 't9801\_%'), 15);
+      and p.proname not like 'expect\_%' and p.proname not like 't9801\_%'), 14);
 
 select 'ALL ONE-FREE-PER-PERSON TESTS PASSED' as result;

@@ -8,7 +8,7 @@
 -- with a full class credits the fee + sends the lost-seat email; reservation
 -- credit of at least the fee books with no Xendit and consumes the credit; credit
 -- below the fee still charges; the eight Journey lines (a hold is never Booked);
--- the Sales grouping; the five profile states. Anon stays FIFTEEN.
+-- the Sales grouping; the five profile states. Anon stays FOURTEEN.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -284,11 +284,11 @@ select expect_text('profile M4 fee state used after the credit is consumed',
   (select state from member_reservation_fees('d10e0000-0000-0000-0000-0000000000f4') limit 1), 'used');
 
 -- =============================================================================
--- 11. ANON STAYS EXACTLY FIFTEEN.
+-- 11. ANON STAYS EXACTLY FOURTEEN.
 -- =============================================================================
-select expect_num('anon surface is exactly fifteen',
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('expect_num','expect_text','expect_true','d10e_complete','d10e_has_kind')), 15);
+      and p.proname not in ('expect_num','expect_text','expect_true','d10e_complete','d10e_has_kind')), 14);
 
 select 'reservation_e_test PASS' as result;

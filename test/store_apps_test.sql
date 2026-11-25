@@ -3,7 +3,7 @@
 --
 --   Per-tenant app-store columns on studios, owner-editable via the studios
 --   RLS; shape CHECKs; anon surface unchanged (studio_by_slug re-issued, still
---   one of the fifteen).
+--   one of the fourteen).
 --
 --   supabase db reset
 --   psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f test/store_apps_test.sql
@@ -124,7 +124,7 @@ begin
 end $$;
 reset role;
 
--- === Anon surface is still EXACTLY FIFTEEN ==================================
+-- === Anon surface is still EXACTLY FOURTEEN ==================================
 do $$
 declare n int;
 begin
@@ -132,9 +132,9 @@ begin
    where ns.nspname = 'public'
      and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not like 'expect\_%';
-  perform expect_num('anon surface is exactly fifteen', n::bigint, 15);
+  perform expect_num('anon surface is exactly fourteen', n::bigint, 14);
   perform expect_true('studio_by_slug is still anon',
-    has_function_privilege('anon','studio_by_slug(text, boolean)','execute'));
+    has_function_privilege('anon','studio_by_slug(text)','execute'));
 end $$;
 
 \echo 'store_apps_test: all assertions passed'

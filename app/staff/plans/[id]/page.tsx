@@ -114,7 +114,7 @@ export default async function EditPlan({
       {/* Decision 57/66: the website buy link. Every online-buyable plan gets
           the link + Copy — a pack, drop-in, trial, or a recurring plan sold one
           period at a time (Decision 66). An archived plan gets no link. */}
-      {plan.status === "active" && plan.visibility === "public" && isOnlineBuyable(plan.type) && studioRow?.slug && (
+      {plan.status !== "archived" && isOnlineBuyable(plan.type) && studioRow?.slug && (
         <WebsiteLink url={buyUrl(await staffMemberOrigin(supabase, studioRow.slug), plan.id)} />
       )}
       <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}

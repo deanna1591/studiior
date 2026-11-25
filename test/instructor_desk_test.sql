@@ -329,10 +329,10 @@ begin
   perform expect_num('(i) D2 sees none', n, 0);
 end $$;
 
-\echo '--- anon surface stays FIFTEEN (excluding this suite''s own helpers) ---'
-select expect_num('anon surface = 15',
+\echo '--- anon surface stays FOURTEEN (excluding this suite''s own helpers) ---'
+select expect_num('anon surface = 14',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon',p.oid,'execute')
-      and p.proname not in ('expect_num','expect_eq','expect_true','as_json')), 15);
+      and p.proname not in ('expect_num','expect_eq','expect_true','as_json')), 14);
 
 \echo 'instructor_desk_test: all assertions passed.'

@@ -186,12 +186,12 @@ select expect_num('a second sweep queues no second reminder',
   (select count(*) from notifications where template_key='membership_expiring' and member_id=:M2)::bigint, 1);
 
 -- =============================================================================
--- (6) Anon surface unchanged — EXACTLY FIFTEEN.
+-- (6) Anon surface unchanged — EXACTLY FOURTEEN.
 -- =============================================================================
-select expect_num('anon surface is exactly fifteen',
+select expect_num('anon surface is exactly fourteen',
   (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%' and p.proname not like 'sp_%')::bigint, 15);
+      and p.proname not like 'expect_%' and p.proname not like 'sp_%')::bigint, 14);
 
 -- --- cleanup -----------------------------------------------------------------
 drop function sp_complete(text, text);
