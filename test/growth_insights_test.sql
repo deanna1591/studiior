@@ -391,7 +391,7 @@ select expect_raise('front desk cannot apply a growth proposal', 'PT403',
 reset role;
 
 -- =============================================================================
--- SECTION 5 — the anon surface stays EXACTLY FOURTEEN, plus the inbox table.
+-- SECTION 5 — the anon surface stays EXACTLY FIFTEEN, plus the inbox table.
 -- =============================================================================
 do $anon$ declare n int; begin
   select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
@@ -399,7 +399,7 @@ do $anon$ declare n int; begin
      and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not in ('expect_num','expect_text','expect_true','expect_false','expect_raise',
                            'g106_week','g106','g106_slot','g106_coach','g106_day');
-  perform expect_num('anon function surface is FOURTEEN', n, 14);
+  perform expect_num('anon function surface is FIFTEEN', n, 15);
   perform expect_true('resend_webhook_inbox keeps anon INSERT',
     has_table_privilege('anon','public.resend_webhook_inbox','insert'));
   perform expect_false('resend_webhook_inbox is not anon-readable',

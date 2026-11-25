@@ -8916,6 +8916,11 @@ export type Database = {
         Row: {
           amount_cents: number
           booking_id: string | null
+          buyer_email: string | null
+          buyer_name: string | null
+          buyer_phone: string | null
+          claimed_at: string | null
+          claimed_member_id: string | null
           completed_at: string | null
           created_at: string
           credit_applied_cents: number
@@ -8923,6 +8928,8 @@ export type Database = {
           discount_cents: number | null
           failure_reason: string | null
           gift_card_id: string | null
+          guest_payment_id: string | null
+          guest_status: string | null
           id: string
           last_return_check_at: string | null
           last_return_check_result: string | null
@@ -8943,6 +8950,11 @@ export type Database = {
         Insert: {
           amount_cents: number
           booking_id?: string | null
+          buyer_email?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          claimed_at?: string | null
+          claimed_member_id?: string | null
           completed_at?: string | null
           created_at?: string
           credit_applied_cents?: number
@@ -8950,6 +8962,8 @@ export type Database = {
           discount_cents?: number | null
           failure_reason?: string | null
           gift_card_id?: string | null
+          guest_payment_id?: string | null
+          guest_status?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
@@ -8970,6 +8984,11 @@ export type Database = {
         Update: {
           amount_cents?: number
           booking_id?: string | null
+          buyer_email?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          claimed_at?: string | null
+          claimed_member_id?: string | null
           completed_at?: string | null
           created_at?: string
           credit_applied_cents?: number
@@ -8977,6 +8996,8 @@ export type Database = {
           discount_cents?: number | null
           failure_reason?: string | null
           gift_card_id?: string | null
+          guest_payment_id?: string | null
+          guest_status?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
@@ -9003,10 +9024,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "xendit_purchases_claimed_member_id_fkey"
+            columns: ["claimed_member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_claimed_member_id_fkey"
+            columns: ["claimed_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "xendit_purchases_gift_card_id_fkey"
             columns: ["gift_card_id"]
             isOneToOne: false
             referencedRelation: "gift_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_guest_payment_id_fkey"
+            columns: ["guest_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
           {
@@ -9557,6 +9599,11 @@ export type Database = {
         }
       }
       claim_ranking: { Args: { p_occurrence_id: string }; Returns: Json }
+      claim_waiting_plans: { Args: { p_studio_id: string }; Returns: Json }
+      claim_waiting_plans_run: {
+        Args: { p_email: string; p_member_id: string; p_studio_id: string }
+        Returns: Json
+      }
       claiming_enabled: { Args: { p_studio_id: string }; Returns: boolean }
       class_seats_used_run: {
         Args: { p_occurrence_id: string }
@@ -10253,6 +10300,22 @@ export type Database = {
         Returns: Json
       }
       guest_pass_report: { Args: { p_studio_id: string }; Returns: Json }
+      guest_purchases_unclaimed: {
+        Args: { p_studio_id: string }
+        Returns: {
+          amount_cents: number
+          buyer_email: string
+          buyer_name: string
+          buyer_phone: string
+          currency: string
+          days_waiting: number
+          paid_at: string
+          payment_id: string
+          plan_name: string
+          purchase_id: string
+          status: string
+        }[]
+      }
       ics_calendar: {
         Args: { p_method: string; p_vevents: string }
         Returns: string
@@ -11048,6 +11111,7 @@ export type Database = {
           reference: string
         }[]
       }
+      my_guest_plans: { Args: { p_studio_id: string }; Returns: Json }
       my_instructor: { Args: never; Returns: Json }
       my_month_roster: {
         Args: { p_instructor_id: string; p_month: string }
@@ -11213,7 +11277,34 @@ export type Database = {
         Args: { p_for_date: string; p_membership_id: string }
         Returns: Json
       }
+      plan_buy_begin: {
+        Args: {
+          p_buyer_email?: string
+          p_buyer_name?: string
+          p_buyer_phone?: string
+          p_plan_id: string
+          p_studio_id: string
+        }
+        Returns: {
+          amount_cents: number
+          apple_pay_verified: boolean
+          currency: string
+          plan_name: string
+          purchase_id: string
+          secret_key_ciphertext: string
+          test_mode: boolean
+        }[]
+      }
       plan_card_detail: { Args: { p_plan_id: string }; Returns: string }
+      plan_guest_email_payload: {
+        Args: { p_purchase_id: string }
+        Returns: Json
+      }
+      plan_guest_intro_ok: {
+        Args: { p_member_id: string; p_plan_id: string }
+        Returns: boolean
+      }
+      plan_is_intro_offer: { Args: { p_plan_id: string }; Returns: boolean }
       plan_period_end: {
         Args: { p_from: string; p_plan_id: string }
         Returns: string
@@ -11227,6 +11318,10 @@ export type Database = {
         Returns: Json
       }
       plan_prices_now: { Args: { p_studio_id: string }; Returns: Json }
+      plan_purchase_activate_run: {
+        Args: { p_member_id: string; p_purchase_id: string }
+        Returns: Json
+      }
       plan_seats: {
         Args: { p_studio_id: string }
         Returns: {
@@ -11705,6 +11800,10 @@ export type Database = {
         }
         Returns: Json
       }
+      record_guest_intro_refund: {
+        Args: { p_purchase_id: string; p_reference: string }
+        Returns: Json
+      }
       record_manual_payment: {
         Args: {
           p_amount_cents: number
@@ -11792,6 +11891,16 @@ export type Database = {
         }
         Returns: Json
       }
+      refund_payment_run: {
+        Args: {
+          p_amount_cents?: number
+          p_method?: string
+          p_payment_id: string
+          p_reason?: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
       release_hold: { Args: { p_booking_id: string }; Returns: Json }
       release_provisional_seats_run: {
         Args: { p_occurrence_id: string }
@@ -11870,6 +11979,7 @@ export type Database = {
         Args: { p_month: string; p_studio_id: string }
         Returns: Json
       }
+      resend_plan_claim: { Args: { p_purchase_id: string }; Returns: Json }
       resend_reply_to: {
         Args: { p_address: string; p_from_name: string }
         Returns: string
@@ -12556,11 +12666,12 @@ export type Database = {
         }[]
       }
       studio_by_slug: {
-        Args: { p_slug: string }
+        Args: { p_slug: string; p_with_plans?: boolean }
         Returns: {
           accent_color: string
           android_package: string
           android_sha256_fingerprints: string
+          buy: Json
           currency: string
           free_first_class_enabled: boolean
           gift_card_image_url: string
@@ -12719,6 +12830,7 @@ export type Database = {
       sweep_membership_periods: { Args: never; Returns: Json }
       sweep_no_shows: { Args: never; Returns: Json }
       sweep_peak_cutoff_reminders: { Args: never; Returns: Json }
+      sweep_plan_claim_reminders: { Args: never; Returns: number }
       sweep_platform_billing: { Args: never; Returns: Json }
       sweep_resend_webhooks: { Args: never; Returns: Json }
       sweep_roster_carry: { Args: never; Returns: Json }

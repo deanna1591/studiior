@@ -4,6 +4,8 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, Rows, SectionLabel } from "@/components/ui";
 import { PLAN_TYPE_LABEL, formatMoney, type PlanType } from "@/lib/plans";
 import PlansReorder, { type ReorderPlan } from "@/components/staff/plans-reorder";
+import WebsiteLink from "./[id]/website-link";
+import { staffMemberOrigin } from "@/lib/member-urls-server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,7 @@ export default async function PlansList() {
     return <AppShell {...shell} title="Plans"><Denied what="Managing plans" role={ctx.role} /></AppShell>;
   }
 
-  const [{ data: plans }, { data: memberships }, { data: seats }] = await Promise.all([
+  const [{ data: plans }, { data: memberships }, { data: seats }, { data: studioRow }] = await Promise.all([
     supabase
       .from("membership_plans")
       .select("id, name, type, price_cents, currency, status, visibility, credits, credits_per_period, validity_days, billing_interval, group_size, sort_order, featured, badge")
@@ -30,7 +32,10 @@ export default async function PlansList() {
     // the feature leave no trace on this screen rather than drawing a column of
     // dashes.
     supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
+    supabase.from("studios").select("slug").eq("id", ctx.studioId).maybeSingle(),
   ]);
+  // Decision 118: the public page listing every plan, for the website.
+  const buyAllUrl = studioRow?.slug ? `${await staffMemberOrigin(supabase, studioRow.slug)}/buy` : null;
 
   const seatOf = new Map((seats ?? []).map((r) => [r.plan_id, r]));
 
@@ -144,6 +149,11 @@ export default async function PlansList() {
         price rise applies to the next person who buys, not to the people who
         already did.
       </p>
+
+      {buyAllUrl && (
+        <WebsiteLink url={buyAllUrl} title="Website link for all plans"
+          hint="Every plan on sale, buyable without an account. Each plan's own link is on its page." />
+      )}
 
       {active.length === 0 ? (
         <Empty>

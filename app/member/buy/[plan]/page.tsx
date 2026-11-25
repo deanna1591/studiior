@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { accentSolid } from "@/lib/accent-pair";
 import type { Metadata } from "next";
 import { getMemberContext } from "@/lib/auth";
 import { memberScreen } from "@/lib/member";
@@ -11,10 +10,12 @@ import { formatMoney, isOnlineBuyable, INTRO_USED_SENTENCE } from "@/lib/plans";
 import type { PlanPrice } from "@/lib/promo";
 import { PriceAmount, PromoTagChip } from "@/components/price-tag";
 import CreditApplied from "@/components/member/credit-applied";
-import { themeVars, neutralAccent, type PresetKey } from "@/lib/theme";
 import { buyPath } from "@/lib/member-urls";
 import { safeNext } from "@/lib/auth-redirect";
 import BuyPlan from "../../account/plan/buy";
+import { buyStudio, planIncludes } from "@/lib/buy-plans";
+import BuyFrame from "../frame";
+import GuestBuyForm from "../guest-form";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,8 @@ export async function generateMetadata({ params }: { params: { plan: string } })
     if (ctx && UUID.test(params.plan)) {
       const p = await readPlan(createClient(), params.plan);
       if (p && isBuyable(p)) planName = p.name;
+    } else if (!ctx) {
+      planName = (await buyStudio())?.plans.find((x) => x.id === params.plan)?.name ?? null;
     }
   } catch {
     /* metadata is best-effort; fall back to the studio name */
@@ -89,32 +92,55 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
   // signed-out visitor screens that all bounce to /login. Sign in / Create
   // account carry ?next so they land back here (Decision 41).
   if (!ctx) {
-    const studio = await anonStudio();
-    const preset = (studio?.theme_preset ?? "warm") as PresetKey;
-    const accent = studio?.accent_color ?? neutralAccent(preset);
-    const vars = themeVars(preset, accent) as React.CSSProperties;
+    // Decision 118: no account needed. The plan comes from the public reader
+    // (studio_by_slug with its plans and today's price); name, email and mobile,
+    // then Xendit. Decision 57's sign-in requirement for this page is lifted.
+    const studio = await buyStudio();
+    const p = studio?.plans.find((x) => x.id === params.plan) ?? null;
+    if (!studio || !p) {
+      return (
+        <BuyFrame studio={studio} title="Plans">
+          <section className="m-card p-5 text-center">
+            <p className="m-body text-ink">This plan isn&rsquo;t available online. Ask the studio.</p>
+            <p className="m-sub mt-1 text-ink-2">
+              <Link href="/buy" className="text-ink underline underline-offset-4">See all plans</Link>
+            </p>
+          </section>
+        </BuyFrame>
+      );
+    }
     return (
-      <div className="m-page min-h-screen" style={vars}>
-        <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-5 text-center">
-          {studio?.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={studio.logo_url} alt="" className="mb-5 h-16 w-16 rounded-2xl object-contain" />
-          ) : null}
-          {studio?.name && <p className="m-head text-[22px] leading-7 text-ink">{studio.name}</p>}
-          <p className="m-body mt-2 text-ink-2">Sign in or create your account to buy this plan.</p>
-          <div className="mt-6 w-full max-w-xs space-y-3">
-            <Link href={`/login?next=${encodeURIComponent(next)}`}
-                  style={accentSolid()}
-                  className="m-action m-press flex w-full items-center justify-center rounded-xl text-[16px] font-semibold">
-              Sign in
-            </Link>
-            <Link href={`/signup?next=${encodeURIComponent(next)}`}
-                  className="m-action m-press flex w-full items-center justify-center rounded-xl border border-line-2 bg-surface text-[16px] font-semibold text-ink">
-              Create an account
-            </Link>
+      <BuyFrame studio={studio}>
+        <Link href="/buy" className="m-sub m-press mb-3 inline-flex items-center gap-1 text-ink-2">
+          <Icon name="chevron-left" size={16} /> All plans
+        </Link>
+        <section className="m-card p-5">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="m-head text-[24px] leading-8 text-ink">{p.name}</h1>
+            <div className="shrink-0 text-right">
+              <PriceAmount priceCents={p.price.price_cents} listCents={p.price.list_cents}
+                           currency={p.price.currency} promo={p.price} />
+            </div>
           </div>
-        </main>
-      </div>
+          <PromoTagChip promo={p.price} className="mt-2" />
+          {p.description && <p className="m-body mt-3 text-ink-2">{p.description}</p>}
+          <ul className="m-sub mt-3 space-y-1 text-ink-2">
+            {planIncludes(p).map((line) => <li key={line}>{line}</li>)}
+          </ul>
+          {p.type === "trial" && (
+            <p className="m-sub mt-3 text-ink-2">The intro offer is for first-timers, once per person.</p>
+          )}
+        </section>
+        <section className="mt-4">
+          {!studio.online ? (
+            <div className="m-card p-5"><p className="m-body text-ink">Online payment isn&rsquo;t set up yet. Pay at the studio.</p></div>
+          ) : p.full ? (
+            <div className="m-card p-5"><p className="m-body text-ink">This plan is full. Ask the studio.</p></div>
+          ) : (
+            <GuestBuyForm planId={p.id} loginHref={`/login?next=${encodeURIComponent(next)}`} />
+          )}
+        </section>
+      </BuyFrame>
     );
   }
 

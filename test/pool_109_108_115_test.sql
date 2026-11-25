@@ -263,11 +263,11 @@ insert into resend_webhook_inbox (event_type, provider_message_id, received_at)
 select expect_num('the cap holds the last minute at 600', (select count(*) from resend_webhook_inbox where received_at > now()-interval '1 minute'), 600);
 insert into resend_webhook_inbox (event_type, provider_message_id) values ('email.delivered','over-cap');
 select expect_num('the over-cap insert was dropped', (select count(*) from resend_webhook_inbox where provider_message_id='over-cap'), 0);
--- surface: anon FOURTEEN functions + the inbox table (anon insert, not select)
-select expect_num('anon surface is fourteen functions',
+-- surface: anon FIFTEEN functions + the inbox table (anon insert, not select)
+select expect_num('anon surface is fifteen functions',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and p.prokind='f' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%'), 14);
+      and p.proname not like 'expect_%'), 15);
 select expect_true('inbox is anon-insertable', has_table_privilege('anon','public.resend_webhook_inbox','insert'));
 select expect_false('inbox is not anon-readable', has_table_privilege('anon','public.resend_webhook_inbox','select'));
 

@@ -11,7 +11,7 @@
 -- on-time cancel -> credit; the credit applied at the next checkout (capped) and
 -- not twice; a refund voids the unused credit; the fee is an invoiceable payment;
 -- the existing-booking dues flow (ask once, release past the cut-off, stays
--- eligible, past-cut-off left alone). Guards + anon FOURTEEN.
+-- eligible, past-cut-off left alone). Guards + anon FIFTEEN.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -635,12 +635,12 @@ select expect_true('sample context: class_list_html is a card',
           like '%border:1px solid #E7E5E4;border-radius:8px%'));
 
 -- =============================================================================
--- 12. Anon surface EXACTLY FOURTEEN.
+-- 12. Anon surface EXACTLY FIFTEEN.
 -- =============================================================================
-select expect_num('anon surface is exactly fourteen',
+select expect_num('anon surface is exactly fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','d103_complete')), 14);
+      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','d103_complete')), 15);
 
 select expect_true('the inbox table is closed to anon reads, with RLS on',
   not has_table_privilege('anon', 'resend_webhook_inbox', 'select')

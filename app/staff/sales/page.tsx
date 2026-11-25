@@ -153,6 +153,10 @@ export default async function Sales({
                 className="text-[13px] text-ink-3 underline underline-offset-4 hover:text-ink">
             Revenue
           </Link>
+          <Link href="/sales/unclaimed"
+                className="text-[13px] text-ink-3 underline underline-offset-4 hover:text-ink">
+            Bought, not yet claimed
+          </Link>
         </>
       }
       filters={

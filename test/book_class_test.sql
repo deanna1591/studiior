@@ -846,8 +846,8 @@ update bookings set provisional = false, confirmed_at = now() where id = 'ffffff
 select expect_text('73a free-first confirmed: the member can book again',
   t73_book('ffffffff-0000-0000-73a2-0000000000a1','ffffffff-0000-0000-73a2-0000000000b1','ffffffff-0000-0000-73a2-0000000000f2'), 'booked');
 
--- anon surface unchanged — EXACTLY FOURTEEN (73a adds no anon function).
-select expect_num('anon surface is EXACTLY FOURTEEN', (
+-- anon surface unchanged — EXACTLY FIFTEEN (73a adds no anon function).
+select expect_num('anon surface is EXACTLY FIFTEEN', (
   select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
    where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-     and p.proname not like 'expect\_%' and p.proname not like 't73%' and p.proname <> 'login'), 14);
+     and p.proname not like 'expect\_%' and p.proname not like 't73%' and p.proname <> 'login'), 15);

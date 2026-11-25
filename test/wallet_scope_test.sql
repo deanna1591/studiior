@@ -10,7 +10,7 @@
 -- the refunded set); the reader is scoped to the CALLER's own member row (it
 -- never returns another member's payment); and it is own-STUDIO + member-only
 -- (a member of another studio, and a login with no member row, are both PT403).
--- Anon surface stays EXACTLY FOURTEEN.
+-- Anon surface stays EXACTLY FIFTEEN.
 --
 -- RED proof: on the pre-88b schema member_wallet does not exist, so wal(...)
 -- errors 42883 rather than returning the three groups.
@@ -147,14 +147,14 @@ begin
   perform expect_text('stranger refused PT403', r->>'err', 'PT403');
 end $$;
 
--- ---- Anon surface is EXACTLY FOURTEEN (suite helpers excluded) --------------
+-- ---- Anon surface is EXACTLY FIFTEEN (suite helpers excluded) --------------
 do $$
 declare n int;
 begin
   select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not in ('expect_num','expect_text','wal','login');
-  perform expect_num('anon surface is fourteen', n, 14);
+  perform expect_num('anon surface is fifteen', n, 15);
 end $$;
 
 select 'wallet_scope_test: all assertions passed' as result;

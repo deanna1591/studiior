@@ -164,10 +164,10 @@ select expect_num('...one of them a date marked off',
     where s.instructor_id = 'a18da18d-0000-0000-0000-00000000d101' and s.period_start = t.p2
       and a.exception_date = t.p2 + 4 and not a.is_available)::bigint, 1);
 
-select expect_num('anon surface is EXACTLY FOURTEEN',
+select expect_num('anon surface is EXACTLY FIFTEEN',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%')::bigint, 14);
+      and p.proname not like 'expect_%')::bigint, 15);
 select expect_true('the inbox table is closed to anon reads with RLS on',
   not has_table_privilege('anon','public.resend_webhook_inbox','select')
   and (select relrowsecurity from pg_class where oid = 'public.resend_webhook_inbox'::regclass));

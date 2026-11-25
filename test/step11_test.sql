@@ -428,10 +428,10 @@ select expect_true('roster_table: built from the instructor''s classes that mont
 -- =============================================================================
 -- 10. The surface
 -- =============================================================================
-select expect_eq('anon surface EXACTLY FOURTEEN',
+select expect_eq('anon surface EXACTLY FIFTEEN',
   (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
     where s.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('expect_eq','expect_true','expect_err','mk_occ','mk_free','mk_due')), '14');
+      and p.proname not in ('expect_eq','expect_true','expect_err','mk_occ','mk_free','mk_due')), '15');
 select expect_true('the new readers are not anon',
   not has_function_privilege('anon', 'occurrence_free_seat_states(uuid)', 'execute')
   and not has_function_privilege('anon', 'reservation_fee_terms(uuid,uuid)', 'execute')

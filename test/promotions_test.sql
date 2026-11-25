@@ -370,8 +370,8 @@ reset role; set role anon;
 select expect_err('8.3 anon cannot read plan_promotions', $$select count(*) from plan_promotions$$, '42501');
 select expect_err('8.4 anon cannot read prices', $$select plan_prices_now('b1170000-0000-0000-0000-0000000000a0')$$, '42501');
 reset role;
-select expect_eq('8.5 anon surface EXACTLY FOURTEEN', (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+select expect_eq('8.5 anon surface EXACTLY FIFTEEN', (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
    where s.nspname = 'public' and p.proname not like 'expect\_%' and p.proname not in ('call_jsonb')
-     and has_function_privilege('anon', p.oid, 'execute')), '14');
+     and has_function_privilege('anon', p.oid, 'execute')), '15');
 
 do $$ begin raise notice 'promotions_test: all assertions passed'; end $$;

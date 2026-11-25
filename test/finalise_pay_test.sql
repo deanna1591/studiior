@@ -217,10 +217,10 @@ select expect_eq('pay_statement carries heads_paid = 6 for OG1',
 select set_config('request.jwt.claim.sub', '', false);
 
 -- --- anon surface and the inbox table -----------------------------------------
-select expect_eq('anon surface is EXACTLY FOURTEEN',
+select expect_eq('anon surface is EXACTLY FIFTEEN',
   (select count(*)::text from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('expect_eq','rec_amt','rec_instr','rec_checked','rec_basis')), '14');
+      and p.proname not in ('expect_eq','rec_amt','rec_instr','rec_checked','rec_basis')), '15');
 select expect_eq('the webhook inbox table is closed to anon reads with RLS on',
   (select (not has_table_privilege('anon','resend_webhook_inbox','select') and relrowsecurity)::text
      from pg_class where relname='resend_webhook_inbox'), 'true');

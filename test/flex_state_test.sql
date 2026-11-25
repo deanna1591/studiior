@@ -145,8 +145,8 @@ select expect_eq('5.2 occurrence_flex_state_run is service-only',
   (has_function_privilege('authenticated', 'occurrence_flex_state_run(uuid)', 'execute')
    or has_function_privilege('anon', 'occurrence_flex_state_run(uuid)', 'execute'))::text, 'false');
 select expect_eq('5.3 public_schedule is still anon', has_function_privilege('anon', 'public_schedule(text, integer)', 'execute')::text, 'true');
-select expect_eq('5.4 anon surface EXACTLY FOURTEEN', (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+select expect_eq('5.4 anon surface EXACTLY FIFTEEN', (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
    where s.nspname = 'public' and p.proname not like 'expect\_%' and p.proname not in ('call_jsonb')
-     and has_function_privilege('anon', p.oid, 'execute')), '14');
+     and has_function_privilege('anon', p.oid, 'execute')), '15');
 
 do $$ begin raise notice 'flex_state_test: all assertions passed'; end $$;

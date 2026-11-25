@@ -252,11 +252,11 @@ select expect_text('desk-unpaid still drop_in', (select payment_source::text fro
 select expect_num('no booking_rebooked for M4 (switch suppressed)',
   (select count(*) from notifications where member_id='9eb00000-0000-0000-0000-0000000000b4' and template_key='booking_rebooked'), 0);
 
-\echo '--- 6. anon FOURTEEN ---'
-select expect_num('anon surface is fourteen',
+\echo '--- 6. anon FIFTEEN ---'
+select expect_num('anon surface is fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('login','as_reason','expect_text','expect_true','expect_num')), 14);
+      and p.proname not in ('login','as_reason','expect_text','expect_true','expect_num')), 15);
 
 reset role;
 drop function login(text); drop function as_reason(text,text);

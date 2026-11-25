@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
 import { safeNext, confirmDestination } from "@/lib/auth-redirect";
+import { claimWaitingPlans } from "@/lib/guest-claim";
 import { resolveHost } from "@/lib/tenant";
 
 // Decision 41: the per-studio auth callback. Supabase sends the member back
@@ -93,6 +94,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const { data: claim } = await supabase.rpc("claim_member_by_email", { p_studio_id: s.id });
       const c = Array.isArray(claim) ? claim[0] : claim;
       claimReason = (c as { failure_reason?: string | null } | null)?.failure_reason ?? null;
+      // Decision 118: a verified email claims every plan paid for under it.
+      if (claimReason == null || claimReason === "already_claimed") {
+        await claimWaitingPlans(supabase, s.id);
+      }
     }
   }
   return NextResponse.redirect(new URL(confirmDestination(true, claimReason, next), base));
