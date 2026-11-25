@@ -65,6 +65,18 @@ export default async function BuyAll() {
               </li>
             ))}
           </ul>
+          {studio.contact_email && (
+            <section id="contact" className="m-card mt-6 scroll-mt-6 p-5">
+              <p className="m-head text-[16px] leading-6 text-ink">Questions?</p>
+              <p className="m-body mt-1 text-ink-2">
+                Email us at{" "}
+                <a href={`mailto:${studio.contact_email}`} className="text-ink underline underline-offset-4">
+                  {studio.contact_email}
+                </a>{" "}
+                and we&rsquo;ll help.
+              </p>
+            </section>
+          )}
           <p className="m-sub mt-6 text-center text-ink-2">
             Already have an account? <Link href="/login?next=%2Faccount%2Fplan" className="text-ink underline underline-offset-4">Sign in</Link>
           </p>

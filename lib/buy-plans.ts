@@ -16,7 +16,7 @@ export type BuyablePlan = {
 export type BuyStudio = {
   id: string; name: string; slug: string; logo_url: string | null;
   theme_preset: string | null; accent_color: string | null; currency: string;
-  online: boolean; plans: BuyablePlan[];
+  online: boolean; plans: BuyablePlan[]; contact_email: string | null;
 };
 
 /**
@@ -35,11 +35,11 @@ export async function buyStudio(): Promise<BuyStudio | null> {
   const { data } = await anon.rpc("studio_by_slug", { p_slug: slug, p_with_plans: true });
   const s = Array.isArray(data) ? data[0] : data;
   if (!s) return null;
-  const buy = (s.buy ?? {}) as { online?: boolean; plans?: BuyablePlan[] };
+  const buy = (s.buy ?? {}) as { online?: boolean; plans?: BuyablePlan[]; contact_email?: string | null };
   return {
     id: s.id, name: s.name, slug: s.slug, logo_url: s.logo_url,
     theme_preset: s.theme_preset, accent_color: s.accent_color, currency: s.currency,
-    online: buy.online === true, plans: buy.plans ?? [],
+    online: buy.online === true, plans: buy.plans ?? [], contact_email: buy.contact_email ?? null,
   };
 }
 

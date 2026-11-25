@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * the studio — no account. Themed to the studio; buyGift opens the Xendit
  * session and the webhook issues the card on payment.
  */
-export default async function GiftPage() {
+export default async function GiftPage({ searchParams }: { searchParams?: { amount?: string } }) {
   const slug = currentSlug();
   const anon = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,6 +29,9 @@ export default async function GiftPage() {
   const currency = studio?.currency ?? "PHP";
   const presets = (studio?.gift_presets ?? [100000, 250000, 500000]) as number[];
   const minCents = studio?.gift_min_cents ?? 50000;
+  // Decision 119: the rescue email links here with the amount (whole units).
+  const askedUnits = Number(searchParams?.amount ?? "");
+  const initialCents = Number.isFinite(askedUnits) && askedUnits > 0 ? Math.round(askedUnits) * 100 : undefined;
 
   // Decision 110(a): a signed-in member of this studio (from the Plans page) is
   // filled in as the buyer, read from their own session — never from the URL.
@@ -86,6 +89,7 @@ export default async function GiftPage() {
           currency={currency}
           buyerName={buyerName}
           buyerEmail={buyerEmail}
+          initialCents={initialCents}
         />
       </main>
     </div>

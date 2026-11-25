@@ -1504,6 +1504,71 @@ export type Database = {
           },
         ]
       }
+      checkout_rescues: {
+        Row: {
+          created_at: string
+          email: string | null
+          item_key: string | null
+          kind: string | null
+          notification_id: string | null
+          outcome: string
+          purchase_id: string
+          reason: string | null
+          studio_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          item_key?: string | null
+          kind?: string | null
+          notification_id?: string | null
+          outcome: string
+          purchase_id: string
+          reason?: string | null
+          studio_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          item_key?: string | null
+          kind?: string | null
+          notification_id?: string | null
+          outcome?: string
+          purchase_id?: string
+          reason?: string | null
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_rescues_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_rescues_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: true
+            referencedRelation: "xendit_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_rescues_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_rescues_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_occurrences: {
         Row: {
           assigned_by: string | null
@@ -9569,6 +9634,11 @@ export type Database = {
         Returns: string
       }
       checkin_slug_studio: { Args: { p_slug: string }; Returns: string }
+      checkout_rescue_backfill: { Args: { p_now?: string }; Returns: Json }
+      checkout_rescue_run: {
+        Args: { p_backfill?: boolean; p_now?: string; p_purchase_id: string }
+        Returns: string
+      }
       choose_pay_at_desk: { Args: { p_booking_id: string }; Returns: Json }
       claim_guarantee_terms: {
         Args: { p_instructor_id: string }
@@ -12808,6 +12878,7 @@ export type Database = {
       sweep_availability_reminders: { Args: never; Returns: Json }
       sweep_booked_count_reconcile: { Args: never; Returns: Json }
       sweep_challenges: { Args: never; Returns: Json }
+      sweep_checkout_rescue: { Args: { p_now?: string }; Returns: Json }
       sweep_class_ended_unmarked: { Args: never; Returns: Json }
       sweep_commitments: { Args: never; Returns: Json }
       sweep_cover_escalations: { Args: never; Returns: number }

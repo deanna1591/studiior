@@ -45,7 +45,7 @@ export default async function Shop() {
       ) : (
         <ul className="space-y-3">
           {items.map((p) => (
-            <li key={p.id} className="m-card flex gap-3 p-3">
+            <li key={p.id} id={`product-${p.id}`} className="m-card flex scroll-mt-6 gap-3 p-3">
               {p.photo_url
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={p.photo_url} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />

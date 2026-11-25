@@ -11,14 +11,17 @@ import { giftAmountProblem } from "@/lib/gift-card";
  * the Xendit session and we navigate there. Phone-first.
  */
 export default function GiftForm({
-  presets, minCents, currencyLabels, minLabel, currency, buyerName = "", buyerEmail = "",
+  presets, minCents, currencyLabels, minLabel, currency, buyerName = "", buyerEmail = "", initialCents,
 }: {
   presets: number[]; minCents: number; currencyLabels: string[]; minLabel: string; currency: string;
-  buyerName?: string; buyerEmail?: string;
+  buyerName?: string; buyerEmail?: string; initialCents?: number;
 }) {
-  const [amount, setAmount] = useState<number>(presets[0] ?? minCents);
-  const [custom, setCustom] = useState("");
-  const [customOn, setCustomOn] = useState(false);
+  // Decision 119: a prefilled amount selects its preset, or fills "Another amount".
+  const startPreset = initialCents != null && presets.includes(initialCents);
+  const startCustom = initialCents != null && !startPreset;
+  const [amount, setAmount] = useState<number>(startPreset ? (initialCents as number) : (presets[0] ?? minCents));
+  const [custom, setCustom] = useState(startCustom ? String((initialCents as number) / 100) : "");
+  const [customOn, setCustomOn] = useState(startCustom);
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
