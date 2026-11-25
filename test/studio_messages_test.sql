@@ -274,14 +274,14 @@ select expect_num('the member now sees an empty thread',
   jsonb_array_length(as_json('de890000-0000-0000-0000-0000000000c1',
     $$ select member_messages('de890000-0000-0000-0000-0000000000a0') $$) -> 'messages'), 0);
 
-\echo '--- 13. the anon surface is still EXACTLY FOURTEEN ---'
+\echo '--- 13. the anon surface is still EXACTLY FIFTEEN ---'
 -- The suite's own helpers (as_json/as_count/expect_*) are anon-executable locally;
 -- exclude them. The migration itself asserts the clean fourteen at apply time.
 reset role;
-select expect_num('anon surface is fourteen',
+select expect_num('anon surface is fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('as_json','as_count','expect_num','expect_eq','expect_true')), 14);
+      and p.proname not in ('as_json','as_count','expect_num','expect_eq','expect_true')), 15);
 
 reset role;
 drop function as_json(text, text); drop function as_count(text, text);

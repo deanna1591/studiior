@@ -377,11 +377,11 @@ select expect_raises('a member cannot read the payments list',
 reset role;
 
 \echo ''
-\echo '=== 8. anon surface is exactly fourteen ==='
-select expect_num('anon surface is fourteen',
+\echo '=== 8. anon surface is exactly fifteen ==='
+select expect_num('anon surface is fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','kard')), 14);
+      and p.proname not like 'expect_%' and p.proname not in ('login','sig','psig','kard')), 15);
 
 \echo ''
 \echo '=== dashboard_cards_test PASSED ==='

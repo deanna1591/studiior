@@ -164,7 +164,7 @@ end $$;
 select expect_raise('instructor cannot run the gate', :'INST'::uuid,
   'select brand_kit_run_allowed('''|| :'SA' ||''')', 'PT403');
 
--- 9. anon refused, and the surface is EXACTLY FOURTEEN
+-- 9. anon refused, and the surface is EXACTLY FIFTEEN
 do $$
 declare got text;
 begin
@@ -180,7 +180,7 @@ begin
   select count(*) into n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not like 'expect%' and p.proname <> 'call_jsonb';
-  perform expect_num('anon surface is exactly fourteen', n::bigint, 14);
+  perform expect_num('anon surface is exactly fifteen', n::bigint, 15);
 end $$;
 
 select 'brand_kit_test OK' as result;

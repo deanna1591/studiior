@@ -245,11 +245,11 @@ begin
 end $$;
 
 -- =============================================================================
--- 9. the anon surface is still EXACTLY FOURTEEN (suite helpers excluded).
+-- 9. the anon surface is still EXACTLY FIFTEEN (suite helpers excluded).
 -- =============================================================================
-select expect_num('anon surface is exactly fourteen',
+select expect_num('anon surface is exactly fifteen',
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect%' and p.proname not like 't91x%')::bigint, 14);
+      and p.proname not like 'expect%' and p.proname not like 't91x%')::bigint, 15);
 
 select 'hide_class_test OK' as result;

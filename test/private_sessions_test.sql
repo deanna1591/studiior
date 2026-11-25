@@ -18,7 +18,7 @@
 -- drop-in sweep; the five templates render with nothing stripped; the gift card
 -- issued at exactly the amount chosen, whole hundreds, the card image on the
 -- send, the Apple Pay flag, refund voiding an unredeemed card and refusing a
--- redeemed one, the Account credit split; the PT403s; anon EXACTLY FOURTEEN.
+-- redeemed one, the Account credit split; the PT403s; anon EXACTLY FIFTEEN.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -476,11 +476,11 @@ select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_text('credits: gift credit named apart from the total', current_setting('t.bs2'), '100000:100000:true');
 
 -- =============================================================================
--- 12. ANON STAYS EXACTLY FOURTEEN.
+-- 12. ANON STAYS EXACTLY FIFTEEN.
 -- =============================================================================
-select expect_num('anon surface is exactly fourteen',
+select expect_num('anon surface is exactly fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('expect_num','expect_text','expect_true','d116_as','d116_at')), 14);
+      and p.proname not in ('expect_num','expect_text','expect_true','d116_as','d116_at')), 15);
 
 select 'private_sessions_test PASS' as result;

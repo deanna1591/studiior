@@ -9,7 +9,7 @@
 -- "finish paying, or cancel" line because a hold is present); cancel releases the
 -- hold and frees the seat; the sweep cancels the hold AND expires the matching
 -- pending xendit purchase; and a BOOKED free seat that owes the fee is still
--- booked and shows the fee due (pay-to-keep). Anon stays FOURTEEN.
+-- booked and shows the fee due (pay-to-keep). Anon stays FIFTEEN.
 -- =============================================================================
 \set ON_ERROR_STOP on
 set client_min_messages to notice;
@@ -182,7 +182,7 @@ select expect_num('sweep: the seat is freed',
   (select booked_count from class_occurrences where id = 'd10c0000-0000-0000-0000-00000000c003'), 0);
 
 -- =============================================================================
--- 5. GUARDS + anon FOURTEEN.
+-- 5. GUARDS + anon FIFTEEN.
 -- =============================================================================
 do $t$ begin
   begin
@@ -194,10 +194,10 @@ do $t$ begin
   end;
 end $t$ language plpgsql;
 
-select expect_num('anon surface EXACTLY FOURTEEN', (
+select expect_num('anon surface EXACTLY FIFTEEN', (
   select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not in ('expect_num','expect_text','expect_true')
-), 14);
+), 15);
 
 \echo 'reservation_hold_test: all assertions passed'

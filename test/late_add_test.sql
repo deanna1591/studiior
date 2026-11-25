@@ -201,11 +201,11 @@ select expect_true('...and the audit is booking.booked_by_staff, not late_add',
           and (after->>'booking_id')::uuid = (select id from bookings where member_id='1a7e0000-0000-0000-0000-0000000000b3' and occurrence_id='1a7e0000-0000-0000-0000-0000000000d3')));
 
 -- =============================================================================
--- 8. Anon surface EXACTLY FOURTEEN (suite helpers excluded).
+-- 8. Anon surface EXACTLY FIFTEEN (suite helpers excluded).
 -- =============================================================================
-select expect_num('anon surface EXACTLY FOURTEEN',
+select expect_num('anon surface EXACTLY FIFTEEN',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('expect_num','expect_text','expect_true','expect_false','expect_raise')), 14);
+      and p.proname not in ('expect_num','expect_text','expect_true','expect_false','expect_raise')), 15);
 
 select 'late_add_test PASS' as result;

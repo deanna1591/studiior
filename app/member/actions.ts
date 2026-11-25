@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberContext } from "@/lib/auth";
 import { stripeFor } from "@/lib/stripe";
-import { memberOrigin, currentMemberOrigin } from "@/lib/tenant";
+import { memberOrigin, currentMemberOrigin, currentSlug } from "@/lib/tenant";
+import { claimWaitingPlans } from "@/lib/guest-claim";
 import { buildAuthCallback } from "@/lib/auth-redirect";
 import { requestOutcome, resetNext, validateNewPassword } from "@/lib/password-reset";
 import { fmtDeadlineShort } from "@/lib/time";
@@ -24,6 +25,14 @@ export async function signIn(_prev: SignInResult, formData: FormData): Promise<S
     password: String(formData.get("password") ?? ""),
   });
   if (error) return { error: error.message };
+  // Decision 118: signing in with a verified email claims every plan paid for
+  // under it (Home then shows "Your {plan} is ready"). Never blocks the sign-in.
+  const slug = currentSlug();
+  if (slug) {
+    const { data: st } = await supabase.rpc("studio_by_slug", { p_slug: slug });
+    const s = Array.isArray(st) ? st[0] : st;
+    if (s?.id) await claimWaitingPlans(supabase, s.id);
+  }
   // NOT redirect("/"): a server-action redirect to a member path renders the
   // STAFF app (the redirect-follow request loses the studio subdomain, so
   // middleware resolves the bare host as staff). The form does a full-document

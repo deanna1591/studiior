@@ -40,6 +40,8 @@ const CHIP: Record<string, { label: string; warn?: boolean }> = {
   active: { label: "Active" },
   refunded: { label: "Refunded" },
   unpaid: { label: "Unpaid" },
+  // Decision 118: bought without an account, not yet claimed.
+  waiting_account: { label: "Waiting for account" },
   // Decision 111: a refund's own status on the Sales Refunds list.
   pending: { label: "Pending", warn: true },
   failed: { label: "Failed", warn: true },

@@ -6,7 +6,7 @@
 -- ciphertext-only return); issue via the webhook (code mint, sale payment, the
 -- two emails); redeem into gift credit (buyer email, audit, guards); the 103(f)
 -- full-credit purchase (source-credit payment, revenue EXCLUDES it, the sale
--- counts); gift-first consume order; void guards; the fail branch; anon FOURTEEN.
+-- counts); gift-first consume order; void guards; the fail branch; anon FIFTEEN.
 -- =============================================================================
 \set GA '''91f70000-0000-0000-0000-0000000000a1'''
 \set GB '''91f70000-0000-0000-0000-0000000000b1'''
@@ -258,16 +258,16 @@ select xendit_webhook(jsonb_build_object('event','payment.failure','data',
 select expect_text('a failed gift purchase voids the pending card',
   (select status from gift_cards where id=current_setting('t.gcid3')::uuid), 'void');
 
-\echo '=== 11. anon surface is EXACTLY FOURTEEN, naming gift_card_begin ==='
+\echo '=== 11. anon surface is EXACTLY FIFTEEN, naming gift_card_begin ==='
 select expect_true('gift_card_begin is anon',
   has_function_privilege('anon','gift_card_begin(uuid,int,text,text,text,text,text,date)','execute'));
 select expect_false('gift_card_redeem is NOT anon',
   has_function_privilege('anon','gift_card_redeem(text)','execute'));
 select expect_false('gift_card_void is NOT anon',
   has_function_privilege('anon','gift_card_void(uuid,text)','execute'));
-select expect_num('anon surface is exactly fourteen (suite helpers excluded)',
+select expect_num('anon surface is exactly fifteen (suite helpers excluded)',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect%')::bigint, 14);
+      and p.proname not like 'expect%')::bigint, 15);
 
 \echo 'gift_cards_test PASS'

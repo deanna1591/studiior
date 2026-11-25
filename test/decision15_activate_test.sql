@@ -173,9 +173,9 @@ select expect_num('backfill idempotent: still one audit row for M_BACKFILL',
     and action='member.status_changed'), 1);
 
 -- --- anon surface unchanged (excluding this suite's own expect_* helpers) -----
-select expect_num('anon surface is exactly fourteen',
+select expect_num('anon surface is exactly fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not like 'expect\_%'), 14);
+      and p.proname not like 'expect\_%'), 15);
 
 do $$ begin raise notice 'Decision 15 amendment — all assertions passed'; end $$;

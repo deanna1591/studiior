@@ -465,10 +465,10 @@ select expect_eq('108 (c): without the audit, T71''s twin would have been flagge
 drop table t_dmc;
 
 -- --- the anon surface ------------------------------------------------------------
-select expect_eq('anon surface stays EXACTLY FOURTEEN',
+select expect_eq('anon surface stays EXACTLY FIFTEEN',
   (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('expect_eq','expect_err','t_occ','t_seat','t_pay','rec_amt','t_past','t_bk')), '14');
+      and p.proname not in ('expect_eq','expect_err','t_occ','t_seat','t_pay','rec_amt','t_past','t_bk')), '15');
 select expect_eq('staff_mark_no_show is not anon',
   has_function_privilege('anon', 'staff_mark_no_show(uuid, text)', 'execute')::text, 'false');
 

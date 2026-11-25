@@ -182,7 +182,7 @@ select expect_eq('4.3 the infraction is voided', (select status from member_infr
 select expect_eq('4.4 no money moved', (select count(*)::text from payments where member_id = '36a00000-0000-0000-0000-0000000d0004'), '0');
 
 -- =============================================================================
--- 5. The email renders clean; anon stays fourteen.
+-- 5. The email renders clean; anon stays fifteen.
 -- =============================================================================
 select expect_eq('5.1 the email renders with nothing stripped',
   (select coalesce(array_length(r.stripped, 1), 0)::text from notifications n
@@ -195,8 +195,8 @@ select expect_true('5.2 the email says what came back',
 reset role; set role anon;
 select expect_err('5.3 anon cannot call it', $$select return_booking_credit('36a00000-0000-0000-0000-0000000bb001', null)$$, '42501');
 reset role;
-select expect_eq('5.4 anon surface EXACTLY FOURTEEN', (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+select expect_eq('5.4 anon surface EXACTLY FIFTEEN', (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
    where s.nspname = 'public' and p.proname not like 'expect\_%' and p.proname not in ('call_jsonb')
-     and has_function_privilege('anon', p.oid, 'execute')), '14');
+     and has_function_privilege('anon', p.oid, 'execute')), '15');
 
 do $$ begin raise notice 'return_credit_test: all assertions passed'; end $$;
