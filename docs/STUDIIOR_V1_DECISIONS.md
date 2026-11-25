@@ -551,6 +551,16 @@ Each roster row that is booked and not checked in shows "Mark no-show" once the 
 
 ---
 
+## 119 — A checkout that expires gets one rescue email (recorded 25 Nov 2026)
+
+**Decision.** One hour after a Xendit checkout expires, is abandoned or fails without payment, the buyer (member or guest, Decision 118) gets one rescue email for what they tried to buy: plans, class packs, memberships, private packs, the Intro Offer, gift cards, shop items and the free first class reservation fee. Skipped when: they have since paid for that item (or, for plans, any plan); the same person already got a rescue email for that item in the last 7 days; the email is marked invalid; it is the studio owner's own account. Plans and packs: button "Finish my purchase" to /buy/{plan} at today's price (promotions apply). Gift cards: "Finish my gift" to /gift with the amount prefilled. Shop: "Finish my order" to the product. Reservation fee: if the class is still in the future and has a seat, the email names the class, day, time and spots left with "Hold my spot" to the class page (the member's free seat is booked again through the normal path, Decision 103 rules unchanged); if the class is full or past, it says the free class is still waiting with "Book my free class"; it always explains that the fee is not a charge for the class and comes back as studio credit for the next class pack or merchandise when they show up. Every rescue email has "Message the studio" (members: /messages; guests: the buy page with the studio contact) and its reply-to is the studio contact email. On the per-email switch. One-time send at release to every expired, abandoned or failed checkout since 9 Nov 2026 that is not skipped by the rules above, EXCEPT reservation fee checkouts: the reservation fee rescue applies only to checkouts started on or after 25 Nov 2026 and is never backfilled. Audit checkout.rescue_sent.
+
+**Touches.** sweep_checkout_rescue (cron every 15 minutes), templates checkout_rescue_plan, checkout_rescue_gift, checkout_rescue_shop, checkout_rescue_reservation with platform defaults and Reform overrides, reply-to on the send path if missing, one-time backfill function.
+
+**Status:** settled, to build. Deanna, 25 Nov 2026.
+
+---
+
 ## 118 — Buy a plan before you have an account (recorded 25 Nov 2026)
 
 **Context.** People find RPC on the website or a post and want to buy before making an account. Today every purchase needs an account first. Gift cards (Decision 110) already sell to people without accounts, so the same shape is used.
