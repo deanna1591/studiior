@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
-import { recordSale, adjustStock, markCollected, setProductStatus, type ShopState } from "./actions";
+import { recordSale, adjustStock, markCollected, setProductStatus, previewShopCode, type ShopState } from "./actions";
+import CodeBox from "@/components/code-box";
+import type { CodePreview } from "@/lib/discount-code";
 
 function Submit({ label, busy }: { label: string; busy: string }) {
   const { pending } = useFormStatus();
@@ -30,6 +32,9 @@ export function RecordSaleForm({ products, members, currency }:
   const [pid, setPid] = useState(products[0]?.id ?? "");
   const [qty, setQty] = useState("1");
   const chosen = products.find((p) => p.id === pid);
+  // Decision 120(b): the same Have a code? box as the shop checkout.
+  const [memberId, setMemberId] = useState("");
+  const [code, setCode] = useState<CodePreview | null>(null);
   const over = chosen?.track_stock && Number(qty) > chosen.stock;
   if (products.length === 0) return <p className="text-[13px] text-ink-3">Add a product first.</p>;
   return (
@@ -52,7 +57,7 @@ export function RecordSaleForm({ products, members, currency }:
           Only <span className="num">{chosen!.stock}</span> left.</p>}
       </Field>
       <Field label="Member (optional)">
-        <select name="member_id" className={inputClass} defaultValue="">
+        <select name="member_id" className={inputClass} value={memberId} onChange={(e) => { setMemberId(e.target.value); setCode(null); }}>
           <option value="">Walk-in / not a member</option>
           {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
@@ -62,7 +67,14 @@ export function RecordSaleForm({ products, members, currency }:
           {METHODS.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
         </select>
       </Field>
-      <Submit label="Record sale" busy="Recording…" />
+      <Field label="Discount code">
+        <CodeBox key={`${pid}:${qty}:${memberId}`} name="code" currency={currency} onChange={setCode} compact
+                 preview={(c) => previewShopCode({ code: c, productId: pid, quantity: Math.max(1, Number(qty) || 1), memberId: memberId || null })} />
+        {code?.priceCents != null && (
+          <p className="mt-1 text-[12px] text-ink">Total <span className="num">{currency} {(code.priceCents / 100).toFixed(2)}</span></p>
+        )}
+      </Field>
+      <Submit label={code?.priceCents === 0 ? "Complete" : "Record sale"} busy="Recording…" />
     </form>
   );
 }

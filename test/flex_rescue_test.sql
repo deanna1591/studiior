@@ -148,8 +148,8 @@ select expect_num('a second sweep queues no duplicate free final',
 -- running and never offered as one needing people.
 select expect_text('the first card is the flex class two short (Flex Plan)',
   (select name from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') limit 1), 'Flex Plan');
-select expect_text('...labelled Needs 2 more',
-  (select label from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') limit 1), 'Needs 2 more');
+select expect_text('...labelled Needs 2 more to run',
+  (select label from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') limit 1), 'Needs 2 more to run');
 select expect_text('the second card is the core class with a booking (C1), Always runs',
   (select name || ' / ' || label from core_classes_for_rescue('95f10000-0000-0000-0000-0000000f0001') offset 1 limit 1),
   'Core One / Always runs');
@@ -264,7 +264,7 @@ select expect_text('the order: one short by start, two short while under four ro
   (select string_agg(name || ':' || label, ', ' order by ord)
      from (select name, label, row_number() over () as ord
              from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901')) z),
-  'One Early:Needs 1 more, One Late:Needs 1 more, Two A:Needs 2 more, Two B:Needs 2 more, Core Booked:Always runs, Core Empty:Always runs');
+  'One Early:Needs 1 more to run, One Late:Needs 1 more to run, Two A:Needs 2 more to run, Two B:Needs 2 more to run, Core Booked:Always runs, Core Empty:Always runs');
 select expect_true('the third two-short class (Two C) is left out: four rows were reached',
   (select not exists (select 1 from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901') where name = 'Two C')));
 
@@ -286,7 +286,7 @@ select expect_text('free_first_core_only on: a free first class rescue lists cor
      from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901','95f10000-0000-0000-0000-00000000a9b0')) z),
   'Always runs, Always runs');
 select expect_true('...but a paid rescue still leads with flex (no booking passed)',
-  (select label from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901') limit 1) = 'Needs 1 more');
+  (select label from core_classes_for_rescue('95f10000-0000-0000-0000-00000000a901') limit 1) = 'Needs 1 more to run');
 
 -- The email card carries the label; the platform default intro sentence changed.
 select expect_true('the rescue card prints its label',

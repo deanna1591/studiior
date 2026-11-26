@@ -33,6 +33,7 @@ export type PlanDraft = {
   restrictions: { class_type_ids?: string[] } | null;
   counts_for_conversion: boolean;
   private_pack?: boolean;
+  private_session_type_id?: string | null;
   group_size: number | null;
   group_book_within_days: number;
   max_active_members: number | null;
@@ -66,7 +67,10 @@ const num = (v: number | null | undefined) => (v === null || v === undefined ? "
 
 export default function PlanForm({
   draft, classTypes, currency, activeMemberships, mode, seatCaps, taken, peakHours, conversionOn, maxRoomCapacity,
+  privateTypes = [],
 }: {
+  /** Decision 116(d): the studio's private session types, by their own names. */
+  privateTypes?: { id: string; name: string; people: number }[];
   draft: PlanDraft;
   classTypes: { id: string; name: string }[];
   currency: string;
@@ -239,13 +243,14 @@ export default function PlanForm({
         {type === "class_pack" && (
           // Decision 116: a private pack is spent only at the private booking
           // step (1:1 sessions), never on a group class.
-          <Field label="Private pack">
-            <label className="flex items-center gap-2 pt-2 text-sm">
-              <input type="checkbox" name="private_pack" defaultChecked={draft.private_pack ?? false} />
-              These credits are for 1:1 private sessions only
-            </label>
+          <Field label="Private pack for">
+            <select name="private_session_type_id" className={inputClass}
+                    defaultValue={draft.private_pack ? (draft.private_session_type_id ?? privateTypes.find((t) => t.people === 1)?.id ?? "") : ""}>
+              <option value="">Not a private pack</option>
+              {privateTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
             <p className="mt-1 text-xs text-ink-3">
-              Members redeem them when they book a private, never on a group class.
+              Members redeem these credits when they book that kind of private session, never on a group class or another session type.
             </p>
           </Field>
         )}

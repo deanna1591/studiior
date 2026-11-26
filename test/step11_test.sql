@@ -484,8 +484,11 @@ select expect_eq('11a: nudge logs zero render warnings',
   (select coalesce(array_length(stripped,1),0)::text from _btn where key='free_reservation_nudge'), '0');
 select expect_eq('11a: last call logs zero render warnings',
   (select coalesce(array_length(stripped,1),0)::text from _btn where key='free_reservation_last_call'), '0');
-select expect_true('11a: the nudge text body is unchanged (marker dropped, link line kept)',
-  (select text_body = text_blank and text_body like '%[Pay ₱500 to keep my spot](https://b11a-s.studiior.app/class/x)' || E'\n\n' || 'Can''t make it%'
+-- Decision 80 (f): the text part reads as prose, so the button is a
+-- "Label: link" line, never raw markup.
+select expect_true('11a: the nudge text body reads the button as a Label: link line',
+  (select text_body = text_blank and text_body like '%Pay ₱500 to keep my spot: https://b11a-s.studiior.app/class/x' || E'\n\n' || 'Can''t make it%'
+          and position('](' in text_body) = 0
           and position('{' in text_body) = 0 from _btn where key='free_reservation_nudge'));
 select expect_true('11a: the HTML is unchanged for both',
   (select bool_and(html_body = html_blank) from _btn));

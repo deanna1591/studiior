@@ -35,14 +35,18 @@ function localMidnight(timeZone: string, d: number): Date {
 }
 
 export default function PrivateFlow({
-  types, coaches, timeZone, timeFormat, packCredits, creditCents, packs = [],
+  types, coaches, timeZone, timeFormat, packCredits, creditCents, packs = [], initialTypeId = null,
 }: {
+  /** Decision 119(a): the rescue email's link opens on the session type. */
+  initialTypeId?: string | null;
   types: T[]; coaches: Coach[]; timeZone: string; timeFormat: "24h" | "12h";
-  packCredits: number; creditCents: number;
+  /** Decision 116(d): pack credits held, keyed by session type id. */
+  packCredits: Record<string, number>; creditCents: number;
   /** Decision 117: the private packs priced now (a sale shows its tag). */
-  packs?: { id: string; name: string; price_cents: number; list_cents: number; currency: string; promo: PlanPrice | null }[];
+  packs?: { id: string; name: string; price_cents: number; list_cents: number; currency: string; promo: PlanPrice | null; typeId: string | null }[];
 }) {
-  const [typeId, setTypeId] = useState<string>(types[0]?.id ?? "");
+  const [typeId, setTypeId] = useState<string>(
+    (initialTypeId && types.some((x) => x.id === initialTypeId) ? initialTypeId : types[0]?.id) ?? "");
   // Decision 116(b): the coach filter (null = all coaches) and the coach the
   // chosen time is with. There is no "any coach": a time names its coach.
   const [filter, setFilter] = useState<string | null>(null);
@@ -93,8 +97,13 @@ export default function PrivateFlow({
     return { wd: f({ weekday: "short" }), dd: f({ day: "numeric" }) };
   }), [timeZone]);
 
-  const usePack = t?.people === 1 && packCredits > 0;
+  // Decision 116(d): a pack is spent only on its own session type.
+  const typeCredits = t ? packCredits[t.id] ?? 0 : 0;
+  const usePack = !!t && typeCredits > 0;
+  const typePacks = t ? packs.filter((p) => p.typeId === t.id) : [];
   const creditCovers = !!t && creditCents >= t.price_cents;
+  // Decision 120(a): a 100% code; the session completes with nothing to pay.
+  const codeFree = code?.priceCents === 0;
   const compsOk = comps.every((c) => c.name.trim() && /.+@.+\..+/.test(c.email.trim()));
 
   function pay(mode: "xendit" | "pack") {
@@ -268,25 +277,25 @@ export default function PrivateFlow({
         {usePack && (
           <button type="button" disabled={pending || !chosen || !coachId || !compsOk} onClick={() => pay("pack")}
             className="m-press w-full rounded-full py-3.5 text-[16px] font-semibold disabled:opacity-60" style={accentSolid()}>
-            {pending ? "Booking…" : `Use a pack credit (${packCredits} left)`}
+            {pending ? "Booking…" : `Use 1 of your ${typeCredits} ${t?.name ?? ""} session${typeCredits === 1 ? "" : "s"}`}
           </button>
         )}
         <button type="button" disabled={pending || !chosen || !coachId || !compsOk} onClick={() => pay("xendit")}
           className="m-press w-full rounded-full py-3.5 text-[16px] font-semibold disabled:opacity-60"
           style={usePack ? { background: "var(--surface)", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" } : accentSolid()}>
-          {pending ? "Opening checkout…" : creditCovers ? `Book with your account credit` : `Pay ${code?.priceCents != null ? formatMoney(code.priceCents, code.currency ?? "PHP") : t?.priceLabel ?? ""} and book`}
+          {pending ? (codeFree ? "Booking…" : "Opening checkout…") : codeFree ? "Complete" : creditCovers ? `Book with your account credit` : `Pay ${code?.priceCents != null ? formatMoney(code.priceCents, code.currency ?? "PHP") : t?.priceLabel ?? ""} and book`}
         </button>
         <p className="m-micro text-center text-ink-2">
-          {creditCovers ? "Your account credit covers it, so there's nothing to pay." : "Card or GCash, on the next screen."}
+          {codeFree ? `Total ${formatMoney(0, code?.currency ?? "PHP")}. Nothing to pay.` : creditCovers ? "Your account credit covers it, so there's nothing to pay." : "Card or GCash, on the next screen."}
         </p>
       </div>
-      {/* Decision 117: private packs, for a 1:1 session. A pack on sale shows the
+      {/* Decision 117: private packs for this session type (116 d). A pack on sale shows the
           struck list price and its tag; the single session price never does. */}
-      {t?.people === 1 && packs.length > 0 && (
+      {typePacks.length > 0 && (
         <section>
           <h2 className="section-label mb-2 text-ink-2">Or buy a private pack</h2>
           <ul className="space-y-2">
-            {packs.map((p) => (
+            {typePacks.map((p) => (
               <li key={p.id}>
                 <Link href={`/buy/${p.id}`} className="m-card m-press flex items-center justify-between gap-3 p-4">
                   <span className="min-w-0">

@@ -18,7 +18,9 @@ export async function saveTemplateOverride(key: string, subject: string, body: s
   const r = renderBody(body, { accent: "{accent}" });
   const supabase = createClient();
   const { data, error } = await supabase.from("notification_templates_overrides")
-    .upsert({ studio_id: ctx.studioId, key, subject, body, body_html: r.html,
+    // Decision 80 (f): the plain-text rendering is saved beside the HTML, and
+    // render_email uses it for the text part.
+    .upsert({ studio_id: ctx.studioId, key, subject, body, body_html: r.html, body_text: r.text,
               updated_by: ctx.userId, updated_at: new Date().toISOString() })
     .select("key");
   if (error) return { error: error.message };

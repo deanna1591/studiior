@@ -61,10 +61,10 @@ test("no em dashes in any move-page sentence", () => {
 test("95(b): flex one short first (by start), then two short, then core (booked first)", () => {
   const rows = [
     { occurrence_id: "core-booked", starts_at: "2026-11-24T01:00:00Z", n_booked: 3, spots_left: 2, label: "Always runs" },
-    { occurrence_id: "two", starts_at: "2026-11-23T01:00:00Z", n_booked: 0, spots_left: 6, label: "Needs 2 more" },
-    { occurrence_id: "one-late", starts_at: "2026-11-25T01:00:00Z", n_booked: 1, spots_left: 5, label: "Needs 1 more" },
+    { occurrence_id: "two", starts_at: "2026-11-23T01:00:00Z", n_booked: 0, spots_left: 6, label: "Needs 2 more to run" },
+    { occurrence_id: "one-late", starts_at: "2026-11-25T01:00:00Z", n_booked: 1, spots_left: 5, label: "Needs 1 more to run" },
     { occurrence_id: "core-empty", starts_at: "2026-11-22T01:00:00Z", n_booked: 0, spots_left: 6, label: "Always runs" },
-    { occurrence_id: "one-early", starts_at: "2026-11-23T00:00:00Z", n_booked: 1, spots_left: 5, label: "Needs 1 more" },
+    { occurrence_id: "one-early", starts_at: "2026-11-23T00:00:00Z", n_booked: 1, spots_left: 5, label: "Needs 1 more to run" },
   ];
   assert.deepEqual(orderRescueCards(rows).map((r) => r.occurrence_id),
     ["one-early", "one-late", "two", "core-booked", "core-empty"]);

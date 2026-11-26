@@ -53,6 +53,8 @@ export async function bookingOptions(
 export type FeeTerms = {
   required: boolean; fee_cents: number; fee_text: string;
   member_waived: boolean; deadline_label: string;
+  /** Decision 103 (l): unused reservation credit covers the fee. */
+  credit_covers?: boolean;
 } | null;
 
 export async function feeTerms(occurrenceId: string, memberId: string): Promise<FeeTerms> {

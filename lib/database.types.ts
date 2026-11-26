@@ -2363,6 +2363,7 @@ export type Database = {
           pct: number
           plan_ids: string[]
           private_sessions: boolean
+          product_ids: string[]
           starts_on: string
           studio_id: string
         }
@@ -2378,6 +2379,7 @@ export type Database = {
           pct: number
           plan_ids?: string[]
           private_sessions?: boolean
+          product_ids?: string[]
           starts_on: string
           studio_id: string
         }
@@ -2393,6 +2395,7 @@ export type Database = {
           pct?: number
           plan_ids?: string[]
           private_sessions?: boolean
+          product_ids?: string[]
           starts_on?: string
           studio_id?: string
         }
@@ -2475,6 +2478,7 @@ export type Database = {
           payment_id: string | null
           plan_id: string | null
           private_occurrence_id: string | null
+          product_order_id: string | null
           purchase_id: string | null
           redeemed_at: string | null
           released_at: string | null
@@ -2494,6 +2498,7 @@ export type Database = {
           payment_id?: string | null
           plan_id?: string | null
           private_occurrence_id?: string | null
+          product_order_id?: string | null
           purchase_id?: string | null
           redeemed_at?: string | null
           released_at?: string | null
@@ -2513,6 +2518,7 @@ export type Database = {
           payment_id?: string | null
           plan_id?: string | null
           private_occurrence_id?: string | null
+          product_order_id?: string | null
           purchase_id?: string | null
           redeemed_at?: string | null
           released_at?: string | null
@@ -2568,6 +2574,13 @@ export type Database = {
             columns: ["private_occurrence_id"]
             isOneToOne: false
             referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_product_order_id_fkey"
+            columns: ["product_order_id"]
+            isOneToOne: false
+            referencedRelation: "product_orders"
             referencedColumns: ["id"]
           },
           {
@@ -5038,6 +5051,7 @@ export type Database = {
           hints_seen: Json
           id: string
           is_demo: boolean
+          is_test_account: boolean
           joined_on: string
           last_name: string
           last_visit_at: string | null
@@ -5085,6 +5099,7 @@ export type Database = {
           hints_seen?: Json
           id?: string
           is_demo?: boolean
+          is_test_account?: boolean
           joined_on?: string
           last_name: string
           last_visit_at?: string | null
@@ -5132,6 +5147,7 @@ export type Database = {
           hints_seen?: Json
           id?: string
           is_demo?: boolean
+          is_test_account?: boolean
           joined_on?: string
           last_name?: string
           last_visit_at?: string | null
@@ -5297,6 +5313,7 @@ export type Database = {
           peak_allowance_period: string
           price_cents: number
           private_pack: boolean
+          private_session_type_id: string | null
           restrictions: Json
           show_remaining_below: number | null
           signup_fee_cents: number
@@ -5340,6 +5357,7 @@ export type Database = {
           peak_allowance_period?: string
           price_cents: number
           private_pack?: boolean
+          private_session_type_id?: string | null
           restrictions?: Json
           show_remaining_below?: number | null
           signup_fee_cents?: number
@@ -5383,6 +5401,7 @@ export type Database = {
           peak_allowance_period?: string
           price_cents?: number
           private_pack?: boolean
+          private_session_type_id?: string | null
           restrictions?: Json
           show_remaining_below?: number | null
           signup_fee_cents?: number
@@ -5397,6 +5416,13 @@ export type Database = {
           visibility?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "membership_plans_private_session_type_id_fkey"
+            columns: ["private_session_type_id"]
+            isOneToOne: false
+            referencedRelation: "private_session_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "membership_plans_studio_id_fkey"
             columns: ["studio_id"]
@@ -5968,6 +5994,7 @@ export type Database = {
         Row: {
           body: string
           body_html: string
+          body_text: string | null
           key: string
           studio_id: string
           subject: string
@@ -5977,6 +6004,7 @@ export type Database = {
         Insert: {
           body: string
           body_html: string
+          body_text?: string | null
           key: string
           studio_id: string
           subject: string
@@ -5986,6 +6014,7 @@ export type Database = {
         Update: {
           body?: string
           body_html?: string
+          body_text?: string | null
           key?: string
           studio_id?: string
           subject?: string
@@ -10422,6 +10451,7 @@ export type Database = {
           p_pct: number
           p_plan_ids: string[]
           p_private?: boolean
+          p_product_ids?: string[]
           p_starts: string
           p_studio_id: string
         }
@@ -10436,6 +10466,7 @@ export type Database = {
           p_pct: number
           p_plan_ids: string[]
           p_private?: boolean
+          p_product_ids?: string[]
           p_starts: string
           p_studio_id: string
         }
@@ -10462,6 +10493,8 @@ export type Database = {
           p_member_id?: string
           p_plan_id?: string
           p_private_type_id?: string
+          p_product_id?: string
+          p_quantity?: number
           p_studio_id: string
         }
         Returns: Json
@@ -10489,6 +10522,7 @@ export type Database = {
           p_pct: number
           p_plan_ids: string[]
           p_private: boolean
+          p_product_ids: string[]
           p_starts: string
           p_studio_id: string
         }
@@ -10513,6 +10547,7 @@ export type Database = {
           template_key: string
         }[]
       }
+      email_markup_text: { Args: { p_src: string }; Returns: string }
       email_on_accent: { Args: { p_hex: string }; Returns: string }
       end_membership: {
         Args: {
@@ -11610,6 +11645,16 @@ export type Database = {
         Args: { p_instructor_id: string; p_month: string }
         Returns: Json
       }
+      my_private_credits: {
+        Args: { p_studio_id: string }
+        Returns: {
+          credits: number
+          expires_on: string
+          people: number
+          type_id: string
+          type_name: string
+        }[]
+      }
       name_last_part: { Args: { p: string }; Returns: string }
       narrative_covers_days: { Args: { p_facts: Json }; Returns: number }
       narrative_numbers: { Args: { p_text: string }; Returns: string[] }
@@ -11961,7 +12006,7 @@ export type Database = {
         Returns: Json
       }
       private_pack_consume: {
-        Args: { p_member_id: string; p_studio_id: string }
+        Args: { p_member_id: string; p_studio_id: string; p_type_id: string }
         Returns: string
       }
       private_refund_run: {
@@ -12355,6 +12400,7 @@ export type Database = {
       }
       record_product_sale: {
         Args: {
+          p_code?: string
           p_member_id?: string
           p_method?: string
           p_method_note?: string
@@ -12942,6 +12988,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_member_test_account: {
+        Args: { p_member_id: string; p_on: boolean }
+        Returns: Json
+      }
       set_occurrence_always_runs: {
         Args: { p_occurrence_id: string; p_on: boolean }
         Returns: Json
@@ -13465,7 +13515,12 @@ export type Database = {
         Returns: undefined
       }
       xendit_begin_product_purchase: {
-        Args: { p_product_id: string; p_quantity: number; p_studio_id: string }
+        Args: {
+          p_code?: string
+          p_product_id: string
+          p_quantity: number
+          p_studio_id: string
+        }
         Returns: {
           amount_cents: number
           credit_applied_cents: number

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { previewFromPrice, type CodePreview } from "@/lib/discount-code";
 import { getStaffContext } from "@/lib/auth";
 import type { PhotoResult } from "@/components/instructor/photo-upload";
 import { toCents } from "@/lib/plans";
@@ -80,6 +81,8 @@ export async function recordSale(_prev: ShopState, fd: FormData): Promise<ShopSt
     p_member_id: String(fd.get("member_id") ?? "").trim() || undefined,
     p_method: String(fd.get("method") ?? "cash"),
     p_method_note: String(fd.get("method_note") ?? "").trim() || undefined,
+    // Decision 120(b): an applied discount code, checked again in the database.
+    p_code: String(fd.get("code") ?? "").trim() || undefined,
   });
   if (error) return { error: error.message };
   void data;
@@ -157,4 +160,22 @@ export async function removeProductPhoto(productId: string): Promise<PhotoResult
   if (old) await supabase.storage.from(BUCKET).remove([old]);
   revalidatePath(`/shop/${productId}`); revalidatePath("/shop");
   return { ok: true, message: "Photo removed." };
+}
+
+/**
+ * Decision 120(b): check a code on a desk shop sale (a member, or a walk-in).
+ * Writes nothing except the rate-limit log.
+ */
+export async function previewShopCode(input: {
+  code: string; productId: string; quantity: number; memberId: string | null;
+}): Promise<CodePreview> {
+  const ctx = await getStaffContext();
+  if (!ctx) return previewFromPrice(null);
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("discount_code_preview", {
+    p_studio_id: ctx.studioId, p_code: input.code, p_product_id: input.productId,
+    p_quantity: input.quantity, p_member_id: (input.memberId ?? null) as string,
+  });
+  if (error) return { ...previewFromPrice(null), message: "That code couldn't be checked. Try again." };
+  return previewFromPrice(data as Record<string, unknown>);
 }

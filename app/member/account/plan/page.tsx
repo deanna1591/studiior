@@ -34,7 +34,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   // the batch — it depended on nothing in it and was a needless extra wave,
   // exactly as /account already folds it in.
   const guestEnabled = settings.guestPassesEnabled;
-  const [{ live, all }, { data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }, prices] =
+  const [{ live, all }, { data: ledger }, { count: activeGuests }, { data: peak }, { data: freeElig }, { data: catalogue }, { data: seats }, { data: unbookedGroupRes }, { data: introCfg }, { data: introWin }, prices, { data: privateTypes }] =
     await Promise.all([
       membershipState(supabase, ctx.memberId),
       supabase.from("credit_ledger")
@@ -51,7 +51,7 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       // (plans_member_read) already limits this to this studio's visibility=
       // 'public' plans — Permissions §9. Purchase is at the desk (Decision 16).
       supabase.from("membership_plans")
-        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count, group_size, featured, badge")
+        .select("id, name, description, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, billing_interval_count, group_size, featured, badge, private_pack, private_session_type_id")
         .eq("visibility", "public").eq("status", "active").order("featured", { ascending: false }).order("sort_order"),
       // Decision 24: which public plans are full. A row only for a capped plan
       // at a seat-caps studio; absent means uncapped or the switch is off.
@@ -68,6 +68,9 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       supabase.rpc("intro_window", { p_member_id: ctx.memberId }),
       // Decision 117: every plan priced now, one call.
       planPrices(supabase, ctx.studioId),
+      // Decision 116(d): the studio's own session type names, for the private
+      // section (members read them through the member-callable reader).
+      supabase.rpc("private_session_types_for", { p_studio_id: ctx.studioId }),
     ]);
   // Decision 66: a recurring membership can be renewed by hand online in its
   // last week, or while past-due inside Decision 4's grace (past_due IS the
@@ -92,6 +95,86 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   const seatOf = new Map((seats ?? []).map((s) => [s.plan_id, s]));
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
+
+  type CatPlan = NonNullable<typeof catalogue>[number];
+  const renderPlan = (p: CatPlan) => {
+              // Decision 76: while this member holds an unbooked group, hide
+              // group plans from the catalogue — the banner above sends them to
+              // book the one they already have rather than buy another.
+              if (p.type === "group" && unbookedGroup) return null;
+              // Decision 24: a full capped plan either hides from members
+              // ('hide') or shows as full, sellable at the desk only
+              // ('staff_only'). The renewal of a plan you already hold is a
+              // separate control at the top and is never cap-gated.
+              const seat = seatOf.get(p.id);
+              const full = !!seat?.is_full;
+              if (full && seat?.on_limit_reached === "hide") return null;
+              const pp = withPrice(p, prices);
+              const includes = p.type === "group"
+                ? [`${p.group_size ?? 2} people`, "one class together"]
+                : p.type === "class_pack"
+                ? [p.credits != null ? (p.private_pack ? `${p.credits} session${p.credits === 1 ? "" : "s"}` : `${p.credits} classes`) : null,
+                   p.validity_days ? `use within ${p.validity_days} days` : null]
+                : p.type === "drop_in"
+                ? ["Single class"]
+                : p.type === "trial"
+                ? [`${p.credits ?? 1} class${(p.credits ?? 1) === 1 ? "" : "es"}`,
+                   p.validity_days ? `use within ${p.validity_days} days` : null]
+                // Decision 66: recurring is sold one period at a time online —
+                // say the per-period allowance and that there is no auto-charge.
+                : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
+                   `one ${p.billing_interval ?? "period"}, renew by hand`];
+              return (
+                // Decision 74: a featured plan is highlighted with an accent
+                // border and its badge chip.
+                <li key={p.id} className="m-card p-4"
+                    style={p.featured ? { border: "1.5px solid var(--accent-solid)" } : undefined}>
+                  {p.featured && p.badge && (
+                    <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4 text-ink"
+                          style={{ background: "var(--accent-chip)" }}>{p.badge}</span>
+                  )}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="text-[16px] font-semibold leading-5 text-ink">{p.name}</h3>
+                    <PriceAmount priceCents={pp.price_cents} listCents={pp.list_cents} currency={p.currency}
+                                 promo={pp.promo} className="shrink-0 text-[16px] font-semibold text-ink" />
+                  </div>
+                  {pp.promo && <PromoTagChip promo={pp.promo} className="mt-1.5" />}
+                  {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
+                  <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
+                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={pp.price_cents} currency={p.currency} showNet />
+                  {/* Decision 40/66: buy online when the studio has Xendit — a
+                      pack, drop-in, trial, or a recurring plan one period at a
+                      time (renew by hand). Decision 62: show the intro-once
+                      sentence in place of Buy when the member has already had the trial. */}
+                  {settings.xenditEnabled && isOnlineBuyable(p.type) && (
+                    p.type === "trial" && settings.trialUsed ? (
+                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+                        {INTRO_USED_SENTENCE}
+                      </p>
+                    ) : full ? (
+                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+                        This plan is full. Ask the studio.
+                      </p>
+                    ) : (
+                      <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} returnTo={settleReturn} /></div>
+                    )
+                  )}
+                </li>
+              );
+  };
+  // Decision 116(d): private packs, grouped by the studio's own session type
+  // names (Reform: Private 1:1, Duo, Trio), each in the studio's type order.
+  const typeById = new Map(((privateTypes ?? []) as { id: string; name: string; people: number }[])
+    .map((t) => [t.id, t]));
+  const privatePlans = sortPlans(shownCatalogue.filter((p) => p.private_pack));
+  const privateGroups = new Map<string, { name: string; people: number; plans: CatPlan[] }>();
+  for (const p of privatePlans) {
+    const t = typeById.get(p.private_session_type_id ?? "");
+    const key = p.private_session_type_id ?? "none";
+    const g = privateGroups.get(key) ?? { name: t?.name ?? "Private sessions", people: t?.people ?? 1, plans: [] };
+    g.plans.push(p); privateGroups.set(key, g);
+  }
+  const privateGroupList = [...privateGroups.values()].sort((a, b) => a.people - b.people);
 
   const d = (iso: string) => {
     const { day, month } = dayMonthParts(iso, ctx.timeZone);
@@ -250,77 +333,13 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
       {/* The catalogue. Decision 16: no online checkout — the studio sells at the
           desk — but "the plans are here" has to actually show the plans and their
           prices, or the free-class conversion has nowhere to land. */}
-      {shownCatalogue.length > 0 && (
+      {shownCatalogue.some((p) => !p.private_pack) && (
         <section className="mt-8">
           <h2 className="section-label text-ink-2">{live ? "Other plans" : "Plans"}</h2>
           <ul className="mt-3 space-y-3">
             {/* Decision 74: featured first, then sort_order — the same pure rule
                 the staff list and the node test use. */}
-            {sortPlans(shownCatalogue).map((p) => {
-              // Decision 76: while this member holds an unbooked group, hide
-              // group plans from the catalogue — the banner above sends them to
-              // book the one they already have rather than buy another.
-              if (p.type === "group" && unbookedGroup) return null;
-              // Decision 24: a full capped plan either hides from members
-              // ('hide') or shows as full, sellable at the desk only
-              // ('staff_only'). The renewal of a plan you already hold is a
-              // separate control at the top and is never cap-gated.
-              const seat = seatOf.get(p.id);
-              const full = !!seat?.is_full;
-              if (full && seat?.on_limit_reached === "hide") return null;
-              const pp = withPrice(p, prices);
-              const includes = p.type === "group"
-                ? [`${p.group_size ?? 2} people`, "one class together"]
-                : p.type === "class_pack"
-                ? [p.credits != null ? `${p.credits} classes` : null,
-                   p.validity_days ? `use within ${p.validity_days} days` : null]
-                : p.type === "drop_in"
-                ? ["Single class"]
-                : p.type === "trial"
-                ? [`${p.credits ?? 1} class${(p.credits ?? 1) === 1 ? "" : "es"}`,
-                   p.validity_days ? `use within ${p.validity_days} days` : null]
-                // Decision 66: recurring is sold one period at a time online —
-                // say the per-period allowance and that there is no auto-charge.
-                : [p.credits_per_period == null ? "Unlimited classes" : `${p.credits_per_period} classes each period`,
-                   `one ${p.billing_interval ?? "period"}, renew by hand`];
-              return (
-                // Decision 74: a featured plan is highlighted with an accent
-                // border and its badge chip.
-                <li key={p.id} className="m-card p-4"
-                    style={p.featured ? { border: "1.5px solid var(--accent-solid)" } : undefined}>
-                  {p.featured && p.badge && (
-                    <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4 text-ink"
-                          style={{ background: "var(--accent-chip)" }}>{p.badge}</span>
-                  )}
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="text-[16px] font-semibold leading-5 text-ink">{p.name}</h3>
-                    <PriceAmount priceCents={pp.price_cents} listCents={pp.list_cents} currency={p.currency}
-                                 promo={pp.promo} className="shrink-0 text-[16px] font-semibold text-ink" />
-                  </div>
-                  {pp.promo && <PromoTagChip promo={pp.promo} className="mt-1.5" />}
-                  {p.description && <p className="m-sub mt-1 text-ink-2">{p.description}</p>}
-                  <p className="m-sub mt-1 text-ink-3">{includes.filter(Boolean).join(" · ")}</p>
-                  <CreditApplied creditCents={settings.reservationCreditCents} priceCents={pp.price_cents} currency={p.currency} showNet />
-                  {/* Decision 40/66: buy online when the studio has Xendit — a
-                      pack, drop-in, trial, or a recurring plan one period at a
-                      time (renew by hand). Decision 62: show the intro-once
-                      sentence in place of Buy when the member has already had the trial. */}
-                  {settings.xenditEnabled && isOnlineBuyable(p.type) && (
-                    p.type === "trial" && settings.trialUsed ? (
-                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
-                        {INTRO_USED_SENTENCE}
-                      </p>
-                    ) : full ? (
-                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
-                        This plan is full. Ask the studio.
-                      </p>
-                    ) : (
-                      <div className="mt-3 flex justify-end"><BuyPlan planId={p.id} returnTo={settleReturn} /></div>
-                    )
-                  )}
-                </li>
-              );
-            })}
+            {sortPlans(shownCatalogue.filter((p) => !p.private_pack)).map(renderPlan)}
           </ul>
           <div className="m-card mt-3 p-4">
             <p className="m-micro text-ink-3">How to buy</p>
@@ -337,6 +356,19 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
               </p>
             )}
           </div>
+        </section>
+      )}
+
+      {privateGroupList.length > 0 && (
+        <section className="mt-8">
+          <h2 className="section-label text-ink-2">Private sessions</h2>
+          <p className="m-sub mt-1 text-ink-2">Book your session from the Book tab after buying.</p>
+          {privateGroupList.map((g) => (
+            <div key={g.name} className="mt-4">
+              <h3 className="m-label mb-2 text-ink">{g.name}</h3>
+              <ul className="space-y-3">{g.plans.map(renderPlan)}</ul>
+            </div>
+          ))}
         </section>
       )}
 

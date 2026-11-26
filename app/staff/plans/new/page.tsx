@@ -29,6 +29,9 @@ export default async function NewPlan({
   const screen = await staffScreen("/plans");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
+  // Decision 116(d): the studio's session types, for "Private pack for".
+  const privateTypesP = supabase.from("private_session_types").select("id, name, people")
+    .eq("studio_id", ctx.studioId).eq("active", true).order("people");
   if (!isManagerUp(ctx.role)) {
     return (
       <AppShell {...shell} title="Plans">
@@ -66,7 +69,7 @@ export default async function NewPlan({
     return (
       <AppShell {...shell} title="New plan"
                 actions={<NavLink href="/plans/new">Start from a template instead</NavLink>}>
-        <PlanForm draft={BLANK} classTypes={classTypes ?? []} currency={ctx.currency}
+        <PlanForm privateTypes={((await privateTypesP).data ?? []) as { id: string; name: string; people: number }[]} draft={BLANK} classTypes={classTypes ?? []} currency={ctx.currency}
                   activeMemberships={0} mode="create"
                 seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} maxRoomCapacity={maxRoom} />
       </AppShell>
@@ -135,7 +138,7 @@ export default async function NewPlan({
       <p className="mb-5 text-[13px] leading-[20px] text-ink-2">
         From the &ldquo;{chosen.name}&rdquo; template. Change anything you like.
       </p>
-      <PlanForm draft={draft} classTypes={classTypes ?? []} currency={ctx.currency}
+      <PlanForm privateTypes={((await privateTypesP).data ?? []) as { id: string; name: string; people: number }[]} draft={draft} classTypes={classTypes ?? []} currency={ctx.currency}
                 activeMemberships={0} mode="create"
                 seatCaps={seatCaps} taken={null} peakHours={peakHours} conversionOn={conversionOn} maxRoomCapacity={maxRoom} />
     </AppShell>

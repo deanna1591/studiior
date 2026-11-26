@@ -16,25 +16,29 @@ export const dynamic = "force-dynamic";
  * pay through Xendit or with a 1:1 pack credit. The session is hidden from every
  * other member and the public timetable.
  */
-export default async function BookPrivate() {
+export default async function BookPrivate({ searchParams }: { searchParams?: { type?: string } }) {
   const { ctx, supabase, settings, studioName, logoUrl, preset, accent, openOffers, memberName, avatarUrl } =
     await memberScreen();
 
   // Decision 116(c): the coach profiles (name, photo, bio, certifications) come
   // from the member-only reader; the private coach list decides who is shown.
-  const [{ data: types }, { data: coaches }, { data: profiles }, { data: packRows }, prices] = await Promise.all([
+  const [{ data: types }, { data: coaches }, { data: profiles }, { data: packRows }, prices, { data: credits }] = await Promise.all([
     supabase.rpc("private_session_types_for", { p_studio_id: ctx.studioId }),
     supabase.from("instructors").select("id, display_name, avatar_url")
       .eq("studio_id", ctx.studioId).eq("status", "active").eq("teaches_privates", true).order("display_name"),
     supabase.rpc("member_coaches", { p_studio_id: ctx.studioId }),
     // Decision 117: the private packs, priced now, shown beside the pay step so a
     // pack on sale carries its tag there.
-    supabase.from("membership_plans").select("id, name, price_cents, currency")
+    supabase.from("membership_plans").select("id, name, price_cents, currency, private_session_type_id")
       .eq("private_pack", true).eq("visibility", "public").eq("status", "active").order("sort_order"),
     planPrices(supabase, ctx.studioId),
+    // Decision 116(d): pack credits by session type.
+    supabase.rpc("my_private_credits", { p_studio_id: ctx.studioId }),
   ]);
-  const packs = ((packRows ?? []) as { id: string; name: string; price_cents: number; currency: string }[])
-    .map((p) => withPrice(p, prices));
+  const creditsByType: Record<string, number> = {};
+  for (const c of ((credits ?? []) as { type_id: string; credits: number }[])) creditsByType[c.type_id] = c.credits;
+  const packs = ((packRows ?? []) as { id: string; name: string; price_cents: number; currency: string; private_session_type_id: string | null }[])
+    .map((p) => ({ ...withPrice(p, prices), typeId: p.private_session_type_id }));
   const byId = new Map(((profiles ?? []) as { id: string; first_name: string; display_name: string; avatar_url: string | null;
     bio: string | null; certifications: unknown }[]).map((p) => [p.id, p]));
   const list = (types ?? []) as { id: string; name: string; price_cents: number; people: number; duration_min: number }[];
@@ -67,7 +71,8 @@ export default async function BookPrivate() {
             };
           })}
           timeZone={ctx.timeZone} timeFormat={ctx.timeFormat}
-          packCredits={settings.privatePackCredits}
+          packCredits={creditsByType}
+          initialTypeId={searchParams?.type ?? null}
           creditCents={settings.reservationCreditCents}
           packs={packs}
         />

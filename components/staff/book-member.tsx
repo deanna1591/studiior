@@ -64,7 +64,10 @@ export function Sheet({
   // Decision 103 (k): a free first class that owes the reservation fee shows the
   // fee and its deadline with a waive switch (staff only). An instructor late add
   // shows the line alone: the fee is due by the end of the studio day.
-  const feeChoice = isFree && !!terms?.required;
+  // Decision 103 (l): unused reservation credit that covers the fee is used
+  // automatically, so there is no Due or Waive choice to make.
+  const creditCovers = isFree && !!terms?.required && !!terms?.credit_covers;
+  const feeChoice = isFree && !!terms?.required && !creditCovers;
   const isInstructor = opts?.method === "instructor";
 
   function submit() {
@@ -143,6 +146,14 @@ export function Sheet({
                   </span>
                 </span>
               </label>
+            )}
+
+            {creditCovers && terms && (
+              <div className="mt-3 rounded-lg bg-paper px-3 py-2.5" data-testid="fee-credit-line">
+                <p className="text-[13px] text-ink">
+                  Their <span className="num font-semibold">{terms.fee_text}</span> credit covers the reservation
+                </p>
+              </div>
             )}
 
             {feeChoice && terms && (

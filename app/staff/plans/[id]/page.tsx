@@ -20,6 +20,9 @@ export default async function EditPlan({
   const screen = await staffScreen("/plans");
   if (screen.gate) return screen.gate;
   const { ctx, supabase, shell } = screen;
+  // Decision 116(d): the studio's session types, for "Private pack for".
+  const privateTypesP = supabase.from("private_session_types").select("id, name, people")
+    .eq("studio_id", ctx.studioId).eq("active", true).order("people");
   if (!isManagerUp(ctx.role)) {
     return (
       <AppShell {...shell} title="Plans">
@@ -92,6 +95,7 @@ export default async function EditPlan({
     restrictions: (plan.restrictions as PlanDraft["restrictions"]) ?? null,
     counts_for_conversion: plan.counts_for_conversion ?? false,
     private_pack: plan.private_pack ?? false,
+    private_session_type_id: (plan as { private_session_type_id?: string | null }).private_session_type_id ?? null,
     group_size: plan.group_size,
     group_book_within_days: plan.group_book_within_days,
     peak_allowance: plan.peak_allowance,
@@ -117,7 +121,7 @@ export default async function EditPlan({
       {plan.status === "active" && plan.visibility === "public" && isOnlineBuyable(plan.type) && studioRow?.slug && (
         <WebsiteLink url={buyUrl(await staffMemberOrigin(supabase, studioRow.slug), plan.id)} />
       )}
-      <PlanForm draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
+      <PlanForm privateTypes={((await privateTypesP).data ?? []) as { id: string; name: string; people: number }[]} draft={draft} classTypes={classTypes ?? []} currency={plan.currency}
                 activeMemberships={active} mode="edit"
                 seatCaps={seatCaps} taken={taken} peakHours={peakHours} conversionOn={conversionOn}
                 maxRoomCapacity={roomRow?.capacity ?? 0} />

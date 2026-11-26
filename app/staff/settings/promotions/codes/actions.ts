@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 export type CodeState = { ok: boolean; message: string; batchId?: string } | null;
 
 function planIds(fd: FormData) { return fd.getAll("plan_ids").map(String).filter(Boolean); }
+function productIds(fd: FormData) { return fd.getAll("product_ids").map(String).filter(Boolean); }
 
 /** Decision 120: a batch of unique single-use codes. */
 export async function createBatch(_prev: CodeState, fd: FormData): Promise<CodeState> {
@@ -16,7 +17,7 @@ export async function createBatch(_prev: CodeState, fd: FormData): Promise<CodeS
   const { data, error } = await supabase.rpc("discount_code_create_batch", {
     p_studio_id: ctx.studioId, p_name: String(fd.get("name") ?? ""), p_pct: Number(fd.get("pct")),
     p_count: Number(fd.get("count")), p_starts: String(fd.get("starts_on") ?? ""), p_ends: String(fd.get("ends_on") ?? ""),
-    p_plan_ids: planIds(fd), p_private: fd.get("private_sessions") === "on",
+    p_plan_ids: planIds(fd), p_private: fd.get("private_sessions") === "on", p_product_ids: productIds(fd),
   });
   if (error) return { ok: false, message: error.message };
   const r = data as { ok: boolean; message?: string; batch_id?: string; count?: number };
@@ -34,6 +35,7 @@ export async function createShared(_prev: CodeState, fd: FormData): Promise<Code
     p_studio_id: ctx.studioId, p_code: String(fd.get("code") ?? ""), p_name: String(fd.get("name") ?? ""),
     p_pct: Number(fd.get("pct")), p_starts: String(fd.get("starts_on") ?? ""), p_ends: String(fd.get("ends_on") ?? ""),
     p_plan_ids: planIds(fd), p_max_uses: Number(fd.get("max_uses")), p_private: fd.get("private_sessions") === "on",
+    p_product_ids: productIds(fd),
   });
   if (error) return { ok: false, message: error.message };
   const r = data as { ok: boolean; message?: string; batch_id?: string; code?: string };

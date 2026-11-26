@@ -21,13 +21,13 @@ function Submit({ children }: { children: React.ReactNode }) {
   return <button className={buttonClass} disabled={pending}>{pending ? "…" : children}</button>;
 }
 
-function Common({ plans, privateEnabled, today }: { plans: { id: string; name: string }[]; privateEnabled: boolean; today: string }) {
+function Common({ plans, products = [], privateEnabled, today }: { plans: { id: string; name: string }[]; products?: { id: string; name: string }[]; privateEnabled: boolean; today: string }) {
   return (
     <>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-[12px] text-ink-2">
           <span className="mb-1 block">Percent off</span>
-          <input name="pct" type="number" min={1} max={90} required defaultValue={10} className={`${inputClass} w-24`} />
+          <input name="pct" type="number" min={1} max={100} required defaultValue={10} className={`${inputClass} w-24`} />
         </label>
         <label className="text-[12px] text-ink-2">
           <span className="mb-1 block">Valid from</span>
@@ -51,12 +51,24 @@ function Common({ plans, privateEnabled, today }: { plans: { id: string; name: s
           </label>
         )}
       </div>
+      {products.length > 0 && (
+        <>
+          <p className="mt-3 text-[12px] text-ink-2">Which shop items</p>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1.5">
+            {products.map((p) => (
+              <label key={p.id} className="flex items-center gap-1.5 text-[13px] text-ink">
+                <input type="checkbox" name="product_ids" value={p.id} /> {p.name}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 }
 
-export default function CodesClient({ rows, plans, privateEnabled, today }: {
-  rows: BatchRow[]; plans: { id: string; name: string }[]; privateEnabled: boolean; today: string;
+export default function CodesClient({ rows, plans, products = [], privateEnabled, today }: {
+  rows: BatchRow[]; plans: { id: string; name: string }[]; products?: { id: string; name: string }[]; privateEnabled: boolean; today: string;
 }) {
   const [tab, setTab] = useState<"batch" | "shared">("batch");
   const [bState, bAction] = useFormState<CodeState, FormData>(createBatch, null);
@@ -90,7 +102,7 @@ export default function CodesClient({ rows, plans, privateEnabled, today }: {
                 <input name="count" type="number" min={1} max={500} required defaultValue={20} className={`${inputClass} w-28`} />
               </label>
             </div>
-            <Common plans={plans} privateEnabled={privateEnabled} today={today} />
+            <Common plans={plans} products={products} privateEnabled={privateEnabled} today={today} />
             <Submit>Create codes</Submit>
           </form>
         ) : (
@@ -110,7 +122,7 @@ export default function CodesClient({ rows, plans, privateEnabled, today }: {
                 <input name="max_uses" type="number" min={1} required defaultValue={50} className={`${inputClass} w-28`} />
               </label>
             </div>
-            <Common plans={plans} privateEnabled={privateEnabled} today={today} />
+            <Common plans={plans} products={products} privateEnabled={privateEnabled} today={today} />
             <Submit>Create code</Submit>
           </form>
         )}

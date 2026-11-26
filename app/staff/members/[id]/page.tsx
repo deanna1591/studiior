@@ -4,6 +4,7 @@ import { isDeskUp, isManagerUp } from "@/lib/auth";
 import Infractions from "./infractions";
 import DeskPay from "./desk-pay";
 import ReservationFeeWaiver from "./reservation-fee-waiver";
+import TestAccount from "./test-account";
 import DoNotChase from "./do-not-chase";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Empty, NavLink, Rows, SectionLabel } from "@/components/ui";
@@ -64,7 +65,7 @@ export default async function MemberDetail({
 
   const { data: m } = await supabase
     .from("members")
-    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason, deleted_at, merged_into, reservation_fee_waived_at, reservation_fee_waived_note, do_not_chase, marketing_opt_in")
+    .select("id, first_name, last_name, email, phone, status, joined_on, source, waiver_signed_at, first_visit_at, last_visit_at, lifetime_visits, current_streak, health_band, health_reason, user_id, avatar_url, desk_pay_blocked_at, desk_pay_blocked_reason, deleted_at, merged_into, reservation_fee_waived_at, reservation_fee_waived_note, do_not_chase, marketing_opt_in, is_test_account")
     .eq("id", params.id)
     .maybeSingle();
   if (!m) notFound();
@@ -792,6 +793,9 @@ export default async function MemberDetail({
       )}
       {manager && !m.deleted_at && (
         <DoNotChase memberId={m.id} on={!!m.do_not_chase} />
+      )}
+      {manager && !m.deleted_at && (
+        <TestAccount memberId={m.id} on={!!m.is_test_account} />
       )}
       <Infractions
         standing={

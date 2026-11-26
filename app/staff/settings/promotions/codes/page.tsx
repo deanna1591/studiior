@@ -17,11 +17,13 @@ export default async function DiscountCodes() {
   if (!isManagerUp(ctx.role)) {
     return <AppShell {...shell} title="Discount codes"><Denied what="discount codes" role={ctx.role} /></AppShell>;
   }
-  const [{ data: list }, { data: plans }, { data: ss }] = await Promise.all([
+  const [{ data: list }, { data: plans }, { data: ss }, { data: products }] = await Promise.all([
     supabase.rpc("discount_code_batches_list", { p_studio_id: ctx.studioId }),
     supabase.from("membership_plans").select("id, name").eq("studio_id", ctx.studioId)
       .eq("status", "active").order("sort_order"),
     supabase.from("studio_settings").select("private_sessions_enabled").eq("studio_id", ctx.studioId).maybeSingle(),
+    // Decision 120(b): shop items can take a code too.
+    supabase.from("products").select("id, name").eq("studio_id", ctx.studioId).eq("status", "active").order("name"),
   ]);
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: ctx.timeZone }).format(new Date());
   return (
@@ -29,11 +31,12 @@ export default async function DiscountCodes() {
       <Link href="/settings/promotions" className="mb-3 inline-block text-[13px] text-ink-2 underline underline-offset-4">← Promotions</Link>
       <SectionLabel>Discount codes</SectionLabel>
       <p className="mb-4 mt-2 max-w-2xl text-[13px] leading-[19px] text-ink-2">
-        A percent off chosen plans, class packs, memberships and private sessions, entered at checkout.
-        Never on shop items, gift cards or the reservation fee. When a promotion is running, the buyer
+        A percent off chosen plans, class packs, memberships, private sessions and shop items, entered at
+        checkout. Up to 100% off. Never on gift cards or the reservation fee. When a promotion is running, the buyer
         pays the lower of the two, never both.
       </p>
       <CodesClient rows={(list ?? []) as BatchRow[]} plans={(plans ?? []) as { id: string; name: string }[]}
+                   products={(products ?? []) as { id: string; name: string }[]}
                    privateEnabled={!!ss?.private_sessions_enabled} today={today} />
     </AppShell>
   );

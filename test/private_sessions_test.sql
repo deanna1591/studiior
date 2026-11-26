@@ -283,7 +283,7 @@ select set_config('t.pkocc', current_setting('t.pk')::jsonb ->> 'occurrence_id',
 select expect_text('pack: confirmed at once', current_setting('t.pk')::jsonb ->> 'confirmed', 'true');
 select expect_num('pack: one credit spent (5 -> 4)',
   (select credits_remaining from memberships where id = 'd1160000-0000-0000-0000-0000000009a1'), 4);
-select expect_text('pack: a Duo cannot use a 1:1 pack', current_setting('t.pkduo')::jsonb ->> 'reason', 'pack_1to1_only');
+select expect_text('pack: a Duo cannot use a 1:1 pack (116 d: a pack is for its own type)', current_setting('t.pkduo')::jsonb ->> 'reason', 'no_pack_credit');
 select expect_true('pack: a group class never draws on a private pack',
   (select payment_source::text <> 'class_pack' and membership_id is null from bookings
     where occurrence_id = 'd1160000-0000-0000-0000-00000000c001' and member_id = 'd1160000-0000-0000-0000-0000000000f3'));

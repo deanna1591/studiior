@@ -20,6 +20,8 @@ export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 export async function buyProduct(_prev: BuyState, fd: FormData): Promise<BuyState> {
   const productId = String(fd.get("product_id") ?? "").trim();
   const quantity = Math.max(1, Math.min(99, Number(fd.get("quantity") ?? 1) || 1));
+  // Decision 120(b): an applied discount code, checked again in the database.
+  const code = String(fd.get("code") ?? "").trim() || null;
   if (!productId) return { ok: false, message: "No product chosen." };
 
   const ctx = await getMemberContext();
@@ -34,10 +36,12 @@ export async function buyProduct(_prev: BuyState, fd: FormData): Promise<BuyStat
     p_studio_id: ctx.studioId,
     p_product_id: productId,
     p_quantity: quantity,
+    p_code: code as string,
   });
   const purchase = Array.isArray(begun) ? begun[0] : begun;
   if (beginErr || !purchase) {
     const m = beginErr?.message ?? "";
+    if (beginErr?.code === "PT460") return { ok: false, message: m };
     if (/Only \d+ left/i.test(m)) return { ok: false, message: m.replace(/^.*?(Only \d+ left\.).*$/, "$1") };
     if (/PT409/.test(m)) return { ok: false, message: "That isn’t available to buy online right now." };
     if (/PT404/.test(m)) return { ok: false, message: "That product is no longer on sale." };
@@ -45,8 +49,8 @@ export async function buyProduct(_prev: BuyState, fd: FormData): Promise<BuyStat
     return { ok: false, message: m || "Could not start the purchase." };
   }
 
-  // Decision 103(f): credit covered the whole order — the begin function already
-  // completed it (source-credit payment, no Xendit). Land on the order screen.
+  // Decision 103(f) / 120(a): credit or a 100% code covered the whole order. The
+  // begin function already completed it (no Xendit). Land on the order screen.
   if (purchase.amount_cents === 0) {
     return { ok: true, url: `${origin}/purchase/${purchase.purchase_id}` };
   }

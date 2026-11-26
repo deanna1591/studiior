@@ -145,8 +145,11 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
       // empty selection stores an empty object rather than an empty array.
       // Decision 116: a private pack carries a sentinel restriction no class type
       // matches, so every coverage reader treats it as covering no group class.
-      private_pack: type === "class_pack" && fd.get("private_pack") === "on",
-      restrictions: type === "class_pack" && fd.get("private_pack") === "on"
+      // Decision 116(d): a private pack names the session type it is for.
+      private_pack: type === "class_pack" && !!String(fd.get("private_session_type_id") ?? ""),
+      private_session_type_id: type === "class_pack" && String(fd.get("private_session_type_id") ?? "")
+        ? String(fd.get("private_session_type_id")) : null,
+      restrictions: type === "class_pack" && !!String(fd.get("private_session_type_id") ?? "")
         ? { class_type_ids: ["private-only"] }
         : classTypeIds.length > 0 ? { class_type_ids: classTypeIds } : {},
 

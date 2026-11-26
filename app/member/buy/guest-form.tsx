@@ -43,7 +43,7 @@ export default function GuestBuyForm({ planId, loginHref, currency = "PHP" }: { 
                  email: (document.getElementById("g-email") as HTMLInputElement | null)?.value })} />
       {code?.priceCents != null && (
         <p className="m-body flex items-baseline justify-between text-ink">
-          <span className="font-semibold">You pay</span>
+          <span className="font-semibold">{code.priceCents === 0 ? "Total" : "You pay"}</span>
           <span className="num font-semibold">{formatMoney(code.priceCents, code.currency ?? currency)}</span>
         </p>
       )}
@@ -56,7 +56,7 @@ export default function GuestBuyForm({ planId, loginHref, currency = "PHP" }: { 
       <button type="submit" disabled={pending}
         className="m-press w-full rounded-full py-3.5 text-center text-[16px] font-semibold disabled:opacity-60"
         style={accentSolid()}>
-        {pending ? "Opening checkout…" : "Continue to pay"}
+        {pending ? (code?.priceCents === 0 ? "One moment…" : "Opening checkout…") : code?.priceCents === 0 ? "Complete" : "Continue to pay"}
       </button>
       <p className="m-micro text-center text-ink-3">Card or GCash, on the next screen.</p>
       <p className="m-sub text-center text-ink-2">

@@ -3194,3 +3194,19 @@ Permissions doc section 17 amended: instructors can make and share posts of thei
 The instructor bottom bar goes back to five tabs; the Posts tab is removed. On the instructor Home, under the Studio guide card, a featured card titled "Marketing" in the studio accent tint (same card shape as Studio guide, accent background at 0.12, accent camera icon): line "Make a post of your classes and share it on Instagram, Facebook or Threads." and a button "Make a post" that opens the posts page. The posts page heading becomes "Marketing" and its back link returns to Home. Nothing else on the page changes.
 
 Spots pill: when Show spots left is on, the spots sit in a pill at the right end of each class row, not in the text line: rounded full, soft accent fill (accent at 0.12) with accent text for "{n} spots left" / "1 spot left", solid accent fill with the on-accent colour for "Full". Mono font, 0.8 of the row text. Same in all four styles; Lock screen puts the pill under the time on the right. The caption keeps the text suffix.
+
+## 120 (a) — A code can be 100% off (amendment, recorded 26 Nov 2026)
+
+Percent off may be 1 to 100. When a code brings the price to ₱0, checkout shows Total ₱0 and the button reads Complete; no Xendit session is made; the purchase completes through the existing full-credit path (Decision 103 (f)) with a payment row of ₱0 carrying the code and the amount taken off; the code is used at once; receipt and invoice show the code line; Sales shows ₱0 received and the amount under Discount codes. Works at member checkout, /buy without an account, the private session pay step, Record a payment and Sold a plan at desk. Coach pay is unaffected (heads only).
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 120. Deanna, 26 Nov 2026.
+
+---
+
+## 120 (b) — Codes work on shop items (amendment, recorded 26 Nov 2026)
+
+A discount code may also apply to shop products: the create form lists the studio's products next to its plans. The shop checkout and the staff shop sale (record_product_sale) have the same Have a code? box and rules (validity, single use or shared cap, once per person, no stacking with promotions). At 100% the order completes at ₱0 without Xendit as Paid, collect at the studio; stock is reserved and decremented exactly as for a paid order; the receipt shows the code line; Sales shows the amount under Discount codes. Codes still never apply to gift cards or the reservation fee.
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 120. Deanna, 26 Nov 2026.
+
+---

@@ -7,7 +7,7 @@ export type RescueCard = {
   coach_first?: string;
   n_booked: number;
   spots_left: number;
-  /** Decision 95(b): "Needs 1 more" / "Needs 2 more" / "Always runs". */
+  /** Decision 95(b): "Needs 1 more to run" / "Needs 2 more to run" (95 c) / "Always runs". */
   label?: string | null;
 };
 export function orderRescueCards(rows: RescueCard[] | null | undefined): RescueCard[];

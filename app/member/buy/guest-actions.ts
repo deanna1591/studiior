@@ -65,6 +65,10 @@ export async function buyPlanAsGuest(_prev: GuestBuyState, fd: FormData): Promis
     return { ok: false, message: "Could not start the purchase. Please try again." };
   }
 
+  // Decision 120(a): a 100% code. The purchase has already completed and the plan
+  // is held for claim (Decision 118); there is no checkout to open.
+  if (b.amount_cents === 0) return { ok: true, url: `${origin}/buy/${planId}/paid` };
+
   let secret: string;
   try {
     secret = decryptSecret(b.secret_key_ciphertext as string);

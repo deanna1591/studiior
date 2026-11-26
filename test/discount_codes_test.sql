@@ -150,9 +150,12 @@ select expect_text('a code is not case sensitive and ignores spaces',
 select expect_text('a plan the code does not cover is refused', t_check(current_setting('t.c1'), '12000000-0000-0000-0000-0000000cc003'), 'not_this_plan');
 select expect_text('never on a shop item, gift card or reservation fee (no plan, not private)',
   t_check(current_setting('t.c1'), null), 'not_this_plan');
-select expect_true('the shop, gift card and reservation fee begins take no code',
+select expect_true('the gift card and reservation fee begins take no code',
   (select bool_and(pg_get_function_identity_arguments(oid) not like '%p_code%') from pg_proc
-    where proname in ('xendit_begin_product_purchase','gift_card_begin','xendit_begin_reservation','reserve_free_first')));
+    where proname in ('gift_card_begin','xendit_begin_reservation','reserve_free_first')));
+select expect_true('the shop begin takes a code (Decision 120 b)',
+  (select bool_and(pg_get_function_identity_arguments(oid) like '%p_code%') from pg_proc
+    where proname = 'xendit_begin_product_purchase'));
 update discount_code_batches set starts_on = t_today() + 2 where id = current_setting('t.b1')::uuid;
 select expect_text('before it starts it is not valid', t_check(current_setting('t.c1'), '12000000-0000-0000-0000-0000000cc001'), 'invalid');
 update discount_code_batches set starts_on = t_today() - 10, ends_on = t_today() - 1 where id = current_setting('t.b1')::uuid;
