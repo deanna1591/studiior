@@ -551,6 +551,54 @@ Each roster row that is booked and not checked in shows "Mark no-show" once the 
 
 ---
 
+## 116 (d) — Private sessions sold under My plan, per session type (amendment, recorded 26 Nov 2026)
+
+A private pack is tied to one session type: membership_plans.private_session_type_id, required when private_pack is true. A pack of 1 is how a single Solo, Duo or Trio is sold in advance. Account → Plans gains a "Private sessions" section grouped by type, each plan showing credits, validity and price from the plan row, bought through the existing checkout or without an account (Decision 118); promotions (Decision 117) and discount codes (Decision 120) apply. Credits are per type: a Duo credit books a Duo, never a Solo. The private pay step reads "Use 1 of your {n} {type} sessions" when the member holds a credit of that type. Refunds, moves and studio cancellations return the credit to the same pack. Reform's existing 5 and 10 session packs are set to Solo. The studio creates single-session plans itself (Reform: Solo, Duo, Trio, 30 days validity, its own prices). Copy under the section: "Book your session from the Book tab after buying." Groups and labels use the studio's session type names (Reform: Private 1:1, Duo, Trio).
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 116. Deanna, 26 Nov 2026.
+
+---
+
+## 80 (f) — Every email on the Templates page, clean plain text, paired tokens (amendment, recorded 26 Nov 2026)
+
+(1) Every notification template is listed on the Templates page with a plain title, audience and when it is sent, grouped as today; no template is reachable only by a one-off. (2) The editor saves the composer's plain-text rendering (renderBody().text) alongside body_html, and render_email uses it for the text part, so cards read as prose and buttons as "Label: link" lines; existing overrides are re-rendered once to fill the text column. (3) Paired tokens: when a payload carries both {x_line} and {x_html}, the HTML part uses x_html and the text part uses x_line whichever one the template names, so a button can never drop out of one part.
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 80. Deanna, 26 Nov 2026.
+
+---
+
+## 103 (l) — Staff bookings use the member's reservation credit (amendment, recorded 26 Nov 2026)
+
+When staff book a free first class for a member whose unused reservation credit covers the fee and who is not fee-waived, the booking takes the credit-covered path automatically: confirmed seat, no due row, no nudge or last call, chip "Credit covers". The staff sheet says "Their {fee} credit covers the reservation" in place of the Due or Waive choice. Found 23 Nov: four 11:00 classes were created and cancelled overnight because each staff rebooking made a new fee-due seat that the cut-off released.
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 103. Deanna, 26 Nov 2026.
+
+---
+
+## 97 (b) — Test accounts (amendment, recorded 26 Nov 2026)
+
+members.is_test_account (manager-up switch on the member profile, "Test account", audited). A test account is excluded from campaigns, the convert, keep and retention sequences, rescue emails (Decision 119) and any catch-up send or backfill, from audience counts, members export, growth and dashboard member counts, and from the daily check's member items. Transactional emails for its own bookings and purchases still send so the owner can test flows. Reform: Deanna's accounts drewdeanna15@gmail.com, deannasallao15@gmail.com, deanna@dsvdigital.com and any @example.com member are marked by the migration.
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 97. Deanna, 26 Nov 2026.
+
+---
+
+## 119 (a) — Private sessions get a rescue email; full class subject (amendment, recorded 26 Nov 2026)
+
+A private session checkout that expires, is abandoned or fails gets the plan-style rescue with "Finish my booking" to the private booking page for that session type (same skip rules). The reservation rescue's full-or-past version uses the subject "Your free class is still waiting, {first_name}".
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 119. Deanna, 26 Nov 2026.
+
+---
+
+## 95 (c) — Rescue labels match the chips (amendment, recorded 26 Nov 2026)
+
+The rescue list labels read "Needs 1 more to run" and "Needs 2 more to run", matching 22(f).
+
+**Status:** settled, to build in Step 13. **Amends:** Decision 95. Deanna, 26 Nov 2026.
+
+---
+
 ## 120 — Discount codes (recorded 25 Nov 2026)
 
 **Decision.** Manager-up creates discount codes in Settings → Promotions → Discount codes. Two kinds. (1) A batch of unique single-use codes: name, percent off (1 to 90), how many codes, valid from and to (studio dates, 00:00 to 23:59), and which plans; the system generates that many codes in the form {STUDIO}-XXXX-XXXX from an unambiguous alphabet, unique per studio; each code works once, for one purchase, by anyone who has it. (2) A shared code: owner-chosen text (letters and digits, e.g. XMAS10, unique per studio), percent off, valid from and to, which plans, and a maximum number of uses; each person (member or buyer email) may use it once. Codes apply to plans, class packs, memberships, private packs and private session payments; never to shop items, gift cards or the reservation fee. Members enter a code in a "Have a code?" box at checkout (member checkout, /buy without an account, the private session pay step) and staff on Record a payment; the price updates at once. No stacking: when a promotion (Decision 117) is running, the buyer pays the lower of the sale price and the code price, and only that one is recorded. A code is held by a pending checkout for that checkout's life and released if it expires; it is used only when the payment succeeds; a refund while the code is still valid makes it usable again (for a shared code, the use is returned). Refusals: "That code isn't valid.", "That code has expired.", "That code has already been used.", "That code doesn't apply to this plan.", "You've already used this code.", "This code is being used in another checkout. Try again in 30 minutes." Payment rows record the code and the amount taken off; receipts and the BIR invoice show "Code {code}: -{amount}"; Sales shows a "Discount codes" line. Staff list per batch or shared code: each code with Unused / Used / Expired / Cancelled, who used it, when, on which plan, the amount off; copy one, copy all, download CSV; cancel an unused code. Guessing is blocked: codes are random and long, and code checks are rate-limited per studio, per buyer email and per member. No new anon function: plan_buy_begin gains an optional code argument (surface stays EXACTLY FIFTEEN). Audit: code batch created, code cancelled, code redeemed, code returned. The instructor desk sale (Sold a plan at desk) accepts a code too. A refund returns the code through every refund path (refund_payment_run, record_refund and apply_payment_refund), through one shared helper.
