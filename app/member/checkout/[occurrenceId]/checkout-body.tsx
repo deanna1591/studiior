@@ -13,6 +13,9 @@ import { PriceAmount, PromoTagChip } from "@/components/price-tag";
 import type { PlanPrice } from "@/lib/promo";
 import { netTotalCents } from "@/lib/reservation-credit";
 import { checkoutPay, payAtDesk, type DeskState } from "./actions";
+import CodeBox from "@/components/code-box";
+import { previewMemberCode } from "@/app/member/code-actions";
+import type { CodePreview } from "@/lib/discount-code";
 import type { BuyState } from "@/app/member/account/plan/actions";
 
 export type CheckoutPlanRow = {
@@ -54,7 +57,12 @@ export default function CheckoutBody({
   // legal name, say so before the member leaves for Xendit. Blank = no line.
   const payeeLine = payeeNoticeLine(studioName, payeeNoticeName);
   const [selectedId, setSelectedId] = useState(plans[0]?.id ?? "");
-  const selected = plans.find((p) => p.id === selectedId) ?? plans[0] ?? null;
+  const base = plans.find((p) => p.id === selectedId) ?? plans[0] ?? null;
+  // Decision 120: an applied code replaces the price for the selected plan.
+  const [code, setCode] = useState<CodePreview | null>(null);
+  const selected = base && code?.priceCents != null
+    ? { ...base, price_cents: code.priceCents, list_cents: code.listCents ?? base.list_cents, promo: null }
+    : base;
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const [payState, pay] = useFormState<BuyState, FormData>(checkoutPay, null);
@@ -118,7 +126,7 @@ export default function CheckoutBody({
                     <label className="m-card m-press flex cursor-pointer items-center gap-3 p-4"
                            style={on ? { border: "1.5px solid var(--accent-solid)" } : { border: "1.5px solid transparent" }}>
                       <input type="radio" name="checkout_plan" value={p.id} checked={on}
-                             onChange={() => { setSelectedId(p.id); haptic("tap"); }}
+                             onChange={() => { setSelectedId(p.id); setCode(null); haptic("tap"); }}
                              className="sr-only" />
                       <span aria-hidden className="grid h-5 w-5 shrink-0 place-items-center rounded-full border"
                             style={{ borderColor: on ? "var(--accent-solid)" : "var(--line)" }}>
@@ -144,7 +152,18 @@ export default function CheckoutBody({
               <h2 className="section-label text-ink-2">Summary</h2>
               <div className="mt-2 flex items-baseline justify-between gap-3">
                 <span className="m-sub text-ink-2">{selected.name}</span>
-                <span className="num text-[15px] text-ink">{formatMoney(selected.price_cents, selected.currency)}</span>
+                <span className="num text-[15px] text-ink">{formatMoney(base?.list_cents ?? base?.price_cents ?? selected.price_cents, selected.currency)}</span>
+              </div>
+              {!code && base?.promo && base.list_cents != null && base.list_cents > base.price_cents && (
+                <div className="mt-1 flex items-baseline justify-between gap-3">
+                  <span className="m-sub text-ink-2">{base.promo.promotion_name}</span>
+                  <span className="num m-sub text-ink">-{formatMoney(base.list_cents - base.price_cents, selected.currency)}</span>
+                </div>
+              )}
+              <div className="mt-2">
+                <CodeBox key={selected.id} name={null} currency={selected.currency}
+                         preview={(c) => previewMemberCode({ code: c, planId: selected.id })}
+                         onChange={setCode} />
               </div>
               <CreditApplied creditCents={creditCents} priceCents={selected.price_cents} currency={selected.currency} creditSource={creditSource} />
               <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2">
@@ -162,6 +181,7 @@ export default function CheckoutBody({
               <form action={pay}>
                 <input type="hidden" name="occurrence_id" value={occId} />
                 <input type="hidden" name="plan_id" value={selected?.id ?? ""} />
+                {code?.code && <input type="hidden" name="code" value={code.code} />}
                 <CompleteSubmit />
                 {payState && !payState.ok && (
                   <p className="m-sub mt-2 text-center text-coral">
@@ -224,6 +244,7 @@ export default function CheckoutBody({
                 <form action={pay} className="mt-5">
                   <input type="hidden" name="occurrence_id" value={occId} />
                   <input type="hidden" name="plan_id" value={selected.id} />
+                  {code?.code && <input type="hidden" name="code" value={code.code} />}
                   <PaySubmit amount={formatMoney(selected.price_cents, selected.currency)} />
                 </form>
                 {payState && !payState.ok && (

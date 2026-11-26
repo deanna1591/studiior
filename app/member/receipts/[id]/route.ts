@@ -69,7 +69,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     .select(`
       id, studio_id, member_id, amount_cents, currency, provider, method, status,
       refunded_cents, refunded_at, invoice_no, received_by, reference, paid_at, created_at, description,
-      list_price_cents, discount_cents, plan_promotions(name),
+      list_price_cents, discount_cents, discount_code, plan_promotions(name),
       memberships(membership_plans(name)),
       product_orders(products(name)),
       bookings(class_occurrences(name, class_types(name))),
@@ -118,7 +118,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   // Decision 117: a promotion's discount, shown as its own line under the list
   // price ("{promotion name}: -{amount}"). The amount paid already reflects it.
   const discount = ((anyP.discount_cents as number | null) ?? 0);
-  const promoName: string = anyP.plan_promotions?.name ?? "Promotion";
+  // Decision 120: a discount code reads "Code {code}" instead (never both).
+  const promoName: string = anyP.discount_code ? `Code ${anyP.discount_code}` : (anyP.plan_promotions?.name ?? "Promotion");
 
   let bytes: Uint8Array;
   let name: string;

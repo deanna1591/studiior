@@ -3,16 +3,20 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { accentSolid } from "@/lib/accent-pair";
-import { buyPlanAsGuest, type GuestBuyState } from "./guest-actions";
+import { buyPlanAsGuest, previewGuestCode, type GuestBuyState } from "./guest-actions";
+import CodeBox from "@/components/code-box";
+import { formatMoney } from "@/lib/format-money";
+import type { CodePreview } from "@/lib/discount-code";
 
 /**
  * Decision 118: name, email and mobile, then "Continue to pay" opens the Xendit
  * checkout. No account needed; the plan waits under the email until the buyer
  * sets one up (or lands in their account at once if they already have one).
  */
-export default function GuestBuyForm({ planId, loginHref }: { planId: string; loginHref: string }) {
+export default function GuestBuyForm({ planId, loginHref, currency = "PHP" }: { planId: string; loginHref: string; currency?: string }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [code, setCode] = useState<CodePreview | null>(null);
 
   function submit(fd: FormData) {
     setErr(null);
@@ -31,6 +35,18 @@ export default function GuestBuyForm({ planId, loginHref }: { planId: string; lo
              hint="Your receipt and the link to set up your account go here." />
       <Field name="phone" label="Mobile number" type="tel" placeholder="0917 123 4567" autoComplete="tel"
              hint="We call or text you about your classes." />
+
+      {/* Decision 120: a discount code. The email, when filled in, lets a shared
+          code count once per person. */}
+      <CodeBox currency={currency} onChange={setCode}
+               preview={(c) => previewGuestCode({ planId, code: c,
+                 email: (document.getElementById("g-email") as HTMLInputElement | null)?.value })} />
+      {code?.priceCents != null && (
+        <p className="m-body flex items-baseline justify-between text-ink">
+          <span className="font-semibold">You pay</span>
+          <span className="num font-semibold">{formatMoney(code.priceCents, code.currency ?? currency)}</span>
+        </p>
+      )}
 
       {err && (
         <p className="rounded-lg px-3 py-2 text-[13px] leading-[19px]"

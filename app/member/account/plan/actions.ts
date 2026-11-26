@@ -7,6 +7,7 @@ import { decryptSecret } from "@/lib/integrations-crypto";
 import { createSession, getCustomerByReferenceId } from "@/lib/xendit";
 import { safeNext } from "@/lib/auth-redirect";
 import { reserveReasonSentence } from "@/lib/booking-reasons";
+import { codeRefusal } from "@/lib/discount-code";
 
 export type BuyState = { ok: boolean; url?: string; message?: string } | null;
 
@@ -33,7 +34,7 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
 
-  return beginXenditCheckout(ctx, planId, returnTo);
+  return beginXenditCheckout(ctx, planId, returnTo, String(fd.get("code") ?? "") || null);
 }
 
 /**
@@ -45,7 +46,7 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
  * On activation the unchanged apply_plan_to_unpaid settles any held drop-in.
  */
 export async function beginXenditCheckout(
-  ctx: MemberCtx, planId: string, returnTo: string,
+  ctx: MemberCtx, planId: string, returnTo: string, code?: string | null,
 ): Promise<BuyState> {
   const origin = currentMemberOrigin();
   if (!origin) return { ok: false, message: "Could not work out the studio address." };
@@ -55,9 +56,13 @@ export async function beginXenditCheckout(
   const { data: begun, error: beginErr } = await supabase.rpc("xendit_begin_purchase", {
     p_studio_id: ctx.studioId,
     p_plan_id: planId,
+    // Decision 120: a discount code, checked and held by the begin.
+    p_code: (code?.trim() || null) as string,
   });
   const purchase = Array.isArray(begun) ? begun[0] : begun;
   if (beginErr || !purchase) {
+    const refused = codeRefusal(beginErr);
+    if (refused) return { ok: false, message: refused };
     const m = beginErr?.message ?? "";
     if (/PT422/.test(m)) return { ok: false, message: "That plan can’t be bought online." };
     if (/PT409/.test(m)) return { ok: false, message: "This studio isn’t set up for online payments yet." };
@@ -269,7 +274,7 @@ export async function startReservation(occId: string): Promise<BuyState> {
  */
 export async function startPrivate(input: {
   typeId: string; coachId: string | null; startsAt: string;
-  companions: { name: string; email: string }[]; payMode: "xendit" | "pack";
+  companions: { name: string; email: string }[]; payMode: "xendit" | "pack"; code?: string | null;
 }): Promise<{ ok: boolean; url?: string; message?: string; occurrenceId?: string; reason?: string }> {
   const ctx = await getMemberContext();
   if (!ctx) return { ok: false, message: "You are not signed in." };
@@ -279,11 +284,13 @@ export async function startPrivate(input: {
   const { data, error } = await supabase.rpc("private_book", {
     p_type_id: input.typeId, p_instructor_id: (input.coachId ?? null) as string,
     p_starts_at: input.startsAt, p_companions: input.companions, p_pay_mode: input.payMode,
+    // Decision 120: a code on the private session pay step (Xendit only).
+    p_code: (input.payMode === "xendit" ? input.code?.trim() || null : null) as string,
   });
   if (error) return { ok: false, message: error.message.replace(/^.*?:\s*/, "") };
   const r = data as { ok: boolean; reason?: string; occurrence_id?: string; confirmed?: boolean;
     purchase_id?: string; amount_cents?: number; currency?: string } | null;
-  if (!r?.ok) return { ok: false, reason: r?.reason ?? "unknown" };
+  if (!r?.ok) return { ok: false, reason: r?.reason ?? "unknown", message: r?.reason === "code" ? (r as { message?: string }).message : undefined };
   if (r.confirmed) return { ok: true, url: `${origin}/private/${r.occurrence_id}?booked=1`, occurrenceId: r.occurrence_id };
   const opened = await openXenditSession(ctx, {
     purchaseId: r.purchase_id!, amountCents: r.amount_cents!, currency: r.currency!,

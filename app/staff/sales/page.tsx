@@ -48,6 +48,7 @@ type Totals = {
   gift_sold?: { count: number; total_cents: number };
   gift_redeemed?: { count: number; total_cents: number };
   discounts?: { count: number; total_cents: number };
+  codes?: { count: number; total_cents: number };
   private?: { count: number; total_cents: number; after_vat_cents: number; vat_cents: number;
               coach_pay_cents: number; studio_keeps_cents: number };
 };
@@ -214,6 +215,10 @@ export default async function Sales({
           {totals.discounts && totals.discounts.count > 0 && (
             <> · <span className="num text-ink">{formatMoney(totals.discounts.total_cents, totals.currency)}</span>
               {" "}discounts given ({totals.discounts.count})</>
+          )}
+          {totals.codes && totals.codes.count > 0 && (
+            <> · <span className="num text-ink">{formatMoney(totals.codes.total_cents, totals.currency)}</span>
+              {" "}Discount codes ({totals.codes.count})</>
           )}
           {totals.gift_redeemed && totals.gift_redeemed.count > 0 && (
             <> · <span className="num text-ink">{formatMoney(totals.gift_redeemed.total_cents, totals.currency)}</span>

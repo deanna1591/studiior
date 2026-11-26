@@ -397,7 +397,7 @@ select expect_num('anon surface is exactly fifteen (suite helpers excluded)',
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname not like 'expect\_%' and p.proname not like 't\_%'), 15);
 select expect_true('plan_buy_begin is the new one',
-  has_function_privilege('anon', 'plan_buy_begin(uuid, uuid, text, text, text)', 'execute'));
+  has_function_privilege('anon', 'plan_buy_begin(uuid, uuid, text, text, text, text, boolean)', 'execute'));
 select expect_true('xendit_purchases keeps row level security (anon reads no rows)',
   (select relrowsecurity from pg_class where oid = 'public.xendit_purchases'::regclass));
 do $$ begin

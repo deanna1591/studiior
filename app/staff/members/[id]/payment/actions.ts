@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getStaffContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { previewFromPrice, type CodePreview } from "@/lib/discount-code";
 
 export type PayState = { ok: boolean; message: string } | null;
 
@@ -53,9 +54,12 @@ export async function recordPayment(_prev: PayState, fd: FormData): Promise<PayS
     p_method_note: String(fd.get("method_note") ?? "").trim() || undefined,
     p_reference: String(fd.get("reference") ?? "").trim() || undefined,
     p_paid_at: paidOn ? new Date(paidOn).toISOString() : undefined,
+    // Decision 120: a discount code; a valid one sets the amount to the code price.
+    p_code: (kind === "plan" ? String(fd.get("code") ?? "").trim() || undefined : undefined),
   });
 
   if (error) {
+    if (error.code === "PT460") return { ok: false, message: error.message };
     if (/PT403/.test(error.message) || error.code === "PT403") {
       return { ok: false, message: "You are not allowed to record payments." };
     }
@@ -107,4 +111,19 @@ export async function refundPayment(_prev: PayState, fd: FormData): Promise<PayS
 
   revalidatePath(`/members/${memberId}`);
   return { ok: true, message: "Refund recorded." };
+}
+
+/**
+ * Decision 120: check a code for this member on this plan, for Record a
+ * payment. Writes nothing except the rate-limit log.
+ */
+export async function previewStaffCode(input: { memberId: string; planId: string; code: string }): Promise<CodePreview> {
+  const ctx = await getStaffContext();
+  if (!ctx) return previewFromPrice(null);
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("discount_code_preview", {
+    p_studio_id: ctx.studioId, p_code: input.code, p_plan_id: input.planId, p_member_id: input.memberId,
+  });
+  if (error) return { ...previewFromPrice(null), message: "That code couldn't be checked. Try again." };
+  return previewFromPrice(data as Record<string, unknown>);
 }

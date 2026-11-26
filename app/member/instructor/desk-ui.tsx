@@ -136,6 +136,8 @@ export function DeskPay({
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [sMethod, setSMethod] = useState("gcash");
   const [sRef, setSRef] = useState("");
+  // Decision 120: a discount code on the desk sale, same rules as Record a payment.
+  const [sCode, setSCode] = useState("");
   const [useToday, setUseToday] = useState(unpaidDropin);
 
   function done(r: DeskResult) {
@@ -148,7 +150,7 @@ export function DeskPay({
   }
   function sell() {
     setErr(null);
-    start(async () => done(await sellPlanAtDesk(occurrenceId, memberId, planId, sMethod, sRef, unpaidDropin && useToday)));
+    start(async () => done(await sellPlanAtDesk(occurrenceId, memberId, planId, sMethod, sRef, unpaidDropin && useToday, sCode)));
   }
 
   const chip = "rounded-full px-2.5 py-1 text-[12px] font-medium";
@@ -216,6 +218,7 @@ export function DeskPay({
             ))}
           </div>
           <input className={`${field} mt-2`} value={sRef} onChange={(e) => setSRef(e.target.value)} placeholder="Reference (optional)" />
+          <input className={`${field} mt-2 uppercase`} value={sCode} onChange={(e) => setSCode(e.target.value)} placeholder="Discount code (optional)" autoComplete="off" />
           {unpaidDropin && (
             <label className="mt-2 flex items-center gap-2 text-[13px] text-ink">
               <input type="checkbox" checked={useToday} onChange={(e) => setUseToday(e.target.checked)} />

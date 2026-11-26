@@ -10,6 +10,10 @@ import { certificationLines, coachAvatarRow, coachStep, groupGaps, privateReason
 import Avatar from "@/components/member/avatar";
 import { privateSlots } from "./actions";
 import { startPrivate } from "../../account/plan/actions";
+import CodeBox from "@/components/code-box";
+import { previewMemberCode } from "@/app/member/code-actions";
+import { formatMoney } from "@/lib/format-money";
+import type { CodePreview } from "@/lib/discount-code";
 
 type T = { id: string; name: string; price_cents: number; people: number; duration_min: number; priceLabel: string };
 type Coach = { id: string; name: string; displayName?: string; avatarUrl?: string | null; bio?: string | null; certifications?: string[] };
@@ -49,6 +53,8 @@ export default function PrivateFlow({
   const [chosen, setChosen] = useState<string | null>(null);
   const [comps, setComps] = useState<{ name: string; email: string }[]>([]);
   const [pending, startPay] = useTransition();
+  // Decision 120: a code on the pay step (Xendit only).
+  const [code, setCode] = useState<CodePreview | null>(null);
   const [err, setErr] = useState<string | null>(null);
   // Decision 116(c): the coach whose profile sheet is open.
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -95,9 +101,10 @@ export default function PrivateFlow({
     if (!t || !chosen || !coachId) return;
     setErr(null);
     startPay(async () => {
-      const r = await startPrivate({ typeId: t.id, coachId, startsAt: chosen, companions: comps, payMode: mode });
+      const r = await startPrivate({ typeId: t.id, coachId, startsAt: chosen, companions: comps, payMode: mode,
+        code: mode === "xendit" ? code?.code ?? null : null });
       if (r.ok && r.url) { window.location.assign(r.url); return; }
-      setErr(r.reason ? privateReasonSentence(r.reason) : (r.message ?? "That didn't work. Please try again."));
+      setErr(r.reason === "code" ? (r.message ?? "That code isn't valid.") : r.reason ? privateReasonSentence(r.reason) : (r.message ?? "That didn't work. Please try again."));
     });
   }
 
@@ -250,6 +257,13 @@ export default function PrivateFlow({
         <p className="rounded-lg px-3 py-2 text-[13px] leading-[19px]" style={{ background: "var(--coral-tint)", color: "var(--ink)" }}>{err}</p>
       )}
 
+      {t && !creditCovers && (
+        <div>
+          <CodeBox key={t.id} name={null} currency={code?.currency ?? "PHP"} onChange={setCode}
+                   preview={(c) => previewMemberCode({ code: c, privateTypeId: t.id })} />
+        </div>
+      )}
+
       <div className="space-y-2">
         {usePack && (
           <button type="button" disabled={pending || !chosen || !coachId || !compsOk} onClick={() => pay("pack")}
@@ -260,7 +274,7 @@ export default function PrivateFlow({
         <button type="button" disabled={pending || !chosen || !coachId || !compsOk} onClick={() => pay("xendit")}
           className="m-press w-full rounded-full py-3.5 text-[16px] font-semibold disabled:opacity-60"
           style={usePack ? { background: "var(--surface)", color: "var(--ink)", boxShadow: "inset 0 0 0 1.5px var(--ink)" } : accentSolid()}>
-          {pending ? "Opening checkout…" : creditCovers ? `Book with your account credit` : `Pay ${t?.priceLabel ?? ""} and book`}
+          {pending ? "Opening checkout…" : creditCovers ? `Book with your account credit` : `Pay ${code?.priceCents != null ? formatMoney(code.priceCents, code.currency ?? "PHP") : t?.priceLabel ?? ""} and book`}
         </button>
         <p className="m-micro text-center text-ink-2">
           {creditCovers ? "Your account credit covers it, so there's nothing to pay." : "Card or GCash, on the next screen."}

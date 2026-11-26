@@ -31,6 +31,10 @@ export default async function PromotionsSettings() {
     <AppShell {...shell} title="Promotions">
       <SettingsBack />
       <SectionLabel>Promotions</SectionLabel>
+      <p className="mt-2 text-[13px]">
+        <a href="/settings/promotions/codes" className="font-semibold text-ink underline underline-offset-4">Discount codes</a>
+        <span className="text-ink-2">: unique single-use codes, or one shared code.</span>
+      </p>
       <p className="mb-4 mt-2 max-w-2xl text-[13px] leading-[19px] text-ink-2">
         A percent off chosen packs, drop-ins and the intro offer, for a date range. The plan does
         not change: credits and validity stay the plan&rsquo;s own. Members see the sale price

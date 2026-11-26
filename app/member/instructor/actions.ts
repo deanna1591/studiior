@@ -490,11 +490,13 @@ export async function recordDeskDropinPaid(
 
 export async function sellPlanAtDesk(
   occurrenceId: string, memberId: string, planId: string, method: string, reference: string, useForToday: boolean,
+  code?: string,
 ): Promise<DeskResult> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("sell_plan_at_desk", {
     p_occurrence: occurrenceId, p_member: memberId, p_plan: planId,
     p_method: method, p_reference: reference, p_use_for_today: useForToday,
+    p_code: (code?.trim() || null) as string,
   });
   if (error) return { ok: false, reason: error.message };
   const r = data as { ok: boolean; reason?: string } | null;

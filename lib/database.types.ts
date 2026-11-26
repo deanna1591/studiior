@@ -2350,6 +2350,308 @@ export type Database = {
           },
         ]
       }
+      discount_code_batches: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          ends_on: string
+          id: string
+          kind: string
+          max_uses: number | null
+          name: string
+          pct: number
+          plan_ids: string[]
+          private_sessions: boolean
+          starts_on: string
+          studio_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_on: string
+          id?: string
+          kind: string
+          max_uses?: number | null
+          name: string
+          pct: number
+          plan_ids?: string[]
+          private_sessions?: boolean
+          starts_on: string
+          studio_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_on?: string
+          id?: string
+          kind?: string
+          max_uses?: number | null
+          name?: string
+          pct?: number
+          plan_ids?: string[]
+          private_sessions?: boolean
+          starts_on?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_code_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_batches_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_batches_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discount_code_checks: {
+        Row: {
+          buyer_email: string | null
+          created_at: string
+          id: number
+          member_id: string | null
+          ok: boolean
+          studio_id: string
+        }
+        Insert: {
+          buyer_email?: string | null
+          created_at?: string
+          id?: number
+          member_id?: string | null
+          ok: boolean
+          studio_id: string
+        }
+        Update: {
+          buyer_email?: string | null
+          created_at?: string
+          id?: number
+          member_id?: string | null
+          ok?: boolean
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_code_checks_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_checks_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discount_code_uses: {
+        Row: {
+          amount_off_cents: number
+          batch_id: string
+          buyer_email: string | null
+          code_id: string
+          created_at: string
+          id: string
+          list_cents: number | null
+          member_id: string | null
+          payment_id: string | null
+          plan_id: string | null
+          private_occurrence_id: string | null
+          purchase_id: string | null
+          redeemed_at: string | null
+          released_at: string | null
+          returned_at: string | null
+          status: string
+          studio_id: string
+        }
+        Insert: {
+          amount_off_cents?: number
+          batch_id: string
+          buyer_email?: string | null
+          code_id: string
+          created_at?: string
+          id?: string
+          list_cents?: number | null
+          member_id?: string | null
+          payment_id?: string | null
+          plan_id?: string | null
+          private_occurrence_id?: string | null
+          purchase_id?: string | null
+          redeemed_at?: string | null
+          released_at?: string | null
+          returned_at?: string | null
+          status: string
+          studio_id: string
+        }
+        Update: {
+          amount_off_cents?: number
+          batch_id?: string
+          buyer_email?: string | null
+          code_id?: string
+          created_at?: string
+          id?: string
+          list_cents?: number | null
+          member_id?: string | null
+          payment_id?: string | null
+          plan_id?: string | null
+          private_occurrence_id?: string | null
+          purchase_id?: string | null
+          redeemed_at?: string | null
+          released_at?: string | null
+          returned_at?: string | null
+          status?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_code_uses_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "discount_code_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_quick_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_private_occurrence_id_fkey"
+            columns: ["private_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "class_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "xendit_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_code_uses_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discount_codes: {
+        Row: {
+          batch_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          code: string
+          created_at: string
+          id: string
+          studio_id: string
+        }
+        Insert: {
+          batch_id: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          studio_id: string
+        }
+        Update: {
+          batch_id?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          studio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_codes_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "discount_code_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_codes_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_codes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studio_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discount_codes_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gift_card_transactions: {
         Row: {
           balance_after: number
@@ -6041,6 +6343,8 @@ export type Database = {
           currency: string
           description: string | null
           discount_cents: number | null
+          discount_code: string | null
+          discount_code_use_id: string | null
           failure_code: string | null
           failure_message: string | null
           gift_card_id: string | null
@@ -6084,6 +6388,8 @@ export type Database = {
           currency: string
           description?: string | null
           discount_cents?: number | null
+          discount_code?: string | null
+          discount_code_use_id?: string | null
           failure_code?: string | null
           failure_message?: string | null
           gift_card_id?: string | null
@@ -6127,6 +6433,8 @@ export type Database = {
           currency?: string
           description?: string | null
           discount_cents?: number | null
+          discount_code?: string | null
+          discount_code_use_id?: string | null
           failure_code?: string | null
           failure_message?: string | null
           gift_card_id?: string | null
@@ -6166,6 +6474,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_discount_code_use_id_fkey"
+            columns: ["discount_code_use_id"]
+            isOneToOne: false
+            referencedRelation: "discount_code_uses"
             referencedColumns: ["id"]
           },
           {
@@ -8991,6 +9306,7 @@ export type Database = {
           credit_applied_cents: number
           currency: string
           discount_cents: number | null
+          discount_code_use_id: string | null
           failure_reason: string | null
           gift_card_id: string | null
           guest_payment_id: string | null
@@ -9025,6 +9341,7 @@ export type Database = {
           credit_applied_cents?: number
           currency: string
           discount_cents?: number | null
+          discount_code_use_id?: string | null
           failure_reason?: string | null
           gift_card_id?: string | null
           guest_payment_id?: string | null
@@ -9059,6 +9376,7 @@ export type Database = {
           credit_applied_cents?: number
           currency?: string
           discount_cents?: number | null
+          discount_code_use_id?: string | null
           failure_reason?: string | null
           gift_card_id?: string | null
           guest_payment_id?: string | null
@@ -9100,6 +9418,13 @@ export type Database = {
             columns: ["claimed_member_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_discount_code_use_id_fkey"
+            columns: ["discount_code_use_id"]
+            isOneToOne: false
+            referencedRelation: "discount_code_uses"
             referencedColumns: ["id"]
           },
           {
@@ -10071,6 +10396,104 @@ export type Database = {
       }
       demo_purge_census: { Args: { p_studio_id: string }; Returns: Json }
       demo_purge_preview: { Args: { p_studio_id: string }; Returns: Json }
+      discount_code_batches_list: {
+        Args: { p_studio_id: string }
+        Returns: Json
+      }
+      discount_code_cancel: { Args: { p_code_id: string }; Returns: Json }
+      discount_code_check_run: {
+        Args: {
+          p_at?: string
+          p_code: string
+          p_email: string
+          p_list_cents: number
+          p_member_id: string
+          p_plan_id: string
+          p_private: boolean
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      discount_code_create_batch: {
+        Args: {
+          p_count: number
+          p_ends: string
+          p_name: string
+          p_pct: number
+          p_plan_ids: string[]
+          p_private?: boolean
+          p_starts: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      discount_code_create_shared: {
+        Args: {
+          p_code: string
+          p_ends: string
+          p_max_uses: number
+          p_name: string
+          p_pct: number
+          p_plan_ids: string[]
+          p_private?: boolean
+          p_starts: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      discount_code_hold_run: {
+        Args: {
+          p_amount_off_cents: number
+          p_batch_id: string
+          p_code_id: string
+          p_email: string
+          p_list_cents: number
+          p_member_id: string
+          p_plan_id: string
+          p_private_occurrence_id: string
+          p_studio_id: string
+        }
+        Returns: string
+      }
+      discount_code_prefix: { Args: { p_studio_id: string }; Returns: string }
+      discount_code_preview: {
+        Args: {
+          p_code: string
+          p_member_id?: string
+          p_plan_id?: string
+          p_private_type_id?: string
+          p_studio_id: string
+        }
+        Returns: Json
+      }
+      discount_code_price_run: {
+        Args: {
+          p_at?: string
+          p_code: string
+          p_email: string
+          p_member_id: string
+          p_plan_id: string
+        }
+        Returns: Json
+      }
+      discount_code_random: { Args: { p_len: number }; Returns: string }
+      discount_code_return_run: {
+        Args: { p_payment_id: string }
+        Returns: boolean
+      }
+      discount_code_rows: { Args: { p_batch_id: string }; Returns: Json }
+      discount_code_validate_batch_run: {
+        Args: {
+          p_ends: string
+          p_name: string
+          p_pct: number
+          p_plan_ids: string[]
+          p_private: boolean
+          p_starts: string
+          p_studio_id: string
+        }
+        Returns: string
+      }
       dismiss_announcement: { Args: { p_id: string }; Returns: Json }
       dismiss_setup_item: {
         Args: { p_dismissed?: boolean; p_key: string; p_studio_id: string }
@@ -11352,13 +11775,20 @@ export type Database = {
           p_buyer_email?: string
           p_buyer_name?: string
           p_buyer_phone?: string
+          p_code?: string
           p_plan_id: string
+          p_preview?: boolean
           p_studio_id: string
         }
         Returns: {
           amount_cents: number
           apple_pay_verified: boolean
+          code: string
+          code_applied: boolean
+          code_message: string
           currency: string
+          discount_cents: number
+          list_cents: number
           plan_name: string
           purchase_id: string
           secret_key_ciphertext: string
@@ -11418,6 +11848,7 @@ export type Database = {
       }
       private_book: {
         Args: {
+          p_code?: string
           p_companions?: Json
           p_instructor_id: string
           p_pay_mode?: string
@@ -11440,6 +11871,7 @@ export type Database = {
       }
       private_book_run: {
         Args: {
+          p_code?: string
           p_companions: Json
           p_instructor_id: string
           p_member_id: string
@@ -11878,6 +12310,7 @@ export type Database = {
         Args: {
           p_amount_cents: number
           p_booking_id?: string
+          p_code?: string
           p_currency?: string
           p_description?: string
           p_kind: string
@@ -11895,6 +12328,7 @@ export type Database = {
         Args: {
           p_amount_cents: number
           p_booking_id?: string
+          p_code?: string
           p_currency?: string
           p_description?: string
           p_kind: string
@@ -12298,6 +12732,7 @@ export type Database = {
       }
       sell_plan_at_desk: {
         Args: {
+          p_code?: string
           p_member: string
           p_method: string
           p_occurrence: string
@@ -13039,7 +13474,7 @@ export type Database = {
         }[]
       }
       xendit_begin_purchase: {
-        Args: { p_plan_id: string; p_studio_id: string }
+        Args: { p_code?: string; p_plan_id: string; p_studio_id: string }
         Returns: {
           amount_cents: number
           credit_applied_cents: number

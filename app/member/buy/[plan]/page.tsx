@@ -137,7 +137,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
           ) : p.full ? (
             <div className="m-card p-5"><p className="m-body text-ink">This plan is full. Ask the studio.</p></div>
           ) : (
-            <GuestBuyForm planId={p.id} loginHref={`/login?next=${encodeURIComponent(next)}`} />
+            <GuestBuyForm planId={p.id} currency={p.price.currency} loginHref={`/login?next=${encodeURIComponent(next)}`} />
           )}
         </section>
       </BuyFrame>
@@ -261,7 +261,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
           </p>
         ) : (
           <div className="mt-5 flex justify-end">
-            <BuyPlan planId={plan.id} returnTo={returnTo && returnTo !== "/" ? returnTo : undefined} />
+            <BuyPlan planId={plan.id} currency={plan.currency} returnTo={returnTo && returnTo !== "/" ? returnTo : undefined} />
           </div>
         )}
       </section>

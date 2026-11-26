@@ -35,6 +35,16 @@ export async function checkoutPay(_prev: BuyState, fd: FormData): Promise<BuySta
   if (!ctx) return { ok: false, message: "You are not signed in." };
 
   const supabase = createClient();
+  // Decision 120: a code is checked before the seat is held, so a bad code
+  // never leaves a held seat behind.
+  const code = String(fd.get("code") ?? "").trim() || null;
+  if (code) {
+    const { data: pv } = await supabase.rpc("discount_code_preview", {
+      p_studio_id: ctx.studioId, p_code: code, p_plan_id: planId,
+    });
+    const p = pv as { code_ok?: boolean; code_message?: string } | null;
+    if (!p?.code_ok) return { ok: false, message: p?.code_message ?? "That code isn't valid." };
+  }
   const { data, error } = await supabase.rpc("book_class", {
     p_occurrence_id: occId, p_member_id: ctx.memberId, p_source: "member",
   });
@@ -46,7 +56,7 @@ export async function checkoutPay(_prev: BuyState, fd: FormData): Promise<BuySta
 
   // Land back on the class after a successful purchase (the existing Pay-now
   // return behaviour), where apply_plan_to_unpaid will already have settled it.
-  return beginXenditCheckout(ctx, planId, `/class/${occId}`);
+  return beginXenditCheckout(ctx, planId, `/class/${occId}`, code);
 }
 
 export type DeskState = { error: string } | { ok: true } | null;

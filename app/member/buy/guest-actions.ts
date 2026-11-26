@@ -6,6 +6,7 @@ import { decryptSecret } from "@/lib/integrations-crypto";
 import { createSession, CHANNELS_WITHOUT_APPLE_PAY } from "@/lib/xendit";
 import { PHONE_INVALID } from "@/lib/phone";
 import type { Database } from "@/lib/database.types";
+import type { CodePreview } from "@/lib/discount-code";
 
 export type GuestBuyState = { ok: boolean; url?: string; message?: string } | null;
 
@@ -43,14 +44,17 @@ export async function buyPlanAsGuest(_prev: GuestBuyState, fd: FormData): Promis
   const studio = Array.isArray(s) ? s[0] : s;
   if (!studio) return { ok: false, message: "This studio could not be found." };
 
+  const codeText = String(fd.get("code") ?? "").trim() || null;
   const { data: begun, error } = await sb.rpc("plan_buy_begin", {
     p_studio_id: studio.id, p_plan_id: planId,
     p_buyer_name: name, p_buyer_email: email, p_buyer_phone: phone,
+    p_code: codeText as string,
   });
   const b = Array.isArray(begun) ? begun[0] : begun;
   if (error || !b) {
     const m = error?.message ?? "";
     const code = error?.code ?? "";
+    if (code === "PT460") return { ok: false, message: m || "That code isn't valid." };
     if (code === "PT404") return { ok: false, message: "That plan isn't on sale right now." };
     if (code === "PT429") return { ok: false, message: "Too many right now. Try again in a minute." };
     if (code === "PT422" && /mobile/.test(m)) return { ok: false, message: PHONE_INVALID };
@@ -63,7 +67,7 @@ export async function buyPlanAsGuest(_prev: GuestBuyState, fd: FormData): Promis
 
   let secret: string;
   try {
-    secret = decryptSecret(b.secret_key_ciphertext);
+    secret = decryptSecret(b.secret_key_ciphertext as string);
   } catch {
     return { ok: false, message: "This studio's online payments aren't available right now." };
   }
@@ -84,4 +88,38 @@ export async function buyPlanAsGuest(_prev: GuestBuyState, fd: FormData): Promis
   });
   if (!res.ok) return { ok: false, message: `Couldn't open checkout: ${res.error.message}` };
   return { ok: true, url: res.data.payment_link_url };
+}
+
+/**
+ * Decision 120: check a code on /buy without an account. plan_buy_begin in
+ * preview mode returns the price and writes no purchase (no new public
+ * function). The email, when typed, lets a shared code apply once per person.
+ */
+export async function previewGuestCode(input: { planId: string; code: string; email?: string }): Promise<CodePreview> {
+  const slug = currentSlug();
+  const none: CodePreview = { ok: false, applied: false, code: null, listCents: null, priceCents: null,
+    discountCents: 0, currency: null, message: "That code couldn't be checked. Try again." };
+  if (!slug) return none;
+  const sb = anonClient();
+  const { data: s } = await sb.rpc("studio_by_slug", { p_slug: slug });
+  const studio = Array.isArray(s) ? s[0] : s;
+  if (!studio) return none;
+  const { data, error } = await sb.rpc("plan_buy_begin", {
+    p_studio_id: studio.id, p_plan_id: input.planId,
+    p_buyer_email: (input.email?.trim() || null) as string,
+    p_code: input.code, p_preview: true,
+  });
+  const r = Array.isArray(data) ? data[0] : data;
+  if (error || !r) return none;
+  const applied = r.code_applied === true;
+  return {
+    ok: applied || (r.code_message ?? "").startsWith("The sale price"),
+    applied,
+    code: r.code ?? null,
+    listCents: r.list_cents ?? null,
+    priceCents: applied ? r.amount_cents : null,
+    discountCents: applied ? (r.discount_cents ?? 0) : 0,
+    currency: r.currency ?? null,
+    message: r.code_message ?? null,
+  };
 }

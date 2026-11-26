@@ -5,7 +5,8 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
 import { INTRO_USED_SENTENCE } from "@/lib/plans";
 import { saleAppliedLine, type PlanPrice } from "@/lib/promo";
-import { recordPayment, type PayState } from "./actions";
+import { recordPayment, previewStaffCode, type PayState } from "./actions";
+import type { CodePreview } from "@/lib/discount-code";
 
 type Plan = {
   id: string; name: string; type: string; price_cents: number; currency: string;
@@ -53,12 +54,26 @@ export default function PaymentForm({
   );
   const [method, setMethod] = useState("cash");
   const chosen = plans.find((p) => p.id === planId);
+  // Decision 120: a discount code; Apply checks it and sets the amount.
+  const [codeText, setCodeText] = useState("");
+  const [codeRes, setCodeRes] = useState<CodePreview | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+  const codeApplied = codeRes?.ok && codeRes.applied ? codeRes : null;
+  async function applyCode() {
+    if (!codeText.trim() || !planId) return;
+    setCodeBusy(true);
+    const r = await previewStaffCode({ memberId, planId, code: codeText });
+    setCodeBusy(false);
+    setCodeRes(r);
+    if (r.ok && r.applied && r.priceCents != null) setAmount((r.priceCents / 100).toFixed(2));
+  }
 
   // Prefilled from the plan, and editable: a studio that takes 2000 off a 2500
   // plan because somebody paid the rest last month should not have to fight the
   // form about it. What was actually taken is what gets recorded.
   const choosePlan = (id: string) => {
     setPlanId(id);
+    setCodeRes(null); setCodeText("");
     const p = plans.find((x) => x.id === id);
     if (p) setAmount((p.price_cents / 100).toFixed(2));
   };
@@ -150,6 +165,31 @@ export default function PaymentForm({
                 </option>
               ))}
             </select>
+          )}
+        </Field>
+      )}
+
+      {kind === "plan" && (
+        <Field label="Discount code (optional)">
+          <div className="flex gap-2">
+            <input value={codeText} onChange={(e) => { setCodeText(e.target.value); setCodeRes(null); }}
+                   className={`${inputClass} font-mono uppercase`} placeholder="Code" autoComplete="off" />
+            <button type="button" onClick={applyCode} disabled={codeBusy || !codeText.trim()}
+                    className="shrink-0 rounded-md border border-line px-3 text-[13px] font-semibold text-ink disabled:opacity-50">
+              {codeBusy ? "Checking…" : "Apply"}
+            </button>
+          </div>
+          {codeApplied && (
+            <>
+              <input type="hidden" name="code" value={codeApplied.code ?? ""} />
+              <p className="mt-1.5 text-[12px] leading-[18px] text-ink-2">
+                Code {codeApplied.code}: -{currency} {(codeApplied.discountCents / 100).toFixed(2)}. The amount is the code price.
+              </p>
+            </>
+          )}
+          {codeRes && !codeApplied && codeRes.message && (
+            <p className={`mt-1.5 text-[12px] leading-[18px] ${codeRes.ok ? "text-ink-2"
+              : "rounded border-l-2 border-coral bg-coral-tint px-2 py-1.5 text-ink"}`}>{codeRes.message}</p>
           )}
         </Field>
       )}
