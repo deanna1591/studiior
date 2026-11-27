@@ -4,6 +4,7 @@ import InstructorShell from "@/components/instructor/shell";
 import SchedulePosts from "@/components/staff/schedule-post";
 import { defaultSpec, type BrandSpec } from "@/lib/brand-kit";
 import type { PostStyle } from "@/lib/schedule-post";
+import { deadlineFrom } from "@/lib/post-deadline";
 import {
   instructorSchedulePostData, instructorUploadPostImage, instructorSignPostImage,
 } from "../actions";
@@ -24,13 +25,14 @@ export default async function InstructorPostsPage() {
   const { ctx, supabase } = await instructorScreen();
   const [{ data: kit }, { data: settings }] = await Promise.all([
     supabase.rpc("instructor_brand_kit"),
-    supabase.from("studio_settings").select("flex_min_bookings").eq("studio_id", ctx.studio_id).maybeSingle(),
+    supabase.from("studio_settings").select("flex_min_bookings, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, time_format").eq("studio_id", ctx.studio_id).maybeSingle(),
   ]);
   const k = (kit ?? {}) as { spec?: BrandSpec; post_style?: string };
   const spec = k.spec ?? defaultSpec({ accent: ctx.accent_color ?? undefined, themePreset: ctx.theme_preset ?? undefined });
   const initialStyle = (k.post_style ?? "invitation") as PostStyle;
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: ctx.timezone }); // studio-local YYYY-MM-DD
   const flexMin = settings?.flex_min_bookings ?? 1;
+  const flexDeadline = deadlineFrom(settings, ctx.timezone);
   const first = (ctx.display_name ?? "").trim().split(/\s+/)[0] || (ctx.display_name ?? "");
 
   return (
@@ -56,6 +58,7 @@ export default async function InstructorPostsPage() {
         onPickStyle={null}
         lockedCoach={{ id: ctx.instructor_id, first }}
         hideEdit
+        flexDeadline={flexDeadline}
       />
     </InstructorShell>
   );

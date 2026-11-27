@@ -7,7 +7,7 @@ import type { BrandSpec } from "@/lib/brand-kit";
 import {
   rangeFor, defaultDate, coreOnlyDefault, filterDays, captionText, monthGrid, totalClasses,
   editorialPlan, headlineParts, shortName, receiptNo, weekRows, anyFlex, titleCase, stripLeadingZero, spotsLabel, flexLegend, needsNote,
-  pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS,
+  pushSpec, undoStack, canUndo, POST_STYLES, STYLE_LABELS, V5_STYLES, styleModes, styleNeedsCoach,
   type PostData, type PostDay, type PostClass, type PostMode, type PostFormat, type PostStyle, type FitPage,
 } from "@/lib/schedule-post";
 import {
@@ -16,6 +16,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { prepareUpload, uploadExt, EDIT_PHOTO_MAX_PX } from "@/lib/browser-image";
 import { sharePost, SHARE_FALLBACK_TOAST } from "@/lib/share-post";
+import { tokens, mixHex, soft, type Tokens } from "@/components/staff/post-kit";
+import { V5Post, V5Thumb, type Deadline } from "@/components/staff/post-styles-v5";
 
 type Coach = { id: string; first: string };
 
@@ -45,7 +47,7 @@ function useInlineImage(url: string | null): string | null {
 export default function SchedulePosts({
   spec, studioName, studioId, todayIso, flexMin, canEdit, editUsed, editCap, initialStyle, coaches,
   loadPostData = schedulePostData, signImage = signPostImage, uploadImage = uploadPostImage,
-  onPickStyle = savePostStyle, lockedCoach = null, hideEdit = false,
+  onPickStyle = savePostStyle, lockedCoach = null, hideEdit = false, flexDeadline = null,
 }: {
   spec: BrandSpec;
   studioName: string;
@@ -66,6 +68,7 @@ export default function SchedulePosts({
   onPickStyle?: ((style: string) => void | Promise<unknown>) | null;
   lockedCoach?: Coach | null;  // when set: no coach picker, coach fixed to this instructor
   hideEdit?: boolean;          // when true: no "Tell Claude what to change" box
+  flexDeadline?: Deadline | null; // Decision 93 (d): the flex deadline for "book by …"
 }) {
   const [style, setStyle] = useState<PostStyle>(initialStyle);
   const [mode, setMode] = useState<PostMode>("week");
@@ -93,11 +96,15 @@ export default function SchedulePosts({
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Lock screen is day only.
-  const lockDayOnly = style === "lock_screen";
+  // Lock screen and Day planner are day only; the v5 styles never offer Month.
+  const allowedModes = styleModes(style);
+  const lockDayOnly = allowedModes.length === 1;
   useEffect(() => {
-    if (lockDayOnly && mode !== "day") { setMode("day"); setDateStr(defaultDate("day", todayIso)); }
-  }, [lockDayOnly, mode, todayIso]);
+    if (!allowedModes.includes(mode)) {
+      const m = allowedModes.includes("week") ? "week" : "day";
+      setMode(m); setDateStr(defaultDate(m, todayIso));
+    }
+  }, [allowedModes, mode, todayIso]);
 
   const load = useCallback(async (m: PostMode, d: string, coach: string) => {
     setLoading(true); setErr(null);
@@ -115,7 +122,15 @@ export default function SchedulePosts({
   function pickStyle(s: PostStyle) {
     setStyle(s);
     void onPickStyle?.(s);                            // best-effort persist (manager-up); instructor: no persist
-    if (s === "lock_screen" && mode !== "day") { setMode("day"); setDateStr(defaultDate("day", todayIso)); }
+    const ok = styleModes(s);
+    if (!ok.includes(mode)) { const m = ok.includes("week") ? "week" : "day"; setMode(m); setDateStr(defaultDate(m, todayIso)); }
+  }
+  // Decision 93 (d): Day planner is disabled in Week/Month ("Day only"); Coach
+  // diary is disabled until a coach is chosen ("Pick a coach").
+  function styleBlock(s: PostStyle): string | null {
+    if (s === "timeline" && mode !== "day") return "Day only";
+    if (styleNeedsCoach(s) && !coachId) return "Pick a coach";
+    return null;
   }
 
   const logoData = useInlineImage(raw?.logo_url ?? null);
@@ -271,20 +286,24 @@ export default function SchedulePosts({
       <div>
         <p className="mb-2 text-[11px] text-ink-3">Style</p>
         <div className="flex flex-wrap gap-2">
-          {POST_STYLES.map((s) => (
-            <button key={s} onClick={() => pickStyle(s)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] ${s === style ? "border-ink" : "border-line-2"}`}>
-              <StyleThumb style={s} spec={activeSpec} />
-              <span className={s === style ? "text-ink" : "text-ink-2"}>{STYLE_LABELS[s]}</span>
-            </button>
-          ))}
+          {POST_STYLES.map((s) => {
+            const block = styleBlock(s);
+            return (
+              <button key={s} onClick={() => pickStyle(s)} disabled={!!block} title={block ?? undefined}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] disabled:opacity-50 ${s === style ? "border-ink" : "border-line-2"}`}>
+                <StyleThumb style={s} spec={activeSpec} />
+                <span className={s === style ? "text-ink" : "text-ink-2"}>{STYLE_LABELS[s]}</span>
+                {block && <span className="text-[11px] text-ink-3">{block}</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-end gap-4">
         <Tabs value={mode} onChange={(v) => pickMode(v as PostMode)}
-          options={lockDayOnly ? [["day", "Day"]] : [["day", "Day"], ["week", "Week"], ["month", "Month"]]} />
+          options={([["day", "Day"], ["week", "Week"], ["month", "Month"]] as [string, string][]).filter(([m]) => allowedModes.includes(m as PostMode))} />
         {!lockedCoach && (
           <label className="block text-[11px] text-ink-3">Coach
             <select value={coachId} onChange={(e) => setCoachId(e.target.value)}
@@ -337,7 +356,8 @@ export default function SchedulePosts({
               bgData={bgData} rangeLabel={rangeLabel} weekday={weekday} monthName={monthName}
               isToday={isToday} isCurrentMonth={isCurrentMonth} showSpots={showSpots}
               footer={raw?.footer_line ?? "Book on the app"} empty={empty} loading={loading}
-              weekTotal={totalClasses(days)} monthStart={from} flexMin={raw?.flex_min ?? flexMin} />
+              weekTotal={totalClasses(days)} monthStart={from} flexMin={raw?.flex_min ?? flexMin}
+              deadline={flexDeadline ?? {}} />
           </div>
         </div>
 
@@ -454,43 +474,6 @@ function labelForRange(mode: PostMode, from: string, to: string, days: PostDay[]
 // ---------------------------------------------------------------------------
 // Brand tokens + colour helpers
 // ---------------------------------------------------------------------------
-type Tokens = {
-  background: string; surface: string; ink: string; accent: string; secondary: string;
-  df: string; bf: string; mono: string; hand: string; onAccent: string;
-};
-function tokens(spec: BrandSpec): Tokens {
-  const c = spec.colors;
-  return {
-    background: c.background, surface: c.surface, ink: c.ink, accent: c.accent, secondary: c.secondary,
-    df: `'${spec.display_font}', serif`, bf: `'${spec.body_font}', sans-serif`,
-    mono: "'Space Mono', monospace", hand: "'Nothing You Could Do', cursive",
-    onAccent: textOn(c.accent, c.ink),
-  };
-}
-function hex(h: string): [number, number, number] {
-  const m = /^#?([0-9a-f]{6})$/i.exec(String(h || "").trim());
-  if (!m) return [128, 128, 128];
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-function toHex([r, g, b]: [number, number, number]): string {
-  return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
-}
-function mixHex(a: string, b: string, t: number): string {
-  const [ar, ag, ab] = hex(a), [br, bg, bb] = hex(b);
-  return toHex([ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t]);
-}
-/** Readable text on an accent fill: dark ink when the accent is light, else white. */
-function textOn(accent: string, ink: string): string {
-  const [r, g, b] = hex(accent);
-  const y = (r * 299 + g * 587 + b * 114) / 1000;
-  return y >= 150 ? ink : "#FFFFFF";
-}
-function soft(hexColor: string, alpha: number): string {
-  const [r, g, b] = hex(hexColor);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
 // ---------------------------------------------------------------------------
 // Small presentational helpers
 // ---------------------------------------------------------------------------
@@ -544,13 +527,14 @@ function SpotsPill({ n, t, fontSize }: { n: number | undefined; t: Tokens; fontS
 
 function EditorialPost({
   style, spec, page, mode, format, studioName, logoData, coachFirst, coachData, bgData,
-  rangeLabel, weekday, monthName, isToday, isCurrentMonth, showSpots, footer, empty, loading, weekTotal, monthStart, flexMin,
+  rangeLabel, weekday, monthName, isToday, isCurrentMonth, showSpots, footer, empty, loading, weekTotal, monthStart, flexMin, deadline,
 }: {
   style: PostStyle; spec: BrandSpec; page: FitPage; mode: PostMode; format: PostFormat;
   studioName: string; logoData: string | null; coachFirst: string | null; coachData: string | null;
   bgData: string | null; rangeLabel: string; weekday: string; monthName: string;
   isToday: boolean; isCurrentMonth: boolean; showSpots: boolean;
   footer: string; empty: boolean; loading: boolean; weekTotal: number; monthStart: string; flexMin: number;
+  deadline: Deadline;
 }) {
   const t = tokens(spec);
   const story = format === "story";
@@ -568,6 +552,15 @@ function EditorialPost({
         <div style={{ fontFamily: t.df, fontSize: 48, color: t.ink, textAlign: "center", maxWidth: 700 }}>No classes to post for these dates.</div>
       </div>
     );
+  }
+
+  // Decision 93 (d): the five v5 styles draw themselves (their own field,
+  // paper, logo and photo placement), so they skip the generic wrappers.
+  if (V5_STYLES.includes(style)) {
+    return <V5Post style={style} t={t} page={page} mode={mode} format={format} headline={headline}
+      rangeLabel={rangeLabel} dateFrom={monthStart} studioName={studioName} logoData={logoData}
+      coachFirst={coachFirst} coachData={coachData} footer={footer} showSpots={showSpots}
+      flexMin={flexMin} weekTotal={weekTotal} deadline={deadline} />;
   }
 
   // Lock screen owns its own background (photo or gradient), the logo watermark
@@ -931,6 +924,7 @@ function LockScreen({ t, page, format, coachFirst, footer, photo, logoData, show
 // --- Style thumbnail (a tiny swatch for the Style control) ------------------
 function StyleThumb({ style, spec }: { style: PostStyle; spec: BrandSpec }) {
   const c = spec.colors;
+  if (V5_STYLES.includes(style)) return <V5Thumb style={style} c={c} />;
   const base: CSSProperties = { width: 26, height: 26, borderRadius: 5, flex: "0 0 auto", overflow: "hidden", border: `1px solid ${soft(c.ink, 0.15)}` };
   if (style === "guest_check") return <div style={{ ...base, background: c.background, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ width: 16, height: 20, background: c.surface }} /></div>;
   if (style === "times") return <div style={{ ...base, background: c.surface, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, padding: 3 }}><div style={{ height: 3, background: c.ink }} /><div style={{ height: 2, background: soft(c.ink, 0.5) }} /><div style={{ height: 2, background: soft(c.ink, 0.5) }} /></div>;

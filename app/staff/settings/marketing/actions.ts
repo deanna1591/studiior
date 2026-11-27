@@ -1,5 +1,7 @@
 "use server";
 
+import { POST_STYLES } from "@/lib/schedule-post";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext, isDeskUp } from "@/lib/auth";
@@ -119,7 +121,7 @@ export async function schedulePostData(from: string, to: string, instructorId?: 
 export async function savePostStyle(style: string): Promise<{ ok?: true; persisted?: boolean; error?: string }> {
   const ctx = await getStaffContext();
   if (!ctx || !isDeskUp(ctx.role)) return { error: "Only the studio team can make posts." };
-  if (!["guest_check", "times", "invitation", "lock_screen"].includes(style)) return { error: "Unknown style." };
+  if (!(POST_STYLES as string[]).includes(style)) return { error: "Unknown style." };
   const supabase = createClient();
   const { error, count } = await supabase.from("studio_settings")
     .update({ post_style: style }, { count: "exact" })

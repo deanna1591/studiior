@@ -16,4 +16,5 @@ export const BRAND_FONT_FACES = `
 @font-face{font-family:'Fraunces';src:url('/fonts/brand/Fraunces.ttf') format('truetype');font-weight:100 900;font-display:swap}
 @font-face{font-family:'Cormorant';src:url('/fonts/brand/Cormorant.ttf') format('truetype');font-weight:100 900;font-display:swap}
 @font-face{font-family:'Nothing You Could Do';src:url('/fonts/brand/NothingYouCouldDo.ttf') format('truetype');font-weight:400;font-display:swap}
+@font-face{font-family:'VT323';src:url('/fonts/brand/VT323-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
 `;

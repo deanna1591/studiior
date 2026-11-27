@@ -599,6 +599,29 @@ The rescue list labels read "Needs 1 more to run" and "Needs 2 more to run", mat
 
 ---
 
+## 93 (d) — Five more schedule post styles (amendment, recorded 27 Nov 2026)
+
+Five styles join Guest Check, The Times, Invitation and Lock screen on Marketing → Schedule posts and on the instructor Posts page, each in Square (1080x1080) and Story (1080x1920), drawn to the approved designs in docs/post-design/v5:
+
+1. **Notes:** a phone-notes card on soft blobs, a checkmark per class. Week and Day.
+2. **Receipt:** a printer receipt coming out of a slot on a pink field with bow and sparkle doodles; day in accent, class and coach, time on the right; item count and barcode; "SEE YOU AT THE REFORMER". Week and Day.
+3. **Day planner:** a week strip with the day circled, then a timeline of that day's classes with a round icon per format, time and coach, and the tier chip (Always runs / Needs {n} to run / Needs {n} more to run); in Story a closing row "book by {flex_cutoff} the night before". Day only.
+4. **Y2K desktop:** retro windows (THIS_WEEK.EXE list, today's date, reminders "always runs / needs {flex_min} by {flex_cutoff} / grip socks on / book on the app", note 2 self). Week and Day.
+5. **Coach diary:** only when a coach is chosen. The coach's photo (avatar_url) runs down the left in Square and across the top half in Story, always anchored to the top so the face is never cut, cover-fit. A diary page with "teaching this week", "Coach {First}'s week" (accent italic name), one section per day with a handwritten "dear diary" line and the classes. Week and Day. With no photo it falls back to the pink panel.
+
+Every style:
+
+- The studio's Brand kit logo on every post and every part (Notes top left of the card, Receipt top of the paper, Day planner top right, Y2K inside the date window, Coach diary bottom right of the page). When no logo is uploaded, the studio name in the display serif.
+- Show spots left adds a pill at the right of each class row ("{n} spots left", "1 spot left", solid "Full"), and nothing when unticked (no empty gap).
+- Core classes only, the coach picker, Download, Copy caption and Share work as for the existing styles. Long weeks split into parts with "Part {n} of {parts}" by the existing fit-then-split.
+- Colours come from the Brand kit (field, paper, ink, accent, muted). Fonts are the kit display serif and body plus the vendored Space Mono, Nothing You Could Do and VT323 (Y2K only).
+- Month mode is not offered for these five (the Month grid stays on the existing styles).
+- No emoji glyphs in the drawn posts except where the design uses them as decoration, rendered as inline SVG so they draw the same on every phone.
+
+**Status:** settled, to build. **Amends:** Decision 93. Deanna, 27 Nov 2026.
+
+---
+
 ## 120 — Discount codes (recorded 25 Nov 2026)
 
 **Decision.** Manager-up creates discount codes in Settings → Promotions → Discount codes. Two kinds. (1) A batch of unique single-use codes: name, percent off (1 to 90), how many codes, valid from and to (studio dates, 00:00 to 23:59), and which plans; the system generates that many codes in the form {STUDIO}-XXXX-XXXX from an unambiguous alphabet, unique per studio; each code works once, for one purchase, by anyone who has it. (2) A shared code: owner-chosen text (letters and digits, e.g. XMAS10, unique per studio), percent off, valid from and to, which plans, and a maximum number of uses; each person (member or buyer email) may use it once. Codes apply to plans, class packs, memberships, private packs and private session payments; never to shop items, gift cards or the reservation fee. Members enter a code in a "Have a code?" box at checkout (member checkout, /buy without an account, the private session pay step) and staff on Record a payment; the price updates at once. No stacking: when a promotion (Decision 117) is running, the buyer pays the lower of the sale price and the code price, and only that one is recorded. A code is held by a pending checkout for that checkout's life and released if it expires; it is used only when the payment succeeds; a refund while the code is still valid makes it usable again (for a shared code, the use is returned). Refusals: "That code isn't valid.", "That code has expired.", "That code has already been used.", "That code doesn't apply to this plan.", "You've already used this code.", "This code is being used in another checkout. Try again in 30 minutes." Payment rows record the code and the amount taken off; receipts and the BIR invoice show "Code {code}: -{amount}"; Sales shows a "Discount codes" line. Staff list per batch or shared code: each code with Unused / Used / Expired / Cancelled, who used it, when, on which plan, the amount off; copy one, copy all, download CSV; cancel an unused code. Guessing is blocked: codes are random and long, and code checks are rate-limited per studio, per buyer email and per member. No new anon function: plan_buy_begin gains an optional code argument (surface stays EXACTLY FIFTEEN). Audit: code batch created, code cancelled, code redeemed, code returned. The instructor desk sale (Sold a plan at desk) accepts a code too. A refund returns the code through every refund path (refund_payment_run, record_refund and apply_payment_refund), through one shared helper.

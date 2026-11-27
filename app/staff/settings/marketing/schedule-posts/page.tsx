@@ -5,6 +5,7 @@ import SettingsBack from "../../back";
 import SchedulePosts from "@/components/staff/schedule-post";
 import { defaultSpec, type BrandSpec } from "@/lib/brand-kit";
 import type { PostStyle } from "@/lib/schedule-post";
+import { deadlineFrom } from "@/lib/post-deadline";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function SchedulePostsPage() {
     supabase.rpc("brand_kit_current", { p_studio_id: ctx.studioId }),
     supabase.from("studios").select("timezone, accent_color, theme_preset").eq("id", ctx.studioId).maybeSingle(),
     supabase.from("studio_settings")
-      .select("flex_min_bookings, post_edit_runs_month, post_edit_runs_reset_on, post_style")
+      .select("flex_min_bookings, post_edit_runs_month, post_edit_runs_reset_on, post_style, flex_deadline_mode, flex_deadline_time, flex_deadline_hours, time_format")
       .eq("studio_id", ctx.studioId).maybeSingle(),
     supabase.from("instructors").select("id, display_name")
       .eq("studio_id", ctx.studioId).eq("status", "active").order("display_name"),
@@ -36,6 +37,7 @@ export default async function SchedulePostsPage() {
   const tz = studio?.timezone ?? "UTC";
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD, studio-local
   const flexMin = settings?.flex_min_bookings ?? 1;
+  const flexDeadline = deadlineFrom(settings, tz);
   const initialStyle = (settings?.post_style ?? "invitation") as PostStyle;
   const coaches = (instructors ?? []).map((i) => ({
     id: i.id, first: (i.display_name ?? "").trim().split(/\s+/)[0] || (i.display_name ?? ""),
@@ -65,6 +67,7 @@ export default async function SchedulePostsPage() {
           editCap={editCap}
           initialStyle={initialStyle}
           coaches={coaches}
+          flexDeadline={flexDeadline}
         />
       </div>
     </AppShell>

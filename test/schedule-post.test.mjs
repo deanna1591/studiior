@@ -204,8 +204,9 @@ import {
   POST_STYLES, STYLE_LABELS, headlineParts, shortName, receiptNo, editorialPlan, STYLE_FIT, titleCase, stripLeadingZero,
 } from "../lib/schedule-post.mjs";
 
-test("editorial: four styles with labels", () => {
-  assert.deepEqual(POST_STYLES, ["guest_check", "times", "invitation", "lock_screen"]);
+test("editorial: the four first styles lead, with labels (93 d adds five after)", () => {
+  assert.deepEqual(POST_STYLES.slice(0, 4), ["guest_check", "times", "invitation", "lock_screen"]);
+  assert.equal(STYLE_LABELS.timeline, "Day planner");
   assert.equal(STYLE_LABELS.guest_check, "Guest Check");
   assert.equal(STYLE_LABELS.lock_screen, "Lock screen");
 });
@@ -480,4 +481,122 @@ test("22(f): the posts legend and the one-short note", () => {
   assert.equal(needsNote({ needs: null }), null);
   const rows = weekRows([{ label: "Mon", classes: [{ time: "7:00", name: "Flow", coach: "Ada", tier: "flex", spots_left: 3, needs: 1 }] }]);
   assert.equal(rows[0].classes[0].needs, 1);
+});
+
+// --- Decision 93 (d): the five v5 styles --------------------------------------
+import {
+  V5_STYLES, styleModes, styleNeedsCoach, classIcon, diaryLine, bookingLine, flexReminder,
+  tierChip, logoFallback, coachPhotoBox, retroDate, weekStrip, shortClass, editorialPlan as plan5, POST_STYLES as ALL_STYLES,
+} from "../lib/schedule-post.mjs";
+
+const wk = ["2026-12-07", "2026-12-08", "2026-12-09", "2026-12-10", "2026-12-11", "2026-12-12", "2026-12-13"]
+  .map((d) => ({ date: d, label: d, count: 3, classes: [
+    { time: "7:00 AM", end: "7:50 AM", name: "Reformer Flow", tier: "core", spots_left: 3 },
+    { time: "12:00 PM", end: "12:50 PM", name: "Reformer Burn", tier: "flex", needs: 2, spots_left: 1 },
+    { time: "8:00 PM", end: "8:50 PM", name: "Reformer Power", tier: "core", spots_left: 0 },
+  ] }));
+const count = (pages) => pages.reduce((n, p) => n + p.days.reduce((m, d) => m + d.classes.length, 0), 0);
+
+test("93d: the nine styles, five of them v5", () => {
+  assert.equal(ALL_STYLES.length, 9);
+  assert.deepEqual(V5_STYLES, ["notes", "receipt", "timeline", "retro", "coach"]);
+});
+
+test("93d: modes: Day planner day only, v5 never Month, coach needs a coach", () => {
+  assert.deepEqual(styleModes("timeline"), ["day"]);
+  for (const s of ["notes", "receipt", "retro", "coach"]) assert.deepEqual(styleModes(s), ["day", "week"]);
+  assert.deepEqual(styleModes("invitation"), ["day", "week", "month"]);
+  assert.equal(styleNeedsCoach("coach"), true);
+  assert.equal(styleNeedsCoach("notes"), false);
+});
+
+test("93d: a 21-class week fit-then-splits for each week style, square and story, totals kept", () => {
+  for (const style of ["notes", "receipt", "retro", "coach"]) {
+    for (const format of ["square", "story"]) {
+      const { pages } = plan5({ days: wk, mode: "week", format, style });
+      assert.equal(count(pages), 21, `${style} ${format} keeps all 21`);
+      pages.forEach((p, i) => { assert.equal(p.part, i + 1); assert.equal(p.parts, pages.length); assert.ok(p.scale >= 0.72 && p.scale <= 1); });
+      // a day's classes stay together
+      const seen = pages.flatMap((p) => p.days.map((d) => d.date));
+      assert.equal(new Set(seen).size, 7);
+    }
+    assert.ok(plan5({ days: wk, mode: "week", format: "square", style }).pages.length > 1, `${style} square splits`);
+  }
+});
+
+test("93d: the Day planner splits a 21-class day in square and story", () => {
+  const day = [{ ...wk[0], classes: Array.from({ length: 21 }, () => wk[0].classes[0]), count: 21 }];
+  for (const format of ["square", "story"]) {
+    const { pages } = plan5({ days: day, mode: "day", format, style: "timeline" });
+    assert.ok(pages.length > 1);
+    assert.equal(count(pages), 21);
+    assert.equal(pages[0].parts, pages.length);
+  }
+  // a short day fits on one page
+  assert.equal(plan5({ days: [wk[0]], mode: "day", format: "square", style: "timeline" }).pages.length, 1);
+});
+
+test("93d: icons from the class name", () => {
+  assert.equal(classIcon("Reformer Burn"), "flame");
+  assert.equal(classIcon("REFORMER POWER"), "bolt");
+  assert.equal(classIcon("Reformer Flow"), "leaf");
+  assert.equal(classIcon("Reformer Sculpt"), "sparkle");
+  assert.equal(classIcon("Mat Pilates"), "sun");
+});
+
+test("93d: diary lines", () => {
+  const d = (date, cls) => ({ date, label: date, classes: cls });
+  assert.equal(diaryLine(d("2026-12-08", [{ time: "5:00 PM", name: "Reformer Power" }, { time: "8:00 PM", name: "Reformer Power" }])), "power night");
+  assert.equal(diaryLine(d("2026-12-08", [{ time: "18:00", name: "Reformer Flow" }])), "flow night");
+  assert.equal(diaryLine(d("2026-12-10", [{ time: "8:00 AM", name: "Reformer Burn" }, { time: "11:00 AM", name: "Reformer Flow" }])), "early start");
+  assert.equal(diaryLine(d("2026-12-10", [{ time: "9:00 AM", name: "Reformer Burn" }])), "almost there");
+  assert.equal(diaryLine(d("2026-12-11", [{ time: "8:00 AM", name: "x" }]), { isLast: true }), "last one");
+});
+
+test("93d: booking line and flex reminder from the deadline settings", () => {
+  assert.equal(bookingLine({ mode: "previous_day_at", time: "8:00 PM" }), "book by 8:00 PM the night before");
+  assert.equal(bookingLine({ mode: "hours_before", hours: 12 }), "book 12 hours before");
+  assert.equal(bookingLine({ mode: "hours_before", hours: 1 }), "book 1 hour before");
+  assert.equal(bookingLine({}), null);
+  assert.equal(flexReminder(2, { mode: "previous_day_at", time: "8:00 PM" }), "needs 2 by 8:00 PM the night before");
+  assert.equal(flexReminder(0, {}), null);
+});
+
+test("93d: tier chip", () => {
+  assert.equal(tierChip({ tier: "core" }, 2).text, "Always runs");
+  assert.equal(tierChip({ tier: "flex", needs: 2 }, 2).text, "Needs 2 to run");
+  assert.equal(tierChip({ tier: "flex", needs: 1 }, 2).text, "Needs 1 more to run");
+  assert.equal(tierChip({ tier: "flex", needs: null }, 2).text, "Running");
+});
+
+test("93d: logo fallback, coach photo anchored top, Y2K date, week strip", () => {
+  assert.equal(logoFallback(null, "Reform Collective"), "Reform Collective");
+  assert.equal(logoFallback("data:image/png;base64,x", "Reform Collective"), null);
+  for (const f of ["square", "story"]) {
+    const b = coachPhotoBox(f);
+    assert.equal(b.objectFit, "cover");
+    assert.equal(b.objectPosition, "center top");
+    assert.equal(b.top, 0);
+  }
+  assert.equal(coachPhotoBox("square").height, 1080);
+  assert.equal(coachPhotoBox("story").width, 1080);
+  assert.equal(retroDate("2026-12-01"), "01.12.26");
+  const strip = weekStrip("2026-12-02");
+  assert.equal(strip.length, 7);
+  assert.deepEqual(strip.map((d) => d.day), [30, 1, 2, 3, 4, 5, 6]);
+  assert.equal(strip.find((d) => d.on).dow, "wed");
+});
+
+test("93d: spots pill text on/off (caption unchanged)", () => {
+  const c = wk[0].classes[2];
+  assert.equal(spotsLabel(c.spots_left), "Full");
+  assert.equal(spotsLabel(1), "1 spot left");
+  assert.equal(classLine(c), "8:00 PM Reformer Power");
+  assert.equal(classLine(c, { showSpots: true }), "8:00 PM Reformer Power · Full");
+});
+
+test("93d: receipt and Y2K drop a leading Reformer", () => {
+  assert.equal(shortClass("Reformer Burn"), "Burn");
+  assert.equal(shortClass("Mat Pilates"), "Mat Pilates");
+  assert.equal(shortClass("Reformer"), "Reformer");
 });
