@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { republishShift, openShift, setAlwaysRuns, type AlwaysRunsState, setDayTier, type DayTierState } from "@/app/staff/roster/actions";
 import { assignCandidates, type CurrentStaffing } from "@/app/staff/schedule/actions";
 import { assignOccurrencesForPeriod, cancelOccurrencesForPeriod, studioCancelPrivate } from "@/app/staff/schedule/actions";
+import RunAnyway from "@/components/staff/run-anyway";
 import type { AssignCandidate } from "@/lib/assign";
 import FreeFirstCard, { type FreeFirstCardState } from "@/components/schedule/free-first";
 import VisibilityCard from "@/components/schedule/visibility";
@@ -229,6 +230,9 @@ export default function BlockPanel({
             <p className="font-medium">This class is cancelled — {causeLabel(facts.cancellationCause)}.</p>
             {facts.cancellationReason && <p className="mt-0.5 text-ink-2">“{facts.cancellationReason}”</p>}
             <p className="mt-0.5 text-ink-2">It stays on the schedule so the gap is visible.</p>
+            {canManage && facts.cancellationCause === "unmet_minimum" && (facts.startsAtMs ?? 0) > Date.now() && (
+              <RunAnyway occurrenceId={facts.id} className="mt-2" />
+            )}
           </div>
         ) : (
           <p className="mt-2 text-[13px] leading-[19px] text-ink-2">

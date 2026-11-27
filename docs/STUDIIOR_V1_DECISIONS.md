@@ -622,6 +622,59 @@ Every style:
 
 ---
 
+## 103 (m) — A settled free first class counts and is never released (amendment, recorded 28 Nov 2026)
+
+A free first class whose reservation fee is settled (paid, covered by reservation credit, waived for the member or the booking, or marked pays at the studio, 103 (n)) is confirmed on booking and is never released by the free_first_confirm_at rule. It counts toward a flex class's minimum, the member and staff chips (22 (e), 22 (f)), the flex latch, 21 (f) and the cut-off decision exactly like a paid class seat, and the coach is paid for it as a head under 75 (l). A free first seat whose fee is still unpaid at its deadline is released as today and does not count.
+
+Found 27 Nov: Kai's Sat 28 Nov 07:00 and 08:00 had two first-timers each with ₱500 paid; the confirm-at-3 rule released all four at the Fri 20:00 cut-off and both classes were cancelled.
+
+**Status:** settled, to build in Step 14. **Amends:** Decisions 103, 30, 21, 22 and 75. Deanna, 28 Nov 2026.
+
+---
+
+## 103 (n) — Pays at the studio (amendment, recorded 28 Nov 2026)
+
+Staff only (owner, manager, front desk; members never see it). When a free first class has the reservation fee due, staff may choose "Pays at the studio" beside Due online and Waive, on the staff booking sheet and on the roster row. The seat is confirmed and settled for 103 (m) at once; no due, nudge, last call or release; the roster chip reads "Pay {fee} at studio".
+
+The coach or desk taps "Paid at studio" to record the fee as a payment (method and optional reference, Record a payment rules), after which it behaves as a paid fee: credited back as studio credit on check-in, kept on a no-show or late cancel. If the member attends or no-shows without the fee recorded, the daily check lists "Reservation fee to collect at the studio: {member}, {class}". Audit reservation.pay_at_studio and reservation.paid_at_studio.
+
+**Status:** settled, to build in Step 14. **Amends:** Decision 103 (k). Deanna, 28 Nov 2026.
+
+---
+
+## 103 (o) — Check-in returns credit for a credit-covered seat (amendment, recorded 28 Nov 2026)
+
+When a free first class held by reservation credit (reservation_credit_covered) is checked in or marked attended, the reservation credit comes back to the member as studio credit exactly as a paid fee does, with free_reservation_credited; on a no-show or late cancel it is kept.
+
+Found 28 Nov: Juliana Rebong, Paula Francisco and Trissa attended covered seats and lost ₱500 (returned by hand 28 Nov).
+
+**Status:** settled, to build in Step 14. **Amends:** Decision 103 (g). Deanna, 28 Nov 2026.
+
+---
+
+## 21 (g) — Run a cancelled class anyway (amendment, recorded 28 Nov 2026)
+
+A manager may bring back a class cancelled at its cut-off (unmet minimum) until it starts: "Run it anyway" on the class sheet and Flex pending. It:
+
+- restores the class (scheduled, visible);
+- restores every booking that cancellation released or cancelled with its free first class, fee payment, credit cover or waiver exactly as before, reversing any credit, free-class or fee return the cancellation wrote (no double credit, no new charge);
+- pins the class to run for that date only, keeps the coach, and pays under 75 (l);
+- queues one email to each restored member (subject "You're still on for {class_name}, {first_name}", body "Hi {first_name},\n\nSorry for the mix-up. Your {class_name} on {when} with Coach {instructor_first_name} is on, and your spot is confirmed.\n\nSee you at the reformer!🎀\n\nRPC Studio") and one notice to the coach, and refreshes the coach's digest.
+
+Not offered for classes cancelled by the studio, a closure or force majeure. Audit occurrence.restored.
+
+**Status:** settled, to build in Step 14. **Amends:** Decision 21. Deanna, 28 Nov 2026.
+
+---
+
+## 108 (d) — Daily check watchdog for first-timers (amendment, recorded 28 Nov 2026)
+
+New daily check items: "Flex class cancelled at the cut-off with first-timers whose fee was settled: {class}" and "Reservation fee to collect at the studio: {member}, {class}" (103 (n)).
+
+**Status:** settled, to build in Step 14. **Amends:** Decision 108. Deanna, 28 Nov 2026.
+
+---
+
 ## 120 — Discount codes (recorded 25 Nov 2026)
 
 **Decision.** Manager-up creates discount codes in Settings → Promotions → Discount codes. Two kinds. (1) A batch of unique single-use codes: name, percent off (1 to 90), how many codes, valid from and to (studio dates, 00:00 to 23:59), and which plans; the system generates that many codes in the form {STUDIO}-XXXX-XXXX from an unambiguous alphabet, unique per studio; each code works once, for one purchase, by anyone who has it. (2) A shared code: owner-chosen text (letters and digits, e.g. XMAS10, unique per studio), percent off, valid from and to, which plans, and a maximum number of uses; each person (member or buyer email) may use it once. Codes apply to plans, class packs, memberships, private packs and private session payments; never to shop items, gift cards or the reservation fee. Members enter a code in a "Have a code?" box at checkout (member checkout, /buy without an account, the private session pay step) and staff on Record a payment; the price updates at once. No stacking: when a promotion (Decision 117) is running, the buyer pays the lower of the sale price and the code price, and only that one is recorded. A code is held by a pending checkout for that checkout's life and released if it expires; it is used only when the payment succeeds; a refund while the code is still valid makes it usable again (for a shared code, the use is returned). Refusals: "That code isn't valid.", "That code has expired.", "That code has already been used.", "That code doesn't apply to this plan.", "You've already used this code.", "This code is being used in another checkout. Try again in 30 minutes." Payment rows record the code and the amount taken off; receipts and the BIR invoice show "Code {code}: -{amount}"; Sales shows a "Discount codes" line. Staff list per batch or shared code: each code with Unused / Used / Expired / Cancelled, who used it, when, on which plan, the amount off; copy one, copy all, download CSV; cancel an unused code. Guessing is blocked: codes are random and long, and code checks are rate-limited per studio, per buyer email and per member. No new anon function: plan_buy_begin gains an optional code argument (surface stays EXACTLY FIFTEEN). Audit: code batch created, code cancelled, code redeemed, code returned. The instructor desk sale (Sold a plan at desk) accepts a code too. A refund returns the code through every refund path (refund_payment_run, record_refund and apply_payment_refund), through one shared helper.

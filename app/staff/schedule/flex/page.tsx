@@ -6,6 +6,9 @@ import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, NavLink, SectionLabel } from "@/components/ui";
 import { studioToday } from "@/lib/tz";
 import Guarantee from "./panel";
+import RunAnyway from "@/components/staff/run-anyway";
+import ToastHost from "@/components/staff/toast-host";
+import { fmtTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +73,13 @@ export default async function FlexDecisions() {
       // Decision 103 (i): free seats per class (Flex pending shows classes).
       supabase.rpc("flex_pending_free_seats", { p_studio_id: ctx.studioId }),
     ]);
+  // Decision 21 (g): classes cancelled at their cut-off that have not started yet.
+  const { data: cancelledData } = await supabase.from("class_occurrences")
+    .select("id, name, starts_at")
+    .eq("studio_id", ctx.studioId).eq("status", "cancelled").eq("cancellation_cause", "unmet_minimum")
+    .gt("starts_at", new Date().toISOString())
+    .order("starts_at").limit(20);
+  const cancelledAtCutoff = (cancelledData ?? []) as { id: string; name: string; starts_at: string }[];
   const freeSeats = new Map<string, { n: number; paid: number; due: number; waived: number }>(
     ((freeData ?? []) as { occurrence_id: string; n: number; paid: number; due: number; waived: number }[])
       .map((f) => [f.occurrence_id, f]));
@@ -123,6 +133,7 @@ export default async function FlexDecisions() {
   return (
     <AppShell {...shell} title="Flex classes"
               actions={<NavLink href="/schedule">Back to the schedule</NavLink>}>
+      <ToastHost />
       <p className="mb-6 max-w-[62ch] text-[13px] leading-[20px] text-ink-2">
         These decide at <strong>{deadline}</strong>. A class that reaches its
         minimum runs and nobody hears anything; one that does not is cancelled and
@@ -157,6 +168,24 @@ export default async function FlexDecisions() {
           </ul>
         )}
       </section>
+
+      {cancelledAtCutoff.length > 0 && (
+        <section className="mb-10" data-testid="cancelled-at-cutoff">
+          <SectionLabel>Cancelled at the cut-off — {cancelledAtCutoff.length}</SectionLabel>
+          <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-surface">
+            {cancelledAtCutoff.map((c) => (
+              <li key={c.id} className="px-3.5 py-3">
+                <Link href={`/roster/${c.id}`} className="text-[14px] leading-5 text-ink hover:underline">{c.name}</Link>
+                <div className="text-[12px] leading-4 text-ink-3">
+                  {new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: ctx.timeZone })
+                    .format(new Date(c.starts_at))} {fmtTime(c.starts_at, ctx.timeZone, ctx.timeFormat)} · did not reach its minimum
+                </div>
+                <RunAnyway occurrenceId={c.id} className="mt-2" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {ready.length > 0 && (
         <section className="mb-10">

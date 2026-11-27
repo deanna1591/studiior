@@ -17,6 +17,8 @@ import { InstructorAddMember } from "@/components/instructor/add-member";
 import MarkAttended from "@/components/staff/mark-attended";
 import MarkNoShow from "@/components/staff/mark-no-show";
 import ReservationChip, { type SeatState } from "@/components/staff/reservation-chip";
+import SeatFeeActions from "@/components/staff/seat-fee-actions";
+import { formatMoney as fmtFee } from "@/lib/format-money";
 
 export const dynamic = "force-dynamic";
 
@@ -198,6 +200,11 @@ export default async function RosterPage({ params }: { params: { id: string } })
               {(m.first_timer || m.birthday || notes.get(m.member_id)?.drifting || seatState.has(m.booking_id)) && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <ReservationChip s={seatState.get(m.booking_id)} />
+                  {seatState.get(m.booking_id)?.state === "at_studio" && (
+                    <SeatFeeActions bookingId={m.booking_id} occurrenceId={r.occurrence_id}
+                                    state="at_studio" canChoose={false}
+                                    feeText={fmtFee(seatState.get(m.booking_id)!.fee_cents ?? 0, seatState.get(m.booking_id)!.currency ?? "")} />
+                  )}
                   {/* A MEMBER'S FIRST EVER CLASS is the one thing an instructor
                       most needs to know, and the fact that decides how the next
                       hour goes. */}

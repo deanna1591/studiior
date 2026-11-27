@@ -566,7 +566,7 @@ test("93d: tier chip", () => {
   assert.equal(tierChip({ tier: "core" }, 2).text, "Always runs");
   assert.equal(tierChip({ tier: "flex", needs: 2 }, 2).text, "Needs 2 to run");
   assert.equal(tierChip({ tier: "flex", needs: 1 }, 2).text, "Needs 1 more to run");
-  assert.equal(tierChip({ tier: "flex", needs: null }, 2).text, "Running");
+  assert.equal(tierChip({ tier: "flex", needs: null }, 2).text, "Confirmed");
 });
 
 test("93d: logo fallback, coach photo anchored top, Y2K date, week strip", () => {

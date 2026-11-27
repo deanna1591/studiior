@@ -31,6 +31,7 @@ import MarkAttended from "@/components/staff/mark-attended";
 import MarkNoShow from "@/components/staff/mark-no-show";
 import { fullName } from "@/lib/full-name";
 import ReservationChip, { type SeatState } from "@/components/staff/reservation-chip";
+import SeatFeeActions from "@/components/staff/seat-fee-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -429,6 +430,14 @@ export default async function Roster({ params, searchParams }: { params: { occur
                     {" · "}
                     <a href={`sms:${b.members.phone}`} className="text-ink underline decoration-line-2 underline-offset-2 hover:decoration-ink">Text</a>
                   </p>
+                )}
+                {/* Decision 103 (n): how this free first seat's fee is paid. */}
+                {seatState.get(b.id) && (b.status === "booked" || seatState.get(b.id)!.state === "at_studio") && (
+                  <div className="mt-1.5 pl-9">
+                    <SeatFeeActions bookingId={b.id} occurrenceId={occ.id} state={seatState.get(b.id)!.state}
+                                    feeText={formatMoney(seatState.get(b.id)!.fee_cents ?? 0, seatState.get(b.id)!.currency ?? "")}
+                                    canChoose={desk} />
+                  </div>
                 )}
                 {guestOf.has(b.member_id) && !b.members?.waiver_signed_at && (
                   <PaperWaiverButton memberId={b.member_id} occurrenceId={occ.id} />

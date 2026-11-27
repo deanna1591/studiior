@@ -22,6 +22,14 @@ function toast(msg: string) {
 /** The core sheet: a member and a class are fixed; pick how to pay and book.
  *  optionsFn/bookFn are injected so the instructor portal can reuse it with its
  *  own actions (Decision 100 amendment b). */
+
+// Decision 103 (k) and (n): the three ways a free first class's fee is settled.
+const FEE_CHOICES: { mode: "due" | "studio" | "waive"; label: string; help: (fee: string) => string }[] = [
+  { mode: "due", label: "Due online", help: () => "The pay-to-keep email goes out now." },
+  { mode: "studio", label: "Pays at the studio", help: (fee) => `They pay ${fee} at the desk. Their seat is confirmed now.` },
+  { mode: "waive", label: "Waive", help: () => "No fee is asked for this booking." },
+];
+
 export function Sheet({
   memberId, occurrenceId, onClose, timeZone, timeFormat,
   optionsFn = bookingOptions, bookFn = bookMemberAction,
@@ -36,8 +44,9 @@ export function Sheet({
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState("");
-  // Decision 103 (k): off by default; Decision 100 (b) keeps a late add on.
-  const [waive, setWaive] = useState(false);
+  // Decision 103 (k) and (n): Due online by default, Pays at the studio or Waive
+  // by choice; Decision 100 (b) keeps a late add on Waive.
+  const [feeMode, setFeeMode] = useState<"due" | "studio" | "waive">("due");
   const [feeNote, setFeeNote] = useState("");
   const [terms, setTerms] = useState<FeeTerms>(null);
   const [freeOnFlex, setFreeOnFlex] = useState(false);  // Decision 30(e)
@@ -50,7 +59,7 @@ export function Sheet({
       .then((o) => { if (!live) return;
         if (!o || o.options.length === 0) { setLoadErr("Nothing can be booked for this class."); return; }
         setOpts(o); setIdx(o.preselect ?? 0);
-        setWaive(!!o.late_add && o.method !== "instructor");
+        setFeeMode(o.late_add && o.method !== "instructor" ? "waive" : "due");
         const dp = o.options[o.preselect ?? 0];
         if (dp?.kind === "drop_in_paid" && dp.price_cents) setAmount(String(dp.price_cents / 100));
       })
@@ -78,8 +87,8 @@ export function Sheet({
       (source as Record<string, unknown>).amount_cents = Math.round(Number(amount || "0") * 100);
     }
     if (feeChoice) {
-      (source as Record<string, unknown>).fee_choice = !isInstructor && waive ? "waive" : "due";
-      if (!isInstructor && waive && feeNote.trim()) (source as Record<string, unknown>).fee_note = feeNote.trim();
+      (source as Record<string, unknown>).fee_choice = isInstructor ? "due" : feeMode;
+      if (!isInstructor && feeMode !== "due" && feeNote.trim()) (source as Record<string, unknown>).fee_note = feeNote.trim();
     }
     if (chosen.kind === "free_first" && freeOnFlex) {
       (source as Record<string, unknown>).allow_free_on_flex = true;
@@ -163,19 +172,22 @@ export function Sheet({
                 </p>
                 {!isInstructor ? (
                   <>
-                    <label className="mt-2 flex items-start gap-2 text-[13px] text-ink-2">
-                      <input type="checkbox" className="mt-0.5" checked={waive}
-                             onChange={(e) => setWaive(e.target.checked)} />
-                      <span>
-                        <span className="font-medium text-ink">Waive the reservation fee</span>
-                        <span className="mt-0.5 block text-[12px] text-ink-3">
-                          {waive ? "No fee is asked for this booking." : "Off: the pay-to-keep email goes out now."}
-                        </span>
-                      </span>
-                    </label>
-                    {waive && (
+                    <div className="mt-2 space-y-1.5" role="radiogroup" aria-label="How the reservation fee is paid"
+                         data-testid="fee-choices">
+                      {FEE_CHOICES.map((c) => (
+                        <label key={c.mode} className="flex items-start gap-2 text-[13px] text-ink-2">
+                          <input type="radio" name="fee-mode" className="mt-0.5" checked={feeMode === c.mode}
+                                 onChange={() => setFeeMode(c.mode)} />
+                          <span>
+                            <span className="font-medium text-ink">{c.label}</span>
+                            <span className="mt-0.5 block text-[12px] text-ink-3">{c.help(terms.fee_text)}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {feeMode !== "due" && (
                       <input className="mt-2 w-full rounded-lg border border-line-2 bg-surface px-3 py-2 text-[13px] text-ink"
-                             placeholder="Why it is waived (optional)"
+                             placeholder={feeMode === "waive" ? "Why it is waived (optional)" : "A note for the desk (optional)"}
                              value={feeNote} onChange={(e) => setFeeNote(e.target.value)} />
                     )}
                   </>

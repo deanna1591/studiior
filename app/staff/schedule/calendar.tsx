@@ -862,8 +862,10 @@ export default function ScheduleCalendar({
               + fmtTime(selected.startsAt, timeZone, timeFormat),
             weekday: new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone })
               .format(new Date(selected.startsAt)),
-            cancelled: selected.cancelled ?? false,
-            cancellationCause: selected.cancellationCause ?? null,
+            // Decision 21 (g): a class cancelled at its cut-off opens read-only
+            // too, with Run it anyway before it starts.
+            cancelled: (selected.cancelled || selected.notRunning) ?? false,
+            cancellationCause: selected.notRunning ? "unmet_minimum" : selected.cancellationCause ?? null,
             instructorId: selected.resourceId === UNASSIGNED ? null : selected.resourceId,
             instructorName: selected.resourceId === UNASSIGNED
               ? null : instructorNames[selected.resourceId] ?? null,

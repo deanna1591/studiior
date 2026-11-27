@@ -12,6 +12,10 @@ test("the five states word themselves", () => {
   assert.deepEqual(reservationChip({ state: "not_asked" }, money), { text: "Not asked", tone: "warn" });
 });
 
+test("Decision 103 (n): pays at the studio", () => {
+  assert.deepEqual(reservationChip({ state: "at_studio", feeCents: 50000, currency: "PHP" }, money), { text: "Pay ₱500 at studio", tone: "warn" });
+});
+
 test("no state, no chip", () => {
   assert.equal(reservationChip({ state: null }, money), null);
   assert.equal(reservationChip(null, money), null);
@@ -25,7 +29,7 @@ test("the Flex pending line", () => {
 });
 
 test("no em dash in any chip or line", () => {
-  for (const st of ["paid", "covered", "waived", "due", "not_asked"]) {
+  for (const st of ["paid", "covered", "at_studio", "waived", "due", "not_asked"]) {
     assert.ok(!reservationChip({ state: st, feeCents: 1, currency: "PHP", deadlineLabel: "x" }, money).text.includes("—"));
   }
   assert.ok(!freeSeatsLine({ n: 2, paid: 1, due: 1, waived: 0 }).includes("—"));

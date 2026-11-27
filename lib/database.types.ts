@@ -562,6 +562,8 @@ export type Database = {
             | null
           reservation_credit_covered: boolean
           reservation_fee_waived: boolean
+          reservation_pay_at_studio: boolean
+          reservation_pay_at_studio_at: string | null
           source: Database["public"]["Enums"]["booking_source"]
           status: Database["public"]["Enums"]["booking_status"]
           studio_id: string
@@ -596,6 +598,8 @@ export type Database = {
             | null
           reservation_credit_covered?: boolean
           reservation_fee_waived?: boolean
+          reservation_pay_at_studio?: boolean
+          reservation_pay_at_studio_at?: string | null
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id: string
@@ -630,6 +634,8 @@ export type Database = {
             | null
           reservation_credit_covered?: boolean
           reservation_fee_waived?: boolean
+          reservation_pay_at_studio?: boolean
+          reservation_pay_at_studio_at?: string | null
           source?: Database["public"]["Enums"]["booking_source"]
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string
@@ -10742,6 +10748,10 @@ export type Database = {
         }[]
       }
       free_first_report: { Args: { p_studio_id: string }; Returns: Json }
+      free_seat_fee_settled_run: {
+        Args: { p_booking_id: string }
+        Returns: boolean
+      }
       free_seat_reservation_state: {
         Args: { p_booking_id: string }
         Returns: Json
@@ -12420,6 +12430,10 @@ export type Database = {
         }
         Returns: Json
       }
+      record_reservation_paid_at_studio: {
+        Args: { p_booking_id: string; p_method: string; p_reference?: string }
+        Returns: Json
+      }
       refresh_member_health: { Args: { p_member_id: string }; Returns: Json }
       refresh_studio_health: { Args: { p_studio_id: string }; Returns: number }
       refund_membership: {
@@ -12646,6 +12660,56 @@ export type Database = {
       }
       rrule_part: { Args: { p_key: string; p_rrule: string }; Returns: string }
       rrule_weekdays: { Args: { p_rrule: string }; Returns: number[] }
+      run_anyway_preview: { Args: { p_occurrence_id: string }; Returns: Json }
+      run_anyway_targets_run: {
+        Args: { p_occurrence_id: string }
+        Returns: {
+          booked_at: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          confirmed_at: string | null
+          created_at: string
+          credit_entry_id: string | null
+          fee_charged_cents: number
+          free_cancel_until: string | null
+          hold_reason: string | null
+          hold_until: string | null
+          id: string
+          is_demo: boolean
+          is_late_cancel: boolean
+          member_id: string
+          membership_id: string | null
+          no_show_at: string | null
+          no_show_by: string | null
+          occurrence_id: string
+          overridden_rules: string[] | null
+          override_reason: string | null
+          payment_source: Database["public"]["Enums"]["payment_source"] | null
+          provisional: boolean
+          release_reason:
+            | Database["public"]["Enums"]["booking_release_reason"]
+            | null
+          reservation_credit_covered: boolean
+          reservation_fee_waived: boolean
+          reservation_pay_at_studio: boolean
+          reservation_pay_at_studio_at: string | null
+          source: Database["public"]["Enums"]["booking_source"]
+          status: Database["public"]["Enums"]["booking_status"]
+          studio_id: string
+          updated_at: string
+          waitlist_position: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      run_cancelled_class_anyway: {
+        Args: { p_occurrence_id: string }
+        Returns: Json
+      }
       run_due_dashboard_narratives: { Args: never; Returns: Json }
       run_due_morning_briefs: { Args: never; Returns: Json }
       sales_history: {
@@ -12904,6 +12968,10 @@ export type Database = {
       set_class_type_instructors: {
         Args: { p_class_type_id: string; p_instructor_ids: string[] }
         Returns: number
+      }
+      set_free_fee_choice: {
+        Args: { p_booking_id: string; p_choice: string; p_note?: string }
+        Returns: Json
       }
       set_free_first_override: {
         Args: { p_occurrence_id: string; p_value?: string }
@@ -13489,6 +13557,10 @@ export type Database = {
       }
       withdraw_application: { Args: { p_occurrence_id: string }; Returns: Json }
       withdraw_cover_request: { Args: { p_request_id: string }; Returns: Json }
+      withdraw_free_fee_notices_run: {
+        Args: { p_booking_id: string }
+        Returns: number
+      }
       withdraw_from_shift: { Args: { p_occurrence_id: string }; Returns: Json }
       write_reservation_credit: {
         Args: { p_booking_id: string }

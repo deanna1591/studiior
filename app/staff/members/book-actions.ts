@@ -20,7 +20,7 @@ export type BookOption = {
   // Decision 100 amendment (b): a free-first late add carries the waiver choice.
   waive_fee?: boolean;
   // Decision 103 (k): the fee choice for a free first class.
-  fee_choice?: "due" | "waive";
+  fee_choice?: "due" | "waive" | "studio";
   fee_note?: string;
 };
 export type BookOptions = {
