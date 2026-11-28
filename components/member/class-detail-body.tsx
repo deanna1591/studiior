@@ -16,6 +16,7 @@ import { flexWaitingLabel } from "@/lib/class-button";
 import GuestInvite from "@/components/member/guest-invite";
 import type { FreeFirst, Pending } from "@/app/member/class/[id]/load";
 import { fmtTime, fmtDayLong, fmtDeadlineShort } from "@/lib/time";
+import { heldUntilLine, HOLDING_LABEL } from "@/lib/checkout";
 import { HoldCountdown, PaymentPendingActions } from "@/components/member/payment-pending";
 
 /**
@@ -58,7 +59,7 @@ export default function ClassDetailBody({
   checkedIn = false, checkedInAt = null, selfCheckinAvailable = false, opensBeforeMin = 60, closesAfterMin = 30,
   unpaid = false, group = null, deskPayAvailable = true, covered = true, waiverBlocked = false,
   seatKind = "unlimited", cutoffMinutes = 720, duplicateHold = false, holdTime = null,
-  reservationFeeLabel = null, creditCoversFee = false, reservationHold = null, due = null,
+  reservationFeeLabel = null, creditCoversFee = false, reservationHold = null, checkoutHold = null, due = null,
 }: {
   occ: DetailOccurrence;
   type: DetailType;
@@ -115,6 +116,8 @@ export default function ClassDetailBody({
    *  class — "Payment pending", never booked. The member's own booking is null
    *  while a hold is live, so this is how the page knows. */
   reservationHold?: { bookingId: string | null; holdUntil: string } | null;
+  /** Decision 88 (e): the online checkout's 30-minute hold on this class. */
+  checkoutHold?: { bookingId: string | null; holdUntil: string } | null;
   /** Decision 103(d) pay-to-keep: this booked free seat owes the fee. Shows
    *  "Booked, {fee} due by {deadline}" + a Pay button, above the flex line. */
   due?: { feeCents: number } | null;
@@ -242,6 +245,25 @@ export default function ClassDetailBody({
             occurrenceId={occ.id}
             bookingId={reservationHold.bookingId}
             cancelBooking={cancelBooking}
+          />
+        </div>
+      ) : checkoutHold ? (
+        /* Decision 88 (e): a seat held while the member pays online. Pay now
+           goes back to the checkout; the time the hold ends sits beside it.
+           Cancel releases it at once; when it ends unpaid the sweep releases it. */
+        <div className="m-card mt-4 p-4">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <p className="m-sub font-semibold text-ink">{HOLDING_LABEL}</p>
+            <p className="m-meta text-ink-2">
+              {heldUntilLine(fmtTime(checkoutHold.holdUntil, timeZone, timeFormat))}
+            </p>
+          </div>
+          <PaymentPendingActions
+            occurrenceId={occ.id}
+            bookingId={checkoutHold.bookingId}
+            cancelBooking={cancelBooking}
+            href={`/checkout/${occ.id}`}
+            label="Pay now"
           />
         </div>
       ) : (

@@ -45,18 +45,25 @@ export async function checkoutPay(_prev: BuyState, fd: FormData): Promise<BuySta
     const p = pv as { code_ok?: boolean; code_message?: string } | null;
     if (!p?.code_ok) return { ok: false, message: p?.code_message ?? "That code isn't valid." };
   }
-  // Decision 103 (p): the online checkout hold is the same book_class seat,
-  // through checkout_hold_class so a staff-only studio's refusal steps aside.
-  const { data, error } = await supabase.rpc("checkout_hold_class", { p_occurrence_id: occId });
+  // Decision 88 (e): the seat is a 30-minute payment hold while the member
+  // pays (checkout_hold_class). Decision 88 (d): a private pack is refused here
+  // for a group class, before any seat is held.
+  const { data, error } = await supabase.rpc("checkout_hold_class", {
+    p_occurrence_id: occId, p_plan_id: planId,
+  });
   if (error) return { ok: false, message: error.message };
-  const reason = (data as { failure_reason: string | null } | null)?.failure_reason ?? null;
+  const held = (data ?? null) as { failure_reason: string | null; booking_id: string | null;
+                                   hold_until: string | null } | null;
+  const reason = held?.failure_reason ?? null;
   if (reason && !HOLD_NON_FATAL.has(reason)) {
     return { ok: false, message: REASONS[reason] ?? reason };
   }
+  const hold = held?.booking_id && held.hold_until
+    ? { bookingId: held.booking_id, holdUntil: held.hold_until } : null;
 
   // Land back on the class after a successful purchase (the existing Pay-now
   // return behaviour), where apply_plan_to_unpaid will already have settled it.
-  return beginXenditCheckout(ctx, planId, `/class/${occId}`, code);
+  return beginXenditCheckout(ctx, planId, `/class/${occId}`, code, hold);
 }
 
 export type DeskState = { error: string } | { ok: true } | null;

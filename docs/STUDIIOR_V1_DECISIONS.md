@@ -743,6 +743,53 @@ Founding Unlimited's cap is 20 (1 sold to date, 28 Nov).
 
 ---
 
+## 88 (d) — Checkout offers every option that books this class (amendment, recorded 28 Nov 2026)
+
+A member with no plan, pack or credit for a class taps Book and lands on checkout. Checkout offers everything they can buy that books this class, in this order:
+
+- the drop-in (single class) first, and preselected;
+- then the intro offer when the member is eligible;
+- then class packs;
+- then memberships.
+
+Sale prices and codes work as today. Drop-ins stay on sale online (Deanna confirmed, 28 Nov).
+
+Private packs (116 (d): 1:1, Duo, Trio) never show at a group-class checkout, because they only book private sessions. Barkada (group) plans stay off checkout too. Below the list, a link "See all plans" opens My plan, where Barkada and private packs are sold.
+
+The database refuses a private pack as payment for a group class at checkout ("That pack is for private sessions. Choose another option."), and a private pack bought anywhere never settles a held group-class seat.
+
+Today (STEP 0, 28 Nov): Reform's group-class checkout lists Single Drop-in, Intro Offer, 10-Class Pack, 5-Class Pack, then all five private packs, then Founding Unlimited and 8 Classes Monthly. Nobody has bought a private pack anywhere at Reform.
+
+**Status:** settled, to build in Step 14c. **Amends:** Decision 88 slice A, 116 (d). Deanna, 28 Nov 2026.
+
+## 88 (e) — No seat without payment (amendment, recorded 28 Nov 2026)
+
+A seat taken through the online checkout is held only while that checkout is open.
+
+- **The hold.** The seat is held as a payment hold that lasts 30 minutes. The Xendit session is set to expire at the same instant (the 103 (e) rule).
+- **While held:**
+  - the member sees "Holding your spot" with Pay now, which goes back to the checkout, and beside it the time the hold ends, "Held until {time}", in studio time and the studio's clock format;
+  - the hold takes a place for capacity;
+  - it does not count toward the flex minimum, the flex chips or coach pay heads.
+- **When the payment succeeds,** the seat is confirmed. The plan bought settles it, as today.
+- **When the checkout expires, fails or is abandoned,** the seat is released automatically:
+  - nothing is owed;
+  - no late cancel, no infraction and no desk-pay strike is recorded;
+  - the waitlist is offered the seat;
+  - the 119 checkout rescue email still applies.
+- **One hold at a time.** A member cannot hold more than one unpaid online seat at a time. A second checkout while one is open reads "Finish paying for your held class first, or cancel the hold."
+- **Unchanged:** staff bookings (staff_book_member, the roster, 103 (n) Pays at the studio) and the free first class reservation hold (103 (e)).
+
+Today (STEP 0, 28 Nov):
+
+- At a studio without Stripe (Reform), the checkout seat is a confirmed, unpaid drop-in. It already takes no part in the flex minimum, the chips or the pay heads.
+- It lasts until the class. When the Xendit checkout expires or fails, only the purchase fails: the seat stays, and a no-show on it is a desk-pay strike.
+- No Reform member booking since 9 Nov is still booked with no payment and no live checkout. The 13 drop-ins since then are 12 cancelled and Mikey's no-show. Existing unpaid member bookings are left as they are.
+
+**Status:** settled, to build in Step 14c. **Amends:** Decision 88 slice A, 103 (p). Deanna, 28 Nov 2026.
+
+---
+
 ## 120 — Discount codes (recorded 25 Nov 2026)
 
 **Decision.** Manager-up creates discount codes in Settings → Promotions → Discount codes. Two kinds. (1) A batch of unique single-use codes: name, percent off (1 to 90), how many codes, valid from and to (studio dates, 00:00 to 23:59), and which plans; the system generates that many codes in the form {STUDIO}-XXXX-XXXX from an unambiguous alphabet, unique per studio; each code works once, for one purchase, by anyone who has it. (2) A shared code: owner-chosen text (letters and digits, e.g. XMAS10, unique per studio), percent off, valid from and to, which plans, and a maximum number of uses; each person (member or buyer email) may use it once. Codes apply to plans, class packs, memberships, private packs and private session payments; never to shop items, gift cards or the reservation fee. Members enter a code in a "Have a code?" box at checkout (member checkout, /buy without an account, the private session pay step) and staff on Record a payment; the price updates at once. No stacking: when a promotion (Decision 117) is running, the buyer pays the lower of the sale price and the code price, and only that one is recorded. A code is held by a pending checkout for that checkout's life and released if it expires; it is used only when the payment succeeds; a refund while the code is still valid makes it usable again (for a shared code, the use is returned). Refusals: "That code isn't valid.", "That code has expired.", "That code has already been used.", "That code doesn't apply to this plan.", "You've already used this code.", "This code is being used in another checkout. Try again in 30 minutes." Payment rows record the code and the amount taken off; receipts and the BIR invoice show "Code {code}: -{amount}"; Sales shows a "Discount codes" line. Staff list per batch or shared code: each code with Unused / Used / Expired / Cancelled, who used it, when, on which plan, the amount off; copy one, copy all, download CSV; cancel an unused code. Guessing is blocked: codes are random and long, and code checks are rate-limited per studio, per buyer email and per member. No new anon function: plan_buy_begin gains an optional code argument (surface stays EXACTLY FIFTEEN). Audit: code batch created, code cancelled, code redeemed, code returned. The instructor desk sale (Sold a plan at desk) accepts a code too. A refund returns the code through every refund path (refund_payment_run, record_refund and apply_payment_refund), through one shared helper.

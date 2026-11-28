@@ -19,4 +19,7 @@ export function checkoutPlanOrder<T extends CheckoutPlan>(
 
 export function planHelpLine(plan: CheckoutPlan | null | undefined): string;
 
+export function heldUntilLine(time: string | null | undefined): string;
+export const HOLDING_LABEL: string;
+
 export function checkoutTotalCents(plan: CheckoutPlan | null | undefined): number;

@@ -316,14 +316,16 @@ update studio_settings set desk_pay_mode = 'staff_only' where studio_id = '14f00
 set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a4',false);
 select set_config('t.p1', coalesce((book_class('14f00000-0000-0000-0000-00000000c0f1','14f00000-0000-0000-0000-000000000031','member')).failure_reason, 'none'), false);
 select set_config('t.p2', (select desk_pay_available::text from member_bootstrap('s14-studio')), false);
-select set_config('t.p3', coalesce((checkout_hold_class('14f00000-0000-0000-0000-00000000c0f1')).failure_reason, 'none'), false);
+select set_config('t.p3', coalesce(checkout_hold_class('14f00000-0000-0000-0000-00000000c0f1') ->> 'failure_reason', 'none'), false);
 select set_config('request.jwt.claim.sub','',false); reset role;
 select expect_text('staff_only: the member''s own unpaid drop-in is refused', current_setting('t.p1'), 'pay_online');
 select expect_text('staff_only: desk_pay_available is false', current_setting('t.p2'), 'false');
 select expect_text('staff_only: the online checkout hold still holds the seat', current_setting('t.p3'), 'none');
-select expect_num('the checkout hold is one booked unpaid drop-in',
+-- 88 (e): the checkout hold is now a 30-minute payment hold, not a confirmed unpaid seat.
+select expect_num('the checkout hold is one pending_payment drop-in held for checkout',
   (select count(*) from bookings where occurrence_id = '14f00000-0000-0000-0000-00000000c0f1'
-     and member_id = '14f00000-0000-0000-0000-000000000031' and status = 'booked' and payment_source = 'drop_in'), 1);
+     and member_id = '14f00000-0000-0000-0000-000000000031' and status = 'pending_payment'
+     and payment_source = 'drop_in' and hold_reason = 'checkout'), 1);
 
 -- the desk still books an unpaid drop-in for the member
 set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a2',false);
@@ -489,7 +491,7 @@ select expect_num('anon surface is exactly fifteen',
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname not like 'expect\_%' and p.proname not like 's14\_%'), 15);
 select expect_true('the Step 14b functions are not anon',
-  not has_function_privilege('anon', 'checkout_hold_class(uuid)', 'execute')
+  not has_function_privilege('anon', 'checkout_hold_class(uuid,uuid)', 'execute')
   and not has_function_privilege('anon', 'plan_sold_states(uuid)', 'execute')
   and not has_function_privilege('anon', 'plan_sold_out_run(uuid)', 'execute')
   and not has_function_privilege('anon', 'set_occurrence_day_tier(uuid,text,boolean)', 'execute'));

@@ -64,3 +64,33 @@ test("checkoutTotalCents: the chosen plan's price, no discounts", () => {
   assert.equal(checkoutTotalCents(mk("d", "drop_in", { price_cents: 15000 })), 15000);
   assert.equal(checkoutTotalCents(null), 0);
 });
+
+// Decision 88 (d): private packs only book private sessions, so a group-class
+// checkout never offers one; Reform's order with its real plan shapes.
+test("checkoutPlanOrder: private packs never show, the order holds", () => {
+  const out = checkoutPlanOrder([
+    mk("intro", "trial"),
+    mk("founding", "recurring"),
+    mk("pack10", "class_pack"),
+    mk("drop", "drop_in"),
+    mk("pack5", "class_pack"),
+    mk("monthly8", "recurring"),
+    mk("barkada", "group"),
+    mk("priv10", "class_pack", { private_pack: true }),
+    mk("priv5", "class_pack", { private_pack: true }),
+    mk("solo", "class_pack", { private_pack: true }),
+    mk("duo", "class_pack", { private_pack: true }),
+    mk("trio", "class_pack", { private_pack: true }),
+  ]);
+  assert.deepEqual(out.map((p) => p.id),
+    ["drop", "intro", "pack10", "pack5", "founding", "monthly8"]);
+});
+
+test("heldUntilLine: the time the hold ends, or nothing", async () => {
+  const { heldUntilLine, HOLDING_LABEL } = await import("../lib/checkout.mjs");
+  assert.equal(heldUntilLine("7:30 PM"), "Held until 7:30 PM");
+  assert.equal(heldUntilLine("19:30"), "Held until 19:30");
+  assert.equal(heldUntilLine(null), "");
+  assert.equal(HOLDING_LABEL, "Holding your spot");
+  assert.ok(!/—/.test(heldUntilLine("7:30 PM") + HOLDING_LABEL));
+});

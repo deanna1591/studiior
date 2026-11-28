@@ -37,7 +37,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
       // The studio's public, active plans — RLS (plans_member_read) already
       // scopes this to this studio. Buyability + ordering is applied below.
       supabase.from("membership_plans")
-        .select("id, name, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval")
+        .select("id, name, type, price_cents, currency, credits, credits_per_period, validity_days, billing_interval, private_pack")
         .eq("visibility", "public").eq("status", "active").order("sort_order"),
       settings.guestPassesEnabled
         ? supabase.from("guest_passes").select("id", { count: "exact", head: true })
@@ -76,7 +76,7 @@ export default async function Checkout({ params }: { params: { occurrenceId: str
 
   // Decision 88 order: drop-in first (preselected), then the intro offer when
   // eligible, then packs, then memberships. Group plans are not a single-seat
-  // purchase and are excluded.
+  // purchase and are excluded; Decision 88 (d): so are private packs.
   const ordered = checkoutPlanOrder(catalogue ?? [], {
     trialUsed: settings.trialUsed,
     introPlanId: introCfg?.intro_offer_plan_id ?? null,

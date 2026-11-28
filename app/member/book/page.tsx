@@ -265,9 +265,13 @@ export default async function Book({
                    hold_until: string | null; pending_until: string | null };
   const holdMap = new Map<string, { bookingId: string | null; holdUntil: string | null }>();
   const flexPendingMap = new Map<string, string | null>(); // occ -> pending_until (flex deadline)
+  // Decision 88 (e): an online checkout hold, with the time it ends.
+  const checkoutHoldMap = new Map<string, { bookingId: string | null; holdUntil: string }>();
   for (const r of (pendingRows ?? []) as PendRow[]) {
     if (r.status === "pending_payment") {
       holdMap.set(r.occurrence_id, { bookingId: r.booking_id, holdUntil: r.hold_until });
+    } else if (r.status === "checkout_hold") {
+      if (r.hold_until) checkoutHoldMap.set(r.occurrence_id, { bookingId: r.booking_id, holdUntil: r.hold_until });
     } else {
       flexPendingMap.set(r.occurrence_id, r.pending_until);
     }
@@ -404,7 +408,9 @@ export default async function Book({
     // Decision 103(c): a reservation hold (pending_payment comp) comes from
     // member_pending_bookings, not the bookings query (which excludes it).
     const hold = holdMap.get(o.id) ?? null;
-    const holding = !!hold;
+    // Decision 88 (e): a checkout hold reads "Holding your spot" with Pay now.
+    const ckHold = checkoutHoldMap.get(o.id) ?? null;
+    const holding = !!hold || !!ckHold;
     const checkedIn = checkedInSet.has(o.id) || booking?.status === "attended";
     const pendingUntil = flexPendingMap.get(o.id) ?? null;
     // Decision 103(d): a booked free booking that owes the fee -> pay-to-keep.
@@ -441,13 +447,15 @@ export default async function Book({
     const opensOn = outOfWindow
       ? dayLabel(new Date(new Date(o.starts_at).getTime() - windowMs).toISOString())
       : null;
-    const base: Row["base"] = past ? "past" : holding ? "reservationHold" : booked ? "booked"
+    const base: Row["base"] = past ? "past" : hold ? "reservationHold" : ckHold ? "holding" : booked ? "booked"
       : waiting ? "waiting" : outOfWindow ? "future" : peakBlocked ? "peakBlocked" : full ? "full" : "none";
     const row: Row = {
       id: o.id,
       classTypeId: o.class_type_id ?? null,
       instructorId: o.instructor_id ?? null,
-      bookingId: hold?.bookingId ?? booking?.id ?? null,
+      bookingId: hold?.bookingId ?? ckHold?.bookingId ?? booking?.id ?? null,
+      checkoutHold: !!ckHold,
+      heldUntilLabel: ckHold ? fmtTime(ckHold.holdUntil, ctx.timeZone, ctx.timeFormat) : null,
       bookingStatus: booking?.status ?? null,
       checkedIn,
       flexPending: flexPendingMap.has(o.id),

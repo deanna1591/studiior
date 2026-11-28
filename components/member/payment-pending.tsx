@@ -31,9 +31,13 @@ export function HoldCountdown({ holdUntil }: { holdUntil: string }) {
 
 /** The hold actions, for the row's action slot. */
 export function PaymentPendingActions({
-  occurrenceId, bookingId, cancelBooking, onCancelled,
+  occurrenceId, bookingId, cancelBooking, onCancelled, href, label = "Finish paying",
 }: {
   occurrenceId: string;
+  /** Where the pay button goes. Defaults to the reservation checkout; the
+   *  Decision 88 (e) online checkout hold passes /checkout/{occurrence}. */
+  href?: string;
+  label?: string;
   bookingId: string | null;
   cancelBooking: (prev: ActionResult, fd: FormData) => Promise<ActionResult>;
   /** Optimistic hook so the Book list can drop the row at once. */
@@ -54,10 +58,10 @@ export function PaymentPendingActions({
   }
   return (
     <span className="flex flex-col items-stretch gap-1.5">
-      <Link href={`/reserve/${occurrenceId}`}
+      <Link href={href ?? `/reserve/${occurrenceId}`}
             className="m-tap m-press w-full rounded-full px-4 text-center text-[13px] font-bold"
             style={{ background: "var(--accent-solid)", color: "var(--accent-on-solid)" }}>
-        Finish paying
+        {label}
       </Link>
       <button type="button" onClick={cancel} disabled={pending}
               className="m-tap m-press text-center text-[13px] text-ink-2 underline decoration-line-2 underline-offset-4 disabled:opacity-50">

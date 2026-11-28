@@ -47,6 +47,9 @@ export async function buyPlan(_prev: BuyState, fd: FormData): Promise<BuyState> 
  */
 export async function beginXenditCheckout(
   ctx: MemberCtx, planId: string, returnTo: string, code?: string | null,
+  // Decision 88 (e): the checkout's held seat. The Xendit session expires when
+  // the hold does, and the purchase is tied to the seat so a failure releases it.
+  hold?: { bookingId: string; holdUntil: string } | null,
 ): Promise<BuyState> {
   const origin = currentMemberOrigin();
   if (!origin) return { ok: false, message: "Could not work out the studio address." };
@@ -82,6 +85,12 @@ export async function beginXenditCheckout(
   const { data: plan } = await supabase.from("membership_plans")
     .select("name").eq("id", planId).maybeSingle();
 
+  if (hold) {
+    await supabase.rpc("checkout_link_hold", {
+      p_purchase_id: purchase.purchase_id, p_booking_id: hold.bookingId,
+    });
+  }
+
   return openXenditSession(ctx, {
     purchaseId: purchase.purchase_id,
     amountCents: purchase.amount_cents,
@@ -90,6 +99,7 @@ export async function beginXenditCheckout(
     metadata: { purchase_id: purchase.purchase_id, studio_id: ctx.studioId, member_id: ctx.memberId, kind: "plan", plan_id: planId },
     successUrl: `${origin}/purchase/${purchase.purchase_id}${returnTo && returnTo !== "/" ? `?return=${encodeURIComponent(returnTo)}` : ""}`,
     cancelUrl: `${origin}/account/plan`,
+    expiresAt: hold?.holdUntil ?? undefined,
   });
 }
 
@@ -105,6 +115,8 @@ async function openXenditSession(
   opts: {
     purchaseId: string; amountCents: number; currency: string; description: string;
     metadata: Record<string, string>; successUrl: string; cancelUrl: string;
+    /** Decision 88 (e): when the checkout holds a seat, the instant it ends. */
+    expiresAt?: string;
   },
 ): Promise<BuyState> {
   const supabase = createClient();
@@ -142,7 +154,7 @@ async function openXenditSession(
     // authoritative control; the session expiry just stops a very late payment.)
     ...(opts.metadata.kind === "reservation"
       ? { expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() }
-      : {}),
+      : opts.expiresAt ? { expiresAt: opts.expiresAt } : {}),
   };
   const withCustomerId = (customerId: string) => createSession(secret, { ...common, customerId });
   const withCustomerObject = () => createSession(secret, {

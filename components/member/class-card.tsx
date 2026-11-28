@@ -119,7 +119,7 @@ export default function ClassCard({
               className={statusTone === "quiet" ? "text-ink-3" : "font-semibold"}
               style={
                 statusTone === "booked"  ? { color: "var(--lime-text)" }
-                : statusTone === "holding" ? { color: "var(--amber-deep)" }
+                : statusTone === "holding" ? { color: "var(--ink)" }
                 : statusTone === "full"    ? { color: "var(--ink-3)" }
                 : undefined
               }

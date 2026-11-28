@@ -38,7 +38,7 @@ export default async function ClassSheet({ params, searchParams }: { params: { i
                        waiverBlocked={waiverBlocked}
                        seatKind={data.seatKind} cutoffMinutes={settings.cancellationCutoff} duplicateHold={data.duplicateHold} holdTime={data.holdTime}
                        deskPayAvailable={deskPayAvailable}
-                       reservationHold={data.reservationHold} due={data.due}
+                       reservationHold={data.reservationHold} checkoutHold={data.checkoutHold} due={data.due}
                        reservationFeeLabel={settings.memberFeeCents > 0 ? formatMoney(settings.memberFeeCents, settings.currency) : null}
                        creditCoversFee={settings.memberFeeCents > 0 && settings.reservationCreditCents >= settings.memberFeeCents} />
     </Sheet>

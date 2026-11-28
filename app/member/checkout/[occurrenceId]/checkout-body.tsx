@@ -144,6 +144,11 @@ export default function CheckoutBody({
                 );
               })}
             </ul>
+            {/* Decision 88 (d): Barkada and private packs are sold under My plan. */}
+            <Link href="/account/plan"
+                  className="m-sub m-press mt-3 inline-block text-ink-2 underline decoration-line-2 underline-offset-4">
+              See all plans
+            </Link>
           </section>
 
           {/* 4. Summary */}

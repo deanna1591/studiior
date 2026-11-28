@@ -8,6 +8,7 @@ import ClassCard from "./class-card";
 import ClassButton from "./class-button";
 import { HoldCountdown, PaymentPendingActions } from "./payment-pending";
 import { formatMoney } from "@/lib/plans";
+import { heldUntilLine, HOLDING_LABEL } from "@/lib/checkout";
 import { haptic } from "@/lib/haptics";
 import type { BookResult, ActionResult, CheckInResult } from "@/app/member/actions";
 
@@ -75,6 +76,11 @@ export type Row = {
   /** Decision 103(c): a reservation HOLD (pending_payment comp) expires at this
    *  instant; the row shows "Payment pending" with the minutes left. */
   holdUntil: string | null;
+  /** Decision 88 (e): an online checkout hold (state "holding"); Pay now goes
+   *  back to the checkout, and the time it ends sits beside it. */
+  checkoutHold?: boolean;
+  /** The hold's end, already in studio time and the studio's clock format. */
+  heldUntilLabel?: string | null;
   /** Decision 103(d) pay-to-keep: an existing free booking owes the fee. The
    *  row shows "Booked, {fee} due by {deadline} to keep your spot" + Pay. */
   dueFee: number | null;
@@ -191,7 +197,7 @@ export default function DayClasses({
           state === "reservationHold" ? <HoldCountdown holdUntil={r.holdUntil!} />
           : payToKeep ? <>Booked, {feeLabel} due by {r.dueDeadline} to keep your spot</>
           : state === "booked" ? "Booked"
-          : state === "holding" ? "Holding your spot"
+          : state === "holding" ? HOLDING_LABEL
           : state === "waiting" ? <>You&rsquo;re #<span className="num">{r.waitlistPosition}</span> on the list</>
           : state === "past" ? "This one has started"
           : state === "full"
@@ -254,6 +260,19 @@ export default function DayClasses({
           action = (
             <span className="m-meta max-w-[7.5rem] text-right leading-[15px] text-ink-2">
               No peak classes left this period
+            </span>
+          );
+        } else if (state === "holding" && r.checkoutHold) {
+          // Decision 88 (e): the online checkout's 30-minute hold. Pay now goes
+          // back to the checkout; the time it ends sits beside it.
+          action = (
+            <span className="flex w-full items-center justify-between gap-3">
+              <span className="m-meta text-ink-2">{heldUntilLine(r.heldUntilLabel)}</span>
+              <Link href={`/checkout/${r.id}`}
+                    className="m-tap m-press rounded-full px-4 text-[13px] font-bold"
+                    style={accentSolid({ display: "inline-block" })}>
+                Pay now
+              </Link>
             </span>
           );
         } else if (state === "holding") {

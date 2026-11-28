@@ -46,6 +46,10 @@ export const REASONS: Record<string, string> = {
   desk_pay_blocked: "Pay online to book. Paying at the desk is not available on this account.",
   // Decision 103 (p): the studio takes payment online only.
   pay_online: "Pay online to book this class.",
+  // Decision 88 (e): one unpaid online seat at a time.
+  hold_open: "Finish paying for your held class first, or cancel the hold.",
+  // Decision 88 (d): a private pack only books private sessions.
+  private_pack_not_for_class: "That pack is for private sessions. Choose another option.",
   // Decision 98: a same-person twin has already had a free class.
   duplicate: "It looks like you've had a free class with us before. You can still book this one by paying.",
   // Decision 100: staff pinned a plan in the "Pay with" dropdown that does not

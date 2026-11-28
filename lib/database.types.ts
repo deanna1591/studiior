@@ -9349,6 +9349,7 @@ export type Database = {
           gift_card_id: string | null
           guest_payment_id: string | null
           guest_status: string | null
+          hold_booking_id: string | null
           id: string
           last_return_check_at: string | null
           last_return_check_result: string | null
@@ -9384,6 +9385,7 @@ export type Database = {
           gift_card_id?: string | null
           guest_payment_id?: string | null
           guest_status?: string | null
+          hold_booking_id?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
@@ -9419,6 +9421,7 @@ export type Database = {
           gift_card_id?: string | null
           guest_payment_id?: string | null
           guest_status?: string | null
+          hold_booking_id?: string | null
           id?: string
           last_return_check_at?: string | null
           last_return_check_result?: string | null
@@ -9477,6 +9480,13 @@ export type Database = {
             columns: ["guest_payment_id"]
             isOneToOne: false
             referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xendit_purchases_hold_booking_id_fkey"
+            columns: ["hold_booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
           {
@@ -9998,14 +10008,12 @@ export type Database = {
       }
       checkin_slug_studio: { Args: { p_slug: string }; Returns: string }
       checkout_hold_class: {
-        Args: { p_occurrence_id: string }
-        Returns: Database["public"]["CompositeTypes"]["book_class_result"]
-        SetofOptions: {
-          from: "*"
-          to: "book_class_result"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Args: { p_occurrence_id: string; p_plan_id?: string }
+        Returns: Json
+      }
+      checkout_link_hold: {
+        Args: { p_booking_id: string; p_purchase_id: string }
+        Returns: boolean
       }
       checkout_rescue_backfill: { Args: { p_now?: string }; Returns: Json }
       checkout_rescue_run: {

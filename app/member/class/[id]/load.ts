@@ -47,6 +47,8 @@ export async function loadClassDetail(
   group: { isHost: boolean; host: string; plan: string; groupId: string } | null;
   duplicateHold: boolean; holdTime: string | null;
   reservationHold: { bookingId: string | null; holdUntil: string } | null;
+  /** Decision 88 (e): an online checkout hold on this class, with its end. */
+  checkoutHold: { bookingId: string | null; holdUntil: string } | null;
   due: { feeCents: number } | null } | null> {
 
   const occQuery = supabase
@@ -131,6 +133,7 @@ export async function loadClassDetail(
     // the private ones, never a single-seat cancel_booking).
     if (occ.is_private) redirect(`/private/${id}`);
     const holdRow = (pendRows ?? []).find((r) => r.occurrence_id === id && r.status === "pending_payment") ?? null;
+    const ckRow = (pendRows ?? []).find((r) => r.occurrence_id === id && r.status === "checkout_hold") ?? null;
     const dueRow = (dueRows ?? []).find((r) => r.occurrence_id === id) ?? null;
     const gr = groupRow as { is_host: boolean; group_purchases: {
       id: string; members: { first_name: string | null } | null;
@@ -201,6 +204,7 @@ export async function loadClassDetail(
       holdTime: heldDup?.hold_until ?? null,
       // Decision 103(c): a reservation hold on this class (Payment pending).
       reservationHold: holdRow && holdRow.hold_until ? { bookingId: holdRow.booking_id, holdUntil: holdRow.hold_until } : null,
+      checkoutHold: ckRow && ckRow.hold_until ? { bookingId: ckRow.booking_id, holdUntil: ckRow.hold_until } : null,
       // Decision 103(d): this booked free booking owes the fee (pay-to-keep).
       due: dueRow ? { feeCents: dueRow.fee_cents } : null,
     };
