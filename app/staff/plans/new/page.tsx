@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const BLANK: PlanDraft = {
   name: "", description: null, type: "recurring", price_cents: null,
   visibility: "public", status: "active", signup_fee_cents: 0,
-  max_active_members: null, show_remaining_below: null, on_limit_reached: "hide",
+  max_active_members: null, max_sold: null, show_remaining_below: null, on_limit_reached: "hide",
   peak_allowance: null, peak_allowance_period: "week",
   billing_interval: "month", billing_interval_count: 1,
   credits: null, credits_per_period: null, validity_days: null,

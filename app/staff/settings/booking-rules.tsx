@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Notice, buttonQuietClass } from "@/components/ui";
 import { saveBookingRules, type PlainState } from "./actions";
 import { cutoffParts, cutoffLabel } from "@/lib/booking-rules";
+import { DESK_PAY_MODES, normaliseDeskPayMode, type DeskPayMode } from "@/lib/desk-pay-mode";
 
 function Save() {
   const { pending } = useFormStatus();
@@ -34,7 +35,7 @@ export default function BookingRulesPanel({
   maxFutureBookings: number | null;
   maxUnpaidBookings: number | null;
   waitlistEnabled: boolean;
-  deskPayMode?: "earned" | "first_visit_only";
+  deskPayMode?: DeskPayMode;
   finaliseAttendance: boolean;
   finaliseDaysAfter: number;
 }) {
@@ -168,24 +169,16 @@ export default function BookingRulesPanel({
       {/* Pay at the desk — desk_pay_mode (Decision 73 (c)) */}
       <div className="rounded border border-line bg-surface px-3.5 py-3" id="desk-pay">
         <p className="text-[13px] font-medium text-ink">Pay at the desk</p>
-        <label className="mt-2 flex items-start gap-2.5">
-          <input type="radio" name="desk_pay_mode" value="earned" defaultChecked={deskPayMode !== "first_visit_only"} className="mt-1" />
-          <span className="text-[13px] leading-[19px] text-ink">
-            <span className="font-medium">Earned</span>
-            <span className="mt-0.5 block text-[12px] text-ink-3">
-              Members can pay at the desk until they miss or late-cancel a desk booking.
+        {DESK_PAY_MODES.map((m) => (
+          <label key={m.value} className="mt-2 flex items-start gap-2.5">
+            <input type="radio" name="desk_pay_mode" value={m.value}
+                   defaultChecked={normaliseDeskPayMode(deskPayMode) === m.value} className="mt-1" />
+            <span className="text-[13px] leading-[19px] text-ink">
+              <span className="font-medium">{m.label}</span>
+              <span className="mt-0.5 block text-[12px] text-ink-3">{m.help}</span>
             </span>
-          </span>
-        </label>
-        <label className="mt-2 flex items-start gap-2.5">
-          <input type="radio" name="desk_pay_mode" value="first_visit_only" defaultChecked={deskPayMode === "first_visit_only"} className="mt-1" />
-          <span className="text-[13px] leading-[19px] text-ink">
-            <span className="font-medium">First visit only</span>
-            <span className="mt-0.5 block text-[12px] text-ink-3">
-              Members can pay at the desk for their first booking only.
-            </span>
-          </span>
-        </label>
+          </label>
+        ))}
       </div>
 
       {/* Waiver */}

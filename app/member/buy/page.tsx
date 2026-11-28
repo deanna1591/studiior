@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buyStudio, planIncludes } from "@/lib/buy-plans";
+import { offlineBuyLine, SOLD_OUT_CHIP } from "@/lib/plan-sold";
 import { PriceAmount, PromoTagChip } from "@/components/price-tag";
 import BuyFrame from "./frame";
 
@@ -28,7 +29,7 @@ export default async function BuyAll() {
     <BuyFrame studio={studio} title="Plans">
       {!studio.online ? (
         <section className="m-card p-5">
-          <p className="m-body text-ink">Online payment isn&rsquo;t set up yet. Pay at the studio.</p>
+          <p className="m-body text-ink">{offlineBuyLine(studio.staff_only)}</p>
         </section>
       ) : studio.plans.length === 0 ? (
         <section className="m-card p-5">
@@ -48,6 +49,9 @@ export default async function BuyAll() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="m-head text-[18px] leading-6 text-ink">{p.name}</p>
+                      {p.sold_out && (
+                        <span className="m-micro mt-1 mr-1 inline-block rounded-full border border-line px-2 py-0.5 text-ink-2">{SOLD_OUT_CHIP}</span>
+                      )}
                       {p.badge && (
                         <span className="m-micro mt-1 inline-block rounded-full px-2 py-0.5"
                               style={{ background: "var(--accent-chip)", color: "var(--ink)" }}>{p.badge}</span>
@@ -60,7 +64,9 @@ export default async function BuyAll() {
                     </div>
                   </div>
                   <PromoTagChip promo={p.price} className="mt-2" />
-                  {p.full && <p className="m-sub mt-2 text-ink-2">This plan is full. Ask the studio.</p>}
+                  {p.sold_out
+                    ? <p className="m-sub mt-2 text-ink-2">This plan is sold out.</p>
+                    : p.full && <p className="m-sub mt-2 text-ink-2">This plan is full. Ask the studio.</p>}
                 </Link>
               </li>
             ))}

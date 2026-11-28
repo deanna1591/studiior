@@ -121,6 +121,9 @@ function readForm(fd: FormData, currency: string, seatCaps: boolean, peakHours: 
           }
         : {}),
 
+      // Decision 24 (a): the most ever sold; blank = no cap.
+      max_sold: num("max_sold"),
+
       ...(seatCaps
         ? {
             max_active_members: num("max_active_members"),

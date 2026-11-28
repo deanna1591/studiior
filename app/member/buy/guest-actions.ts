@@ -55,6 +55,7 @@ export async function buyPlanAsGuest(_prev: GuestBuyState, fd: FormData): Promis
     const m = error?.message ?? "";
     const code = error?.code ?? "";
     if (code === "PT460") return { ok: false, message: m || "That code isn't valid." };
+    if (code === "PT410") return { ok: false, message: "This plan is sold out." };
     if (code === "PT404") return { ok: false, message: "That plan isn't on sale right now." };
     if (code === "PT429") return { ok: false, message: "Too many right now. Try again in a minute." };
     if (code === "PT422" && /mobile/.test(m)) return { ok: false, message: PHONE_INVALID };

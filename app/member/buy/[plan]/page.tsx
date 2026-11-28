@@ -14,6 +14,7 @@ import { buyPath } from "@/lib/member-urls";
 import { safeNext } from "@/lib/auth-redirect";
 import BuyPlan from "../../account/plan/buy";
 import { buyStudio, planIncludes } from "@/lib/buy-plans";
+import { offlineBuyLine, SOLD_OUT_SENTENCE } from "@/lib/plan-sold";
 import BuyFrame from "../frame";
 import GuestBuyForm from "../guest-form";
 
@@ -133,7 +134,9 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
         </section>
         <section className="mt-4">
           {!studio.online ? (
-            <div className="m-card p-5"><p className="m-body text-ink">Online payment isn&rsquo;t set up yet. Pay at the studio.</p></div>
+            <div className="m-card p-5"><p className="m-body text-ink">{offlineBuyLine(studio.staff_only)}</p></div>
+          ) : p.sold_out ? (
+            <div className="m-card p-5"><p className="m-body text-ink">{SOLD_OUT_SENTENCE}</p></div>
           ) : p.full ? (
             <div className="m-card p-5"><p className="m-body text-ink">This plan is full. Ask the studio.</p></div>
           ) : (
@@ -177,7 +180,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
       <Frame>
         <section className="m-card p-5">
           <h1 className="m-head text-[24px] leading-8 text-ink">{plan.name}</h1>
-          <p className="m-body mt-3 text-ink">Online payment isn&rsquo;t set up yet. Pay at the studio.</p>
+          <p className="m-body mt-3 text-ink">{offlineBuyLine(ctx.bootstrap?.desk_pay_available === false)}</p>
         </section>
       </Frame>
     );
@@ -216,6 +219,9 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
     // Decision 117: the price now (a sale while a promotion runs).
     supabase.rpc("plan_price_now", { p_plan_id: plan.id }),
   ]);
+  // Decision 24 (a): a plan capped by the number ever sold.
+  const { data: soldStates } = await supabase.rpc("plan_sold_states", { p_studio_id: ctx.studioId });
+
   const price = (priceNow as PlanPrice | null) ?? null;
   const priceCents = price?.price_cents ?? plan.price_cents;
   const introActive = ((introWin as { active?: boolean } | null)?.active) === true;
@@ -226,6 +232,7 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
   const isRenewal = plan.type === "recurring" &&
     heldRows.some((h) => h.status === "active" || h.status === "past_due");
   const full = !isRenewal && (seats ?? []).some((s) => s.plan_id === plan.id && s.is_full);
+  const soldOut = !isRenewal && (soldStates ?? []).some((s) => s.plan_id === plan.id && s.sold_out);
 
   return (
     <Frame>
@@ -254,6 +261,10 @@ export default async function Buy({ params, searchParams }: { params: { plan: st
         ) : exclusiveLocked ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
             This offer is just for your intro. Take a free class first, and it opens up.
+          </p>
+        ) : soldOut ? (
+          <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+            {SOLD_OUT_SENTENCE}
           </p>
         ) : full ? (
           <p className="m-sub mt-4 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">

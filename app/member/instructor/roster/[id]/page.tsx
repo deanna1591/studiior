@@ -76,7 +76,10 @@ export default async function RosterPage({ params }: { params: { id: string } })
   const seatState = new Map<string, SeatState>(
     ((seatData ?? []) as SeatState[]).map((x) => [x.booking_id, x]));
   const currency = studio?.currency ?? "USD";
-  const plans = ((planData ?? []) as DeskPlan[]).map((p) => withPrice(p, prices));
+  // Decision 24 (a): plans capped by the number ever sold read "Sold out".
+  const { data: soldStates } = await supabase.rpc("plan_sold_states", { p_studio_id: ctx.studio_id });
+  const soldOutIds = new Set((soldStates ?? []).filter((x) => x.sold_out).map((x) => x.plan_id));
+  const plans = ((planData ?? []) as DeskPlan[]).map((p) => ({ ...withPrice(p, prices), sold_out: soldOutIds.has(p.id) }));
   const pay = new Map<string, { member_id: string; payment_source: string; paid: boolean; due_cents: number | null }>(
     ((payData ?? []) as { booking_id: string; member_id: string; payment_source: string; paid: boolean; due_cents: number | null }[])
       .map((p) => [p.booking_id, p]),

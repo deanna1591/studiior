@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isSoldOut, soldLine, SOLD_OUT_CHIP } from "@/lib/plan-sold";
 import { isManagerUp } from "@/lib/auth";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied, Empty, Rows, SectionLabel } from "@/components/ui";
@@ -34,6 +35,9 @@ export default async function PlansList() {
     supabase.rpc("plan_seats", { p_studio_id: ctx.studioId }),
     supabase.from("studios").select("slug").eq("id", ctx.studioId).maybeSingle(),
   ]);
+  // Decision 24 (a): plans capped by the number ever sold.
+  const { data: soldStates } = await supabase.rpc("plan_sold_states", { p_studio_id: ctx.studioId });
+  const soldOf = new Map((soldStates ?? []).map((r) => [r.plan_id, r]));
   // Decision 118: the public page listing every plan, for the website.
   const buyAllUrl = studioRow?.slug ? `${await staffMemberOrigin(supabase, studioRow.slug)}/buy` : null;
 
@@ -67,9 +71,13 @@ export default async function PlansList() {
   const reorderActive: ReorderPlan[] = active.map((p) => {
     const n = live.get(p.id) ?? 0;
     const seat = seatOf.get(p.id);
-    const right = seat
+    const sold = soldOf.get(p.id);
+    const base = seat
       ? `${seat.taken} of ${seat.cap} places${seat.is_over ? " · over" : seat.is_full ? " · full" : ""}`
       : n === 0 ? "Nobody on it" : `${n} member${n === 1 ? "" : "s"}`;
+    const right = sold
+      ? `${base} · ${isSoldOut(sold) ? SOLD_OUT_CHIP : soldLine(sold)}`
+      : base;
     return {
       id: p.id,
       name: p.name,

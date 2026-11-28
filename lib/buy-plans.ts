@@ -10,6 +10,8 @@ export type BuyablePlan = {
   credits_per_period: number | null; billing_interval: string | null;
   featured: boolean; badge: string | null; group_size: number | null;
   private_pack: boolean; full: boolean;
+  /** Decision 24 (a): the plan's cap on the number ever sold is reached. */
+  sold_out?: boolean;
   price: PlanPrice;
 };
 
@@ -17,6 +19,8 @@ export type BuyStudio = {
   id: string; name: string; slug: string; logo_url: string | null;
   theme_preset: string | null; accent_color: string | null; currency: string;
   online: boolean; plans: BuyablePlan[]; contact_email: string | null;
+  /** Decision 103 (p): the studio takes payment online only. */
+  staff_only: boolean;
 };
 
 /**
@@ -35,11 +39,12 @@ export async function buyStudio(): Promise<BuyStudio | null> {
   const { data } = await anon.rpc("studio_by_slug", { p_slug: slug, p_with_plans: true });
   const s = Array.isArray(data) ? data[0] : data;
   if (!s) return null;
-  const buy = (s.buy ?? {}) as { online?: boolean; plans?: BuyablePlan[]; contact_email?: string | null };
+  const buy = (s.buy ?? {}) as { online?: boolean; plans?: BuyablePlan[]; contact_email?: string | null; staff_only?: boolean };
   return {
     id: s.id, name: s.name, slug: s.slug, logo_url: s.logo_url,
     theme_preset: s.theme_preset, accent_color: s.accent_color, currency: s.currency,
     online: buy.online === true, plans: buy.plans ?? [], contact_email: buy.contact_email ?? null,
+    staff_only: buy.staff_only === true,
   };
 }
 

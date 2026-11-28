@@ -438,7 +438,7 @@ export default function ClassDetailBody({
         <div className="m-card mt-3 p-4">
           <p className="text-[15px] font-medium leading-5 text-ink">This booking isn&rsquo;t paid yet</p>
           <p className="m-sub mt-1 text-ink-2">
-            Pay now to settle it, or pay at the desk when you come in.
+            {deskPayAvailable ? "Pay now to settle it, or pay at the desk when you come in." : "Pay now to settle it."}
           </p>
           <Link href={`/checkout/${occ.id}`}
                 style={accentSolid()}

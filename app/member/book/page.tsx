@@ -621,7 +621,7 @@ export default async function Book({
         freeEligibleIds={[...freeEligibleIds]}
         selfCheckIn={selfCheckIn}
         startCheckout={startCheckout}
-        payAtDesk={payAtDesk}
+        payAtDesk={ctx.bootstrap?.desk_pay_available === false ? null : payAtDesk}
         cancelBooking={cancelBooking}
         currency={settings.currency}
         opensBeforeMin={settings.checkinOpensBefore}

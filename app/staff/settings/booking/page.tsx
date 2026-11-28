@@ -1,4 +1,5 @@
 import { isManagerUp } from "@/lib/auth";
+import { normaliseDeskPayMode } from "@/lib/desk-pay-mode";
 import { staffScreen } from "@/lib/screen";
 import { AppShell, Denied } from "@/components/ui";
 import BookingRulesPanel from "../booking-rules";
@@ -60,7 +61,7 @@ export default async function BookingSettings() {
           maxFutureBookings={s?.max_future_bookings ?? null}
           maxUnpaidBookings={s?.max_unpaid_bookings ?? null}
           waitlistEnabled={s?.waitlist_enabled ?? true}
-          deskPayMode={(s?.desk_pay_mode as "earned" | "first_visit_only") ?? "earned"}
+          deskPayMode={normaliseDeskPayMode(s?.desk_pay_mode)}
           finaliseAttendance={s?.finalise_attendance ?? false}
           finaliseDaysAfter={s?.finalise_days_after ?? 1} />
       </SettingsSection>

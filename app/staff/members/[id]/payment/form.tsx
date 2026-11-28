@@ -18,6 +18,8 @@ type Plan = {
    * here at all, rather than one reading "unlimited".
    */
   seats: { cap: number; taken: number; remaining: number; is_full: boolean; is_over: boolean } | null;
+  /** Decision 24 (a): the plan's cap on the number ever sold is reached. */
+  sold_out?: boolean;
   /** They already hold this plan, so paying for it is a renewal (Decision 23). */
   holds: boolean;
 };
@@ -100,6 +102,7 @@ export default function PaymentForm({
               <option key={p.id} value={p.id}>
                 {p.name} — {p.currency} {(p.price_cents / 100).toFixed(2)}
                 {p.promo ? ` (was ${(p.list_cents! / 100).toFixed(2)})` : ""}
+                {p.sold_out && !p.holds ? " · Sold out" : ""}
               </option>
             ))}
           </select>
@@ -111,7 +114,11 @@ export default function PaymentForm({
           {/* Decision 62: an intro offer is bought once per person. The sale is
               refused by activate_purchase (PT409); say so before it is attempted.
               A sentence, so ink on the coral tint with a coral rule. */}
-          {chosen?.type === "trial" && trialUsed ? (
+          {chosen?.sold_out && !chosen?.holds ? (
+            <p className="mt-1.5 rounded border-l-2 border-coral bg-coral-tint px-2 py-1.5 text-[12px] leading-[18px] text-ink">
+              This plan is sold out. Raise its Maximum sold on the plan to sell another.
+            </p>
+          ) : chosen?.type === "trial" && trialUsed ? (
             <p className="mt-1.5 rounded border-l-2 border-coral bg-coral-tint px-2 py-1.5 text-[12px] leading-[18px] text-ink">
               {INTRO_USED_SENTENCE}
             </p>

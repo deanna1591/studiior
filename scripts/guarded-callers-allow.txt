@@ -39,3 +39,4 @@ instructor_block_dates -> set_availability_exception    # passes only the caller
 instructor_unblock_dates -> clear_availability_exception # passes only the caller's OWN instructor id (resolved from auth.uid()); clear_availability_exception's same-subject guard passes
 reserve_free_first -> free_first_eligibility        # the member's own self-call (v_member.user_id = auth.uid()); is_self passes, exactly like book_first_free
 staff_book_member -> book_first_free                # book_first_free_run is Decision 103's reservation-completion function, NOT book_first_free's _run twin; staff_book_member correctly calls the guarded book_first_free (which does the eligibility + desk-up check)
+growth_apply -> set_occurrence_day_tier            # growth_apply is manager-up, so the wrapper's manager guard passes; it must call the wrapper, not the _run twin, so the 21 (h) flex-after-cut-off guard still applies

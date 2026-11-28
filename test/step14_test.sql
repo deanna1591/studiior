@@ -285,11 +285,214 @@ select expect_true('daily check: a reservation fee to collect at the studio',
   (daily_money_check('14f00000-0000-0000-0000-000000000001') -> 'items')::text
     like '%Reservation fee to collect at the studio: First18 Timer%');
 
+-- Reverse order (Step 14 report): checked in first, then Paid at studio.
+select s14_seat('14f00000-0000-0000-0000-0000000b0e19','14f00000-0000-0000-0000-00000000c0e1','14f00000-0000-0000-0000-000000000019');
+update bookings set reservation_pay_at_studio = true where id = '14f00000-0000-0000-0000-0000000b0e19';
+update bookings set status = 'attended' where id = '14f00000-0000-0000-0000-0000000b0e19';
+select expect_num('reverse: checked in with the fee unpaid, no credit yet',
+  (select count(*) from member_credits where booking_id = '14f00000-0000-0000-0000-0000000b0e19'), 0);
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a3',false);
+select set_config('t.rev', (record_reservation_paid_at_studio('14f00000-0000-0000-0000-0000000b0e19', 'cash', null) ->> 'ok'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('reverse: Paid at studio recorded after check-in', current_setting('t.rev'), 'true');
+select expect_num('reverse: the ₱500 comes back as credit when the payment is recorded',
+  (select amount_cents from member_credits where booking_id = '14f00000-0000-0000-0000-0000000b0e19' and reason = 'reservation_credit'), 50000);
+
+-- =============================================================================
+-- 14b. 103 (p) staff_only, 21 (h), 22 (g), 111 (b), 97 (c), 24 (a).
+-- =============================================================================
+insert into auth.users (id) values ('14f00000-0000-0000-0000-0000000000a4');
+insert into profiles (id, email) values ('14f00000-0000-0000-0000-0000000000a4', 's14-online@example.com');
+insert into members (id, studio_id, first_name, last_name, email, status, user_id) values
+  ('14f00000-0000-0000-0000-000000000031','14f00000-0000-0000-0000-000000000001','Online','Payer','s14-online@example.com','active','14f00000-0000-0000-0000-0000000000a4');
+insert into class_occurrences (id, studio_id, class_type_id, room_id, location_id, instructor_id, name,
+                               starts_at, ends_at, capacity, status, staffing)
+values
+  ('14f00000-0000-0000-0000-00000000c0f1','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-0000000000f1','14f00000-0000-0000-0000-00000000b005','14f00000-0000-0000-0000-00000000000a','14f00000-0000-0000-0000-0000000000c1','REFORMER CORE', now() + interval '5 days', now() + interval '5 days 50 minutes', 6, 'scheduled','assigned'),
+  ('14f00000-0000-0000-0000-00000000c0f2','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-0000000000f1','14f00000-0000-0000-0000-00000000b005','14f00000-0000-0000-0000-00000000000a','14f00000-0000-0000-0000-0000000000c1','REFORMER DESK', now() + interval '6 days', now() + interval '6 days 50 minutes', 6, 'scheduled','assigned');
+
+-- 103 (p): earned lets the member hold an unpaid desk seat; staff_only does not.
+update studio_settings set desk_pay_mode = 'staff_only' where studio_id = '14f00000-0000-0000-0000-000000000001';
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a4',false);
+select set_config('t.p1', coalesce((book_class('14f00000-0000-0000-0000-00000000c0f1','14f00000-0000-0000-0000-000000000031','member')).failure_reason, 'none'), false);
+select set_config('t.p2', (select desk_pay_available::text from member_bootstrap('s14-studio')), false);
+select set_config('t.p3', coalesce((checkout_hold_class('14f00000-0000-0000-0000-00000000c0f1')).failure_reason, 'none'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('staff_only: the member''s own unpaid drop-in is refused', current_setting('t.p1'), 'pay_online');
+select expect_text('staff_only: desk_pay_available is false', current_setting('t.p2'), 'false');
+select expect_text('staff_only: the online checkout hold still holds the seat', current_setting('t.p3'), 'none');
+select expect_num('the checkout hold is one booked unpaid drop-in',
+  (select count(*) from bookings where occurrence_id = '14f00000-0000-0000-0000-00000000c0f1'
+     and member_id = '14f00000-0000-0000-0000-000000000031' and status = 'booked' and payment_source = 'drop_in'), 1);
+
+-- the desk still books an unpaid drop-in for the member
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a2',false);
+select set_config('t.p4', coalesce((book_class('14f00000-0000-0000-0000-00000000c0f2','14f00000-0000-0000-0000-000000000031','front_desk')).failure_reason, 'none'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('staff_only: front desk still books the member an unpaid drop-in', current_setting('t.p4'), 'none');
+
+-- choose_pay_at_desk on a held seat: the member is refused, front desk is not.
+insert into bookings (id, studio_id, occurrence_id, member_id, status, payment_source, booked_at)
+values ('14f00000-0000-0000-0000-0000000b0f31','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-00000000c0e1',
+        '14f00000-0000-0000-0000-000000000031','pending_payment','drop_in', now());
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a4',false);
+do $$ begin
+  perform choose_pay_at_desk('14f00000-0000-0000-0000-0000000b0f31');
+  perform set_config('t.p5', 'allowed', false);
+exception when others then perform set_config('t.p5', sqlerrm, false);
+end $$;
+select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a2',false);
+select set_config('t.p6', (choose_pay_at_desk('14f00000-0000-0000-0000-0000000b0f31') ->> 'status'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('staff_only: the member cannot choose pay at the studio', current_setting('t.p5'), 'Pay online to book this class.');
+select expect_text('staff_only: front desk still can', current_setting('t.p6'), 'booked');
+update studio_settings set desk_pay_mode = 'earned' where studio_id = '14f00000-0000-0000-0000-000000000001';
+
+-- 21 (h): a core class switched to flex after the flex cut-off (12 h) under
+-- the minimum. Refused without confirm, cancels with it.
+insert into class_occurrences (id, studio_id, class_type_id, room_id, location_id, instructor_id, name,
+                               starts_at, ends_at, capacity, status, staffing)
+values
+  ('14f00000-0000-0000-0000-00000000c0c9','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-0000000000f1','14f00000-0000-0000-0000-00000000b006','14f00000-0000-0000-0000-00000000000a','14f00000-0000-0000-0000-0000000000c1','EVENING BURN', now() + interval '5 hours', now() + interval '5 hours 50 minutes', 6, 'scheduled','assigned'),
+  ('14f00000-0000-0000-0000-00000000c0ca','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-0000000000f1','14f00000-0000-0000-0000-00000000b006','14f00000-0000-0000-0000-00000000000a','14f00000-0000-0000-0000-0000000000c1','EVENING FLOW', now() + interval '7 hours', now() + interval '7 hours 50 minutes', 6, 'scheduled','assigned');
+select s14_seat('14f00000-0000-0000-0000-0000000b0c91','14f00000-0000-0000-0000-00000000c0ca','14f00000-0000-0000-0000-000000000020');
+select s14_seat('14f00000-0000-0000-0000-0000000b0c92','14f00000-0000-0000-0000-00000000c0ca','14f00000-0000-0000-0000-000000000021');
+select s14_fee('14f00000-0000-0000-0000-0000000b0c91');
+select s14_fee('14f00000-0000-0000-0000-0000000b0c92');
+
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a1',false);
+select set_config('t.h1', (set_occurrence_day_tier('14f00000-0000-0000-0000-00000000c0c9', 'flex') ->> 'reason'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('flex after the cut-off, under the minimum: refused without confirm', current_setting('t.h1'), 'confirm_cancel');
+select expect_text('the refused switch changed nothing',
+  (select status::text || '/' || flex::text from class_occurrences where id = '14f00000-0000-0000-0000-00000000c0c9'), 'scheduled/false');
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a1',false);
+select set_config('t.h2', (set_occurrence_day_tier('14f00000-0000-0000-0000-00000000c0c9', 'flex', true) ->> 'cancelled'), false);
+select set_config('t.h3', coalesce((set_occurrence_day_tier('14f00000-0000-0000-0000-00000000c0ca', 'flex') ->> 'reason'), 'none'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('with confirm it switches and cancels at once', current_setting('t.h2'), 'true');
+select expect_text('the cancelled class is unmet minimum',
+  (select cancellation_cause::text from class_occurrences where id = '14f00000-0000-0000-0000-00000000c0c9'), 'unmet_minimum');
+select expect_text('at the minimum it switches with no warning', current_setting('t.h3'), 'none');
+select expect_text('and the class is still on',
+  (select status::text || '/' || flex::text from class_occurrences where id = '14f00000-0000-0000-0000-00000000c0ca'), 'scheduled/true');
+
+-- 22 (g): each change clears the studio's cached public schedule.
+create or replace function s14_cache() returns void language sql as $$
+  insert into public_schedule_cache (slug, days, payload, computed_at)
+  values ('s14-studio', 60, '{}'::jsonb, now())
+  on conflict do nothing;
+$$;
+create or replace function s14_cached() returns bigint language sql as $$
+  select count(*) from public_schedule_cache where slug = 's14-studio';
+$$;
+select s14_cache();
+select expect_num('the cache row is there', s14_cached(), 1);
+update class_occurrences set guarantee_tier = 'always' where id = '14f00000-0000-0000-0000-00000000c0f1';
+select expect_num('cache cleared on a tier change', s14_cached(), 0);
+select s14_cache();
+select cancel_occurrence('14f00000-0000-0000-0000-00000000c0f2', 'test', 'studio_fault');
+select expect_num('cache cleared on a cancellation', s14_cached(), 0);
+select s14_cache();
+set role authenticated; select set_config('request.jwt.claim.sub','14f00000-0000-0000-0000-0000000000a1',false);
+select set_config('t.g1', (run_cancelled_class_anyway('14f00000-0000-0000-0000-00000000c0c9') ->> 'ok'), false);
+select set_config('request.jwt.claim.sub','',false); reset role;
+select expect_text('Run it anyway on the class cancelled by the switch', current_setting('t.g1'), 'true');
+select expect_num('cache cleared on Run it anyway', s14_cached(), 0);
+select s14_cache();
+update class_occurrences set starts_at = starts_at + interval '1 hour', ends_at = ends_at + interval '1 hour' where id = '14f00000-0000-0000-0000-00000000c0f1';
+select expect_num('cache cleared on a move', s14_cached(), 0);
+select s14_cache();
+update class_occurrences set instructor_id = null where id = '14f00000-0000-0000-0000-00000000c0f1';
+select expect_num('cache cleared on a coach change', s14_cached(), 0);
+select s14_cache();
+update class_occurrences set hidden_from_members = true where id = '14f00000-0000-0000-0000-00000000c0f1';
+select expect_num('cache cleared on a visibility change', s14_cached(), 0);
+select s14_cache();
+update class_occurrences set capacity = 5 where id = '14f00000-0000-0000-0000-00000000c0f1';
+select expect_num('cache cleared on a capacity change', s14_cached(), 0);
+select s14_cache();
+insert into class_occurrences (id, studio_id, class_type_id, room_id, location_id, name, starts_at, ends_at, capacity, status, staffing)
+values ('14f00000-0000-0000-0000-00000000c0f3','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-0000000000f1','14f00000-0000-0000-0000-00000000b005','14f00000-0000-0000-0000-00000000000a','NEW ONE', now() + interval '8 days', now() + interval '8 days 50 minutes', 6, 'scheduled','open');
+select expect_num('cache cleared on a new occurrence', s14_cached(), 0);
+
+-- 111 (b): a studio cancel that returns no money sends class_cancelled stating
+-- what came back, and no payment_refunded.
+select s14_seat('14f00000-0000-0000-0000-0000000b0f33','14f00000-0000-0000-0000-00000000c0f3','14f00000-0000-0000-0000-000000000022');
+update bookings set provisional = false where id = '14f00000-0000-0000-0000-0000000b0f33';
+select cancel_occurrence('14f00000-0000-0000-0000-00000000c0f3', 'roof leak', 'studio_fault');
+select expect_text('the class-cancelled email says what came back',
+  (select payload ->> 'returned_line' from notifications
+    where template_key = 'class_cancelled' and member_id = '14f00000-0000-0000-0000-000000000022'
+      and payload ->> 'occurrence_id' = '14f00000-0000-0000-0000-00000000c0f3'), 'Your free first class is still yours.');
+select expect_num('and no payment_refunded email',
+  (select count(*) from notifications where template_key = 'payment_refunded'
+     and member_id = '14f00000-0000-0000-0000-000000000022'), 0);
+select expect_true('the class-cancelled default carries the line, no em dash',
+  (select text_body like '%{returned_line}%' and text_body not like '%—%' from notification_templates where key = 'class_cancelled'));
+
+-- 97 (c): a test account is not counted in member health or the retention board.
+insert into members (id, studio_id, first_name, last_name, email, status, health_band, health_reason, is_test_account) values
+  ('14f00000-0000-0000-0000-000000000041','14f00000-0000-0000-0000-000000000001','Real','Risk','s14-r1@example.com','active','at_risk','Not in for six weeks', false),
+  ('14f00000-0000-0000-0000-000000000042','14f00000-0000-0000-0000-000000000001','Test','Risk','s14-r2@example.com','active','at_risk','Not in for six weeks', true);
+select expect_num('member health counts one at-risk member, not the test account',
+  (select (b ->> 'count')::int from jsonb_array_elements(dashboard_health('14f00000-0000-0000-0000-000000000001') -> 'bands') b
+    where b ->> 'band' = 'at_risk'), 1);
+select expect_num('the retention board lists the real member',
+  (select count(*) from retention_board('14f00000-0000-0000-0000-000000000001') where member_id = '14f00000-0000-0000-0000-000000000041'), 1);
+select expect_num('and not the test account',
+  (select count(*) from retention_board('14f00000-0000-0000-0000-000000000001') where member_id = '14f00000-0000-0000-0000-000000000042'), 0);
+
+-- 24 (a): a plan capped at 2 sold.
+insert into membership_plans (id, studio_id, name, type, price_cents, currency, credits, validity_days, status, visibility, max_sold)
+values ('14f00000-0000-0000-0000-0000000000e1','14f00000-0000-0000-0000-000000000001','Founding Pack','class_pack',100000,'PHP',5,30,'active','public',2);
+insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on) values
+  ('14f00000-0000-0000-0000-0000000000e2','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000011','14f00000-0000-0000-0000-0000000000e1','active',100000,'PHP',current_date);
+select expect_true('one sold, not sold out', not plan_sold_out_run('14f00000-0000-0000-0000-0000000000e1'));
+insert into xendit_purchases (id, studio_id, member_id, plan_id, amount_cents, currency, status)
+values ('14f00000-0000-0000-0000-0000000000e3','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000012','14f00000-0000-0000-0000-0000000000e1',100000,'PHP','pending');
+select expect_true('a pending checkout holds the second place: sold out', plan_sold_out_run('14f00000-0000-0000-0000-0000000000e1'));
+do $$ begin
+  insert into xendit_purchases (studio_id, member_id, plan_id, amount_cents, currency, status)
+  values ('14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000013','14f00000-0000-0000-0000-0000000000e1',100000,'PHP','pending');
+  perform set_config('t.c1', 'allowed', false);
+exception when others then perform set_config('t.c1', sqlerrm, false);
+end $$;
+select expect_text('an online checkout of a sold-out plan is refused', current_setting('t.c1'), 'This plan is sold out.');
+do $$ begin
+  perform record_manual_payment_run('14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000014','plan',100000,'cash',
+                                    '14f00000-0000-0000-0000-0000000000e1');
+  perform set_config('t.c2', 'allowed', false);
+exception when others then perform set_config('t.c2', sqlerrm, false);
+end $$;
+select expect_text('a desk sale of a sold-out plan is refused', current_setting('t.c2'), 'This plan is sold out.');
+update xendit_purchases set status = 'expired' where id = '14f00000-0000-0000-0000-0000000000e3';
+insert into memberships (id, studio_id, member_id, plan_id, status, price_cents, currency, starts_on) values
+  ('14f00000-0000-0000-0000-0000000000e4','14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000015','14f00000-0000-0000-0000-0000000000e1','cancelled',100000,'PHP',current_date);
+insert into payments (studio_id, member_id, membership_id, amount_cents, currency, status, provider, refunded_cents)
+values ('14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000015','14f00000-0000-0000-0000-0000000000e4',100000,'PHP','refunded','manual',100000);
+select expect_num('a refunded sale does not count (1 sold)', plan_sold_count_run('14f00000-0000-0000-0000-0000000000e1'), 1);
+select expect_true('so the plan is open again', not plan_sold_out_run('14f00000-0000-0000-0000-0000000000e1'));
+insert into memberships (studio_id, member_id, plan_id, status, price_cents, currency, starts_on) values
+  ('14f00000-0000-0000-0000-000000000001','14f00000-0000-0000-0000-000000000016','14f00000-0000-0000-0000-0000000000e1','active',100000,'PHP',current_date);
+select expect_true('two sold: sold out', plan_sold_out_run('14f00000-0000-0000-0000-0000000000e1'));
+update membership_plans set max_sold = 3 where id = '14f00000-0000-0000-0000-0000000000e1';
+select expect_true('a raised cap reopens it', not plan_sold_out_run('14f00000-0000-0000-0000-0000000000e1'));
+select expect_true('studio_by_slug carries sold_out for the buy page',
+  exists (select 1 from studio_by_slug('s14-studio', true) s,
+                 jsonb_array_elements(s.buy -> 'plans') p
+           where p ->> 'id' = '14f00000-0000-0000-0000-0000000000e1' and p ? 'sold_out'));
+
 -- Anon stays EXACTLY FIFTEEN and the new functions are closed to anon.
 select expect_num('anon surface is exactly fifteen',
   (select count(*) from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
     where ns.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname not like 'expect\_%' and p.proname not like 's14\_%'), 15);
+select expect_true('the Step 14b functions are not anon',
+  not has_function_privilege('anon', 'checkout_hold_class(uuid)', 'execute')
+  and not has_function_privilege('anon', 'plan_sold_states(uuid)', 'execute')
+  and not has_function_privilege('anon', 'plan_sold_out_run(uuid)', 'execute')
+  and not has_function_privilege('anon', 'set_occurrence_day_tier(uuid,text,boolean)', 'execute'));
 select expect_true('the new functions are not anon',
   not has_function_privilege('anon', 'run_cancelled_class_anyway(uuid)', 'execute')
   and not has_function_privilege('anon', 'set_free_fee_choice(uuid,text,text)', 'execute')

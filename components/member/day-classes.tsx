@@ -120,7 +120,8 @@ export default function DayClasses({
   freeEligibleIds?: Set<string>;
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
-  payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  /** Decision 103 (p): null when the member may not choose to pay at the studio. */
+  payAtDesk: ((p: ActionResult, f: FormData) => Promise<ActionResult>) | null;
   /** Decision 103(c): release a reservation hold at once (the existing cancel
    *  path for a pending_payment booking). */
   cancelBooking: (p: ActionResult, f: FormData) => Promise<ActionResult>;
@@ -268,12 +269,14 @@ export default function DayClasses({
                   Pay now
                 </button>
               </form>
-              <form action={(fd) => { payAtDesk(null, fd); }}>
-                <input type="hidden" name="booking_id" value={r.bookingId ?? ""} />
-                <button className="m-tap m-press text-ink-2 underline decoration-line-2 underline-offset-4 text-[13px]">
-                  Pay at the studio
-                </button>
-              </form>
+              {payAtDesk && (
+                <form action={(fd) => { payAtDesk(null, fd); }}>
+                  <input type="hidden" name="booking_id" value={r.bookingId ?? ""} />
+                  <button className="m-tap m-press text-ink-2 underline decoration-line-2 underline-offset-4 text-[13px]">
+                    Pay at the studio
+                  </button>
+                </form>
+              )}
             </span>
           );
         } else if (payToKeep) {

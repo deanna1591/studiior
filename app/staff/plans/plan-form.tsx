@@ -37,6 +37,8 @@ export type PlanDraft = {
   group_size: number | null;
   group_book_within_days: number;
   max_active_members: number | null;
+  /** Decision 24 (a): the most ever sold, null = no cap. */
+  max_sold?: number | null;
   show_remaining_below: number | null;
   on_limit_reached: string;
   peak_allowance: number | null;
@@ -395,6 +397,17 @@ export default function PlanForm({
           </Field>
         </Section>
       )}
+
+      <Section
+        title="Maximum sold"
+        note="The most of this plan you will ever sell. Leave it empty for no cap. Refunded sales do not count, and a checkout in progress holds a place."
+      >
+        <Field label="Maximum sold">
+          <input name="max_sold" type="number" min={1} defaultValue={num(draft.max_sold ?? null)}
+                 className={inputClass} placeholder="No cap" />
+          <p className="mt-1 text-xs text-ink-3">When it is reached the plan shows Sold out and cannot be bought. You can raise it any time.</p>
+        </Field>
+      </Section>
 
       {seatCaps && (
         <Section

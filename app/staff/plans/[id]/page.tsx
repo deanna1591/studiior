@@ -101,6 +101,7 @@ export default async function EditPlan({
     peak_allowance: plan.peak_allowance,
     peak_allowance_period: plan.peak_allowance_period,
     max_active_members: plan.max_active_members,
+    max_sold: plan.max_sold ?? null,
     show_remaining_below: plan.show_remaining_below,
     on_limit_reached: plan.on_limit_reached,
   };

@@ -1,5 +1,7 @@
 "use server";
 
+import { formatMoney } from "@/lib/plans";
+import { flexAfterCutoffLine } from "@/lib/flex-copy";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/auth";
@@ -613,7 +615,7 @@ export async function setAlwaysRuns(_prev: AlwaysRunsState, fd: FormData): Promi
   };
 }
 
-export type DayTierState = { ok: boolean; message: string } | null;
+export type DayTierState = { ok: boolean; message: string; confirm?: boolean } | null;
 
 /**
  * Decision 21(b) — the day tier switch. A manager makes THIS class core (runs
@@ -625,9 +627,10 @@ export type DayTierState = { ok: boolean; message: string } | null;
 export async function setDayTier(_prev: DayTierState, fd: FormData): Promise<DayTierState> {
   const occurrenceId = String(fd.get("occurrence_id") ?? "");
   const tier = String(fd.get("tier") ?? "");
+  const confirmCancel = fd.get("confirm_cancel") === "1";
   const supabase = createClient();
   const { data, error } = await supabase.rpc("set_occurrence_day_tier", {
-    p_occurrence_id: occurrenceId, p_tier: tier,
+    p_occurrence_id: occurrenceId, p_tier: tier, p_confirm_cancel: confirmCancel,
   });
   if (error) {
     const m = error.message;
@@ -639,10 +642,22 @@ export async function setDayTier(_prev: DayTierState, fd: FormData): Promise<Day
         : m,
     };
   }
+  // Decision 21 (h): after the flex cut-off and under the minimum, the switch
+  // cancels the class, so the database asks first.
+  const res = data as { ok?: boolean; reason?: string; booked?: number; cancelled?: boolean; restored?: boolean } | null;
+  if (res?.ok === false && res.reason === "confirm_cancel") {
+    const { data: occ } = await supabase.from("class_occurrences")
+      .select("studios(currency)").eq("id", occurrenceId).maybeSingle();
+    const ccy = (occ?.studios as { currency?: string } | null)?.currency ?? "PHP";
+    return { ok: false, confirm: true, message: flexAfterCutoffLine(res.booked ?? 0, formatMoney(0, ccy)) };
+  }
   revalidatePath(`/roster/${occurrenceId}`);
   revalidatePath("/schedule");
   revalidatePath("/schedule/flex");
-  const restored = (data as { restored?: boolean } | null)?.restored;
+  if (res?.cancelled) {
+    return { ok: true, message: "Switched to flex and cancelled. The coach is paid nothing for it." };
+  }
+  const restored = res?.restored;
   return {
     ok: true,
     message: restored

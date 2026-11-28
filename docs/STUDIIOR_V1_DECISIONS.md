@@ -675,6 +675,74 @@ New daily check items: "Flex class cancelled at the cut-off with first-timers wh
 
 ---
 
+## 103 (p) — Members never choose to pay at the studio (amendment, recorded 28 Nov 2026)
+
+`studio_settings.desk_pay_mode` gains a third value, staff_only: "Staff only. Members pay online. Front desk and up can still mark a booking to pay at the studio." Under staff_only:
+
+- members see no "Pay at the desk" at checkout and no "Pay at the studio" on a held seat;
+- member_bootstrap returns desk_pay_available false;
+- the database refuses every member path that leaves a seat confirmed and unpaid (choose_pay_at_desk called by the member themselves, the member book_class unpaid drop-in) with "Pay online to book this class.";
+- the online checkout hold is unchanged;
+- the staff paths are unchanged: staff_book_member, the roster, choose_pay_at_desk by front desk and up, and 103 (n) Pays at the studio;
+- the /buy fallback "Online payment isn't set up yet. Pay at the studio." reads "Online payment isn't set up yet. Message the studio to buy."
+
+Existing unpaid member desk bookings are left as they are. The default for new studios stays earned. Deanna sets Reform to Staff only in Settings → Booking after the deploy.
+
+**Status:** settled, to build in Step 14b. **Amends:** Decisions 73 (c) and 103 (n). Deanna, 28 Nov 2026.
+
+---
+
+## 21 (h) — Switching a class to Flex after its flex cut-off (amendment, recorded 28 Nov 2026)
+
+If the class is under the flex minimum, the switch first shows "This class has {n} booked and its cut-off has passed. Switching to Flex cancels it now and pays the coach ₱0." with the buttons "Keep as core" (the default) and "Switch and cancel". At or above the minimum, it switches with no warning. The database refuses a silent switch: setting the day tier to flex after the cut-off and under the minimum requires p_confirm_cancel true.
+
+Found 28 Nov: Reform's Sat 28 Nov 17:00 and 20:00 were switched to Flex at 02:43, after the Fri 20:00 cut-off, and the 02:45 sweep cancelled both (restored by hand as core).
+
+**Status:** settled, to build in Step 14b. **Amends:** Decisions 21 (e) and 22. Deanna, 28 Nov 2026.
+
+---
+
+## 22 (g) — The public schedule updates at once (amendment, recorded 28 Nov 2026)
+
+public_schedule_cache is cleared for the studio on any tier change, cancellation, Run it anyway, move, coach change, visibility change, capacity change or new occurrence, so the Webflow embed and the website never show a stale chip.
+
+Found 28 Nov: the embed showed "Always runs" on two classes switched to Flex 25 seconds after its cache was built.
+
+**Status:** settled, to build in Step 14b. **Amends:** Decision 22 (c) and the public_schedule cache (migration 147). Deanna, 28 Nov 2026.
+
+---
+
+## 111 (b) — A ₱0 refund is a cancellation, not a refund (amendment, recorded 28 Nov 2026)
+
+When the studio cancels a class and the member gets no money back (a credit, class or free class returned), they get the class-cancelled email stating what came back, never payment_refunded with ₱0. The payment_refunded email fires only when money moves.
+
+**Status:** settled, to build in Step 14b. **Amends:** Decision 111. Deanna, 28 Nov 2026.
+
+---
+
+## 97 (c) — Member health excludes test accounts (amendment, recorded 28 Nov 2026)
+
+The 97 (b) test accounts are left out of the member health counts, the at-risk lists, the growth figures and the dashboard, the same as Sales.
+
+**Status:** settled, to build in Step 14b. **Amends:** Decisions 97 (b) and 14. Deanna, 28 Nov 2026.
+
+---
+
+## 24 (a) — A plan can be capped by the number ever sold (amendment, recorded 28 Nov 2026)
+
+A plan can have a "Maximum sold" number; blank means no cap. The count is every sale of the plan ever (active, trialing, paused and ended), with refunded sales excluded. It is separate from 24's seat cap, which counts live holders only.
+
+- At the cap, the plan shows "Sold out" on Plans, /buy, /buy/{plan} and the staff sell sheet.
+- Every purchase path refuses it with "This plan is sold out." (xendit_begin_purchase, plan_buy_begin, sell_plan_at_desk and a code checkout).
+- A pending checkout holds a place for its life.
+- Staff can raise the cap.
+
+Founding Unlimited's cap is 20 (1 sold to date, 28 Nov).
+
+**Status:** settled, to build in Step 14b. **Amends:** Decision 24. Deanna, 28 Nov 2026.
+
+---
+
 ## 120 — Discount codes (recorded 25 Nov 2026)
 
 **Decision.** Manager-up creates discount codes in Settings → Promotions → Discount codes. Two kinds. (1) A batch of unique single-use codes: name, percent off (1 to 90), how many codes, valid from and to (studio dates, 00:00 to 23:59), and which plans; the system generates that many codes in the form {STUDIO}-XXXX-XXXX from an unambiguous alphabet, unique per studio; each code works once, for one purchase, by anyone who has it. (2) A shared code: owner-chosen text (letters and digits, e.g. XMAS10, unique per studio), percent off, valid from and to, which plans, and a maximum number of uses; each person (member or buyer email) may use it once. Codes apply to plans, class packs, memberships, private packs and private session payments; never to shop items, gift cards or the reservation fee. Members enter a code in a "Have a code?" box at checkout (member checkout, /buy without an account, the private session pay step) and staff on Record a payment; the price updates at once. No stacking: when a promotion (Decision 117) is running, the buyer pays the lower of the sale price and the code price, and only that one is recorded. A code is held by a pending checkout for that checkout's life and released if it expires; it is used only when the payment succeeds; a refund while the code is still valid makes it usable again (for a shared code, the use is returned). Refusals: "That code isn't valid.", "That code has expired.", "That code has already been used.", "That code doesn't apply to this plan.", "You've already used this code.", "This code is being used in another checkout. Try again in 30 minutes." Payment rows record the code and the amount taken off; receipts and the BIR invoice show "Code {code}: -{amount}"; Sales shows a "Discount codes" line. Staff list per batch or shared code: each code with Unused / Used / Expired / Cancelled, who used it, when, on which plan, the amount off; copy one, copy all, download CSV; cancel an unused code. Guessing is blocked: codes are random and long, and code checks are rate-limited per studio, per buyer email and per member. No new anon function: plan_buy_begin gains an optional code argument (surface stays EXACTLY FIFTEEN). Audit: code batch created, code cancelled, code redeemed, code returned. The instructor desk sale (Sold a plan at desk) accepts a code too. A refund returns the code through every refund path (refund_payment_run, record_refund and apply_payment_refund), through one shared helper.

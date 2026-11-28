@@ -5,3 +5,4 @@ export function standaloneFlexSentence(standbyText: string | null | undefined, c
 
 /** The opening-hours warning (Decision 44), or "" when hoursText is falsy (unset). */
 export function outsideHoursSentence(hoursText: string | null | undefined, plural?: boolean): string;
+export function flexAfterCutoffLine(booked: number, pay: string): string;

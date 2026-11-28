@@ -45,9 +45,9 @@ export async function checkoutPay(_prev: BuyState, fd: FormData): Promise<BuySta
     const p = pv as { code_ok?: boolean; code_message?: string } | null;
     if (!p?.code_ok) return { ok: false, message: p?.code_message ?? "That code isn't valid." };
   }
-  const { data, error } = await supabase.rpc("book_class", {
-    p_occurrence_id: occId, p_member_id: ctx.memberId, p_source: "member",
-  });
+  // Decision 103 (p): the online checkout hold is the same book_class seat,
+  // through checkout_hold_class so a staff-only studio's refusal steps aside.
+  const { data, error } = await supabase.rpc("checkout_hold_class", { p_occurrence_id: occId });
   if (error) return { ok: false, message: error.message };
   const reason = (data as { failure_reason: string | null } | null)?.failure_reason ?? null;
   if (reason && !HOLD_NON_FATAL.has(reason)) {

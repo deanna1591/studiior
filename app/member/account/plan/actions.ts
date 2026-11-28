@@ -64,6 +64,8 @@ export async function beginXenditCheckout(
     const refused = codeRefusal(beginErr);
     if (refused) return { ok: false, message: refused };
     const m = beginErr?.message ?? "";
+    // Decision 24 (a): the plan's cap on the number ever sold is reached.
+    if (beginErr?.code === "PT410" || /sold out/.test(m)) return { ok: false, message: "This plan is sold out." };
     if (/PT422/.test(m)) return { ok: false, message: "That plan can’t be bought online." };
     if (/PT409/.test(m)) return { ok: false, message: "This studio isn’t set up for online payments yet." };
     if (/PT404/.test(m)) return { ok: false, message: "That plan is no longer on sale." };

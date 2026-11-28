@@ -1,4 +1,5 @@
 import { accentSolid } from "@/lib/accent-pair";
+import { SOLD_OUT_CHIP, SOLD_OUT_SENTENCE } from "@/lib/plan-sold";
 import Link from "next/link";
 import { memberScreen, membershipState } from "@/lib/member";
 import MemberShell from "@/components/member/shell";
@@ -93,6 +94,9 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
   const unbookedGroup = (unbookedGroupRes as unknown as {
     id: string; group_size: number; membership_plans: { name: string } | null } | null);
   const seatOf = new Map((seats ?? []).map((s) => [s.plan_id, s]));
+  // Decision 24 (a): a plan capped by the number ever sold.
+  const { data: soldStates } = await supabase.rpc("plan_sold_states", { p_studio_id: ctx.studioId });
+  const soldOutIds = new Set((soldStates ?? []).filter((x) => x.sold_out).map((x) => x.plan_id));
   const freeFirstEligible = (freeElig as { ok?: boolean } | null)?.ok === true;
   const peakLine = (peak ?? []).find((r) => r.is_peak && r.remaining !== null);
 
@@ -134,7 +138,12 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                           style={{ background: "var(--accent-chip)" }}>{p.badge}</span>
                   )}
                   <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="text-[16px] font-semibold leading-5 text-ink">{p.name}</h3>
+                    <h3 className="text-[16px] font-semibold leading-5 text-ink">
+                      {p.name}
+                      {soldOutIds.has(p.id) && (
+                        <span className="ml-2 inline-block rounded-full border border-line px-2 py-0.5 align-middle text-[11px] font-semibold leading-4 text-ink-2">{SOLD_OUT_CHIP}</span>
+                      )}
+                    </h3>
                     <PriceAmount priceCents={pp.price_cents} listCents={pp.list_cents} currency={p.currency}
                                  promo={pp.promo} className="shrink-0 text-[16px] font-semibold text-ink" />
                   </div>
@@ -150,6 +159,10 @@ export default async function Plan({ searchParams }: { searchParams: { return?: 
                     p.type === "trial" && settings.trialUsed ? (
                       <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
                         {INTRO_USED_SENTENCE}
+                      </p>
+                    ) : soldOutIds.has(p.id) ? (
+                      <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">
+                        {SOLD_OUT_SENTENCE}
                       </p>
                     ) : full ? (
                       <p className="m-sub mt-3 rounded-xl border-l-2 border-coral bg-coral-tint px-3 py-2 text-ink">

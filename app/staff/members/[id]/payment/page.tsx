@@ -54,6 +54,9 @@ export default async function RecordPayment({ params }: { params: { id: string }
       // Decision 117: the plans priced now, so the form pre-fills the sale price.
       planPrices(supabase, ctx.studioId),
     ]);
+  // Decision 24 (a): plans capped by the number ever sold.
+  const { data: soldStates } = await supabase.rpc("plan_sold_states", { p_studio_id: ctx.studioId });
+  const soldOutIds = new Set((soldStates ?? []).filter((x) => x.sold_out).map((x) => x.plan_id));
 
   const seatOf = new Map((seats ?? []).map((r) => [r.plan_id, r]));
   const holdsPlan = new Set((held ?? []).map((m) => m.plan_id));
@@ -79,6 +82,7 @@ export default async function RecordPayment({ params }: { params: { id: string }
             id: p.id, name: p.name, type: p.type,
             price_cents: p.price_cents, currency: p.currency,
             list_cents: p.list_cents, promo: p.promo,
+            sold_out: soldOutIds.has(p.id),
             seats: seatOf.has(p.id)
               ? {
                   cap: seatOf.get(p.id)!.cap,

@@ -5313,6 +5313,7 @@ export type Database = {
           max_active_members: number | null
           max_bookings_per_day: number | null
           max_freeze_days: number | null
+          max_sold: number | null
           name: string
           on_limit_reached: string
           peak_allowance: number | null
@@ -5357,6 +5358,7 @@ export type Database = {
           max_active_members?: number | null
           max_bookings_per_day?: number | null
           max_freeze_days?: number | null
+          max_sold?: number | null
           name: string
           on_limit_reached?: string
           peak_allowance?: number | null
@@ -5401,6 +5403,7 @@ export type Database = {
           max_active_members?: number | null
           max_bookings_per_day?: number | null
           max_freeze_days?: number | null
+          max_sold?: number | null
           name?: string
           on_limit_reached?: string
           peak_allowance?: number | null
@@ -9994,6 +9997,16 @@ export type Database = {
         Returns: string
       }
       checkin_slug_studio: { Args: { p_slug: string }; Returns: string }
+      checkout_hold_class: {
+        Args: { p_occurrence_id: string }
+        Returns: Database["public"]["CompositeTypes"]["book_class_result"]
+        SetofOptions: {
+          from: "*"
+          to: "book_class_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       checkout_rescue_backfill: { Args: { p_now?: string }; Returns: Json }
       checkout_rescue_run: {
         Args: { p_backfill?: boolean; p_now?: string; p_purchase_id: string }
@@ -11891,6 +11904,17 @@ export type Database = {
         }[]
       }
       plan_seats_taken: { Args: { p_plan_id: string }; Returns: number }
+      plan_sold_count_run: { Args: { p_plan_id: string }; Returns: number }
+      plan_sold_out_run: { Args: { p_plan_id: string }; Returns: boolean }
+      plan_sold_states: {
+        Args: { p_studio_id: string }
+        Returns: {
+          max_sold: number
+          plan_id: string
+          sold: number
+          sold_out: boolean
+        }[]
+      }
       post_edit_run_allowed: { Args: { p_studio_id: string }; Returns: Json }
       preview_template: {
         Args: {
@@ -13065,6 +13089,14 @@ export type Database = {
         Returns: Json
       }
       set_occurrence_day_tier: {
+        Args: {
+          p_confirm_cancel?: boolean
+          p_occurrence_id: string
+          p_tier: string
+        }
+        Returns: Json
+      }
+      set_occurrence_day_tier_run: {
         Args: { p_occurrence_id: string; p_tier: string }
         Returns: Json
       }

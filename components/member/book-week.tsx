@@ -92,7 +92,8 @@ export default function BookWeek({
   freeEligibleIds: string[];
   selfCheckIn: (bookingId: string, lat: number | null, lng: number | null, accuracy: number | null) => Promise<CheckInResult>;
   startCheckout: (p: ActionResult, f: FormData) => Promise<ActionResult>;
-  payAtDesk: (p: ActionResult, f: FormData) => Promise<ActionResult>;
+  /** Decision 103 (p): null when the member may not choose to pay at the studio. */
+  payAtDesk: ((p: ActionResult, f: FormData) => Promise<ActionResult>) | null;
   cancelBooking: (p: ActionResult, f: FormData) => Promise<ActionResult>;
   currency: string;
   opensBeforeMin: number;

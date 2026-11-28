@@ -935,6 +935,7 @@ export async function payAtDesk(_prev: ActionResult, formData: FormData): Promis
     p_booking_id: String(formData.get("booking_id") ?? ""),
   });
   if (error) {
+    if (/Pay online to book this class/.test(error.message)) return { ok: false, message: "Pay online to book this class." };
     return /PT409/.test(error.message)
       ? { ok: false, message: "That hold has already been settled." }
       : { ok: false, message: error.message };

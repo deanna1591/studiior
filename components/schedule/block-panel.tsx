@@ -457,12 +457,17 @@ export function DayTierCard({ occurrenceId, isCore }: { occurrenceId: string; is
   const [core, setCore] = useState(isCore);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState(false);
-  function set(tier: "core" | "flex") {
+  // Decision 21 (h): the warning before a switch that cancels the class.
+  const [confirm, setConfirm] = useState<string | null>(null);
+  function set(tier: "core" | "flex", confirmCancel = false) {
     const fd = new FormData();
     fd.set("occurrence_id", occurrenceId);
     fd.set("tier", tier);
+    if (confirmCancel) fd.set("confirm_cancel", "1");
     start(async () => {
       const r: DayTierState = await setDayTier(null, fd);
+      if (r?.confirm) { setConfirm(r.message); setMsg(null); return; }
+      setConfirm(null);
       if (r?.ok) { setCore(tier === "core"); setErr(false); setMsg(r.message); }
       else { setErr(true); setMsg(r?.message ?? "That could not be done."); }
     });
@@ -486,6 +491,22 @@ export function DayTierCard({ occurrenceId, isCore }: { occurrenceId: string; is
         </button>
         {pending && <span className="self-center text-[12px] text-ink-3">Saving…</span>}
       </div>
+      {confirm && (
+        <div className="mt-2 rounded border-l-2 border-coral bg-coral-tint px-3 py-2">
+          <p className="text-[12px] leading-[18px] text-ink">{confirm}</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" autoFocus disabled={pending} onClick={() => setConfirm(null)}
+              className="rounded-full px-3 py-1 text-[12px] font-semibold disabled:opacity-50"
+              style={{ background: "var(--ink)", color: "var(--surface)" }}>
+              Keep as core
+            </button>
+            <button type="button" disabled={pending} onClick={() => set("flex", true)}
+              className="rounded-full border border-line px-3 py-1 text-[12px] font-medium text-ink disabled:opacity-50">
+              Switch and cancel
+            </button>
+          </div>
+        </div>
+      )}
       {msg && (
         <p className="mt-1.5 text-[12px]" style={{ color: err ? "var(--coral-deep)" : "var(--ink-2)" }}>{msg}</p>
       )}

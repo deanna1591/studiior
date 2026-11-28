@@ -19,7 +19,9 @@ function altWhen(start: string, tz: string, timeFormat: "24h" | "12h"): string {
 }
 
 /** Decision 81a — the desk, from the roster. All amounts via formatMoney. */
-export type DeskPlan = { id: string; name: string; price_cents: number; list_cents?: number; promo?: PlanPrice | null };
+export type DeskPlan = { id: string; name: string; price_cents: number; list_cents?: number; promo?: PlanPrice | null;
+  /** Decision 24 (a): the plan's cap on the number ever sold is reached. */
+  sold_out?: boolean };
 
 const METHODS: { v: string; label: string }[] = [
   { v: "gcash", label: "GCash" }, { v: "cash", label: "Cash" }, { v: "card_terminal", label: "Card" },
@@ -205,7 +207,7 @@ export function DeskPay({
       {open === "sell" && (
         <div className="mt-2 rounded-lg px-2.5 py-2.5" style={{ background: "var(--paper)" }}>
           <select className={field} value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={busy}>
-            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price_cents, currency)}{p.promo ? ` (was ${formatMoney(p.list_cents ?? p.price_cents, currency)})` : ""}</option>)}
+            {plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price_cents, currency)}{p.promo ? ` (was ${formatMoney(p.list_cents ?? p.price_cents, currency)})` : ""}{p.sold_out ? " · Sold out" : ""}</option>)}
           </select>
           {/* Decision 117: the sale price is what the desk charges. */}
           {(() => { const line = saleAppliedLine(plans.find((p) => p.id === planId)?.promo); return line

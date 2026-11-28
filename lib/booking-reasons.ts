@@ -44,6 +44,8 @@ export const REASONS: Record<string, string> = {
   free_first_pending: "Your free first class isn't confirmed yet. You can book more once it is.",
   // Decision 73 (c): pay at the desk has been turned off for this member.
   desk_pay_blocked: "Pay online to book. Paying at the desk is not available on this account.",
+  // Decision 103 (p): the studio takes payment online only.
+  pay_online: "Pay online to book this class.",
   // Decision 98: a same-person twin has already had a free class.
   duplicate: "It looks like you've had a free class with us before. You can still book this one by paying.",
   // Decision 100: staff pinned a plan in the "Pay with" dropdown that does not
